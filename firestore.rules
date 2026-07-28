@@ -1,0 +1,134 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() {
+      return request.auth != null;
+    }
+    function isAssigner(orgId) {
+      return signedIn()
+        && exists(/databases/$(database)/documents/orgs/$(orgId)/members/$(request.auth.uid))
+        && 'assigner' in get(/databases/$(database)/documents/orgs/$(orgId)/members/$(request.auth.uid)).data.roles;
+    }
+    function isMember(orgId) {
+      return signedIn()
+        && exists(/databases/$(database)/documents/orgs/$(orgId)/members/$(request.auth.uid));
+    }
+    function isOrgMember(orgId, uid) {
+      return exists(/databases/$(database)/documents/orgs/$(orgId)/members/$(uid));
+    }
+    function defaultOrgId() {
+      return 'lonestar';
+    }
+    function crewVisible(matchData) {
+      return matchData.get('status', '') in ['mo_confirmed', 'crew_confirmed', 't72_team_pending', 't72_officials_pending', 'locked_confirmed'];
+    }
+    /** Assigner may patch profile + society-managed fields on an org member. */
+    function assignerMemberPatch() {
+      return request.resource.data.diff(resource.data).affectedKeys()
+        .hasOnly([
+          'firstName', 'lastName', 'preferredName', 'displayName',
+          'phone', 'smsOptIn',
+          'homeStreet', 'homeUnit', 'homeCity', 'homeRegion', 'homePostalCode',
+          'homeAddress', 'homeLat', 'homeLng',
+          'roles', 'teamIds',
+          'refereeLevel', 'assessedLevel',
+          'refereeingSince', 'birthday', 'jerseySize', 'shortsSize',
+          'photoUrl', 'competitionAccess', 'profileComplete', 'updatedAt'
+        ]);
+    }
+
+    match /users/{uid} {
+      allow read: if signedIn() && (
+        request.auth.uid == uid
+        || (isAssigner(defaultOrgId()) && isOrgMember(defaultOrgId(), uid))
+      );
+      allow create: if signedIn() && request.auth.uid == uid;
+      allow update: if signedIn() && (
+        (request.auth.uid == uid
+          && request.resource.data.email is string
+          && request.resource.data.phone is string)
+        || (isAssigner(defaultOrgId())
+          && isOrgMember(defaultOrgId(), uid)
+          && assignerMemberPatch())
+      );
+      allow delete: if false;
+    }
+
+    /** Outbound email queue — Admin SDK / Cloud Functions only. */
+    match /mail/{mailId} {
+      allow read: if signedIn() && (
+        resource.data.uid == request.auth.uid
+        || isAssigner(defaultOrgId())
+      );
+      allow create, update, delete: if false;
+    }
+
+    match /orgs/{orgId} {
+      allow read: if isMember(orgId);
+      allow write: if isAssigner(orgId);
+
+      match /members/{uid} {
+        allow read: if isMember(orgId);
+        // First join / self bootstrap: create own membership; assigners manage all.
+        allow create: if signedIn() && (
+          request.auth.uid == uid || isAssigner(orgId)
+        );
+        allow update, delete: if isAssigner(orgId);
+      }
+      match /teams/{teamId} {
+        allow read: if isMember(orgId);
+        allow write: if isAssigner(orgId);
+      }
+      match /matches/{matchId} {
+        allow read: if isMember(orgId);
+        allow write: if isAssigner(orgId)
+          || (isMember(orgId) && request.resource.data.diff(resource.data).affectedKeys()
+                .hasOnly(['homeConfirmedAt', 'awayConfirmedAt', 'status', 't72TeamHome', 't72TeamAway']));
+
+        match /crew/{slot} {
+          allow read: if isAssigner(orgId)
+            || (signedIn() && resource.data.userId == request.auth.uid)
+            || (isMember(orgId) && crewVisible(get(/databases/$(database)/documents/orgs/$(orgId)/matches/$(matchId)).data));
+          allow write: if isAssigner(orgId)
+            || (signedIn() && resource.data.userId == request.auth.uid);
+        }
+        match /proposals/{proposalId} {
+          allow read: if isMember(orgId);
+          allow write: if isMember(orgId);
+        }
+        match /gameRequests/{requestId} {
+          allow read: if isAssigner(orgId)
+            || (signedIn() && resource.data.userId == request.auth.uid);
+          allow create: if signedIn() && request.resource.data.userId == request.auth.uid;
+          allow update: if isAssigner(orgId)
+            || (signedIn() && resource.data.userId == request.auth.uid);
+        }
+      }
+      match /fixtureRequests/{requestId} {
+        allow read: if isMember(orgId);
+        allow create: if signedIn()
+          && request.resource.data.requesterUserId == request.auth.uid
+          && request.resource.data.status == 'pending'
+          && request.resource.data.keys().hasAll([
+            'orgId', 'requesterUserId', 'requesterName', 'requesterTeamId',
+            'side', 'opponentTeamId', 'homeTeamId', 'awayTeamId',
+            'homeTeamName', 'awayTeamName', 'kickoffAt', 'venueName',
+            'venueAddress', 'level', 'gender', 'flightProvided',
+            'housingProvided', 'status', 'createdAt'
+          ]);
+        // Assigner may decline; approve/match create is Admin SDK only.
+        allow update: if isAssigner(orgId)
+          && request.resource.data.diff(resource.data).affectedKeys()
+            .hasOnly([
+              'status', 'declineReason', 'reviewedAt', 'reviewedByUserId',
+              'updatedAt', 'matchId', 'sheetRowKey'
+            ]);
+        allow delete: if isAssigner(orgId);
+      }
+      match /availability/{uid}/ranges/{rangeId} {
+        allow read: if isAssigner(orgId) || request.auth.uid == uid;
+        allow write: if request.auth.uid == uid;
+      }
+    }
+  }
+}

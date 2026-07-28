@@ -1,0 +1,51 @@
+---
+description: Firebase backend and release security — secrets, Firestore rules, callables, client trust model
+alwaysApply: true
+---
+
+# Security (Firebase + release)
+
+refOpenMic uses **Flutter + Firestore + Cloud Functions + LiveKit**. There is no Postgres RLS — **Firestore Security Rules** and **callable authorization** are the data-access layer.
+
+## Secrets
+
+- **Never** commit `.env` (gitignored). Never ship `LIVEKIT_API_SECRET` in store/release builds.
+- Production: LiveKit JWTs only via `generateLiveKitToken` (`defineSecret` in `functions/src/index.ts`). `AppConfig.allowClientLiveKitJwt` must be **false** in release.
+- `pubspec.yaml` bundles `.env` as an asset — treat release builds as **public**; only non-sensitive overrides belong in the bundle.
+- Restrict `TO3_GOOGLE_MAPS_API_KEY` by Android/iOS app id + Places API in Google Cloud Console.
+- `google-services.json` / `GoogleService-Info.plist` are expected in the repo; they are **not** a substitute for protecting LiveKit secrets.
+
+## Firestore (RLS equivalent)
+
+- Default **deny** for unknown paths. Every `allow write` needs **auth + ownership/org/admin** checks — not `request.auth != null` alone.
+- `config/*`, grants, admin allowlists: **super-admin or server (Admin SDK) only** for writes.
+- Sensitive fields (email, phone, FCM tokens, tier flags): never writable by arbitrary clients.
+- After rule changes: run `scripts/audit_firestore_rules.sh` and deploy with `firebase deploy --only firestore:rules`.
+
+## Cloud Functions (`onCall`)
+
+- Require `request.auth` unless explicitly public (rare).
+- Validate inputs: type, length, allowlists; reject unknown fields for security-sensitive operations.
+- **Authorize** against Firestore/event state (mirror LiveKit publish rules) — do not trust client flags alone.
+- Secrets via `defineSecret` / Firebase params; never log tokens, JWTs, or API secrets.
+- New callables: add **rate limiting** or document why Firebase quotas/App Check are sufficient.
+
+## Client (Flutter)
+
+- All client writes are **hostile**. Tier caps, bans, host codes, and publish permission must be enforced in **rules or callables**, not UI-only checks.
+- Validate user input before Firestore writes (length, charset, profanity/phone helpers where used).
+
+## Caching and pooling
+
+- **Connection pooling:** N/A for app code — Firestore/LiveKit are managed services.
+- **Caching:** Remote Config and in-memory UI state are fine. Do not cache auth tokens, LiveKit secrets, or unencrypted PII in `SharedPreferences` (see OWASP M9 skill).
+
+## Before merge / release
+
+Run project skills (from repo root):
+
+1. `.cursor/skills/secrets-and-release-security/` — bundle and env checks
+2. `.cursor/skills/firebase-backend-security-audit/` — rules + callables review
+3. `.cursor/skills/02-owasp-mobile-security-checker(security)/` — client scanners (pre-release checklist)
+
+Update `docs/SPEC.md` **Security & Privacy** if rules or auth model change.

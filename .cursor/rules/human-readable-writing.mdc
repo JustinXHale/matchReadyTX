@@ -1,0 +1,40 @@
+---
+description: Keep docs and prose human-readable—clear, direct, not generic AI tone
+globs:
+  - "**/*.md"
+  - "src/app/GuideLLM/content/**"
+  - "src/app/GuideLLM/components/Path0SummaryPanel.tsx"
+  - "src/app/GuideLLM/components/SectionGuidePanel.tsx"
+  - "src/app/GuideLLM/GuideLLMOnboardingPage.tsx"
+alwaysApply: false
+---
+
+# Human-readable writing
+
+Use this when drafting or editing markdown docs, ADRs, design notes, and similar prose in this repo.
+
+## Voice and clarity
+
+- Write like a careful colleague, not a brochure. Prefer plain words over jargon when both work.
+- Keep related ideas close together: short sentences, clear subject–verb–object order, one main idea per paragraph.
+- Contractions are fine when they fit the audience; avoid forced slang or filler ("honestly," "delve into," "leverage," "it's worth noting that").
+- Cut throat-clearing ("In this section we will…"). Start with the point.
+
+## What to avoid (typical AI tells)
+
+- Stock openers and closers ("Let's explore…," "In conclusion…," engagement bait every paragraph).
+- Parallel buzzword triples and hollow intensifiers ("robust, scalable, cutting-edge").
+- Over-outline numbering in casual notes unless the doc truly needs a rigid structure.
+- Padding length, keyword stuffing, or meta lines about being an assistant.
+
+## Format
+
+- Prefer short paragraphs and real headings only where they help scanability.
+- Use lists when they aid comparison or steps; avoid list-only walls with no narrative glue.
+- Do not wrap routine deliverables in heavy markdown ceremony unless the user asked for publish-ready layout.
+
+## Product and UX copy
+
+- Task-oriented, concise labels and errors; match PatternFly / console-adjacent tone where relevant.
+- Say what the user should do next; avoid blamey or vague phrasing.
+- Do not use internal research IDs (`F-001`, `R-002`, `P0-3`, etc.) in prototype guide panels, About copy, or page intro — write what the friction or proposal is in plain language. IDs stay in `findings.md` and eng-facing specs only.

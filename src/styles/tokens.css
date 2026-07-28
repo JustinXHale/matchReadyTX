@@ -1,0 +1,76 @@
+/**
+ * MatchReadyTX design tokens — T03 monochrome system adapted for web/PWA.
+ * Source of truth docs: docs/THEME.md and .design/theme.md
+ * Prefer these variables over raw hex in components.
+ */
+
+:root,
+.rs-theme {
+  /* Brand pair */
+  --rs-color-primary: #000000;
+  --rs-color-secondary: #ffffff;
+  --rs-color-primary-muted: #1f2937;
+
+  /* Neutrals (charcoal ladder — not brand “secondary”) */
+  --rs-color-charcoal: #374151;
+  --rs-color-charcoal-light: #4b5563;
+  --rs-color-charcoal-dark: #1f2937;
+  --rs-color-muted: #6b7280;
+  --rs-color-ended: #9ca3af;
+
+  /* Surfaces */
+  --rs-color-bg: #f9fafb;
+  --rs-color-surface: #ffffff;
+  --rs-color-surface-muted: #f3f4f6;
+  --rs-color-border: #e5e7eb;
+
+  /* Semantic status — do not repurpose for chrome */
+  --rs-color-urgent: #dc2626; /* LIVE / needs action / destructive accent */
+  --rs-color-ok: #16a34a; /* confirmed / success */
+  --rs-color-warn: #ca8a04; /* assigned, awaiting confirm */
+  --rs-color-ink: #000000;
+  --rs-color-on-primary: #ffffff;
+
+  /* Radius / elevation (T03: soft, flat) */
+  --rs-radius-card: 12px;
+  --rs-radius-chip: 8px;
+  --rs-radius-pill: 999px;
+  --rs-radius-dialog: 16px;
+  --rs-shadow: none;
+
+  /* Spacing — prefer PatternFly spacers; avoid raw px in layout CSS */
+  --rs-space-xs: var(--pf-t--global--spacer--xs); /* 0.25rem / 4px — micro (chips, icon gaps) */
+  --rs-space-sm: var(--pf-t--global--spacer--sm); /* 0.5rem / 8px — controls, action rows */
+  --rs-space-md: var(--pf-t--global--spacer--md); /* 1rem / 16px — fields, card body, sections */
+  --rs-space-lg: var(--pf-t--global--spacer--lg); /* 1.5rem / 24px — major section breaks */
+  --rs-space-xl: var(--pf-t--global--spacer--xl); /* 2rem / 32px */
+
+  /* Layout */
+  --rs-page-pad: 0.75rem; /* T03 mobile density (between PF sm/md) */
+  --rs-gap-grid: var(--rs-space-sm);
+  --rs-bottom-nav-height: 4rem;
+  --rs-bottom-clearance: 6.25rem;
+  --rs-tap-min: var(--pf-t--global--spacer--2xl); /* 3rem / 48px */
+
+  /* Type */
+  --rs-font-family: 'Roboto', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --rs-font-title: 600 18px/1.3 var(--rs-font-family);
+  --rs-font-card-title: 700 14px/1.25 var(--rs-font-family);
+  --rs-font-card-title-compact: 700 13px/1.25 var(--rs-font-family);
+  --rs-font-meta: 400 12px/1.35 var(--rs-font-family);
+  --rs-font-chip: 600 12px/1.2 var(--rs-font-family);
+  --rs-font-nav: 600 12px/1.2 var(--rs-font-family);
+  --rs-font-body: 400 15px/1.45 var(--rs-font-family);
+
+  /* PatternFly brand overrides → monochrome */
+  --pf-t--global--color--brand--default: var(--rs-color-primary);
+  --pf-t--global--color--brand--hover: var(--rs-color-primary-muted);
+  --pf-t--global--color--brand--clicked: var(--rs-color-primary-muted);
+  --pf-t--global--text--color--link--default: var(--rs-color-primary);
+  --pf-t--global--text--color--link--hover: var(--rs-color-primary-muted);
+  --pf-t--global--background--color--primary--default: var(--rs-color-surface);
+  --pf-t--global--background--color--secondary--default: var(--rs-color-bg);
+  --pf-t--global--border--color--default: var(--rs-color-border);
+  --pf-t--global--text--color--regular: var(--rs-color-ink);
+  --pf-t--global--text--color--subtle: var(--rs-color-muted);
+}

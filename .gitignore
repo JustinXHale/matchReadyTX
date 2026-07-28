@@ -1,0 +1,20 @@
+# Logs
+logs
+*.log
+npm-debug.log*
+node_modules
+dist
+dist-ssr
+*.local
+.env
+.env.local
+.env.matchreadytx
+functions/.env*
+.firebase
+functions/lib
+functions/node_modules
+.DS_Store
+*.tsbuildinfo
+keys/*.json
+keys/*.p8
+*-firebase-adminsdk*.json

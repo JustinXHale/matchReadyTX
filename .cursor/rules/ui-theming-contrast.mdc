@@ -1,0 +1,24 @@
+---
+description: MatchReadyTX theming — T03 monochrome tokens and contrast
+globs: src/**/*.{tsx,css}
+alwaysApply: false
+---
+
+# UI theming (MatchReadyTX)
+
+## Tokens first
+
+- Prefer CSS variables from `src/styles/tokens.css` (`--rs-color-*`, `--rs-radius-*`, `--rs-font-*`).
+- Do not introduce PatternFly default blue as brand; brand is black/white.
+- Urgent / needs-action / LIVE-style accents use `--rs-color-urgent` (`#DC2626`) only — not for general chrome.
+
+## Contrast
+
+- Body text on white/light surfaces: `--rs-color-ink` / `--rs-color-primary` (black).
+- On primary (black) fills: `--rs-color-on-primary` (white).
+- Meta / secondary copy: `--rs-color-muted` — not low-contrast grey-on-grey.
+
+## Layout
+
+- Mobile-first: 2-up card grid (`.rs-card-grid`), chip filter scroller, fixed bottom nav with ~100px clearance.
+- Document changes in `docs/THEME.md` when adding tokens.
