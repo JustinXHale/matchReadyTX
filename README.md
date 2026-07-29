@@ -65,7 +65,7 @@ Pushing to `main` runs [.github/workflows/deploy.yml](.github/workflows/deploy.y
 2. GitHub repo → **Settings → Secrets and variables → Actions** → add:
    - `FIREBASE_TOKEN`
    - `VITE_FIREBASE_API_KEY`, `VITE_FIREBASE_AUTH_DOMAIN` (`matchreadytx.web.app`), `VITE_FIREBASE_PROJECT_ID`, `VITE_FIREBASE_STORAGE_BUCKET`, `VITE_FIREBASE_MESSAGING_SENDER_ID`, `VITE_FIREBASE_APP_ID`
-3. Optional **Variables**: `VITE_DEMO_MODE`, `VITE_DEFAULT_ORG_ID`, `VITE_APP_ORIGIN`.
+3. Optional **Variables**: `VITE_DEMO_MODE` (CI defaults to `true`), `VITE_DEFAULT_ORG_ID`, `VITE_APP_ORIGIN`, `RESEND_FROM_EMAIL`.
 
 Function secrets (Resend, sheet service account, etc.) stay in Firebase Secret Manager — not in GitHub.
 

@@ -52,7 +52,8 @@ jobs:
       - name: Build web app
         run: npm run build
         env:
-          VITE_DEMO_MODE: ${{ vars.VITE_DEMO_MODE || 'false' }}
+          # Default true so Try demo stays on production unless you set the Variable to false
+          VITE_DEMO_MODE: ${{ vars.VITE_DEMO_MODE || 'true' }}
           VITE_DEFAULT_ORG_ID: ${{ vars.VITE_DEFAULT_ORG_ID || 'lonestar' }}
           VITE_APP_ORIGIN: ${{ vars.VITE_APP_ORIGIN || 'https://matchreadytx.web.app' }}
           VITE_FIREBASE_API_KEY: ${{ secrets.VITE_FIREBASE_API_KEY }}

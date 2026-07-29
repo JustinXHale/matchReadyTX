@@ -33,6 +33,9 @@ export default defineConfig({
       },
       workbox: {
         globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2}'],
+        // Never hijack Firebase Auth helper URLs — otherwise Google/Apple
+        // popups load the SPA login page instead of the OAuth handler.
+        navigateFallbackDenylist: [/^\/__\//],
       },
     }),
   ],
