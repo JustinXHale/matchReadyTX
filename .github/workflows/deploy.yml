@@ -7,10 +7,11 @@
 #   VITE_FIREBASE_STORAGE_BUCKET
 #   VITE_FIREBASE_MESSAGING_SENDER_ID
 #   VITE_FIREBASE_APP_ID
-# Optional:
-#   VITE_DEMO_MODE          — default false in this workflow
-#   VITE_DEFAULT_ORG_ID     — default lonestar
-#   VITE_APP_ORIGIN         — default https://matchreadytx.web.app
+# Optional Variables:
+#   VITE_DEMO_MODE, VITE_DEFAULT_ORG_ID, VITE_APP_ORIGIN, RESEND_FROM_EMAIL
+#
+# Function secrets (GOOGLE_SERVICE_ACCOUNT_JSON, RESEND_API_KEY) live in
+# Firebase Secret Manager — set once with `firebase functions:secrets:set`.
 name: Deploy
 
 on:
@@ -60,6 +61,17 @@ jobs:
           VITE_FIREBASE_STORAGE_BUCKET: ${{ secrets.VITE_FIREBASE_STORAGE_BUCKET }}
           VITE_FIREBASE_MESSAGING_SENDER_ID: ${{ secrets.VITE_FIREBASE_MESSAGING_SENDER_ID }}
           VITE_FIREBASE_APP_ID: ${{ secrets.VITE_FIREBASE_APP_ID }}
+
+      # Non-interactive Functions deploy needs project dotenv for defineString params.
+      # Secrets stay in Secret Manager (already set locally); do not put them here.
+      - name: Write Functions project env
+        run: |
+          FROM_EMAIL='${{ vars.RESEND_FROM_EMAIL }}'
+          if [ -z "$FROM_EMAIL" ]; then
+            FROM_EMAIL='MatchReadyTX <onboarding@resend.dev>'
+          fi
+          printf 'RESEND_FROM_EMAIL=%s\n' "$FROM_EMAIL" > functions/.env.matchreadytx
+          echo "Wrote functions/.env.matchreadytx (RESEND_FROM_EMAIL only)"
 
       - name: Deploy to Firebase
         run: npx firebase-tools@13 deploy --only hosting,firestore:rules,functions --project matchreadytx --non-interactive
