@@ -3,7 +3,8 @@ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faCalendar, faClock } from '@fortawesome/free-solid-svg-icons';
 import { TextInput, type TextInputProps } from '@patternfly/react-core';
 
-type DateLikeType = 'date' | 'time' | 'datetime-local' | 'month' | 'week';
+/** Subset of HTML date-like types that PatternFly TextInput accepts. */
+type DateLikeType = 'date' | 'time' | 'datetime-local' | 'month';
 
 export type IconDateInputProps = Omit<TextInputProps, 'type' | 'customIcon'> & {
   type?: DateLikeType;

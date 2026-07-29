@@ -87,12 +87,12 @@ function TeamAdminCrewPendingTrailing({
 
 export function TeamAdminMatchRow({
   match,
-  teamId,
   to,
   back,
   hasPendingProposal = false,
 }: {
   match: Match;
+  /** Kept for call-site keys / future per-team row logic. */
   teamId: string;
   to: string;
   back: BackNav;

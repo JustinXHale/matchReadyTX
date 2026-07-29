@@ -30,7 +30,7 @@ export function ProfilePage() {
 
   const [firstName, setFirstName] = useState(currentUser?.firstName ?? '');
   const [lastName, setLastName] = useState(currentUser?.lastName ?? '');
-  const [email, setEmail] = useState(currentUser?.email ?? '');
+  const email = currentUser?.email ?? '';
   const [phone, setPhone] = useState(currentUser?.phone ?? '');
   const [homeStreet, setHomeStreet] = useState(
     currentUser?.homeStreet ?? '',
