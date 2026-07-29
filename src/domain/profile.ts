@@ -50,6 +50,17 @@ export function hasSelfSelectableRole(roles: Role[]): boolean {
     roles.includes('official') ||
     roles.includes('teamAdmin') ||
     roles.includes('cmo') ||
+    roles.includes('assigner') ||
+    roles.includes('fan')
+  );
+}
+
+/** Roles that need phone + birthday (and heavier fields when Referee/CMO). */
+export function hasWorkingSocietyRole(roles: Role[]): boolean {
+  return (
+    roles.includes('official') ||
+    roles.includes('teamAdmin') ||
+    roles.includes('cmo') ||
     roles.includes('assigner')
   );
 }
@@ -107,10 +118,17 @@ export function isProfileComplete(user: Pick<
     !user.firstName?.trim() ||
     !user.lastName?.trim() ||
     !user.email?.trim() ||
-    !user.phone?.trim() ||
-    !hasSelfSelectableRole(user.roles) ||
-    !user.birthday?.trim()
+    !hasSelfSelectableRole(user.roles)
   ) {
+    return false;
+  }
+
+  // Fan-only: name + email + role are enough.
+  if (!hasWorkingSocietyRole(user.roles)) {
+    return user.roles.includes('fan');
+  }
+
+  if (!user.phone?.trim() || !user.birthday?.trim()) {
     return false;
   }
   // Home address + kit only for Referee / CMO (mileage & society kit).

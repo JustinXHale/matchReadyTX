@@ -9,7 +9,7 @@ import {
   REQUESTABLE_SLOT_SHORT,
 } from '@/domain/types';
 
-export type MemberTab = 'referees' | 'teamAdmins' | 'cmos';
+export type MemberTab = 'referees' | 'teamAdmins' | 'cmos' | 'fans';
 
 export function isRegisteredMember(user: UserProfile): boolean {
   // Include incomplete profiles so assigners can manage new joiners.
@@ -23,6 +23,7 @@ export function memberMatchesTab(
   if (!isRegisteredMember(user)) return false;
   if (tab === 'referees') return user.roles.includes('official');
   if (tab === 'teamAdmins') return user.roles.includes('teamAdmin');
+  if (tab === 'fans') return user.roles.includes('fan');
   return user.roles.includes('cmo');
 }
 
@@ -220,6 +221,7 @@ export function rolePillsForMember(roles: Role[]): string[] {
   if (roles.includes('cmo')) labels.push('CMO');
   if (roles.includes('teamAdmin')) labels.push('Team Admin');
   if (roles.includes('assigner')) labels.push('Scheduler');
+  if (roles.includes('fan')) labels.push('Fan');
   return labels;
 }
 

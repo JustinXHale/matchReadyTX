@@ -51,6 +51,11 @@ import {
   zonedLocalToUtcIso,
 } from '@/domain/availability';
 import { matchesForUser, applyMatchScope } from '@/domain/visibility';
+import {
+  memberMatchesTab,
+  rolePillsForMember,
+} from '@/domain/members';
+import { defaultRoleView, lensesForUser } from '@/app/AppContext';
 import { standingsByDivision } from '@/domain/standings';
 
 function baseMatch(): Match {
@@ -341,6 +346,34 @@ describe('profile helpers', () => {
     expect(isProfileComplete({ ...teamAdmin, roles: ['official'] })).toBe(
       false,
     );
+    expect(
+      isProfileComplete({
+        firstName: 'Fan',
+        lastName: 'User',
+        email: 'fan@b.com',
+        phone: '',
+        homeStreet: '',
+        homeCity: '',
+        homeRegion: '',
+        homePostalCode: '',
+        homeAddress: '',
+        roles: ['fan'],
+      }),
+    ).toBe(true);
+    expect(
+      isProfileComplete({
+        firstName: 'Fan',
+        lastName: '',
+        email: 'fan@b.com',
+        phone: '',
+        homeStreet: '',
+        homeCity: '',
+        homeRegion: '',
+        homePostalCode: '',
+        homeAddress: '',
+        roles: ['fan'],
+      }),
+    ).toBe(false);
     expect(
       isProfileComplete({
         ...teamAdmin,
@@ -872,6 +905,41 @@ describe('matchesForUser visibility', () => {
     ).toHaveLength(1);
   });
 
+  it('shows fans only released matches (no drafts)', () => {
+    const draft = baseMatch();
+    const released = releaseMatch({ ...baseMatch(), id: 'm2' });
+    const otherClub = releaseMatch({
+      ...baseMatch(),
+      id: 'm3',
+      homeTeamId: 'x',
+      awayTeamId: 'y',
+    });
+    const fan = {
+      uid: 'f1',
+      firstName: 'Fan',
+      lastName: 'One',
+      displayName: 'Fan One',
+      email: 'f@x.com',
+      phone: '',
+      smsOptIn: false as const,
+      homeStreet: '',
+      homeCity: '',
+      homeRegion: '',
+      homePostalCode: '',
+      homeAddress: '',
+      roles: ['fan' as const],
+      teamIds: [],
+      fanTeamIds: ['h'],
+      profileComplete: true,
+    };
+    expect(matchesForUser([draft, released], fan)).toEqual([released]);
+    expect(matchesForUser([draft, released], fan, 'fan')).toEqual([released]);
+    expect(applyMatchScope([released], fan, 'mine', 'fan')).toHaveLength(1);
+    expect(
+      applyMatchScope([released, otherClub], fan, 'mine', 'fan'),
+    ).toHaveLength(1);
+  });
+
   it('scopes officials to assigned and teams to club schedule', () => {
     const official = {
       uid: 'r1',
@@ -1008,5 +1076,54 @@ describe('fixtureRequests', () => {
     expect(match.homeConfirmedAt).toBe('2026-07-28T12:00:00.000Z');
     expect(match.awayConfirmedAt).toBeUndefined();
     expect(match.sheetRowKey).toBe(sheetRowKey);
+  });
+});
+
+describe('fan role helpers', () => {
+  const fanUser = {
+    uid: 'f1',
+    firstName: 'Fan',
+    lastName: 'One',
+    displayName: 'Fan One',
+    email: 'f@x.com',
+    phone: '',
+    smsOptIn: false as const,
+    homeStreet: '',
+    homeCity: '',
+    homeRegion: '',
+    homePostalCode: '',
+    homeAddress: '',
+    roles: ['fan' as const],
+    teamIds: [],
+    profileComplete: true,
+  };
+
+  it('role pills and members tab include Fan', () => {
+    expect(rolePillsForMember(['fan'])).toEqual(['Fan']);
+    expect(memberMatchesTab(fanUser, 'fans')).toBe(true);
+    expect(memberMatchesTab(fanUser, 'referees')).toBe(false);
+  });
+
+  it('lensesForUser and defaultRoleView prefer working roles over Fan', () => {
+    expect(lensesForUser(fanUser)).toEqual(['fan']);
+    expect(defaultRoleView(fanUser)).toBe('fan');
+    expect(
+      lensesForUser({
+        ...fanUser,
+        roles: ['official', 'fan'],
+      }),
+    ).toEqual(['referee', 'fan']);
+    expect(
+      defaultRoleView({
+        ...fanUser,
+        roles: ['official', 'fan'],
+      }),
+    ).toBe('referee');
+    expect(
+      defaultRoleView({
+        ...fanUser,
+        roles: ['assigner', 'fan'],
+      }),
+    ).toBe('scheduler');
   });
 });

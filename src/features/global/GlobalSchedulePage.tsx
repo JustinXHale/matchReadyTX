@@ -3,7 +3,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Navigate, useParams } from 'react-router-dom';
 import { useApp, useAppHref } from '@/app/AppContext';
 import { isKickoffUpcoming } from '@/domain/requests';
-import { releasedMatches } from '@/domain/visibility';
+import { isTeamMatch, releasedMatches } from '@/domain/visibility';
 import { MatchListRow } from '@/ui/MatchListRow';
 import { MatchCrewTrailing } from '@/ui/MatchCrewTrailing';
 import type { Match, MatchGender } from '@/domain/types';
@@ -36,12 +36,17 @@ function parsePane(raw: string | undefined): SchedulePane | null {
 export function GlobalSchedulePage() {
   const { pane: paneParam } = useParams<{ pane?: string }>();
   const pane = parsePane(paneParam);
-  const { currentUser, state } = useApp();
+  const { currentUser, state, isFanView } = useApp();
   const upcomingHref = useAppHref('/global/schedule/upcoming');
   const completedHref = useAppHref('/global/schedule/completed');
   const [genderFilter, setGenderFilter] = useState<MatchGender | null>(null);
   const [levelFilter, setLevelFilter] = useState<string | null>(null);
   const [sortDir, setSortDir] = useState<SortDir>('asc');
+  const [myTeamsOnly, setMyTeamsOnly] = useState(false);
+
+  const fanFavorites = currentUser?.fanTeamIds;
+  const showMyTeamsChip =
+    isFanView && Boolean(fanFavorites && fanFavorites.length > 0);
 
   useEffect(() => {
     // Upcoming: soonest first. Completed: most recent first.
@@ -68,6 +73,9 @@ export function GlobalSchedulePage() {
         if (pane === 'completed' && upcoming) return false;
         if (genderFilter && m.gender !== genderFilter) return false;
         if (levelFilter && m.level !== levelFilter) return false;
+        if (myTeamsOnly && fanFavorites && fanFavorites.length > 0) {
+          if (!isTeamMatch(m, fanFavorites)) return false;
+        }
         return true;
       })
       .sort(
@@ -75,7 +83,15 @@ export function GlobalSchedulePage() {
           dir *
           (new Date(a.kickoffAt).getTime() - new Date(b.kickoffAt).getTime()),
       );
-  }, [state.matches, genderFilter, levelFilter, pane, sortDir]);
+  }, [
+    state.matches,
+    genderFilter,
+    levelFilter,
+    pane,
+    sortDir,
+    myTeamsOnly,
+    fanFavorites,
+  ]);
 
   const byMonth = useMemo(() => {
     const groups: { key: string; label: string; matches: Match[] }[] = [];
@@ -119,6 +135,16 @@ export function GlobalSchedulePage() {
             role="group"
             aria-label="Sort by date"
           >
+            {showMyTeamsChip && (
+              <button
+                type="button"
+                className={`rs-filter-chip${myTeamsOnly ? ' rs-filter-chip--selected' : ''}`}
+                aria-pressed={myTeamsOnly}
+                onClick={() => setMyTeamsOnly((v) => !v)}
+              >
+                My teams
+              </button>
+            )}
             <button
               type="button"
               className={`rs-filter-chip${sortDir === 'asc' ? ' rs-filter-chip--selected' : ''}`}
@@ -146,7 +172,7 @@ export function GlobalSchedulePage() {
       ) : list.length === 0 ? (
         <EmptyState titleText={emptyTitle} headingLevel="h3">
           <EmptyStateBody>
-            {genderFilter || levelFilter
+            {genderFilter || levelFilter || myTeamsOnly
               ? 'No games match these filters. Tap a chip again to clear it.'
               : emptyBody}
           </EmptyStateBody>

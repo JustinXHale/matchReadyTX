@@ -22,6 +22,7 @@ const TABS: { id: MemberTab; label: string }[] = [
   { id: 'referees', label: 'Referees' },
   { id: 'teamAdmins', label: 'Team Admins' },
   { id: 'cmos', label: 'CMOs' },
+  { id: 'fans', label: 'Fans' },
 ];
 
 function MemberRow({

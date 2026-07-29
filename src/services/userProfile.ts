@@ -1,10 +1,6 @@
 import {
-  collection,
   doc,
   getDoc,
-  getDocs,
-  limit,
-  query,
   setDoc,
   serverTimestamp,
 } from 'firebase/firestore';
@@ -103,6 +99,9 @@ export function profileFromFirestore(
     homeLng: typeof data.homeLng === 'number' ? data.homeLng : undefined,
     roles: Array.isArray(data.roles) ? (data.roles as Role[]) : [],
     teamIds: Array.isArray(data.teamIds) ? (data.teamIds as string[]) : [],
+    fanTeamIds: Array.isArray(data.fanTeamIds)
+      ? (data.fanTeamIds as string[])
+      : undefined,
     profileComplete: false,
     refereeLevel:
       typeof data.refereeLevel === 'number' ? data.refereeLevel : undefined,
@@ -133,7 +132,10 @@ export async function ensureFirebaseUser(user: User): Promise<UserProfile> {
   const snap = await getDoc(userRef);
 
   if (snap.exists()) {
-    return profileFromFirestore(user.uid, snap.data() as Record<string, unknown>);
+    return profileFromFirestore(
+      user.uid,
+      snap.data() as Record<string, unknown>,
+    );
   }
 
   const roles = await bootstrapOrgMembership(user.uid);
@@ -148,26 +150,14 @@ export async function ensureFirebaseUser(user: User): Promise<UserProfile> {
   return profile;
 }
 
+/**
+ * Join default org as a normal member. Does not read orgs/{id} (members-only)
+ * and never self-grants assigner — schedulers promote people in Members.
+ */
 async function bootstrapOrgMembership(uid: string): Promise<Role[]> {
   const database = requireDb();
   const orgId = DEFAULT_ORG;
-  const orgRef = doc(database, 'orgs', orgId);
   const memberRef = doc(database, 'orgs', orgId, 'members', uid);
-
-  const orgSnap = await getDoc(orgRef);
-  if (!orgSnap.exists()) {
-    await setDoc(orgRef, {
-      name: 'Lonestar Rugby',
-      timezone: 'America/Chicago',
-      mileageRatePerMile: 0.67,
-      mileageMinMiles: 0,
-      defaultFees: { mo: 80, ar1: 50, ar2: 50, no4: 40, cmo: 0 },
-      matchLevels: ['Tier 1', 'Tier 2', 'Tier 3', 'Exhibition', 'Tourney'],
-      competitions: ['Lonestar Men', 'Lonestar Women'],
-      createdAt: serverTimestamp(),
-      updatedAt: serverTimestamp(),
-    });
-  }
 
   const memberSnap = await getDoc(memberRef);
   if (memberSnap.exists()) {
@@ -175,18 +165,7 @@ async function bootstrapOrgMembership(uid: string): Promise<Role[]> {
     return Array.isArray(roles) ? (roles as Role[]) : [];
   }
 
-  const isFirst = !orgSnap.exists();
-  // If org already existed with no members, first joiner is assigner.
-  let roles: Role[];
-  if (isFirst) {
-    roles = ['assigner', 'official'];
-  } else {
-    const members = await getDocs(
-      query(collection(database, 'orgs', orgId, 'members'), limit(1)),
-    );
-    roles = members.empty ? ['assigner', 'official'] : ['official'];
-  }
-
+  const roles: Role[] = ['official'];
   await setDoc(memberRef, {
     roles,
     teamIds: [],
@@ -204,7 +183,7 @@ function stripUndefined<T extends Record<string, unknown>>(obj: T): T {
   return out;
 }
 
-/** Persist profile fields to users/{uid} (and mirror roles onto org membership). */
+/** Persist profile fields to users/{uid} and mirror roles onto org membership. */
 export async function saveFirebaseProfile(
   profile: UserProfile,
 ): Promise<UserProfile> {
@@ -237,6 +216,7 @@ export async function saveFirebaseProfile(
     homeLng: next.homeLng,
     roles: next.roles,
     teamIds: next.teamIds,
+    fanTeamIds: next.fanTeamIds ?? [],
     profileComplete: next.profileComplete,
     refereeLevel: next.refereeLevel,
     assessedLevel: next.assessedLevel,
@@ -250,6 +230,17 @@ export async function saveFirebaseProfile(
   } as Record<string, unknown>);
 
   await setDoc(doc(database, 'users', next.uid), payload, { merge: true });
+
+  await setDoc(
+    doc(database, 'orgs', DEFAULT_ORG, 'members', next.uid),
+    {
+      roles: next.roles,
+      teamIds: next.teamIds,
+      fanTeamIds: next.fanTeamIds ?? [],
+      updatedAt: serverTimestamp(),
+    },
+    { merge: true },
+  );
 
   return { ...next, photoUrl: photoUrl ?? next.photoUrl };
 }

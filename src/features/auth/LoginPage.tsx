@@ -19,6 +19,9 @@ function authErrorMessage(provider: 'Google' | 'Apple', err: unknown): string {
   if (message.includes('auth/popup-closed-by-user')) {
     return 'Sign-in was cancelled.';
   }
+  if (message.includes('auth/popup-blocked')) {
+    return 'Pop-up blocked. Allow pop-ups for this site (or use Chrome, not the IDE browser), then try again.';
+  }
   if (
     message.includes('invalid_client') ||
     message.includes('auth/invalid-credential')
@@ -36,6 +39,7 @@ export function LoginPage() {
     dataMode,
     isDemoMode: showcaseEnabled,
     setRoleView,
+    authBootstrapError,
   } = useApp();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -54,8 +58,13 @@ export function LoginPage() {
   useLayoutEffect(() => {
     if (hasFirebaseSession && liveProfile && dataMode === 'live') {
       setRoleView(defaultRoleView(liveProfile));
+      setBusyProvider(null);
     }
   }, [hasFirebaseSession, liveProfile, dataMode, setRoleView]);
+
+  useLayoutEffect(() => {
+    if (authBootstrapError) setBusyProvider(null);
+  }, [authBootstrapError]);
 
   if (hasFirebaseSession && liveProfile && dataMode === 'live') {
     const view = defaultRoleView(liveProfile);
@@ -66,6 +75,7 @@ export function LoginPage() {
   }
 
   const busy = busyProvider != null;
+  const statusNote = authNote ?? authBootstrapError;
 
   const tryDemo = () => {
     navigate('/demo');
@@ -81,11 +91,11 @@ export function LoginPage() {
     setBusyProvider('google');
     setAuthNote(null);
     try {
-      await signInWithGoogle();
-      // AppContext auth listener loads profile; this page redirects when ready.
+      const user = await signInWithGoogle();
+      // Redirect leaves the page; popup success keeps busy until Navigate.
+      if (!user) setBusyProvider(null);
     } catch (err) {
       setAuthNote(authErrorMessage('Google', err));
-    } finally {
       setBusyProvider(null);
     }
   };
@@ -100,10 +110,10 @@ export function LoginPage() {
     setBusyProvider('apple');
     setAuthNote(null);
     try {
-      await signInWithApple();
+      const user = await signInWithApple();
+      if (!user) setBusyProvider(null);
     } catch (err) {
       setAuthNote(authErrorMessage('Apple', err));
-    } finally {
       setBusyProvider(null);
     }
   };
@@ -144,9 +154,9 @@ export function LoginPage() {
             Try demo
           </Button>
         )}
-        {authNote && (
+        {statusNote && (
           <p className="rs-signin__note" role="status">
-            {authNote}
+            {statusNote}
           </p>
         )}
       </section>

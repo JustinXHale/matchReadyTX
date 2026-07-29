@@ -1,0 +1,67 @@
+# Deploy Hosting + Firestore rules + Cloud Functions on push to main.
+# One-time setup (GitHub → Settings → Secrets and variables → Actions):
+#   FIREBASE_TOKEN          — from `firebase login:ci`
+#   VITE_FIREBASE_API_KEY
+#   VITE_FIREBASE_AUTH_DOMAIN   — matchreadytx.web.app (Hosting host)
+#   VITE_FIREBASE_PROJECT_ID
+#   VITE_FIREBASE_STORAGE_BUCKET
+#   VITE_FIREBASE_MESSAGING_SENDER_ID
+#   VITE_FIREBASE_APP_ID
+# Optional:
+#   VITE_DEMO_MODE          — default false in this workflow
+#   VITE_DEFAULT_ORG_ID     — default lonestar
+#   VITE_APP_ORIGIN         — default https://matchreadytx.web.app
+name: Deploy
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-production
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+
+      - name: Install app dependencies
+        run: npm ci
+
+      - name: Install functions dependencies
+        run: npm ci
+        working-directory: functions
+
+      - name: Build Cloud Functions
+        run: npm run build
+        working-directory: functions
+
+      - name: Build web app
+        run: npm run build
+        env:
+          VITE_DEMO_MODE: ${{ vars.VITE_DEMO_MODE || 'false' }}
+          VITE_DEFAULT_ORG_ID: ${{ vars.VITE_DEFAULT_ORG_ID || 'lonestar' }}
+          VITE_APP_ORIGIN: ${{ vars.VITE_APP_ORIGIN || 'https://matchreadytx.web.app' }}
+          VITE_FIREBASE_API_KEY: ${{ secrets.VITE_FIREBASE_API_KEY }}
+          VITE_FIREBASE_AUTH_DOMAIN: ${{ secrets.VITE_FIREBASE_AUTH_DOMAIN }}
+          VITE_FIREBASE_PROJECT_ID: ${{ secrets.VITE_FIREBASE_PROJECT_ID }}
+          VITE_FIREBASE_STORAGE_BUCKET: ${{ secrets.VITE_FIREBASE_STORAGE_BUCKET }}
+          VITE_FIREBASE_MESSAGING_SENDER_ID: ${{ secrets.VITE_FIREBASE_MESSAGING_SENDER_ID }}
+          VITE_FIREBASE_APP_ID: ${{ secrets.VITE_FIREBASE_APP_ID }}
+
+      - name: Deploy to Firebase
+        run: npx firebase-tools@13 deploy --only hosting,firestore:rules,functions --project matchreadytx --non-interactive
+        env:
+          FIREBASE_TOKEN: ${{ secrets.FIREBASE_TOKEN }}

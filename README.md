@@ -57,6 +57,18 @@ When signed in with Google/Apple, use the masthead **Demo | Live** control to co
 5. Point Apps Script `onEdit` / time trigger at `sheetWebhook`.
 6. `npm run build` && `firebase deploy --only hosting,functions`
 
+### CI (auto-deploy)
+
+Pushing to `main` runs [.github/workflows/deploy.yml](.github/workflows/deploy.yml) (Hosting + Firestore rules + Functions).
+
+1. Create a CI token: `firebase login:ci` (copy the token once).
+2. GitHub repo → **Settings → Secrets and variables → Actions** → add:
+   - `FIREBASE_TOKEN`
+   - `VITE_FIREBASE_API_KEY`, `VITE_FIREBASE_AUTH_DOMAIN` (`matchreadytx.web.app`), `VITE_FIREBASE_PROJECT_ID`, `VITE_FIREBASE_STORAGE_BUCKET`, `VITE_FIREBASE_MESSAGING_SENDER_ID`, `VITE_FIREBASE_APP_ID`
+3. Optional **Variables**: `VITE_DEMO_MODE`, `VITE_DEFAULT_ORG_ID`, `VITE_APP_ORIGIN`.
+
+Function secrets (Resend, sheet service account, etc.) stay in Firebase Secret Manager — not in GitHub.
+
 ## Design
 
 Visual system mirrors **T03 / to3-app** monochrome (black & white + urgent red). See [`docs/THEME.md`](docs/THEME.md) and [`.design/theme.md`](.design/theme.md).

@@ -40,8 +40,9 @@ orgs/{orgId}
   sheetId?, sheetSyncedAt?
 
 orgs/{orgId}/members/{uid}
-  roles: ('assigner'|'teamAdmin'|'official'|'cmo')[]
+  roles: ('assigner'|'teamAdmin'|'official'|'cmo'|'fan')[]
   teamIds?: string[]
+  fanTeamIds?: string[]   // Fan favorites; empty = general society fan
 
 orgs/{orgId}/teams/{teamId}
   name, contactEmails[], contactPhones[]
@@ -75,13 +76,14 @@ users/{uid}
   homeAddress (composed), homeLat?, homeLng?,
   birthday?, refereeLevel?, assessedLevel?, refereeingSince?,
   jerseySize?, shortsSize?, photoUrl?,
-  profileComplete, roles: assigner|teamAdmin|official|cmo
+  profileComplete, roles: assigner|teamAdmin|official|cmo|fan,
+  fanTeamIds?: string[]
 
 mail/{mailId}   // outbound queue — Admin SDK only; see docs/EMAIL.md
   to, message: { subject, text?, html? }, uid?, event?, delivery?
 ```
 
-**Onboarding (`/onboarding`):** progressive one-question flow with image placeholders. Ends with optional photo. Referee level optional (“I don’t know”); birthday for everyone; began date + jersey/shorts when Referee/CMO. `cmo` shares the Referee/CMO lens with `official` (Q-R6).
+**Onboarding (`/onboarding`):** progressive one-question flow with image placeholders. Ends with optional photo. Fan-only: roles → names → optional favorite teams → photo. Referee/Team Admin/CMO keep phone + birthday; referee level optional (“I don’t know”); began date + jersey/shorts when Referee/CMO. `cmo` shares the Referee/CMO lens with `official` (Q-R6). `fan` lens homes to Global schedule.
 
 ### Match status values
 

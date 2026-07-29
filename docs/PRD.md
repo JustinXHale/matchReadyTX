@@ -75,11 +75,12 @@ Assigners currently manage schedules, contacts, and referee assignments across s
 | **Assistant Referee (AR1 / AR2)** | Optional but supported in v1 | Same availability / request / confirm / T-72 flows when assigned |
 | **Number 4** | Optional fourth official | Same when assigned |
 | **CMO (optional)** | Coaching Match Official on a fixture | Selectable profile role + crew/contact slot; **Coaching Reports** under the shared **Referee/CMO** lens — not a separate masthead role |
+| **Fan** | Spectator / society follower | Browse released schedule, standings, and teams; see official **names** only after MO confirmation (same as teams). Light onboarding (name + email); optional favorite clubs |
 | **Org / Tenant** | Society using an open-source deploy | Owns schedules, teams, officials, settings |
 
 **v1 assumption:** Assigner and Org Admin are often the same person. Model capabilities separately for other societies later.
 
-**UI lenses (masthead / bottom nav):** **Referee/CMO | Team Admin | Scheduler**. Scheduler = Assigner **control center** (Queues · Schedule · Org). Referee and CMO share one lens (**Q-R6** locked).
+**UI lenses (masthead / bottom nav):** **Referee/CMO | Team Admin | Scheduler | Fan**. Scheduler = Assigner **control center** (Queues · Schedule · Org). Fan home = Global schedule. Referee and CMO share one lens (**Q-R6** locked).
 
 ### Role open items (non-blocking)
 
@@ -102,8 +103,8 @@ Assigners currently manage schedules, contacts, and referee assignments across s
 6. **Teams see officials only after Match Official confirmation** (not merely after assignment).
 7. **Crew model:** role types MO / AR1 / AR2 / No.4 / CMO; **multiple blocks per type** (empty or filled); at least one MO block required. Teams see crew when **any** assigned MO has confirmed. Official Accept/Decline only in Referee lens.
 8. **72-hour dual reconfirm** (teams first, then each assigned official).
-9. **Email for everyone; SMS only if the user opts in** (choice required on profile). **Email and phone are both required.**
-10. **Officials see match fee** and rare **flight / housing** perks when provided; **Where** opens Maps directions. Distance / mileage estimates stay in domain until driving distance is reliable. **Fees stay in-app**, never on the shared Sheet.
+9. **Email for everyone; SMS only if the user opts in** (choice required on profile when phone is collected). **Email is required for all; phone is required for Referee / Team Admin / CMO / Scheduler** (not Fan-only).
+10. **Officials see match fee** and rare **flight / housing** perks when provided; **Where** opens Maps directions. Distance / mileage estimates stay in domain until driving distance is reliable. **Fees stay in-app**, never on the shared Sheet. Fans and teams do not see official fees.
 11. **Lean stack:** Vite + React + PatternFly + Firebase.
 12. **Multi-tenant later** — don’t hard-code a single society into the schema.
 13. **No payments** — the product never processes fees or mileage reimbursements.
@@ -560,7 +561,7 @@ Admin links the Sheet. **Automatic sync** keeps the app aligned when the Sheet c
 | Phone | **Yes** | Contact + SMS when opted in |
 | SMS opt-in | **Yes (explicit Yes/No)** | Whether to send SMS for workflow alerts |
 | Home address | **Yes** (street, city, state, ZIP; apt/unit optional) | Round-trip distance; Google Address Validation / Places later |
-| Self-selected roles | **Yes** (≥1 of Referee, Team Admin, CMO) | Access lenses; Scheduler/assigner stays org-granted |
+| Self-selected roles | **Yes** (≥1 of Referee, Team Admin, CMO, Fan) | Access lenses; Scheduler/assigner stays org-granted. Fan-only needs name + email (phone/birthday optional for that path) |
 | Birthday | **Yes** | Society records |
 | Referee level | Optional when Referee/CMO (“I don’t know” allowed) | Assigner placement |
 | Began refereeing | **Yes** when Referee or CMO | Experience signal |
@@ -598,7 +599,7 @@ Profile onboarding is incomplete until first/last name, email, phone, SMS opt-in
 
 ### 10.1 MVP
 
-1. Org + roles: Assigner (Scheduler), Coach (Team Admin), Official  
+1. Org + roles: Assigner (Scheduler), Coach (Team Admin), Official, Fan  
 2. Google Sheet link + **automatic sync** (+ CSV fallback)  
 3. Contacts → team mapping  
 4. Admin release for confirmation  
@@ -612,7 +613,7 @@ Profile onboarding is incomplete until first/last name, email, phone, SMS opt-in
 12. **Official availability ranges** + assigner overlap hints  
 13. **Game requests** (official requests match → assigner approve/decline)  
 14. Official/assigner match view: **fee** + flight/housing **when provided** + **Maps directions**; distance/mileage estimate deferred pending driving-distance API  
-15. Role-based match lists (PatternFly UI); **Global** = Schedule / Standings / Teams; masthead **Referee/CMO | Team Admin | Scheduler**  
+15. Role-based match lists (PatternFly UI); **Global** = Schedule / Standings / Teams; masthead **Referee/CMO | Team Admin | Scheduler | Fan**  
 16. PWA installability (Android-first; iOS secondary)
 
 ### 10.2 Later

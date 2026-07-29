@@ -12,7 +12,7 @@ import { flushSync } from 'react-dom';
 import type { AppState } from '@/services/demoStore';
 import { demoStore } from '@/services/demoStore';
 import { isDemoMode, isFirebaseConfigured } from '@/services/firebase';
-import { signOutFirebase, subscribeAuth } from '@/services/auth';
+import { signOutFirebase, subscribeAuth, completeRedirectSignIn } from '@/services/auth';
 import { ensureFirebaseUser } from '@/services/userProfile';
 import {
   defaultOrgId,
@@ -27,19 +27,20 @@ import { hasRefereeLensRole, type UserProfile } from '@/domain/types';
 import { withDemoPrefix } from '@/app/demoPaths';
 
 /** Header role switcher — Referee/CMO combined (Q-R6 locked). Team Admin = club lens. */
-export type RoleView = 'referee' | 'teamAdmin' | 'scheduler';
+export type RoleView = 'referee' | 'teamAdmin' | 'scheduler' | 'fan';
 
 /** Seed showcase vs Firebase + Firestore. Independent of Auth when on `/demo`. */
 export type DataMode = 'demo' | 'live';
 
 const ROLE_VIEW_KEY = 'rs-role-view';
 const DATA_MODE_KEY = 'rs-data-mode';
-const ROLE_VIEWS: RoleView[] = ['referee', 'teamAdmin', 'scheduler'];
+const ROLE_VIEWS: RoleView[] = ['referee', 'teamAdmin', 'scheduler', 'fan'];
 
 export const ROLE_VIEW_LABELS: Record<RoleView, string> = {
   referee: 'Referee/CMO',
   teamAdmin: 'Team Admin',
   scheduler: 'Scheduler',
+  fan: 'Fan',
 };
 
 /** Lenses the user may enter from their domain roles. Scheduler = assigner only. */
@@ -49,6 +50,7 @@ export function lensesForUser(user: UserProfile | null): RoleView[] {
   if (hasRefereeLensRole(user.roles)) out.push('referee');
   if (user.roles.includes('teamAdmin')) out.push('teamAdmin');
   if (user.roles.includes('assigner')) out.push('scheduler');
+  if (user.roles.includes('fan')) out.push('fan');
   return out;
 }
 
@@ -67,6 +69,8 @@ interface AppContextValue {
   isDemoShowcase: boolean;
   /** Firebase Auth session present (may still be viewing demo). */
   hasFirebaseSession: boolean;
+  /** Last profile bootstrap failure (permission / network) — shown on login. */
+  authBootstrapError: string | null;
   /** Cached live profile while Auth is signed in (used when returning from demo). */
   liveProfile: UserProfile | null;
   enterDemoShowcase: (opts?: { onboarding?: boolean }) => void;
@@ -98,6 +102,8 @@ interface AppContextValue {
   isAssignerView: boolean;
   /** Alias: referee/cmo lens (legacy official tools). */
   isOfficialView: boolean;
+  /** Fan browse lens (Global schedule). */
+  isFanView: boolean;
 }
 
 const AppContext = createContext<AppContextValue | null>(null);
@@ -139,10 +145,11 @@ function persistDataMode(mode: DataMode): void {
 
 export function defaultRoleView(user: UserProfile | null): RoleView {
   if (!user) return 'referee';
-  // Day-to-day home: Referee/CMO first, then Team Admin. Scheduler is opt-in via header.
+  // Day-to-day home: Referee/CMO first, then Team Admin, then Scheduler. Fan last.
   if (hasRefereeLensRole(user.roles)) return 'referee';
   if (user.roles.includes('teamAdmin')) return 'teamAdmin';
   if (user.roles.includes('assigner')) return 'scheduler';
+  if (user.roles.includes('fan')) return 'fan';
   return 'referee';
 }
 
@@ -151,6 +158,7 @@ export const ROLE_HOME: Record<RoleView, string> = {
   referee: '/referee/appointments',
   teamAdmin: '/team-admin',
   scheduler: '/scheduler',
+  fan: '/global/schedule/upcoming',
 };
 
 function pickTourPersonaUid(): string {
@@ -181,6 +189,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
     return readStoredDataMode();
   });
   const [liveProfile, setLiveProfile] = useState<UserProfile | null>(null);
+  const [authBootstrapError, setAuthBootstrapError] = useState<string | null>(
+    null,
+  );
   const dataModeRef = useRef(dataMode);
   dataModeRef.current = dataMode;
 
@@ -228,6 +239,17 @@ export function AppProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (!isFirebaseConfigured) return;
     let cancelled = false;
+
+    // Finish mobile redirect sign-in before relying on auth state alone.
+    void completeRedirectSignIn().catch((err) => {
+      console.error('Redirect sign-in failed', err);
+      if (!cancelled) {
+        setAuthBootstrapError(
+          err instanceof Error ? err.message : 'Sign-in redirect failed.',
+        );
+      }
+    });
+
     const unsub = subscribeAuth(async (fbUser) => {
       if (cancelled) return;
       if (!fbUser) {
@@ -247,6 +269,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       try {
         const profile = await ensureFirebaseUser(fbUser);
         if (cancelled) return;
+        setAuthBootstrapError(null);
         setLiveProfile(profile);
         if (dataModeRef.current === 'live') {
           flushSync(() => {
@@ -258,6 +281,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
         console.error('Firebase profile bootstrap failed', err);
         if (cancelled) return;
         setLiveProfile(null);
+        setAuthBootstrapError(
+          err instanceof Error
+            ? err.message
+            : 'Could not finish signing in. Check your connection and try again.',
+        );
         if (dataModeRef.current === 'live') {
           flushSync(() => {
             demoStore.signOut();
@@ -424,6 +452,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const isSchedulerView = roleView === 'scheduler';
   const isAssignerView = isSchedulerView;
   const isOfficialView = isRefereeView;
+  const isFanView = roleView === 'fan';
 
   const value = useMemo(
     () => ({
@@ -433,6 +462,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       dataMode,
       isDemoShowcase,
       hasFirebaseSession,
+      authBootstrapError,
       liveProfile,
       enterDemoShowcase,
       enterLive,
@@ -454,6 +484,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       isSchedulerView,
       isAssignerView,
       isOfficialView,
+      isFanView,
     }),
     [
       state,
@@ -461,6 +492,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       dataMode,
       isDemoShowcase,
       hasFirebaseSession,
+      authBootstrapError,
       liveProfile,
       enterDemoShowcase,
       enterLive,
@@ -481,6 +513,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       isSchedulerView,
       isAssignerView,
       isOfficialView,
+      isFanView,
     ],
   );
 

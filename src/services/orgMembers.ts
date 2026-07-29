@@ -35,6 +35,7 @@ export type OrgMemberMeta = {
   uid: string;
   roles: Role[];
   teamIds: string[];
+  fanTeamIds: string[];
 };
 
 /**
@@ -61,6 +62,10 @@ export function subscribeOrgRoster(
           ...profile,
           roles: meta.roles.length ? meta.roles : profile.roles,
           teamIds: meta.teamIds.length ? meta.teamIds : profile.teamIds,
+          fanTeamIds:
+            meta.fanTeamIds.length > 0
+              ? meta.fanTeamIds
+              : profile.fanTeamIds,
         });
       } else {
         // Member without a user doc yet — stub so assigners still see them.
@@ -79,6 +84,7 @@ export function subscribeOrgRoster(
           homeAddress: '',
           roles: meta.roles,
           teamIds: meta.teamIds,
+          fanTeamIds: meta.fanTeamIds,
           profileComplete: false,
         });
       }
@@ -118,6 +124,9 @@ export function subscribeOrgRoster(
             teamIds: Array.isArray(data.teamIds)
               ? (data.teamIds as string[])
               : [],
+            fanTeamIds: Array.isArray(data.fanTeamIds)
+              ? (data.fanTeamIds as string[])
+              : [],
           });
         }
         memberMeta = next;
@@ -151,6 +160,9 @@ export async function fetchOrgRoster(orgId: string): Promise<UserProfile[]> {
     const teamIds = Array.isArray(meta.teamIds)
       ? (meta.teamIds as string[])
       : [];
+    const fanTeamIds = Array.isArray(meta.fanTeamIds)
+      ? (meta.fanTeamIds as string[])
+      : [];
     const userSnap = await getDoc(doc(database, 'users', m.id));
     if (userSnap.exists()) {
       const profile = profileFromFirestore(
@@ -161,6 +173,8 @@ export async function fetchOrgRoster(orgId: string): Promise<UserProfile[]> {
         ...profile,
         roles: roles.length ? roles : profile.roles,
         teamIds: teamIds.length ? teamIds : profile.teamIds,
+        fanTeamIds:
+          fanTeamIds.length > 0 ? fanTeamIds : profile.fanTeamIds,
       });
     }
   }
@@ -196,6 +210,7 @@ export async function saveAssignerMemberProfile(
     {
       roles: saved.roles,
       teamIds: saved.teamIds,
+      fanTeamIds: saved.fanTeamIds ?? [],
       updatedAt: new Date().toISOString(),
     },
     { merge: true },

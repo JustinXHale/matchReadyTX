@@ -1,6 +1,6 @@
 /** Domain types for MatchReadyTX — see docs/IMPLEMENTATION_SPEC.md */
 
-export type Role = 'assigner' | 'teamAdmin' | 'official' | 'cmo';
+export type Role = 'assigner' | 'teamAdmin' | 'official' | 'cmo' | 'fan';
 
 export type CrewSlot = 'mo' | 'ar1' | 'ar2' | 'no4';
 
@@ -256,6 +256,11 @@ export interface UserProfile {
   homeLng?: number;
   roles: Role[];
   teamIds: string[];
+  /**
+   * Favorite clubs for Fan lens schedule filters. Empty / omit = general society fan.
+   * Not the same as teamIds (Team Admin club ownership).
+   */
+  fanTeamIds?: string[];
   profileComplete: boolean;
   /** Society referee grade (e.g. 5). Optional — officials may choose “I don’t know”. */
   refereeLevel?: number;

@@ -30,7 +30,7 @@ service cloud.firestore {
           'phone', 'smsOptIn',
           'homeStreet', 'homeUnit', 'homeCity', 'homeRegion', 'homePostalCode',
           'homeAddress', 'homeLat', 'homeLng',
-          'roles', 'teamIds',
+          'roles', 'teamIds', 'fanTeamIds',
           'refereeLevel', 'assessedLevel',
           'refereeingSince', 'birthday', 'jerseySize', 'shortsSize',
           'photoUrl', 'competitionAccess', 'profileComplete', 'updatedAt'
@@ -68,12 +68,31 @@ service cloud.firestore {
       allow write: if isAssigner(orgId);
 
       match /members/{uid} {
-        allow read: if isMember(orgId);
-        // First join / self bootstrap: create own membership; assigners manage all.
+        // Members see roster; self-read needed so new sign-ups can check/create their doc.
+        allow read: if isMember(orgId)
+          || (signedIn() && request.auth.uid == uid);
+        // Self-join: official / teamAdmin / cmo / fan — never self-grant assigner.
         allow create: if signedIn() && (
-          request.auth.uid == uid || isAssigner(orgId)
+          isAssigner(orgId)
+          || (
+            request.auth.uid == uid
+            && request.resource.data.keys().hasOnly(['roles', 'teamIds', 'joinedAt'])
+            && request.resource.data.roles is list
+            && request.resource.data.teamIds is list
+            && !('assigner' in request.resource.data.roles)
+          )
         );
-        allow update, delete: if isAssigner(orgId);
+        // Assigner manages anyone; members may update own roles / favorites but not grant or revoke assigner.
+        allow update: if isAssigner(orgId) || (
+          signedIn()
+          && request.auth.uid == uid
+          && request.resource.data.diff(resource.data).affectedKeys()
+            .hasOnly(['roles', 'teamIds', 'fanTeamIds', 'updatedAt'])
+          && request.resource.data.roles is list
+          && request.resource.data.teamIds is list
+          && ('assigner' in resource.data.roles) == ('assigner' in request.resource.data.roles)
+        );
+        allow delete: if isAssigner(orgId);
       }
       match /teams/{teamId} {
         allow read: if isMember(orgId);

@@ -31,6 +31,7 @@ type StepId =
   | 'refereeLevel'
   | 'refereeingSince'
   | 'kitSizes'
+  | 'favoriteTeams'
   | 'photo';
 
 const ROLE_OPTIONS = [
@@ -49,6 +50,11 @@ const ROLE_OPTIONS = [
     label: 'CMO',
     description: 'Coaching Match Official',
   },
+  {
+    id: 'fan' as const,
+    label: 'Fan',
+    description: 'Browse the schedule and who’s assigned',
+  },
 ];
 
 /** Stock rugby stills for step placeholders (from /img → public/img). */
@@ -62,13 +68,14 @@ const STEP_VISUALS: Partial<Record<StepId, string>> = {
   // refereeLevel uses RefereeLevelChart instead
   refereeingSince: '/img/onboard-5.jpg',
   kitSizes: '/img/onboard-1.jpeg',
+  favoriteTeams: '/img/onboard-4.jpg',
   photo: '/img/onboard-3.jpeg',
 };
 
 const PHOTO_PLACEHOLDER = STEP_VISUALS.photo!;
 
 export function OnboardingPage() {
-  const { currentUser, store, dataMode } = useApp();
+  const { currentUser, store, dataMode, state } = useApp();
   const navigate = useNavigate();
   const inputRef = useRef<HTMLInputElement>(null);
   const photoRef = useRef<HTMLInputElement>(null);
@@ -110,6 +117,10 @@ export function OnboardingPage() {
   const [roleOfficial, setRoleOfficial] = useState(false);
   const [roleTeamAdmin, setRoleTeamAdmin] = useState(false);
   const [roleCmo, setRoleCmo] = useState(false);
+  const [roleFan, setRoleFan] = useState(false);
+  const [fanTeamIds, setFanTeamIds] = useState<string[]>(
+    () => currentUser?.fanTeamIds ?? [],
+  );
   const [birthday, setBirthday] = useState(
     currentUser?.birthday?.slice(0, 10) ?? '',
   );
@@ -128,7 +139,13 @@ export function OnboardingPage() {
   const [saveError, setSaveError] = useState<string | null>(null);
 
   const needsRefDetails = roleOfficial || roleCmo;
+  const needsWorkingFields = roleOfficial || roleTeamAdmin || roleCmo;
+  const fanOnly = roleFan && !needsWorkingFields;
+
   const steps: StepId[] = useMemo(() => {
+    if (fanOnly) {
+      return ['roles', 'firstName', 'lastName', 'favoriteTeams', 'photo'];
+    }
     const base: StepId[] = ['roles', 'firstName', 'lastName', 'phone'];
     if (needsRefDetails) {
       base.push(
@@ -138,9 +155,11 @@ export function OnboardingPage() {
         'kitSizes',
       );
     }
-    base.push('birthday', 'photo');
+    base.push('birthday');
+    if (roleFan) base.push('favoriteTeams');
+    base.push('photo');
     return base;
-  }, [needsRefDetails]);
+  }, [fanOnly, needsRefDetails, roleFan]);
 
   const safeIndex = Math.min(stepIndex, steps.length - 1);
   const step = steps[safeIndex]!;
@@ -153,7 +172,12 @@ export function OnboardingPage() {
   }, [stepIndex, steps.length]);
 
   useEffect(() => {
-    if (step === 'photo' || step === 'roles' || step === 'kitSizes') {
+    if (
+      step === 'photo' ||
+      step === 'roles' ||
+      step === 'kitSizes' ||
+      step === 'favoriteTeams'
+    ) {
       return;
     }
     const t = window.setTimeout(() => inputRef.current?.focus(), 40);
@@ -163,7 +187,15 @@ export function OnboardingPage() {
   if (!currentUser) return null;
 
   const levelNum = Number(refereeLevel);
-  const rolesOk = roleOfficial || roleTeamAdmin || roleCmo;
+  const rolesOk = roleOfficial || roleTeamAdmin || roleCmo || roleFan;
+
+  const toggleFanTeam = (teamId: string) => {
+    setFanTeamIds((prev) =>
+      prev.includes(teamId)
+        ? prev.filter((id) => id !== teamId)
+        : [...prev, teamId],
+    );
+  };
 
   const stepValid = (): boolean => {
     switch (step) {
@@ -193,6 +225,8 @@ export function OnboardingPage() {
         return isValidRefYear(refereeingSince);
       case 'kitSizes':
         return Boolean(jerseySize) && Boolean(shortsSize);
+      case 'favoriteTeams':
+        return true;
       case 'photo':
         return true;
       default:
@@ -205,18 +239,20 @@ export function OnboardingPage() {
     if (roleOfficial) roles.push('official');
     if (roleTeamAdmin) roles.push('teamAdmin');
     if (roleCmo) roles.push('cmo');
+    if (roleFan) roles.push('fan');
     if (currentUser.roles.includes('assigner')) roles.push('assigner');
 
     const patch: Parameters<typeof store.updateProfile>[1] = {
       firstName: firstName.trim(),
       lastName: lastName.trim(),
       email: currentUser.email.trim(),
-      phone: phone.trim(),
+      phone: fanOnly ? '' : phone.trim(),
       // SMS deferred — email notifications only for now.
       smsOptIn: false,
       roles,
-      birthday: birthday.trim(),
+      birthday: fanOnly ? undefined : birthday.trim(),
       photoUrl,
+      fanTeamIds: roleFan ? fanTeamIds : [],
     };
 
     if (needsRefDetails) {
@@ -230,7 +266,7 @@ export function OnboardingPage() {
       patch.shortsSize = shortsSize;
       patch.refereeLevel = levelUnknown ? undefined : levelNum;
     } else {
-      // Team Admin–only: no mileage address / kit.
+      // Team Admin / Fan: no mileage address / kit.
       patch.homeStreet = '';
       patch.homeUnit = undefined;
       patch.homeCity = '';
@@ -298,6 +334,7 @@ export function OnboardingPage() {
       step !== 'roles' &&
       step !== 'homeAddress' &&
       step !== 'kitSizes' &&
+      step !== 'favoriteTeams' &&
       step !== 'photo'
     ) {
       e.preventDefault();
@@ -448,13 +485,17 @@ export function OnboardingPage() {
                     ? roleOfficial
                     : r.id === 'teamAdmin'
                       ? roleTeamAdmin
-                      : roleCmo;
+                      : r.id === 'cmo'
+                        ? roleCmo
+                        : roleFan;
                 const set =
                   r.id === 'official'
                     ? setRoleOfficial
                     : r.id === 'teamAdmin'
                       ? setRoleTeamAdmin
-                      : setRoleCmo;
+                      : r.id === 'cmo'
+                        ? setRoleCmo
+                        : setRoleFan;
                 return (
                   <button
                     key={r.id}
@@ -487,6 +528,77 @@ export function OnboardingPage() {
                   </button>
                 );
               })}
+            </div>
+          )}
+          {step === 'favoriteTeams' && (
+            <div
+              className="rs-onboard__choices"
+              role="group"
+              aria-label="Favorite teams"
+            >
+              <button
+                type="button"
+                className={`rs-onboard__choice rs-onboard__choice--multi${
+                  fanTeamIds.length === 0 ? ' rs-onboard__choice--selected' : ''
+                }`}
+                aria-pressed={fanTeamIds.length === 0}
+                onClick={() => setFanTeamIds([])}
+              >
+                <span
+                  className={`rs-onboard__check${
+                    fanTeamIds.length === 0 ? ' rs-onboard__check--on' : ''
+                  }`}
+                  aria-hidden
+                >
+                  {fanTeamIds.length === 0 ? (
+                    <svg viewBox="0 0 20 20" width="14" height="14">
+                      <path
+                        fill="currentColor"
+                        d="M7.6 13.2 4.4 10l-1.2 1.2 4.4 4.4L17 6.2 15.8 5z"
+                      />
+                    </svg>
+                  ) : null}
+                </span>
+                <span className="rs-onboard__choice-text">
+                  <strong>General</strong>
+                  <span>Follow the whole society schedule</span>
+                </span>
+              </button>
+              {[...state.teams]
+                .sort((a, b) => a.name.localeCompare(b.name))
+                .map((t) => {
+                  const checked = fanTeamIds.includes(t.id);
+                  return (
+                    <button
+                      key={t.id}
+                      type="button"
+                      className={`rs-onboard__choice rs-onboard__choice--multi${
+                        checked ? ' rs-onboard__choice--selected' : ''
+                      }`}
+                      aria-pressed={checked}
+                      onClick={() => toggleFanTeam(t.id)}
+                    >
+                      <span
+                        className={`rs-onboard__check${
+                          checked ? ' rs-onboard__check--on' : ''
+                        }`}
+                        aria-hidden
+                      >
+                        {checked ? (
+                          <svg viewBox="0 0 20 20" width="14" height="14">
+                            <path
+                              fill="currentColor"
+                              d="M7.6 13.2 4.4 10l-1.2 1.2 4.4 4.4L17 6.2 15.8 5z"
+                            />
+                          </svg>
+                        ) : null}
+                      </span>
+                      <span className="rs-onboard__choice-text">
+                        <strong>{t.name}</strong>
+                      </span>
+                    </button>
+                  );
+                })}
             </div>
           )}
           {step === 'birthday' && (
@@ -758,6 +870,11 @@ function stepCopy(
       return {
         title: 'Jersey & shorts size?',
         hint: 'For referee/CMO kit orders.',
+      };
+    case 'favoriteTeams':
+      return {
+        title: 'Any favorite teams?',
+        hint: 'Optional — pick clubs to follow, or leave as General for the full schedule.',
       };
     case 'birthday':
       return {

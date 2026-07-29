@@ -139,6 +139,10 @@ function navForRole(roleView: RoleView, demo: boolean): NavItem[] {
     ];
   }
 
+  if (roleView === 'fan') {
+    return [about, global, members, profile];
+  }
+
   return [
     about,
     {

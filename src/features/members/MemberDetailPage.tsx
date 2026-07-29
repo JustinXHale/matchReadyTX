@@ -76,6 +76,7 @@ type EditDraft = {
   roleTeamAdmin: boolean;
   roleCmo: boolean;
   roleAssigner: boolean;
+  roleFan: boolean;
   refereeLevel: string;
   levelUnknown: boolean;
   refereeingSince: string;
@@ -99,6 +100,7 @@ function draftFromUser(user: UserProfile): EditDraft {
     roleTeamAdmin: user.roles.includes('teamAdmin'),
     roleCmo: user.roles.includes('cmo'),
     roleAssigner: user.roles.includes('assigner'),
+    roleFan: user.roles.includes('fan'),
     refereeLevel: user.refereeLevel != null ? String(user.refereeLevel) : '',
     levelUnknown:
       (user.roles.includes('official') || user.roles.includes('cmo')) &&
@@ -262,17 +264,26 @@ export function MemberDetailPage() {
       setEditError('First and last name are required.');
       return;
     }
-    if (!editDraft.phone.trim()) {
-      setEditError('Phone is required.');
-      return;
-    }
     const roles: Role[] = [];
     if (editDraft.roleOfficial) roles.push('official');
     if (editDraft.roleTeamAdmin) roles.push('teamAdmin');
     if (editDraft.roleCmo) roles.push('cmo');
     if (editDraft.roleAssigner) roles.push('assigner');
+    if (editDraft.roleFan) roles.push('fan');
     if (roles.length === 0) {
       setEditError('Pick at least one role.');
+      return;
+    }
+
+    const fanOnly =
+      editDraft.roleFan &&
+      !editDraft.roleOfficial &&
+      !editDraft.roleTeamAdmin &&
+      !editDraft.roleCmo &&
+      !editDraft.roleAssigner;
+
+    if (!fanOnly && !editDraft.phone.trim()) {
+      setEditError('Phone is required.');
       return;
     }
 
@@ -303,9 +314,11 @@ export function MemberDetailPage() {
       ...user,
       firstName,
       lastName,
-      phone: editDraft.phone.trim(),
+      phone: fanOnly ? '' : editDraft.phone.trim(),
       smsOptIn: false,
-      birthday: editDraft.birthday.trim() || undefined,
+      birthday: fanOnly
+        ? undefined
+        : editDraft.birthday.trim() || undefined,
       roles,
       homeStreet: needsRef ? editDraft.homeStreet.trim() : '',
       homeUnit: needsRef
@@ -543,13 +556,21 @@ export function MemberDetailPage() {
                 <FormGroup label="Email">
                   <TextInput value={user.email} isDisabled readOnly />
                 </FormGroup>
-                <FormGroup label="Phone" isRequired>
-                  <TextInput
-                    type="tel"
-                    value={editDraft.phone}
-                    onChange={(_, v) => patchDraft({ phone: v })}
-                  />
-                </FormGroup>
+                {!(
+                  editDraft.roleFan &&
+                  !editDraft.roleOfficial &&
+                  !editDraft.roleTeamAdmin &&
+                  !editDraft.roleCmo &&
+                  !editDraft.roleAssigner
+                ) && (
+                  <FormGroup label="Phone" isRequired>
+                    <TextInput
+                      type="tel"
+                      value={editDraft.phone}
+                      onChange={(_, v) => patchDraft({ phone: v })}
+                    />
+                  </FormGroup>
+                )}
               </div>
               <FormGroup label="Roles" isRequired>
                 <div className="rs-onboarding__roles">
@@ -570,6 +591,12 @@ export function MemberDetailPage() {
                     label="CMO"
                     isChecked={editDraft.roleCmo}
                     onChange={(_, v) => patchDraft({ roleCmo: v })}
+                  />
+                  <Checkbox
+                    id="member-role-fan"
+                    label="Fan"
+                    isChecked={editDraft.roleFan}
+                    onChange={(_, v) => patchDraft({ roleFan: v })}
                   />
                   <Checkbox
                     id="member-role-assigner"

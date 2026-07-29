@@ -24,7 +24,7 @@ import { RefereeLevelChart } from '@/ui/RefereeLevelChart';
 import { UserAvatar } from '@/ui/UserAvatar';
 
 export function ProfilePage() {
-  const { currentUser, store, signOut } = useApp();
+  const { currentUser, store, signOut, state } = useApp();
   const navigate = useNavigate();
   const fileRef = useRef<HTMLInputElement>(null);
 
@@ -51,6 +51,12 @@ export function ProfilePage() {
   );
   const [roleCmo, setRoleCmo] = useState(
     Boolean(currentUser?.roles.includes('cmo')),
+  );
+  const [roleFan, setRoleFan] = useState(
+    Boolean(currentUser?.roles.includes('fan')),
+  );
+  const [fanTeamIds, setFanTeamIds] = useState<string[]>(
+    () => currentUser?.fanTeamIds ?? [],
   );
   const [birthday, setBirthday] = useState(
     currentUser?.birthday?.slice(0, 10) ?? '',
@@ -79,8 +85,10 @@ export function ProfilePage() {
   if (!currentUser) return null;
 
   const needsRefDetails = roleOfficial || roleCmo;
+  const needsWorkingFields = roleOfficial || roleTeamAdmin || roleCmo;
+  const fanOnly = roleFan && !needsWorkingFields;
   const levelNum = Number(refereeLevel);
-  const rolesOk = roleOfficial || roleTeamAdmin || roleCmo;
+  const rolesOk = roleOfficial || roleTeamAdmin || roleCmo || roleFan;
   const levelOk =
     levelUnknown ||
     (Number.isFinite(levelNum) && levelNum >= 1 && levelNum <= 20);
@@ -88,22 +96,24 @@ export function ProfilePage() {
     Boolean(firstName.trim()) &&
     Boolean(lastName.trim()) &&
     Boolean(email.trim()) &&
-    Boolean(phone.trim()) &&
     rolesOk &&
-    Boolean(birthday.trim()) &&
-    (!needsRefDetails ||
-      (hasCompleteHomeAddress({
-        homeStreet,
-        homeCity,
-        homeRegion,
-        homePostalCode,
-      }) &&
-        levelOk &&
-        /^\d{4}$/.test(refereeingSince.trim()) &&
-        Number(refereeingSince) >= 1950 &&
-        Number(refereeingSince) <= new Date().getFullYear() &&
-        Boolean(jerseySize) &&
-        Boolean(shortsSize)));
+    (fanOnly
+      ? true
+      : Boolean(phone.trim()) &&
+        Boolean(birthday.trim()) &&
+        (!needsRefDetails ||
+          (hasCompleteHomeAddress({
+            homeStreet,
+            homeCity,
+            homeRegion,
+            homePostalCode,
+          }) &&
+            levelOk &&
+            /^\d{4}$/.test(refereeingSince.trim()) &&
+            Number(refereeingSince) >= 1950 &&
+            Number(refereeingSince) <= new Date().getFullYear() &&
+            Boolean(jerseySize) &&
+            Boolean(shortsSize))));
 
   const onPickPhoto = async (file: File | undefined) => {
     setPhotoError(null);
@@ -127,18 +137,20 @@ export function ProfilePage() {
     if (roleOfficial) roles.push('official');
     if (roleTeamAdmin) roles.push('teamAdmin');
     if (roleCmo) roles.push('cmo');
+    if (roleFan) roles.push('fan');
     if (currentUser.roles.includes('assigner')) roles.push('assigner');
 
     const patch: Parameters<typeof store.updateProfile>[1] = {
       firstName: firstName.trim(),
       lastName: lastName.trim(),
       email: email.trim(),
-      phone: phone.trim(),
+      phone: fanOnly ? '' : phone.trim(),
       // SMS deferred — keep false until we ship SMS again.
       smsOptIn: false,
       roles,
-      birthday: birthday.trim(),
+      birthday: fanOnly ? undefined : birthday.trim(),
       photoUrl,
+      fanTeamIds: roleFan ? fanTeamIds : [],
     };
     if (needsRefDetails) {
       patch.homeStreet = homeStreet.trim();
@@ -260,14 +272,16 @@ export function ProfilePage() {
               autoComplete="email"
             />
           </FormGroup>
-          <FormGroup label="Phone" isRequired>
-            <TextInput
-              type="tel"
-              value={phone}
-              onChange={(_, v) => setPhone(v)}
-              autoComplete="tel"
-            />
-          </FormGroup>
+          {!fanOnly && (
+            <FormGroup label="Phone" isRequired>
+              <TextInput
+                type="tel"
+                value={phone}
+                onChange={(_, v) => setPhone(v)}
+                autoComplete="tel"
+              />
+            </FormGroup>
+          )}
         </div>
         <FormHelperText>
           <HelperText>
@@ -298,6 +312,12 @@ export function ProfilePage() {
               isChecked={roleCmo}
               onChange={(_, v) => setRoleCmo(v)}
             />
+            <Checkbox
+              id="pf-role-fan"
+              label="Fan"
+              isChecked={roleFan}
+              onChange={(_, v) => setRoleFan(v)}
+            />
           </div>
           {currentUser.roles.includes('assigner') && (
             <FormHelperText>
@@ -311,13 +331,54 @@ export function ProfilePage() {
           )}
         </FormGroup>
 
-        <FormGroup label="Birthday" isRequired>
-          <TextInput
-            type="date"
-            value={birthday}
-            onChange={(_, v) => setBirthday(v)}
-          />
-        </FormGroup>
+        {roleFan && (
+          <FormGroup label="Favorite teams">
+            <div className="rs-onboarding__roles">
+              <Checkbox
+                id="pf-fan-general"
+                label="General (whole society)"
+                isChecked={fanTeamIds.length === 0}
+                onChange={(_, v) => {
+                  if (v) setFanTeamIds([]);
+                }}
+              />
+              {[...state.teams]
+                .sort((a, b) => a.name.localeCompare(b.name))
+                .map((t) => (
+                  <Checkbox
+                    key={t.id}
+                    id={`pf-fan-team-${t.id}`}
+                    label={t.name}
+                    isChecked={fanTeamIds.includes(t.id)}
+                    onChange={(_, v) => {
+                      setFanTeamIds((prev) =>
+                        v
+                          ? [...prev.filter((id) => id !== t.id), t.id]
+                          : prev.filter((id) => id !== t.id),
+                      );
+                    }}
+                  />
+                ))}
+            </div>
+            <FormHelperText>
+              <HelperText>
+                <HelperTextItem>
+                  Optional — used to filter Global schedule to your clubs.
+                </HelperTextItem>
+              </HelperText>
+            </FormHelperText>
+          </FormGroup>
+        )}
+
+        {!fanOnly && (
+          <FormGroup label="Birthday" isRequired>
+            <TextInput
+              type="date"
+              value={birthday}
+              onChange={(_, v) => setBirthday(v)}
+            />
+          </FormGroup>
+        )}
 
         {needsRefDetails && (
           <>

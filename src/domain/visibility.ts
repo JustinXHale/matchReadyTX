@@ -9,7 +9,7 @@ export function isTeamMatch(match: Match, teamIds: string[]): boolean {
   return teamIds.includes(match.homeTeamId) || teamIds.includes(match.awayTeamId);
 }
 
-export type MatchListRole = 'assigner' | 'official' | 'teamAdmin';
+export type MatchListRole = 'assigner' | 'official' | 'teamAdmin' | 'fan';
 
 /** Browse vs personal schedule scope for officials / teams. */
 export type MatchScope = 'all' | 'mine';
@@ -29,9 +29,17 @@ export function matchesForUser(
       ? 'assigner'
       : user.roles.includes('teamAdmin')
         ? 'teamAdmin'
-        : 'official');
+        : user.roles.includes('fan') &&
+            !user.roles.includes('official') &&
+            !user.roles.includes('cmo')
+          ? 'fan'
+          : 'official');
 
   if (role === 'assigner') return matches;
+
+  if (role === 'fan') {
+    return releasedMatches(matches);
+  }
 
   if (role === 'teamAdmin') {
     return matches.filter(
@@ -65,7 +73,9 @@ export function applyMatchScope(
   asRole: MatchListRole,
 ): Match[] {
   if (scope === 'all') {
-    if (asRole === 'teamAdmin') return releasedMatches(matches);
+    if (asRole === 'teamAdmin' || asRole === 'fan') {
+      return releasedMatches(matches);
+    }
     return matchesForUser(matches, user, asRole);
   }
 
@@ -75,6 +85,11 @@ export function applyMatchScope(
   }
   if (asRole === 'teamAdmin') {
     return matchesForUser(matches, user, 'teamAdmin');
+  }
+  if (asRole === 'fan') {
+    const favorites = user.fanTeamIds ?? [];
+    if (favorites.length === 0) return releasedMatches(matches);
+    return releasedMatches(matches).filter((m) => isTeamMatch(m, favorites));
   }
   return matchesForUser(matches, user, asRole);
 }
