@@ -38,9 +38,11 @@ service cloud.firestore {
     }
 
     match /users/{uid} {
+      // Org directory: any member may read fellow members' profiles (names, roles).
+      // Address/phone stay UI-gated for Scheduler where needed.
       allow read: if signedIn() && (
         request.auth.uid == uid
-        || (isAssigner(defaultOrgId()) && isOrgMember(defaultOrgId(), uid))
+        || (isMember(defaultOrgId()) && isOrgMember(defaultOrgId(), uid))
       );
       allow create: if signedIn() && request.auth.uid == uid;
       allow update: if signedIn() && (

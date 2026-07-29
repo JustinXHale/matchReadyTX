@@ -5,6 +5,7 @@ import { useApp } from '@/app/AppContext';
 import {
   formatMemberScheduleHint,
   groupTeamAdminsByTeam,
+  memberListName,
   membersForTab,
   nextMatchForMember,
   rolePillsForMember,
@@ -30,13 +31,16 @@ function MemberRow({
   tab,
   teamMeta,
   scheduleHint,
+  showIncomplete,
 }: {
   user: UserProfile;
   tab: MemberTab;
   teamMeta?: string | null;
   scheduleHint?: string | null;
+  showIncomplete: boolean;
 }) {
   const pills = rolePillsForMember(user.roles);
+  const name = memberListName(user);
   return (
     <Link
       to={`/members/${user.uid}`}
@@ -45,14 +49,14 @@ function MemberRow({
     >
       <UserAvatar user={user} size="md" />
       <div className="rs-member-row__body">
-        <p className="rs-member-row__name">{user.displayName}</p>
+        <p className="rs-member-row__name">{name}</p>
         <div className="rs-label-row" aria-label="Roles">
           {pills.map((p) => (
             <span key={p} className="rs-pill rs-pill--ink rs-list-row__chip">
               {p}
             </span>
           ))}
-          {!user.profileComplete && (
+          {showIncomplete && !user.profileComplete && (
             <span className="rs-pill rs-list-row__chip">Incomplete</span>
           )}
           {user.refereeLevel != null && tab !== 'teamAdmins' && (
@@ -82,7 +86,8 @@ function MemberRow({
  * Address is never shown on the list (detail: assigners only).
  */
 export function MembersPage() {
-  const { state } = useApp();
+  const { state, hasAssignerRole, isAssignerView } = useApp();
+  const showIncomplete = hasAssignerRole && isAssignerView;
   const [tab, setTab] = useState<MemberTab>('referees');
   const [teamAdminSort, setTeamAdminSort] =
     useState<TeamAdminSort>('contact');
@@ -94,7 +99,9 @@ export function MembersPage() {
   );
 
   const members = useMemo(() => {
-    let list = membersForTab(state.users, tab);
+    let list = membersForTab(state.users, tab, {
+      includeIncomplete: showIncomplete,
+    });
     if (tab === 'teamAdmins' && genderFilter) {
       list = list.filter((u) =>
         teamAdminMatchesGender(u, genderFilter, teamGenders),
@@ -102,7 +109,7 @@ export function MembersPage() {
     }
     if (tab === 'teamAdmins' && teamAdminSort === 'contact') {
       return [...list].sort((a, b) =>
-        a.displayName.localeCompare(b.displayName),
+        memberListName(a).localeCompare(memberListName(b)),
       );
     }
     return list;
@@ -112,6 +119,7 @@ export function MembersPage() {
     genderFilter,
     teamGenders,
     teamAdminSort,
+    showIncomplete,
   ]);
 
   const teamGroups = useMemo(() => {
@@ -239,7 +247,11 @@ export function MembersPage() {
                 <ul className="rs-list" aria-label={group.teamName}>
                   {group.admins.map((user) => (
                     <li key={`${group.teamId}-${user.uid}`}>
-                      <MemberRow user={user} tab={tab} />
+                      <MemberRow
+                        user={user}
+                        tab={tab}
+                        showIncomplete={showIncomplete}
+                      />
                     </li>
                   ))}
                 </ul>
@@ -278,6 +290,7 @@ export function MembersPage() {
                 <MemberRow
                   user={user}
                   tab={tab}
+                  showIncomplete={showIncomplete}
                   teamMeta={
                     tab === 'teamAdmins'
                       ? teams.length > 0

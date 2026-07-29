@@ -36,7 +36,63 @@ export type OrgMemberMeta = {
   roles: Role[];
   teamIds: string[];
   fanTeamIds: string[];
+  joinedAt?: string;
 };
+
+/** Coerce Firestore Timestamp | string | Date into ISO, else undefined. */
+function coerceJoinedAt(value: unknown): string | undefined {
+  if (value == null) return undefined;
+  if (typeof value === 'string' && value.trim()) return value;
+  if (value instanceof Date && !Number.isNaN(value.getTime())) {
+    return value.toISOString();
+  }
+  if (
+    typeof value === 'object' &&
+    value !== null &&
+    'toDate' in value &&
+    typeof (value as { toDate: () => Date }).toDate === 'function'
+  ) {
+    const d = (value as { toDate: () => Date }).toDate();
+    if (!Number.isNaN(d.getTime())) return d.toISOString();
+  }
+  return undefined;
+}
+
+function withMemberMeta(
+  profile: UserProfile,
+  meta: OrgMemberMeta,
+): UserProfile {
+  return {
+    ...profile,
+    roles: meta.roles.length ? meta.roles : profile.roles,
+    teamIds: meta.teamIds.length ? meta.teamIds : profile.teamIds,
+    fanTeamIds:
+      meta.fanTeamIds.length > 0 ? meta.fanTeamIds : profile.fanTeamIds,
+    joinedAt: meta.joinedAt ?? profile.joinedAt,
+  };
+}
+
+function pendingMemberStub(meta: OrgMemberMeta): UserProfile {
+  return {
+    uid: meta.uid,
+    firstName: '',
+    lastName: '',
+    displayName: 'Pending profile',
+    email: '',
+    phone: '',
+    smsOptIn: null,
+    homeStreet: '',
+    homeCity: '',
+    homeRegion: '',
+    homePostalCode: '',
+    homeAddress: '',
+    roles: meta.roles,
+    teamIds: meta.teamIds,
+    fanTeamIds: meta.fanTeamIds,
+    profileComplete: false,
+    joinedAt: meta.joinedAt,
+  };
+}
 
 /**
  * Subscribe to org membership, then load each users/{uid} profile.
@@ -58,35 +114,10 @@ export function subscribeOrgRoster(
     for (const [uid, meta] of memberMeta) {
       const profile = profiles.get(uid);
       if (profile) {
-        list.push({
-          ...profile,
-          roles: meta.roles.length ? meta.roles : profile.roles,
-          teamIds: meta.teamIds.length ? meta.teamIds : profile.teamIds,
-          fanTeamIds:
-            meta.fanTeamIds.length > 0
-              ? meta.fanTeamIds
-              : profile.fanTeamIds,
-        });
+        list.push(withMemberMeta(profile, meta));
       } else {
         // Member without a user doc yet — stub so assigners still see them.
-        list.push({
-          uid,
-          firstName: '',
-          lastName: '',
-          displayName: uid.slice(0, 8),
-          email: '',
-          phone: '',
-          smsOptIn: null,
-          homeStreet: '',
-          homeCity: '',
-          homeRegion: '',
-          homePostalCode: '',
-          homeAddress: '',
-          roles: meta.roles,
-          teamIds: meta.teamIds,
-          fanTeamIds: meta.fanTeamIds,
-          profileComplete: false,
-        });
+        list.push(pendingMemberStub(meta));
       }
     }
     list.sort((a, b) => a.displayName.localeCompare(b.displayName));
@@ -127,6 +158,7 @@ export function subscribeOrgRoster(
             fanTeamIds: Array.isArray(data.fanTeamIds)
               ? (data.fanTeamIds as string[])
               : [],
+            joinedAt: coerceJoinedAt(data.joinedAt),
           });
         }
         memberMeta = next;
@@ -155,27 +187,29 @@ export async function fetchOrgRoster(orgId: string): Promise<UserProfile[]> {
   const members = await getDocs(collection(database, 'orgs', orgId, 'members'));
   const users: UserProfile[] = [];
   for (const m of members.docs) {
-    const meta = m.data();
-    const roles = Array.isArray(meta.roles) ? (meta.roles as Role[]) : [];
-    const teamIds = Array.isArray(meta.teamIds)
-      ? (meta.teamIds as string[])
-      : [];
-    const fanTeamIds = Array.isArray(meta.fanTeamIds)
-      ? (meta.fanTeamIds as string[])
-      : [];
+    const data = m.data();
+    const memberMeta: OrgMemberMeta = {
+      uid: m.id,
+      roles: Array.isArray(data.roles) ? (data.roles as Role[]) : [],
+      teamIds: Array.isArray(data.teamIds) ? (data.teamIds as string[]) : [],
+      fanTeamIds: Array.isArray(data.fanTeamIds)
+        ? (data.fanTeamIds as string[])
+        : [],
+      joinedAt: coerceJoinedAt(data.joinedAt),
+    };
     const userSnap = await getDoc(doc(database, 'users', m.id));
     if (userSnap.exists()) {
-      const profile = profileFromFirestore(
-        m.id,
-        userSnap.data() as Record<string, unknown>,
+      users.push(
+        withMemberMeta(
+          profileFromFirestore(
+            m.id,
+            userSnap.data() as Record<string, unknown>,
+          ),
+          memberMeta,
+        ),
       );
-      users.push({
-        ...profile,
-        roles: roles.length ? roles : profile.roles,
-        teamIds: teamIds.length ? teamIds : profile.teamIds,
-        fanTeamIds:
-          fanTeamIds.length > 0 ? fanTeamIds : profile.fanTeamIds,
-      });
+    } else {
+      users.push(pendingMemberStub(memberMeta));
     }
   }
   return users.sort((a, b) => a.displayName.localeCompare(b.displayName));

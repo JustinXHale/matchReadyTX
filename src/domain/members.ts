@@ -16,6 +16,31 @@ export function isRegisteredMember(user: UserProfile): boolean {
   return user.roles.length > 0;
 }
 
+/** True when we only have a membership stub (no real profile/name yet). */
+export function isPendingMemberStub(user: UserProfile): boolean {
+  return (
+    !user.profileComplete &&
+    !user.firstName?.trim() &&
+    !user.lastName?.trim() &&
+    (user.displayName === 'Pending profile' || !user.email?.trim())
+  );
+}
+
+/**
+ * Directory label: first + last when present, else displayName.
+ * Prefers preferredName as the given name when set (matches syncDisplayName).
+ */
+export function memberListName(user: UserProfile): string {
+  const given = user.preferredName?.trim() || user.firstName?.trim() || '';
+  const last = user.lastName?.trim() || '';
+  const joined = `${given} ${last}`.trim();
+  if (joined) return joined;
+  const fallback = user.displayName?.trim();
+  if (fallback && fallback !== 'Pending profile') return fallback;
+  if (user.email?.trim()) return user.email.trim();
+  return 'Pending profile';
+}
+
 export function memberMatchesTab(
   user: UserProfile,
   tab: MemberTab,
@@ -27,13 +52,33 @@ export function memberMatchesTab(
   return user.roles.includes('cmo');
 }
 
+export type MembersForTabOptions = {
+  /** When false, hide incomplete / pending stubs (default for non-schedulers). */
+  includeIncomplete?: boolean;
+};
+
 export function membersForTab(
   users: UserProfile[],
   tab: MemberTab,
+  opts: MembersForTabOptions = {},
 ): UserProfile[] {
+  const includeIncomplete = opts.includeIncomplete === true;
   return users
     .filter((u) => memberMatchesTab(u, tab))
-    .sort((a, b) => a.displayName.localeCompare(b.displayName));
+    .filter((u) => includeIncomplete || u.profileComplete)
+    .sort((a, b) => memberListName(a).localeCompare(memberListName(b)));
+}
+
+/** Format membership join date for Scheduler-only UI. */
+export function formatMemberJoinedAt(iso: string | undefined): string | null {
+  if (!iso?.trim()) return null;
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return null;
+  return d.toLocaleDateString(undefined, {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+  });
 }
 
 export function teamNamesForUser(
@@ -106,7 +151,7 @@ export function groupTeamAdminsByTeam(
       teamId: t.id,
       teamName: t.name,
       admins: (byTeam.get(t.id) ?? []).sort((a, b) =>
-        a.displayName.localeCompare(b.displayName),
+        memberListName(a).localeCompare(memberListName(b)),
       ),
     }))
     .sort((a, b) => a.teamName.localeCompare(b.teamName));
@@ -117,7 +162,9 @@ export function groupTeamAdminsByTeam(
     groups.push({
       teamId,
       teamName: teamId,
-      admins: list.sort((a, b) => a.displayName.localeCompare(b.displayName)),
+      admins: list.sort((a, b) =>
+        memberListName(a).localeCompare(memberListName(b)),
+      ),
     });
   }
   groups.sort((a, b) => a.teamName.localeCompare(b.teamName));
@@ -127,7 +174,7 @@ export function groupTeamAdminsByTeam(
       teamId: '_none',
       teamName: 'No team linked',
       admins: unassigned.sort((a, b) =>
-        a.displayName.localeCompare(b.displayName),
+        memberListName(a).localeCompare(memberListName(b)),
       ),
     });
   }

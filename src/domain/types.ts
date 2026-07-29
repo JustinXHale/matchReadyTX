@@ -265,6 +265,8 @@ export interface UserProfile {
   /** When the fan picks “Other” instead of a listed club. */
   fanTeamOther?: string;
   profileComplete: boolean;
+  /** Org membership join time (ISO), from orgs/.../members/{uid}.joinedAt. */
+  joinedAt?: string;
   /** Society referee grade (e.g. 5). Optional — officials may choose “I don’t know”. */
   refereeLevel?: number;
   /**

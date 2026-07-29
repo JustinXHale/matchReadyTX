@@ -17,6 +17,8 @@ import { useApp } from '@/app/AppContext';
 import {
   availabilityForUser,
   formatMemberAddress,
+  formatMemberJoinedAt,
+  memberListName,
   memberSlotLabel,
   pastMatchesForMember,
   rolePillsForMember,
@@ -186,10 +188,16 @@ export function MemberDetailPage() {
     setEditError(null);
   }, [user?.uid]);
 
+  const listName = user ? memberListName(user) : '';
+  const joinedLabel =
+    user && canSeeAssignerPii
+      ? formatMemberJoinedAt(user.joinedAt)
+      : null;
+
   const matchBack: BackNav | undefined = user
     ? {
         to: `/members/${user.uid}`,
-        label: user.displayName,
+        label: listName,
         state: location.state,
       }
     : undefined;
@@ -412,7 +420,7 @@ export function MemberDetailPage() {
           <UserAvatar user={user} size="md" />
           <div>
             <Title headingLevel="h1" size="lg" id="member-name">
-              {user.displayName}
+              {listName}
             </Title>
             <div className="rs-label-row" aria-label="Roles">
               {pills.map((p) => (
@@ -420,6 +428,9 @@ export function MemberDetailPage() {
                   {p}
                 </span>
               ))}
+              {canManage && !user.profileComplete && (
+                <span className="rs-pill">Incomplete</span>
+              )}
               {user.refereeLevel != null && (
                 <span className="rs-pill">Level {user.refereeLevel}</span>
               )}
@@ -427,6 +438,9 @@ export function MemberDetailPage() {
                 <span className="rs-pill">Assessed {user.assessedLevel}</span>
               )}
             </div>
+            {joinedLabel ? (
+              <p className="rs-match-card__meta">Joined {joinedLabel}</p>
+            ) : null}
           </div>
         </div>
       </section>
@@ -778,7 +792,7 @@ export function MemberDetailPage() {
         />
         <ModalBody className="rs-form-stack">
           <p id="remove-member-desc" className="rs-modal-lede">
-            Permanently delete <strong>{user.displayName}</strong>? This removes
+            Permanently delete <strong>{listName}</strong>? This removes
             their society membership, profile, and Firebase login. They will
             need to sign in again to rejoin.
           </p>

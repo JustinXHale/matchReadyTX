@@ -20,7 +20,7 @@ import {
 } from '@/domain/profile';
 import { confirmTeam, releaseMatch } from '@/domain/matchTransitions';
 import { assignOfficial, confirmOfficialSlot, markUnavailableAndRelease } from '@/domain/crew';
-import { emptyCrew, crewBlocks, crewPeople, emptyCrewBlocks, isCrewVisibleToTeams, type Match, type OrgSettings } from '@/domain/types';
+import { emptyCrew, crewBlocks, crewPeople, emptyCrewBlocks, isCrewVisibleToTeams, type Match, type OrgSettings, type UserProfile } from '@/domain/types';
 import {
   matchFromFixtureRequest,
   newAppMatchId,
@@ -52,7 +52,10 @@ import {
 } from '@/domain/availability';
 import { matchesForUser, applyMatchScope } from '@/domain/visibility';
 import {
+  formatMemberJoinedAt,
+  memberListName,
   memberMatchesTab,
+  membersForTab,
   rolePillsForMember,
 } from '@/domain/members';
 import { defaultRoleView, lensesForUser } from '@/app/AppContext';
@@ -1125,5 +1128,66 @@ describe('fan role helpers', () => {
         roles: ['assigner', 'fan'],
       }),
     ).toBe('scheduler');
+  });
+});
+
+describe('member directory helpers', () => {
+  const base: UserProfile = {
+    uid: 'u1',
+    firstName: 'Ada',
+    lastName: 'Lovelace',
+    preferredName: 'Addy',
+    displayName: 'Ada Lovelace',
+    email: 'ada@x.com',
+    phone: '5125550100',
+    smsOptIn: false,
+    homeStreet: '1 Main',
+    homeCity: 'Austin',
+    homeRegion: 'TX',
+    homePostalCode: '78701',
+    homeAddress: '1 Main, Austin, TX 78701',
+    roles: ['official'],
+    teamIds: [],
+    profileComplete: true,
+    joinedAt: '2026-07-01T12:00:00.000Z',
+  };
+
+  it('memberListName prefers preferred + last, then first + last', () => {
+    expect(memberListName(base)).toBe('Addy Lovelace');
+    expect(
+      memberListName({ ...base, preferredName: undefined }),
+    ).toBe('Ada Lovelace');
+    expect(
+      memberListName({
+        ...base,
+        firstName: '',
+        lastName: '',
+        preferredName: undefined,
+        displayName: 'Pending profile',
+        email: '',
+      }),
+    ).toBe('Pending profile');
+  });
+
+  it('membersForTab hides incomplete unless includeIncomplete', () => {
+    const incomplete: UserProfile = {
+      ...base,
+      uid: 'u2',
+      profileComplete: false,
+      firstName: '',
+      lastName: '',
+      displayName: 'Pending profile',
+    };
+    const users = [base, incomplete];
+    expect(membersForTab(users, 'referees')).toHaveLength(1);
+    expect(
+      membersForTab(users, 'referees', { includeIncomplete: true }),
+    ).toHaveLength(2);
+  });
+
+  it('formatMemberJoinedAt formats ISO dates', () => {
+    expect(formatMemberJoinedAt(undefined)).toBeNull();
+    expect(formatMemberJoinedAt('not-a-date')).toBeNull();
+    expect(formatMemberJoinedAt(base.joinedAt)).toMatch(/2026/);
   });
 });
