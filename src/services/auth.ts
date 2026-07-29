@@ -25,12 +25,11 @@ export function requireAuth() {
   return auth;
 }
 
-/** Mobile / iPad — popup auth is unreliable; prefer full-page redirect. */
-function prefersRedirectSignIn(): boolean {
+/** Rough mobile / iPad detection — used only for popup-blocked fallback. */
+function isMobileClient(): boolean {
   if (typeof navigator === 'undefined') return false;
   const ua = navigator.userAgent || '';
   if (/Android|iPhone|iPad|iPod|Mobile/i.test(ua)) return true;
-  // iPadOS desktop UA with touch
   return navigator.maxTouchPoints > 1 && /Macintosh/i.test(ua);
 }
 
@@ -39,8 +38,7 @@ function isPopupBlockedError(err: unknown): boolean {
     err && typeof err === 'object' && 'code' in err
       ? String((err as { code: unknown }).code)
       : '';
-  // Only true blocks — do NOT treat cancelled-popup-request as blocked (causes
-  // a bad redirect race). Desktop redirect after block also breaks IDE browsers.
+  // Only true blocks — do NOT treat cancelled-popup-request as blocked.
   return (
     code === 'auth/popup-blocked' ||
     (err instanceof Error &&
@@ -49,22 +47,20 @@ function isPopupBlockedError(err: unknown): boolean {
   );
 }
 
+/**
+ * Prefer popup everywhere. Redirect loses sessionStorage state on many mobile
+ * browsers ("missing initial state") — only use it when the popup is blocked
+ * on a phone/tablet.
+ */
 async function signInWithProvider(
   provider: AuthProvider,
 ): Promise<User | null> {
   const a = requireAuth();
-  if (prefersRedirectSignIn()) {
-    await signInWithRedirect(a, provider);
-    return null;
-  }
   try {
     const result = await signInWithPopup(a, provider);
     return result.user;
   } catch (err) {
-    // Mobile only: popup often blocked → full-page redirect.
-    // Desktop: surface the error (redirect leaves IDE/Simple Browser on a white
-    // __/auth/handler page and never returns a session).
-    if (isPopupBlockedError(err) && prefersRedirectSignIn()) {
+    if (isPopupBlockedError(err) && isMobileClient()) {
       await signInWithRedirect(a, provider);
       return null;
     }
