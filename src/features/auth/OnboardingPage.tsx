@@ -51,6 +51,22 @@ const ROLE_OPTIONS = [
   },
 ];
 
+/** Stock rugby stills for step placeholders (from /img → public/img). */
+const STEP_VISUALS: Partial<Record<StepId, string>> = {
+  roles: '/img/onboard-4.jpg',
+  firstName: '/img/onboard-5.jpg',
+  lastName: '/img/onboard-1.jpeg',
+  phone: '/img/onboard-2.jpeg',
+  homeAddress: '/img/onboard-3.jpeg',
+  birthday: '/img/onboard-6.png',
+  // refereeLevel uses RefereeLevelChart instead
+  refereeingSince: '/img/onboard-5.jpg',
+  kitSizes: '/img/onboard-1.jpeg',
+  photo: '/img/onboard-3.jpeg',
+};
+
+const PHOTO_PLACEHOLDER = STEP_VISUALS.photo!;
+
 export function OnboardingPage() {
   const { currentUser, store, dataMode } = useApp();
   const navigate = useNavigate();
@@ -306,6 +322,7 @@ export function OnboardingPage() {
 
   const isLast = safeIndex >= steps.length - 1;
   const copy = stepCopy(step, firstName);
+  const stepVisual = STEP_VISUALS[step];
 
   return (
     <div className="rs-onboard">
@@ -329,6 +346,11 @@ export function OnboardingPage() {
         </p>
         <h1 className="rs-onboard__question">{copy.title}</h1>
         {copy.hint && <p className="rs-onboard__hint">{copy.hint}</p>}
+        {step !== 'photo' && stepVisual && (
+          <div className="rs-onboard__visual" aria-hidden>
+            <img src={stepVisual} alt="" className="rs-onboard__visual-img" />
+          </div>
+        )}
 
         <div className="rs-onboard__answer">
           {step === 'firstName' && (
@@ -589,7 +611,11 @@ export function OnboardingPage() {
                 {photoUrl ? (
                   <img src={photoUrl} alt="" />
                 ) : (
-                  <span>No photo yet</span>
+                  <img
+                    src={PHOTO_PLACEHOLDER}
+                    alt=""
+                    className="rs-onboard__photo-preview-placeholder"
+                  />
                 )}
               </div>
               <input

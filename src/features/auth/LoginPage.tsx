@@ -71,10 +71,6 @@ export function LoginPage() {
     navigate('/demo');
   };
 
-  const startOnboarding = () => {
-    navigate('/demo/onboarding');
-  };
-
   const onGoogle = async () => {
     if (!isFirebaseConfigured) {
       setAuthNote(
@@ -153,18 +149,7 @@ export function LoginPage() {
             {authNote}
           </p>
         )}
-        <p className="rs-signin__legal">
-          Email and phone are required after sign-in. SMS only if you opt in.
-        </p>
       </section>
-
-      {showcaseEnabled && (
-        <p className="rs-signin__onboard-link">
-          <button type="button" onClick={startOnboarding}>
-            Test onboarding
-          </button>
-        </p>
-      )}
     </div>
   );
 }

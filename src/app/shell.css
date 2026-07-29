@@ -2906,14 +2906,16 @@ button.rs-detail-people__confirm:focus-visible {
   aspect-ratio: 16 / 9;
   margin: 16px 0 4px;
   border-radius: 12px;
-  border: 1px dashed var(--rs-color-border);
-  background:
-    linear-gradient(
-      135deg,
-      var(--rs-color-surface-muted) 0%,
-      color-mix(in srgb, var(--rs-color-border) 55%, white) 100%
-    );
+  border: 1px solid var(--rs-color-border);
+  background: var(--rs-color-surface-muted);
   overflow: hidden;
+}
+
+.rs-onboard__visual-img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
 }
 
 .rs-onboard__visual-mark {
