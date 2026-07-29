@@ -257,10 +257,13 @@ export interface UserProfile {
   roles: Role[];
   teamIds: string[];
   /**
-   * Favorite clubs for Fan lens schedule filters. Empty / omit = general society fan.
+   * Favorite club for Fan lens schedule filters. Empty / omit = general society fan
+   * (or free-text via fanTeamOther). At most one id — single selection in UI.
    * Not the same as teamIds (Team Admin club ownership).
    */
   fanTeamIds?: string[];
+  /** When the fan picks “Other” instead of a listed club. */
+  fanTeamOther?: string;
   profileComplete: boolean;
   /** Society referee grade (e.g. 5). Optional — officials may choose “I don’t know”. */
   refereeLevel?: number;

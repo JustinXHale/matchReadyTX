@@ -5,7 +5,7 @@ import {
   useState,
   type KeyboardEvent,
 } from 'react';
-import { Button, TextInput } from '@patternfly/react-core';
+import { Button, FormSelect, FormSelectOption, TextInput } from '@patternfly/react-core';
 import { useNavigate } from 'react-router-dom';
 import { defaultRoleView, ROLE_HOME, useApp } from '@/app/AppContext';
 import { withDemoPrefix } from '@/app/demoPaths';
@@ -118,8 +118,14 @@ export function OnboardingPage() {
   const [roleTeamAdmin, setRoleTeamAdmin] = useState(false);
   const [roleCmo, setRoleCmo] = useState(false);
   const [roleFan, setRoleFan] = useState(false);
-  const [fanTeamIds, setFanTeamIds] = useState<string[]>(
-    () => currentUser?.fanTeamIds ?? [],
+  const [fanFavoriteChoice, setFanFavoriteChoice] = useState(() => {
+    const other = currentUser?.fanTeamOther?.trim();
+    if (other) return 'other';
+    const id = currentUser?.fanTeamIds?.[0];
+    return id ?? 'general';
+  });
+  const [fanTeamOther, setFanTeamOther] = useState(
+    () => currentUser?.fanTeamOther ?? '',
   );
   const [birthday, setBirthday] = useState(
     currentUser?.birthday?.slice(0, 10) ?? '',
@@ -189,12 +195,21 @@ export function OnboardingPage() {
   const levelNum = Number(refereeLevel);
   const rolesOk = roleOfficial || roleTeamAdmin || roleCmo || roleFan;
 
-  const toggleFanTeam = (teamId: string) => {
-    setFanTeamIds((prev) =>
-      prev.includes(teamId)
-        ? prev.filter((id) => id !== teamId)
-        : [...prev, teamId],
-    );
+  const fanFavoritePayload = (): {
+    fanTeamIds: string[];
+    fanTeamOther: string | undefined;
+  } => {
+    if (!roleFan) return { fanTeamIds: [], fanTeamOther: undefined };
+    if (fanFavoriteChoice === 'general') {
+      return { fanTeamIds: [], fanTeamOther: undefined };
+    }
+    if (fanFavoriteChoice === 'other') {
+      return {
+        fanTeamIds: [],
+        fanTeamOther: fanTeamOther.trim() || undefined,
+      };
+    }
+    return { fanTeamIds: [fanFavoriteChoice], fanTeamOther: undefined };
   };
 
   const stepValid = (): boolean => {
@@ -226,6 +241,9 @@ export function OnboardingPage() {
       case 'kitSizes':
         return Boolean(jerseySize) && Boolean(shortsSize);
       case 'favoriteTeams':
+        if (fanFavoriteChoice === 'other') {
+          return Boolean(fanTeamOther.trim());
+        }
         return true;
       case 'photo':
         return true;
@@ -242,6 +260,8 @@ export function OnboardingPage() {
     if (roleFan) roles.push('fan');
     if (currentUser.roles.includes('assigner')) roles.push('assigner');
 
+    const favorite = fanFavoritePayload();
+
     const patch: Parameters<typeof store.updateProfile>[1] = {
       firstName: firstName.trim(),
       lastName: lastName.trim(),
@@ -252,7 +272,8 @@ export function OnboardingPage() {
       roles,
       birthday: fanOnly ? undefined : birthday.trim(),
       photoUrl,
-      fanTeamIds: roleFan ? fanTeamIds : [],
+      fanTeamIds: favorite.fanTeamIds,
+      fanTeamOther: favorite.fanTeamOther,
     };
 
     if (needsRefDetails) {
@@ -334,8 +355,8 @@ export function OnboardingPage() {
       step !== 'roles' &&
       step !== 'homeAddress' &&
       step !== 'kitSizes' &&
-      step !== 'favoriteTeams' &&
-      step !== 'photo'
+      step !== 'photo' &&
+      !(step === 'favoriteTeams' && fanFavoriteChoice !== 'other')
     ) {
       e.preventDefault();
       goNext();
@@ -531,74 +552,36 @@ export function OnboardingPage() {
             </div>
           )}
           {step === 'favoriteTeams' && (
-            <div
-              className="rs-onboard__choices"
-              role="group"
-              aria-label="Favorite teams"
-            >
-              <button
-                type="button"
-                className={`rs-onboard__choice rs-onboard__choice--multi${
-                  fanTeamIds.length === 0 ? ' rs-onboard__choice--selected' : ''
-                }`}
-                aria-pressed={fanTeamIds.length === 0}
-                onClick={() => setFanTeamIds([])}
+            <div className="rs-onboard__favorite">
+              <FormSelect
+                id="ob-fan-favorite"
+                value={fanFavoriteChoice}
+                onChange={(_, v) => {
+                  setFanFavoriteChoice(v);
+                  if (v !== 'other') setFanTeamOther('');
+                }}
+                aria-label="Favorite team"
+                className="rs-onboard__input"
               >
-                <span
-                  className={`rs-onboard__check${
-                    fanTeamIds.length === 0 ? ' rs-onboard__check--on' : ''
-                  }`}
-                  aria-hidden
-                >
-                  {fanTeamIds.length === 0 ? (
-                    <svg viewBox="0 0 20 20" width="14" height="14">
-                      <path
-                        fill="currentColor"
-                        d="M7.6 13.2 4.4 10l-1.2 1.2 4.4 4.4L17 6.2 15.8 5z"
-                      />
-                    </svg>
-                  ) : null}
-                </span>
-                <span className="rs-onboard__choice-text">
-                  <strong>General</strong>
-                  <span>Follow the whole society schedule</span>
-                </span>
-              </button>
-              {[...state.teams]
-                .sort((a, b) => a.name.localeCompare(b.name))
-                .map((t) => {
-                  const checked = fanTeamIds.includes(t.id);
-                  return (
-                    <button
-                      key={t.id}
-                      type="button"
-                      className={`rs-onboard__choice rs-onboard__choice--multi${
-                        checked ? ' rs-onboard__choice--selected' : ''
-                      }`}
-                      aria-pressed={checked}
-                      onClick={() => toggleFanTeam(t.id)}
-                    >
-                      <span
-                        className={`rs-onboard__check${
-                          checked ? ' rs-onboard__check--on' : ''
-                        }`}
-                        aria-hidden
-                      >
-                        {checked ? (
-                          <svg viewBox="0 0 20 20" width="14" height="14">
-                            <path
-                              fill="currentColor"
-                              d="M7.6 13.2 4.4 10l-1.2 1.2 4.4 4.4L17 6.2 15.8 5z"
-                            />
-                          </svg>
-                        ) : null}
-                      </span>
-                      <span className="rs-onboard__choice-text">
-                        <strong>{t.name}</strong>
-                      </span>
-                    </button>
-                  );
-                })}
+                <FormSelectOption value="general" label="General (whole society)" />
+                {[...state.teams]
+                  .sort((a, b) => a.name.localeCompare(b.name))
+                  .map((t) => (
+                    <FormSelectOption key={t.id} value={t.id} label={t.name} />
+                  ))}
+                <FormSelectOption value="other" label="Other" />
+              </FormSelect>
+              {fanFavoriteChoice === 'other' && (
+                <TextInput
+                  ref={inputRef}
+                  id="ob-fan-other"
+                  value={fanTeamOther}
+                  onChange={(_, v) => setFanTeamOther(v)}
+                  aria-label="Other team name"
+                  className="rs-onboard__input"
+                  placeholder="Team name"
+                />
+              )}
             </div>
           )}
           {step === 'birthday' && (
@@ -873,8 +856,8 @@ function stepCopy(
       };
     case 'favoriteTeams':
       return {
-        title: 'Any favorite teams?',
-        hint: 'Optional — pick clubs to follow, or leave as General for the full schedule.',
+        title: 'Any favorite team?',
+        hint: 'Pick one club, General for the full schedule, or Other to type a name.',
       };
     case 'birthday':
       return {

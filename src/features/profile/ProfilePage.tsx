@@ -5,6 +5,8 @@ import {
   Form,
   FormGroup,
   FormHelperText,
+  FormSelect,
+  FormSelectOption,
   HelperText,
   HelperTextItem,
   TextInput,
@@ -55,8 +57,14 @@ export function ProfilePage() {
   const [roleFan, setRoleFan] = useState(
     Boolean(currentUser?.roles.includes('fan')),
   );
-  const [fanTeamIds, setFanTeamIds] = useState<string[]>(
-    () => currentUser?.fanTeamIds ?? [],
+  const [fanFavoriteChoice, setFanFavoriteChoice] = useState(() => {
+    const other = currentUser?.fanTeamOther?.trim();
+    if (other) return 'other';
+    const id = currentUser?.fanTeamIds?.[0];
+    return id ?? 'general';
+  });
+  const [fanTeamOther, setFanTeamOther] = useState(
+    () => currentUser?.fanTeamOther ?? '',
   );
   const [birthday, setBirthday] = useState(
     currentUser?.birthday?.slice(0, 10) ?? '',
@@ -92,11 +100,16 @@ export function ProfilePage() {
   const levelOk =
     levelUnknown ||
     (Number.isFinite(levelNum) && levelNum >= 1 && levelNum <= 20);
+  const fanFavoriteOk =
+    !roleFan ||
+    fanFavoriteChoice !== 'other' ||
+    Boolean(fanTeamOther.trim());
   const canSave =
     Boolean(firstName.trim()) &&
     Boolean(lastName.trim()) &&
     Boolean(email.trim()) &&
     rolesOk &&
+    fanFavoriteOk &&
     (fanOnly
       ? true
       : Boolean(phone.trim()) &&
@@ -140,6 +153,16 @@ export function ProfilePage() {
     if (roleFan) roles.push('fan');
     if (currentUser.roles.includes('assigner')) roles.push('assigner');
 
+    let nextFanTeamIds: string[] = [];
+    let nextFanTeamOther: string | undefined;
+    if (roleFan) {
+      if (fanFavoriteChoice === 'other') {
+        nextFanTeamOther = fanTeamOther.trim() || undefined;
+      } else if (fanFavoriteChoice !== 'general') {
+        nextFanTeamIds = [fanFavoriteChoice];
+      }
+    }
+
     const patch: Parameters<typeof store.updateProfile>[1] = {
       firstName: firstName.trim(),
       lastName: lastName.trim(),
@@ -150,7 +173,8 @@ export function ProfilePage() {
       roles,
       birthday: fanOnly ? undefined : birthday.trim(),
       photoUrl,
-      fanTeamIds: roleFan ? fanTeamIds : [],
+      fanTeamIds: nextFanTeamIds,
+      fanTeamOther: nextFanTeamOther,
     };
     if (needsRefDetails) {
       patch.homeStreet = homeStreet.trim();
@@ -332,38 +356,40 @@ export function ProfilePage() {
         </FormGroup>
 
         {roleFan && (
-          <FormGroup label="Favorite teams">
-            <div className="rs-onboarding__roles">
-              <Checkbox
-                id="pf-fan-general"
+          <FormGroup label="Favorite team">
+            <FormSelect
+              id="pf-fan-favorite"
+              value={fanFavoriteChoice}
+              onChange={(_, v) => {
+                setFanFavoriteChoice(v);
+                if (v !== 'other') setFanTeamOther('');
+              }}
+              aria-label="Favorite team"
+            >
+              <FormSelectOption
+                value="general"
                 label="General (whole society)"
-                isChecked={fanTeamIds.length === 0}
-                onChange={(_, v) => {
-                  if (v) setFanTeamIds([]);
-                }}
               />
               {[...state.teams]
                 .sort((a, b) => a.name.localeCompare(b.name))
                 .map((t) => (
-                  <Checkbox
-                    key={t.id}
-                    id={`pf-fan-team-${t.id}`}
-                    label={t.name}
-                    isChecked={fanTeamIds.includes(t.id)}
-                    onChange={(_, v) => {
-                      setFanTeamIds((prev) =>
-                        v
-                          ? [...prev.filter((id) => id !== t.id), t.id]
-                          : prev.filter((id) => id !== t.id),
-                      );
-                    }}
-                  />
+                  <FormSelectOption key={t.id} value={t.id} label={t.name} />
                 ))}
-            </div>
+              <FormSelectOption value="other" label="Other" />
+            </FormSelect>
+            {fanFavoriteChoice === 'other' && (
+              <TextInput
+                className="pf-v6-u-mt-sm"
+                value={fanTeamOther}
+                onChange={(_, v) => setFanTeamOther(v)}
+                aria-label="Other team name"
+                placeholder="Team name"
+              />
+            )}
             <FormHelperText>
               <HelperText>
                 <HelperTextItem>
-                  Optional — used to filter Global schedule to your clubs.
+                  Used to filter Global schedule when you pick a listed club.
                 </HelperTextItem>
               </HelperText>
             </FormHelperText>

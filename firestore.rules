@@ -30,7 +30,7 @@ service cloud.firestore {
           'phone', 'smsOptIn',
           'homeStreet', 'homeUnit', 'homeCity', 'homeRegion', 'homePostalCode',
           'homeAddress', 'homeLat', 'homeLng',
-          'roles', 'teamIds', 'fanTeamIds',
+          'roles', 'teamIds', 'fanTeamIds', 'fanTeamOther',
           'refereeLevel', 'assessedLevel',
           'refereeingSince', 'birthday', 'jerseySize', 'shortsSize',
           'photoUrl', 'competitionAccess', 'profileComplete', 'updatedAt'
@@ -87,7 +87,7 @@ service cloud.firestore {
           signedIn()
           && request.auth.uid == uid
           && request.resource.data.diff(resource.data).affectedKeys()
-            .hasOnly(['roles', 'teamIds', 'fanTeamIds', 'updatedAt'])
+            .hasOnly(['roles', 'teamIds', 'fanTeamIds', 'fanTeamOther', 'updatedAt'])
           && request.resource.data.roles is list
           && request.resource.data.teamIds is list
           && ('assigner' in resource.data.roles) == ('assigner' in request.resource.data.roles)

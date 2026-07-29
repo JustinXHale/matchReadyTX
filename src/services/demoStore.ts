@@ -2078,6 +2078,12 @@ class DemoStore {
         ) {
           delete next.assessedLevel;
         }
+        if (
+          Object.prototype.hasOwnProperty.call(patch, 'fanTeamOther') &&
+          !next.fanTeamOther?.trim()
+        ) {
+          delete next.fanTeamOther;
+        }
         next.profileComplete = isProfileComplete(next);
         return next;
       }),

@@ -211,6 +211,7 @@ export async function saveAssignerMemberProfile(
       roles: saved.roles,
       teamIds: saved.teamIds,
       fanTeamIds: saved.fanTeamIds ?? [],
+      fanTeamOther: saved.fanTeamOther ?? null,
       updatedAt: new Date().toISOString(),
     },
     { merge: true },

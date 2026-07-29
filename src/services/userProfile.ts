@@ -102,6 +102,10 @@ export function profileFromFirestore(
     fanTeamIds: Array.isArray(data.fanTeamIds)
       ? (data.fanTeamIds as string[])
       : undefined,
+    fanTeamOther:
+      typeof data.fanTeamOther === 'string' && data.fanTeamOther.trim()
+        ? data.fanTeamOther.trim()
+        : undefined,
     profileComplete: false,
     refereeLevel:
       typeof data.refereeLevel === 'number' ? data.refereeLevel : undefined,
@@ -217,6 +221,7 @@ export async function saveFirebaseProfile(
     roles: next.roles,
     teamIds: next.teamIds,
     fanTeamIds: next.fanTeamIds ?? [],
+    fanTeamOther: next.fanTeamOther?.trim() || null,
     profileComplete: next.profileComplete,
     refereeLevel: next.refereeLevel,
     assessedLevel: next.assessedLevel,
@@ -237,6 +242,7 @@ export async function saveFirebaseProfile(
       roles: next.roles,
       teamIds: next.teamIds,
       fanTeamIds: next.fanTeamIds ?? [],
+      fanTeamOther: next.fanTeamOther ?? null,
       updatedAt: serverTimestamp(),
     },
     { merge: true },

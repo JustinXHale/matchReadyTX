@@ -3425,6 +3425,12 @@ button.rs-detail-people__confirm:focus-visible {
   gap: var(--rs-space-md);
 }
 
+.rs-onboard__favorite {
+  display: flex;
+  flex-direction: column;
+  gap: var(--rs-space-md);
+}
+
 .rs-onboard__address-row {
   display: grid;
   grid-template-columns: 1fr 1fr;
