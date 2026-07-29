@@ -64,6 +64,15 @@ body {
   letter-spacing: -0.02em;
 }
 
+.rs-brand-logo {
+  display: block;
+  width: 32px;
+  height: 32px;
+  object-fit: contain;
+  flex-shrink: 0;
+  border-radius: 6px;
+}
+
 .rs-brand-row {
   display: inline-flex;
   align-items: center;
@@ -113,15 +122,18 @@ body {
 .rs-signin__hero {
   display: flex;
   flex-direction: column;
+  align-items: center;
   gap: var(--pf-t--global--spacer--sm);
   text-align: center;
 }
 
-.rs-signin__brand {
-  margin: 0;
-  font: 700 2rem/1.15 var(--rs-font-family);
-  letter-spacing: -0.03em;
-  color: var(--rs-color-ink);
+.rs-signin__logo {
+  display: block;
+  width: min(280px, 72vw);
+  height: auto;
+  aspect-ratio: 1;
+  object-fit: contain;
+  border-radius: 28px;
 }
 
 .rs-signin__lede {

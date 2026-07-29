@@ -199,6 +199,14 @@ export function MobileShell() {
               <MastheadBrand className="rs-masthead__brand">
                 <span className="rs-brand-block">
                   <span className="rs-brand-row">
+                    <img
+                      className="rs-brand-logo"
+                      src="/matchReadyLogo.png"
+                      alt=""
+                      width={32}
+                      height={32}
+                      decoding="async"
+                    />
                     <span className="rs-brand">MatchReadyTX</span>
                     {isDemoShowcase && (
                       <span

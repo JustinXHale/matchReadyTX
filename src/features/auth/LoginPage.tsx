@@ -121,15 +121,17 @@ export function LoginPage() {
   return (
     <div className="rs-signin">
       <header className="rs-signin__hero">
-        <p className="rs-signin__brand">MatchReadyTX</p>
+        <img
+          className="rs-signin__logo"
+          src="/matchReadyLogo.png"
+          alt="MatchReadyTX"
+          width={280}
+          height={280}
+          decoding="async"
+        />
         <p className="rs-signin__lede">
           Sign in securely with your Google or Apple account
         </p>
-        {isFirebaseConfigured && (
-          <p className="rs-signin__legal">
-            Connected to Firebase project matchreadytx
-          </p>
-        )}
       </header>
 
       <section className="rs-signin__providers" aria-label="Sign in">
