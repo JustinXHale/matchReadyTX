@@ -52,6 +52,7 @@ import {
 } from '@/domain/availability';
 import { matchesForUser, applyMatchScope } from '@/domain/visibility';
 import {
+  fanFavoriteLabel,
   formatMemberJoinedAt,
   memberListName,
   memberMatchesTab,
@@ -1189,5 +1190,22 @@ describe('member directory helpers', () => {
     expect(formatMemberJoinedAt(undefined)).toBeNull();
     expect(formatMemberJoinedAt('not-a-date')).toBeNull();
     expect(formatMemberJoinedAt(base.joinedAt)).toMatch(/2026/);
+  });
+
+  it('fanFavoriteLabel resolves team name or other text', () => {
+    const teams = [{ id: 't1', name: 'Austin Blacks' }] as const;
+    expect(
+      fanFavoriteLabel(
+        { ...base, roles: ['fan'], fanTeamIds: ['t1'] },
+        [...teams],
+      ),
+    ).toBe('Austin Blacks');
+    expect(
+      fanFavoriteLabel(
+        { ...base, roles: ['fan'], fanTeamOther: 'Visiting club' },
+        [...teams],
+      ),
+    ).toBe('Visiting club');
+    expect(fanFavoriteLabel({ ...base, roles: ['fan'] }, [...teams])).toBeNull();
   });
 });

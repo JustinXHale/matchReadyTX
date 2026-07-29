@@ -9,6 +9,7 @@ import {
   AppleSignInButton,
   GoogleSignInButton,
 } from '@/features/auth/SocialSignInButtons';
+import { PwaInstallCard } from '@/ui/PwaInstallCard';
 
 function authErrorMessage(provider: 'Google' | 'Apple', err: unknown): string {
   const message =
@@ -162,6 +163,8 @@ export function LoginPage() {
           </p>
         )}
       </section>
+
+      <PwaInstallCard className="rs-signin__pwa" />
     </div>
   );
 }

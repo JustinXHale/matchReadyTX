@@ -16,6 +16,7 @@ import {
 import { useApp } from '@/app/AppContext';
 import {
   availabilityForUser,
+  fanFavoriteLabel,
   formatMemberAddress,
   formatMemberJoinedAt,
   memberListName,
@@ -220,6 +221,8 @@ export function MemberDetailPage() {
   const isOfficialLens =
     user.roles.includes('official') || user.roles.includes('cmo');
   const isTeamAdmin = user.roles.includes('teamAdmin');
+  const isFan = user.roles.includes('fan');
+  const fanFavorite = isFan ? fanFavoriteLabel(user, state.teams) : null;
   const isSelf = currentUser?.uid === user.uid;
   const canDelete = canManage && !isSelf;
 
@@ -440,6 +443,9 @@ export function MemberDetailPage() {
             </div>
             {joinedLabel ? (
               <p className="rs-match-card__meta">Joined {joinedLabel}</p>
+            ) : null}
+            {fanFavorite ? (
+              <p className="rs-match-card__meta">Favorite: {fanFavorite}</p>
             ) : null}
           </div>
         </div>

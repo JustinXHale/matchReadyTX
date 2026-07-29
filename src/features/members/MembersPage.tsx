@@ -4,6 +4,7 @@ import { EmptyState, EmptyStateBody, Title } from '@patternfly/react-core';
 import { useApp } from '@/app/AppContext';
 import {
   formatMemberScheduleHint,
+  fanFavoriteLabel,
   groupTeamAdminsByTeam,
   memberListName,
   membersForTab,
@@ -276,6 +277,8 @@ export function MembersPage() {
         >
           {members.map((user) => {
             const teams = teamNamesForUser(user, state.teams);
+            const fanFavorite =
+              tab === 'fans' ? fanFavoriteLabel(user, state.teams) : null;
             const next =
               tab === 'referees' || tab === 'cmos'
                 ? nextMatchForMember(state.matches, user.uid)
@@ -296,7 +299,7 @@ export function MembersPage() {
                       ? teams.length > 0
                         ? teams.join(' · ')
                         : 'No teams linked'
-                      : null
+                      : fanFavorite
                   }
                   scheduleHint={scheduleHint}
                 />

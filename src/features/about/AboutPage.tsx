@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Title } from '@patternfly/react-core';
 import { useApp } from '@/app/AppContext';
+import { PwaInstallCard } from '@/ui/PwaInstallCard';
 
 const TOC = [
   { id: 'about-why', label: 'Why MatchReadyTX exists' },
@@ -77,6 +78,8 @@ export function AboutPage() {
         </p>
         <p className="rs-match-card__meta">Organization: {state.org.name}</p>
       </header>
+
+      <PwaInstallCard />
 
       <nav className="rs-about-toc" aria-label="On this page">
         <p className="rs-about-toc__label">On this page</p>

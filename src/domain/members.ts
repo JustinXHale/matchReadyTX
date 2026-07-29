@@ -90,6 +90,21 @@ export function teamNamesForUser(
     .filter((n): n is string => Boolean(n));
 }
 
+/** Fan favorite club label (listed team or free-text “Other”). */
+export function fanFavoriteLabel(
+  user: UserProfile,
+  teams: Team[],
+): string | null {
+  const other = user.fanTeamOther?.trim();
+  if (other) return other;
+  const ids = user.fanTeamIds ?? [];
+  for (const id of ids) {
+    const name = teams.find((t) => t.id === id)?.name?.trim();
+    if (name) return name;
+  }
+  return null;
+}
+
 /** Genders each team has appeared in on the schedule. */
 export function teamGendersFromMatches(
   matches: Match[],
