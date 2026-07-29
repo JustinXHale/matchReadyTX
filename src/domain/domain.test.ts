@@ -20,7 +20,7 @@ import {
 } from '@/domain/profile';
 import { confirmTeam, releaseMatch } from '@/domain/matchTransitions';
 import { assignOfficial, confirmOfficialSlot, markUnavailableAndRelease } from '@/domain/crew';
-import { emptyCrew, crewBlocks, crewPeople, emptyCrewBlocks, isCrewVisibleToTeams, type Match, type OrgSettings, type UserProfile } from '@/domain/types';
+import { emptyCrew, crewBlocks, crewPeople, emptyCrewBlocks, isCrewVisibleToTeams, type Match, type OrgSettings, type Team, type UserProfile } from '@/domain/types';
 import {
   matchFromFixtureRequest,
   newAppMatchId,
@@ -1193,19 +1193,21 @@ describe('member directory helpers', () => {
   });
 
   it('fanFavoriteLabel resolves team name or other text', () => {
-    const teams = [{ id: 't1', name: 'Austin Blacks' }] as const;
+    const teams: Team[] = [
+      { id: 't1', name: 'Austin Blacks', contactEmails: [] },
+    ];
     expect(
       fanFavoriteLabel(
         { ...base, roles: ['fan'], fanTeamIds: ['t1'] },
-        [...teams],
+        teams,
       ),
     ).toBe('Austin Blacks');
     expect(
       fanFavoriteLabel(
         { ...base, roles: ['fan'], fanTeamOther: 'Visiting club' },
-        [...teams],
+        teams,
       ),
     ).toBe('Visiting club');
-    expect(fanFavoriteLabel({ ...base, roles: ['fan'] }, [...teams])).toBeNull();
+    expect(fanFavoriteLabel({ ...base, roles: ['fan'] }, teams)).toBeNull();
   });
 });
