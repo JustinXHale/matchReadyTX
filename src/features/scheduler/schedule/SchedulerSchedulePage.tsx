@@ -137,7 +137,7 @@ export function SchedulerSchedulePage() {
 
   return (
     <div className="rs-stack">
-      <Title headingLevel="h2" size="lg">
+      <Title headingLevel="h1" size="lg">
         Schedule
       </Title>
       <p className="rs-match-card__meta">

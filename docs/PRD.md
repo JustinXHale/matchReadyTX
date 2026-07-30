@@ -1,7 +1,7 @@
 # MatchReadyTX — Product Requirements Document (PRD)
 
-**Status:** Draft v0.9 (build defaults locked)  
-**Last updated:** 2026-07-25  
+**Status:** Draft v0.10 (build defaults locked)  
+**Last updated:** 2026-07-29  
 **Owner:** Justin  
 **Product name:** **MatchReadyTX**  
 **Platform:** Progressive Web App (PWA), open source  
@@ -30,12 +30,11 @@ This document is the **product** source of truth for what we are building and wh
 | **Fee model** | Org **default fee structure** by slot (MO / AR / No.4); per-match or tournament **overrides** when needed |
 | **Match economics (display)** | Officials (+ assigner) see **match fee** and optional **flight provided** / **housing provided** indicators — MVP. **Where** opens Maps directions. **Distance / Est. mileage** remain in domain for assigner budgeting and return when driving distance is reliable (Distance Matrix); not shown on match detail today |
 | **Travel perks UI** | Flight / housing are **uncommon**; show as **icons** (or compact badges) when true — do not clutter every match with “not provided” text |
-| **Profile contacts** | **Email and phone are required** for all users |
-| **Q-N2** | Users **must choose SMS opt-in** (yes/no). Email notifications are always on. SMS only if opted in |
+| **Profile contacts** | **Email required** for all; **phone required** for Referee / Team Admin / CMO / Scheduler (not Fan-only) |
+| **Q-N1** | **Email notifications from day one** (only channel) |
 | **Q-T1** | **Vite + React + TypeScript** PWA |
 | **UI** | **PatternFly** |
-| **Q-T2** | **Firebase** (Auth, Firestore, Cloud Functions; FCM later if useful) |
-| **Q-N1** | **Email + SMS from day one** (SMS only to opted-in users) |
+| **Q-T2** | **Firebase** (Auth, Firestore, Cloud Functions) |
 | **Q-V1** | Teams see officials **only after any assigned Match Official has confirmed** the assignment (see §5.5 for crew nuance) |
 | **Q-G1** | Prefer **automatic Sheet sync** (push via Apps Script webhook and/or short-interval pull) |
 | **Q-R4** | Each role type (MO, AR1, AR2, No.4, optional CMO) may have **multiple explicit blocks** (including empty). Assigners add blocks via **Add role** (all types always listed). At least **one Match Official** block is required. Raise-hand stays open until empty blocks are filled |
@@ -103,7 +102,7 @@ Assigners currently manage schedules, contacts, and referee assignments across s
 6. **Teams see officials only after Match Official confirmation** (not merely after assignment).
 7. **Crew model:** role types MO / AR1 / AR2 / No.4 / CMO; **multiple blocks per type** (empty or filled); at least one MO block required. Teams see crew when **any** assigned MO has confirmed. Official Accept/Decline only in Referee lens.
 8. **72-hour dual reconfirm** (teams first, then each assigned official).
-9. **Email for everyone; SMS only if the user opts in** (choice required on profile when phone is collected). **Email is required for all; phone is required for Referee / Team Admin / CMO / Scheduler** (not Fan-only).
+9. **Email for everyone** (account/workflow alerts). **Email is required for all; phone is required for Referee / Team Admin / CMO / Scheduler** (not Fan-only).
 10. **Officials see match fee** and rare **flight / housing** perks when provided; **Where** opens Maps directions. Distance / mileage estimates stay in domain until driving distance is reliable. **Fees stay in-app**, never on the shared Sheet. Fans and teams do not see official fees.
 11. **Lean stack:** Vite + React + PatternFly + Firebase.
 12. **Multi-tenant later** — don’t hard-code a single society into the schema.
@@ -319,7 +318,7 @@ Taps raise-hand / card → match detail request section
 Confirms position (MO / AR1 / AR2 / No.4 / CMO when needed) + optional note
         │
         ▼
-Assigner notified (email; SMS if assigner opted in)
+Assigner notified (email)
         │
         ├── Assigner approves → creates / upgrades assignment for that slot
         │     (same pending_internal → official pipeline as a normal assign)
@@ -495,15 +494,14 @@ Admin links the Sheet. **Automatic sync** keeps the app aligned when the Sheet c
 
 ---
 
-## 8. Notifications (email + SMS from day one)
+## 8. Notifications (email only)
 
 **Contact rules (locked):**
 
-- Every user **must** provide **email** and **phone** (profile incomplete until both are set).
-- Every user **must** choose **SMS opt-in: Yes or No** (explicit decision; no silent default to SMS).
+- Every user **must** provide **email**.
+- **Phone** is required for Referee / Team Admin / CMO / Scheduler (not Fan-only).
 - **Email notifications:** always enabled for account/workflow alerts.
-- **SMS:** sent **only** if `smsOptIn === true`.
-- Assigner notification matrix below uses email always; SMS follows each recipient’s opt-in.
+- **No SMS** — cost and ops; email is the only channel.
 
 ### 8.1 Trigger matrix (v1)
 
@@ -537,10 +535,8 @@ Admin links the Sheet. **Automatic sync** keeps the app aligned when the Sheet c
 | Q-N3 | Soft “tentative hold” for pre-assign? | **No** for v1 (less noise) |
 | Q-N4 | Quiet hours? | Later |
 | Q-N5 | Reminder cadence? | 24h then 12h before kickoff if pending |
-| Q-N6 | PWA Web Push in MVP? | **No** — email/SMS first |
-| Q-N7 | Can user change SMS opt-in later? | **Yes** |
 
-**Providers (implementation lean):** Email via Resend/Postmark/SES; SMS via Twilio; orchestrated from Cloud Functions.
+**Providers (implementation lean):** Email via Resend; orchestrated from Cloud Functions.
 
 ---
 
@@ -558,17 +554,16 @@ Admin links the Sheet. **Automatic sync** keeps the app aligned when the Sheet c
 |-------|-----------|---------|
 | First name + last name | **Yes** | Display (joined as `displayName`); prefilled from email when guessable |
 | Email | **Yes** | Auth + email notify (always); prefilled from sign-in |
-| Phone | **Yes** | Contact + SMS when opted in |
-| SMS opt-in | **Yes (explicit Yes/No)** | Whether to send SMS for workflow alerts |
-| Home address | **Yes** (street, city, state, ZIP; apt/unit optional) | Round-trip distance; Google Address Validation / Places later |
-| Self-selected roles | **Yes** (≥1 of Referee, Team Admin, CMO, Fan) | Access lenses; Scheduler/assigner stays org-granted. Fan-only needs name + email (phone/birthday optional for that path) |
-| Birthday | **Yes** | Society records |
+| Phone | **Yes** for working roles | Contact (Referee / Team Admin / CMO / Scheduler). Not required for Fan-only |
+| Home address | **Yes** when Referee/CMO | Round-trip / future mileage (ZIP↔venue via Maps API — follow-up); apt/unit optional |
+| Self-selected roles | **Yes** (≥1). **Fan XOR working roles** | Fan-only cannot also be Referee/Team Admin/CMO; working roles cannot add Fan. Scheduler/assigner stays org-granted |
+| Birthday | **Yes** for working roles | Society records |
 | Referee level | Optional when Referee/CMO (“I don’t know” allowed) | Assigner placement |
 | Began refereeing | **Yes** when Referee or CMO | Experience signal |
 | Jersey + shorts size | **Yes** when Referee or CMO | Kit ordering |
 | Photo | Optional (≤5 MB JPEG/PNG/WebP); last onboarding step | Profile + assigner surfaces |
 
-Profile onboarding is incomplete until first/last name, email, phone, SMS opt-in, home address, and at least one self-selected role are set (plus referee grade fields when Referee/CMO).
+Profile onboarding is incomplete until required fields for the chosen role path are set. Incomplete profiles are visible to Schedulers only in the Members directory.
 
 ### 9.3 Match economics (display only — in-app)
 
@@ -609,24 +604,22 @@ Profile onboarding is incomplete until first/last name, email, phone, SMS opt-in
 8. Official confirmations; **team crew visibility after MO confirms**  
 9. Fact change → team reconfirm; officials availability check; **unavailable → auto-release**  
 10. T-72: both teams, then each assigned official availability (+ reason on no)  
-11. **Email** for all alerts; **SMS** only when user opted in (email + phone required)  
+11. **Email** for all alerts  
 12. **Official availability ranges** + assigner overlap hints  
 13. **Game requests** (official requests match → assigner approve/decline)  
-14. Official/assigner match view: **fee** + flight/housing **when provided** + **Maps directions**; distance/mileage estimate deferred pending driving-distance API  
+14. Official/assigner match view: **fee** + flight/housing **when provided** + **Maps directions**; distance/mileage estimate deferred pending Maps API (ZIP↔venue)  
 15. Role-based match lists (PatternFly UI); **Global** = Schedule / Standings / Teams; masthead **Referee/CMO | Team Admin | Scheduler | Fan**  
 16. PWA installability (Android-first; iOS secondary)
 
 ### 10.2 Later
 
-- Multi-tenant SaaS billing (org hosting — **not** official fee payouts)  
 - Auto-assign / conflict AI beyond simple availability overlap  
 - Native apps  
-- In-app chat  
 - Public fixture pages  
-- PWA push  
 - Third-party calendar sync (Google) for availability  
+- Driving-distance / mileage display (home ZIP ↔ venue via Google Maps APIs)
 
-**Never:** payment processing, Stripe, fee/mileage reimbursements.
+**Never:** payment processing, Stripe, fee/mileage reimbursements; SMS; in-app chat; PWA push; multi-tenant SaaS billing.
 
 ---
 
@@ -640,8 +633,7 @@ Profile onboarding is incomplete until first/last name, email, phone, SMS opt-in
 | Auth | **Firebase Auth** (Google + Apple) |
 | Data | **Cloud Firestore** |
 | Backend jobs | **Cloud Functions** (sync webhook, T-72, reminders, notify) |
-| Email | Transactional provider (TBD) |
-| SMS | **Twilio** (or equivalent) |
+| Email | Resend (`mail/` queue) |
 | Sheets | Google Sheets API + Apps Script webhook (+ poll fallback) |
 | Hosting | Firebase Hosting **or** Vercel for the SPA; Functions on Firebase |
 
@@ -659,7 +651,7 @@ Profile onboarding is incomplete until first/last name, email, phone, SMS opt-in
 | Audit | Who confirmed what / when (esp. T-72 and declines) |
 | Privacy | No secrets in repo; per-deploy credentials |
 | Accessibility | Mobile-first; PatternFly a11y defaults |
-| Reliability | Failed SMS/email visible to assigner |
+| Reliability | Failed email visible to assigner |
 | Licensing | OSI-friendly TBD (MIT / Apache-2.0) |
 
 ---
@@ -696,7 +688,7 @@ Profile onboarding is incomplete until first/last name, email, phone, SMS opt-in
 | **Q-C2** | Required AR slots by competition — **not MVP** |
 | **License** | **MIT** |
 | **Domain** | Rugby terms (Match Official / AR / Number 4); club contact = **Coach** (= Team Admin) |
-| **Email / SMS** | Resend + Twilio; SMS only if opted in |
+| **Email** | Resend |
 | **Hosting** | Firebase Hosting + Cloud Functions |
 | **Payments** | **Never** — no Stripe / reimbursements |
 | **Q-R6** | **Referee + CMO = one lens** (label **Referee/CMO**); Reports: Match Reports vs Coaching Reports |
@@ -708,7 +700,8 @@ Profile onboarding is incomplete until first/last name, email, phone, SMS opt-in
 - **No payment processing** (forever) — fee/distance/mileage are display-only when shown  
 - No Flutter/native commitment  
 - No fees/pay columns on the shared Google Sheet  
-- No offline-first sync / multi-tenant SaaS billing in v1  
+- No offline-first sync  
+- No SMS, in-app chat, PWA push, or multi-tenant SaaS billing  
 - No separate Coach vs Team Admin products (they are one persona)  
 - No separate CMO masthead role — CMO shares **Referee/CMO**; only Reports routing differs (Match vs Coaching)
 
@@ -738,7 +731,6 @@ See [`IMPLEMENTATION_SPEC.md`](./IMPLEMENTATION_SPEC.md).
 | Flight / housing provided | Per-match flags; shown only when true |
 | Distance | Estimated travel distance from official home address to match venue |
 | Standings | W/L/T and points for/against/differential from scored released matches, by gender × level |
-| SMS opt-in | Required Yes/No profile choice; SMS sent only when Yes |
 | Assignment history chain | Ordered per-slot log of who was assigned, confirmed, declined, or released — and why |
 | Official assignment | Past both-team confirmation gate; notifies the official |
 | Pending internal | Pre-assign visible only to assigner |

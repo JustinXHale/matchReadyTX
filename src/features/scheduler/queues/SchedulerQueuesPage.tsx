@@ -171,7 +171,7 @@ export function SchedulerQueuesPage() {
   if (counts.totalActionable === 0 && notifications.length === 0) {
     return (
       <div className="rs-stack">
-        <Title headingLevel="h2" size="lg">
+        <Title headingLevel="h1" size="lg">
           Queues
         </Title>
         <EmptyState titleText="All clear" headingLevel="h3">
@@ -186,7 +186,7 @@ export function SchedulerQueuesPage() {
 
   return (
     <div className="rs-stack">
-      <Title headingLevel="h2" size="lg">
+      <Title headingLevel="h1" size="lg">
         Queues
       </Title>
       <p className="rs-match-card__meta">
@@ -251,11 +251,19 @@ export function SchedulerQueuesPage() {
         title="Proposals awaiting ack"
         count={counts.proposals}
       >
+        {state.org.sheetSyncError && (
+          <p className="rs-match-card__meta" role="alert">
+            Sheet sync / write-back issue: {state.org.sheetSyncError}. Open
+            Upload to fix and sync.
+          </p>
+        )}
         <ProposalQueueList
           proposals={proposals}
           matches={state.matches}
           emptyText="No change proposals waiting on you."
-          onAcknowledge={(id) => store.acknowledgeProposal(id)}
+          onAcknowledge={(id) =>
+            store.acknowledgeProposal(id, currentUser?.uid)
+          }
         />
       </QueueSection>
 

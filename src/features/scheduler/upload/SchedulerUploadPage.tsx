@@ -17,12 +17,34 @@ import {
 
 function callableErrorMessage(err: unknown): string {
   if (err && typeof err === 'object') {
-    const o = err as { message?: string };
-    if (typeof o.message === 'string' && o.message.length > 0) {
-      return o.message;
+    const o = err as {
+      message?: string;
+      code?: string;
+      details?: unknown;
+    };
+    const code = typeof o.code === 'string' ? o.code : '';
+    const msg =
+      typeof o.message === 'string' && o.message.length > 0
+        ? o.message
+        : '';
+    if (code.includes('permission-denied') || /permission/i.test(msg)) {
+      return (
+        msg ||
+        'Permission denied. Share the Sheet with the service account (Viewer) and try again.'
+      );
     }
+    if (code.includes('failed-precondition') || /sheetId|Sheet/i.test(msg)) {
+      return (
+        msg ||
+        'Sheet is not ready. Check the link, then Sync schedule again.'
+      );
+    }
+    if (code.includes('unauthenticated')) {
+      return 'Sign in again, then retry sync.';
+    }
+    if (msg) return msg;
   }
-  return err instanceof Error ? err.message : 'Request failed.';
+  return err instanceof Error ? err.message : 'Sync failed. Try again.';
 }
 
 /**
@@ -73,9 +95,17 @@ export function SchedulerUploadPage() {
       setSyncNote(
         `Synced ${result.matched} row(s) → ${result.upserted} match(es), ${result.teams} team(s).`,
       );
+      store.updateOrgFees({
+        sheetId: id,
+        sheetSyncedAt: result.sheetSyncedAt,
+        sheetSyncError: undefined,
+      });
       refresh();
     } catch (err) {
       setLinkError(callableErrorMessage(err));
+      store.updateOrgFees({
+        sheetSyncError: callableErrorMessage(err),
+      });
     } finally {
       setBusy(null);
     }
@@ -115,7 +145,7 @@ export function SchedulerUploadPage() {
 
   return (
     <div className="rs-stack">
-      <Title headingLevel="h2" size="lg">
+      <Title headingLevel="h1" size="lg">
         Upload
       </Title>
       <p className="rs-match-card__meta">
@@ -172,6 +202,12 @@ export function SchedulerUploadPage() {
             ? new Date(state.org.sheetSyncedAt).toLocaleString()
             : 'Never'}
         </p>
+        {state.org.sheetSyncError && !linkError && (
+          <p className="rs-match-card__meta" role="alert">
+            Last sync failed: {state.org.sheetSyncError}. Fix the Sheet link /
+            sharing, then tap Sync schedule again.
+          </p>
+        )}
         {linkError && (
           <p className="rs-match-card__meta" role="alert">
             {linkError}

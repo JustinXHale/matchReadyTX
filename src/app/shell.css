@@ -5,6 +5,8 @@ body,
 #root {
   height: 100%;
   margin: 0;
+  max-width: 100%;
+  overflow-x: clip;
 }
 
 body {
@@ -44,7 +46,7 @@ body {
 
 .pf-v6-c-masthead {
   background: var(--rs-color-surface) !important;
-  border-bottom: 1px solid var(--rs-color-border);
+  border-bottom: none;
   box-shadow: none !important;
 }
 
@@ -52,10 +54,20 @@ body {
   padding-bottom: var(--rs-bottom-clearance) !important;
   max-width: 720px;
   width: 100%;
+  min-width: 0;
   margin: 0 auto;
   box-sizing: border-box;
   padding-inline: var(--rs-page-pad) !important;
   background: transparent !important;
+  overflow-x: clip;
+}
+
+/* Page titles: semantic h1 at the compact title size (not PF’s oversized default). */
+.rs-page-body .pf-v6-c-title.pf-m-h1,
+.rs-stack > h1.pf-v6-c-title,
+.rs-about-hero .pf-v6-c-title.pf-m-h1 {
+  font: var(--rs-font-title) !important;
+  letter-spacing: -0.02em;
 }
 
 .rs-brand {
@@ -92,7 +104,9 @@ body {
   font-weight: 500;
   color: var(--rs-color-ended);
   letter-spacing: 0.01em;
-  text-decoration: none;
+  text-decoration: none !important;
+  border: none;
+  box-shadow: none;
 }
 
 .rs-login-role-card .pf-v6-c-card__body {
@@ -700,12 +714,12 @@ body {
   display: inline-flex !important;
   align-items: center !important;
   justify-content: center !important;
-  min-height: 1.5rem !important;
-  height: 1.5rem !important;
-  padding-block: 0 !important;
-  padding-inline: 0.55rem !important;
-  font-size: 0.7rem !important;
-  line-height: 1 !important;
+  min-height: 2rem !important;
+  height: auto !important;
+  padding-block: 0.35rem !important;
+  padding-inline: 0.65rem !important;
+  font-size: 0.75rem !important;
+  line-height: 1.2 !important;
 }
 
 .rs-queue-decision__actions .pf-v6-c-button .pf-v6-c-button__text {
@@ -993,8 +1007,8 @@ body {
 
 .rs-role-switch__select.pf-v6-c-form-control {
   width: auto;
-  min-width: 7.5rem;
-  max-width: 9.5rem;
+  min-width: 0;
+  max-width: 8.75rem;
 }
 
 .rs-filter-panel {
@@ -1022,20 +1036,27 @@ input.rs-filter-search {
   flex-wrap: nowrap;
   gap: var(--pf-t--global--spacer--sm);
   overflow-x: auto;
+  overscroll-behavior-x: contain;
   -webkit-overflow-scrolling: touch;
   padding-bottom: var(--pf-t--global--spacer--xs);
   scrollbar-width: thin;
+  max-width: 100%;
+  min-width: 0;
 }
 
 .rs-filter-chip {
   flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   border: var(--pf-t--global--border--width--regular) solid var(--rs-color-border);
   background: var(--rs-color-surface);
   color: var(--rs-color-ink);
   border-radius: var(--rs-radius-pill);
   padding: var(--pf-t--global--spacer--xs) var(--pf-t--global--spacer--sm);
   font: var(--rs-font-chip);
-  min-height: 32px;
+  min-height: 40px;
+  line-height: 1.2;
   cursor: pointer;
   white-space: nowrap;
 }
@@ -1047,10 +1068,17 @@ input.rs-filter-search {
 }
 
 .rs-filter-sep {
-  flex: 0 0 1px;
-  align-self: stretch;
+  flex: 0 0 auto;
+  align-self: center;
+  width: 1px;
+  height: 1.1em;
+  margin: 0 2px;
+  padding: 0;
+  border: none;
   background: var(--rs-color-border);
-  margin: var(--pf-t--global--spacer--xs) 2px;
+  color: transparent;
+  font-size: 0;
+  overflow: hidden;
 }
 
 .rs-filter-meta {
@@ -1299,22 +1327,41 @@ input.rs-filter-search {
   justify-content: space-between;
   gap: 8px;
   padding-inline: 12px;
+  max-width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
 }
 
 .rs-masthead__main {
-  flex: 1;
+  flex: 1 1 auto;
   min-width: 0;
+  overflow: hidden;
 }
 
 .rs-masthead__brand {
   display: inline-flex;
+  max-width: 100%;
   text-decoration: none !important;
   color: inherit;
 }
 
+.rs-masthead__brand *,
+.rs-masthead__brand:hover,
+.rs-masthead__brand:focus,
+.rs-masthead__brand:hover *,
+.rs-masthead__brand:focus * {
+  text-decoration: none !important;
+}
+
 .rs-masthead__content {
-  flex: 0 0 auto;
+  flex: 0 1 auto;
+  min-width: 0;
+  max-width: 48%;
   margin-inline-start: 0 !important;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 4px;
 }
 
 .rs-masthead-actions {
@@ -1326,6 +1373,14 @@ input.rs-filter-search {
 
 .rs-role-switch {
   margin-right: 0;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.rs-demo-signin.pf-v6-c-button {
+  margin-right: 0;
+  flex-shrink: 0;
+  padding-inline: 6px !important;
 }
 
 .rs-top-tabs,
@@ -1333,22 +1388,31 @@ input.rs-filter-search {
   display: flex;
   gap: 0;
   border-bottom: 1px solid var(--rs-color-border);
-  margin: 0 -4px;
+  margin: 0;
   overflow-x: auto;
+  overscroll-behavior-x: contain;
   -webkit-overflow-scrolling: touch;
+  max-width: 100%;
+  min-width: 0;
 }
 
 .rs-top-tabs a,
 .rs-sub-tabs a {
-  flex: 1;
+  flex: 1 1 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   text-align: center;
-  padding: 10px 8px;
+  padding: 10px 6px;
   min-height: var(--rs-tap-min);
+  min-width: 0;
   text-decoration: none;
   color: var(--rs-color-ended);
   font: var(--rs-font-nav);
+  font-weight: 600;
   border-bottom: 2px solid transparent;
   white-space: nowrap;
+  line-height: 1.2;
 }
 
 .rs-top-tabs a.rs-nav-with-badge,
@@ -3129,6 +3193,15 @@ button.rs-detail-people__confirm:focus-visible {
   .rs-onboard__track-fill {
     transition: none;
   }
+
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }
 
 .rs-onboard__count {
@@ -3616,6 +3689,20 @@ button.rs-detail-people__confirm:focus-visible {
   background: color-mix(in srgb, var(--rs-color-ok) 8%, white);
 }
 
+.rs-onboard__choice--disabled,
+.rs-onboard__choice:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.rs-onboard__choice--disabled:hover,
+.rs-onboard__choice:disabled:hover,
+.rs-onboard__choice--disabled:focus-visible,
+.rs-onboard__choice:disabled:focus-visible {
+  border-color: var(--rs-color-border);
+  background: var(--rs-color-surface);
+}
+
 .rs-onboard__nav {
   display: flex;
   align-items: center;
@@ -3740,6 +3827,7 @@ button.rs-detail-people__confirm:focus-visible {
   align-items: stretch;
   width: 100%;
   max-width: 100%;
+  min-width: 0;
   box-sizing: border-box;
 }
 

@@ -135,7 +135,7 @@ export function AvailabilityPage() {
   if (!isRefereeView) {
     return (
       <div className="rs-stack">
-        <Title headingLevel="h2">Availability</Title>
+        <Title headingLevel="h1">Availability</Title>
         <p>
           Availability is managed in the Referee/CMO lens. Switch role in the
           header to continue.
@@ -319,7 +319,7 @@ export function AvailabilityPage() {
 
   return (
     <div className="rs-stack rs-avail-page">
-      <Title headingLevel="h2">Availability</Title>
+      <Title headingLevel="h1">Availability</Title>
       <p className="rs-match-card__meta">
         Days start closed. Tap to cycle: open (available) → blocked → closed.
         Use Edit on an open day to set one or more time windows.

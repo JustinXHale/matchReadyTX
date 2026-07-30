@@ -262,6 +262,7 @@ export async function runSheetSync(opts: {
   setDoc(db.doc(`orgs/${orgId}`), {
     sheetId,
     sheetSyncedAt,
+    sheetSyncError: FieldValue.delete(),
     updatedAt: FieldValue.serverTimestamp(),
   });
   await flushBatch();

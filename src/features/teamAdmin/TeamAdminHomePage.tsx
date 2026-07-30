@@ -193,7 +193,7 @@ export function TeamAdminHomePage() {
 
   return (
     <div className="rs-stack rs-team-admin-home">
-      <Title headingLevel="h2">Team Admin</Title>
+      <Title headingLevel="h1">Team Admin</Title>
       <p className="rs-match-card__meta">
         Confirm kickoff details for each of your sides. Open a game to propose
         a change when something’s wrong.

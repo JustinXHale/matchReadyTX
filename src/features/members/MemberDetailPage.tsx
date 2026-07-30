@@ -226,6 +226,14 @@ export function MemberDetailPage() {
   const isSelf = currentUser?.uid === user.uid;
   const canDelete = canManage && !isSelf;
 
+  const editFanOnly =
+    Boolean(editDraft) &&
+    editDraft!.roleFan &&
+    !editDraft!.roleOfficial &&
+    !editDraft!.roleTeamAdmin &&
+    !editDraft!.roleCmo &&
+    !editDraft!.roleAssigner;
+
   const onSaveAssessedLevel = () => {
     const trimmed = assessedDraft.trim();
     let next: number | undefined;
@@ -297,6 +305,10 @@ export function MemberDetailPage() {
       setEditError('Phone is required.');
       return;
     }
+    if (!fanOnly && !editDraft.birthday.trim()) {
+      setEditError('Birthday is required.');
+      return;
+    }
 
     const needsRef =
       editDraft.roleOfficial || editDraft.roleCmo;
@@ -318,6 +330,17 @@ export function MemberDetailPage() {
           return;
         }
         refereeLevel = n;
+      }
+      const year = editDraft.refereeingSince.trim();
+      const yearNum = Number(year);
+      const thisYear = new Date().getFullYear();
+      if (!/^\d{4}$/.test(year) || yearNum < 1950 || yearNum > thisYear) {
+        setEditError(`Year started refereeing must be 1950–${thisYear}.`);
+        return;
+      }
+      if (!editDraft.jerseySize.trim() || !editDraft.shortsSize.trim()) {
+        setEditError('Jersey and shorts size are required for Referee/CMO.');
+        return;
       }
     }
 
@@ -626,7 +649,7 @@ export function MemberDetailPage() {
                   />
                 </div>
               </FormGroup>
-              <FormGroup label="Birthday">
+              <FormGroup label="Birthday" isRequired={!editFanOnly}>
                 <TextInput
                   type="date"
                   value={editDraft.birthday}
@@ -694,19 +717,23 @@ export function MemberDetailPage() {
                       }
                     />
                   </FormGroup>
-                  <FormGroup label="Year started refereeing">
+                  <FormGroup label="Year started refereeing" isRequired>
                     <TextInput
                       type="number"
+                      inputMode="numeric"
+                      min={1950}
+                      max={new Date().getFullYear()}
                       value={editDraft.refereeingSince}
                       onChange={(_, v) =>
                         patchDraft({
                           refereeingSince: v.replace(/\D/g, '').slice(0, 4),
                         })
                       }
+                      placeholder="e.g. 2018"
                     />
                   </FormGroup>
-                  <FormGroup label="Jersey size">
-                    <div className="rs-onboard__sizes" role="group">
+                  <FormGroup label="Jersey size" isRequired>
+                    <div className="rs-onboard__sizes" role="group" aria-label="Jersey size">
                       {APPAREL_SIZES.map((s) => (
                         <button
                           key={`mj-${s}`}
@@ -723,8 +750,8 @@ export function MemberDetailPage() {
                       ))}
                     </div>
                   </FormGroup>
-                  <FormGroup label="Shorts size">
-                    <div className="rs-onboard__sizes" role="group">
+                  <FormGroup label="Shorts size" isRequired>
+                    <div className="rs-onboard__sizes" role="group" aria-label="Shorts size">
                       {APPAREL_SIZES.map((s) => (
                         <button
                           key={`ms-${s}`}

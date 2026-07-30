@@ -122,7 +122,7 @@ export function GlobalTeamDetailPage() {
         ← {backLabel}
       </button>
 
-      <Title headingLevel="h2" className="rs-team-detail__title">
+      <Title headingLevel="h1" className="rs-team-detail__title">
         {team.name}
       </Title>
 

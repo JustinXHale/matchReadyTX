@@ -15,6 +15,7 @@ import {
 import { useNavigate } from 'react-router-dom';
 import { useApp } from '@/app/AppContext';
 import {
+  applyFanXorRoleToggle,
   hasCompleteHomeAddress,
   readFileAsDataUrl,
   validateProfilePhoto,
@@ -220,7 +221,7 @@ export function ProfilePage() {
 
   return (
     <div className="rs-stack">
-      <Title headingLevel="h2">Profile</Title>
+      <Title headingLevel="h1">Profile</Title>
       <Form className="rs-profile-form">
         <FormGroup label="Photo" fieldId="pf-photo">
           <div className="rs-profile-photo">
@@ -322,27 +323,101 @@ export function ProfilePage() {
               id="pf-role-official"
               label="Referee"
               isChecked={roleOfficial}
-              onChange={(_, v) => setRoleOfficial(v)}
+              isDisabled={roleFan}
+              onChange={(_, v) => {
+                const next = applyFanXorRoleToggle(
+                  {
+                    roleOfficial,
+                    roleTeamAdmin,
+                    roleCmo,
+                    roleFan,
+                  },
+                  'official',
+                  v,
+                );
+                setRoleOfficial(next.roleOfficial);
+                setRoleTeamAdmin(next.roleTeamAdmin);
+                setRoleCmo(next.roleCmo);
+                setRoleFan(next.roleFan);
+              }}
             />
             <Checkbox
               id="pf-role-team"
               label="Team Admin"
               isChecked={roleTeamAdmin}
-              onChange={(_, v) => setRoleTeamAdmin(v)}
+              isDisabled={roleFan}
+              onChange={(_, v) => {
+                const next = applyFanXorRoleToggle(
+                  {
+                    roleOfficial,
+                    roleTeamAdmin,
+                    roleCmo,
+                    roleFan,
+                  },
+                  'teamAdmin',
+                  v,
+                );
+                setRoleOfficial(next.roleOfficial);
+                setRoleTeamAdmin(next.roleTeamAdmin);
+                setRoleCmo(next.roleCmo);
+                setRoleFan(next.roleFan);
+              }}
             />
             <Checkbox
               id="pf-role-cmo"
               label="CMO"
               isChecked={roleCmo}
-              onChange={(_, v) => setRoleCmo(v)}
+              isDisabled={roleFan}
+              onChange={(_, v) => {
+                const next = applyFanXorRoleToggle(
+                  {
+                    roleOfficial,
+                    roleTeamAdmin,
+                    roleCmo,
+                    roleFan,
+                  },
+                  'cmo',
+                  v,
+                );
+                setRoleOfficial(next.roleOfficial);
+                setRoleTeamAdmin(next.roleTeamAdmin);
+                setRoleCmo(next.roleCmo);
+                setRoleFan(next.roleFan);
+              }}
             />
             <Checkbox
               id="pf-role-fan"
               label="Fan"
               isChecked={roleFan}
-              onChange={(_, v) => setRoleFan(v)}
+              isDisabled={
+                (roleOfficial || roleTeamAdmin || roleCmo) && !roleFan
+              }
+              onChange={(_, v) => {
+                const next = applyFanXorRoleToggle(
+                  {
+                    roleOfficial,
+                    roleTeamAdmin,
+                    roleCmo,
+                    roleFan,
+                  },
+                  'fan',
+                  v,
+                );
+                setRoleOfficial(next.roleOfficial);
+                setRoleTeamAdmin(next.roleTeamAdmin);
+                setRoleCmo(next.roleCmo);
+                setRoleFan(next.roleFan);
+              }}
             />
           </div>
+          <FormHelperText>
+            <HelperText>
+              <HelperTextItem>
+                Fan is browse-only and cannot be combined with Referee, Team
+                Admin, or CMO.
+              </HelperTextItem>
+            </HelperText>
+          </FormHelperText>
           {currentUser.roles.includes('assigner') && (
             <FormHelperText>
               <HelperText>

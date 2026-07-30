@@ -55,7 +55,7 @@ export function hasSelfSelectableRole(roles: Role[]): boolean {
   );
 }
 
-/** Roles that need phone + birthday (and heavier fields when Referee/CMO). */
+/** Working society roles that are mutually exclusive with Fan. */
 export function hasWorkingSocietyRole(roles: Role[]): boolean {
   return (
     roles.includes('official') ||
@@ -63,6 +63,40 @@ export function hasWorkingSocietyRole(roles: Role[]): boolean {
     roles.includes('cmo') ||
     roles.includes('assigner')
   );
+}
+
+/**
+ * Fan is read-only browse and cannot combine with Referee / Team Admin / CMO
+ * (or assigner) on self-serve onboarding/profile.
+ */
+export type SelfServeRoleDraft = {
+  roleOfficial: boolean;
+  roleTeamAdmin: boolean;
+  roleCmo: boolean;
+  roleFan: boolean;
+};
+
+export function applyFanXorRoleToggle(
+  draft: SelfServeRoleDraft,
+  toggled: 'official' | 'teamAdmin' | 'cmo' | 'fan',
+  next: boolean,
+): SelfServeRoleDraft {
+  if (toggled === 'fan') {
+    if (next) {
+      return {
+        roleOfficial: false,
+        roleTeamAdmin: false,
+        roleCmo: false,
+        roleFan: true,
+      };
+    }
+    return { ...draft, roleFan: false };
+  }
+  const out = { ...draft, roleFan: next ? false : draft.roleFan };
+  if (toggled === 'official') out.roleOfficial = next;
+  if (toggled === 'teamAdmin') out.roleTeamAdmin = next;
+  if (toggled === 'cmo') out.roleCmo = next;
+  return out;
 }
 
 export type HomeAddressParts = {

@@ -66,6 +66,11 @@ import {
   newAssignmentId,
   newCmoId,
 } from '@/domain/types';
+import { isFirebaseConfigured } from '@/services/firebase';
+import {
+  callProposalWriteback,
+  defaultOrgId,
+} from '@/services/orgData';
 
 /** Urgent assigner → official alert shown atop Request → Pending. */
 export interface OfficialAlert {
@@ -2452,12 +2457,58 @@ class DemoStore {
           : p,
       ),
     }));
+    // If other team already accepted, apply local facts (idempotent) + Sheet write-back.
+    this.tryCompleteProposal(proposalId);
+    void this.writebackProposalToSheet(proposalId);
   }
 
-  /** Sheet write-back when the other team accepts (assigner ack is awareness only). */
+  /**
+   * When both other-team accept + assigner ack are done, push facts to Schedule SoR.
+   * Demo-only mode skips the callable (local applySheetFacts is enough).
+   */
+  private async writebackProposalToSheet(proposalId: string): Promise<void> {
+    const p = this.state.proposals.find((x) => x.id === proposalId);
+    if (!p?.otherTeamAcceptedAt || !p.assignerAckAt) return;
+    if (!isFirebaseConfigured) return;
+
+    try {
+      await callProposalWriteback({
+        orgId: defaultOrgId(),
+        matchId: p.matchId,
+        proposalId: p.id,
+        kickoffAt: p.kickoffAt,
+        venueName: p.venueName,
+        venueAddress: p.venueAddress,
+      });
+      this.set((s) => ({
+        ...s,
+        org: {
+          ...s.org,
+          sheetSyncedAt: new Date().toISOString(),
+          sheetSyncError: undefined,
+        },
+      }));
+    } catch (err) {
+      const message =
+        err && typeof err === 'object' && 'message' in err
+          ? String((err as { message: unknown }).message)
+          : err instanceof Error
+            ? err.message
+            : 'Sheet write-back failed. Open Upload and sync, or retry acknowledge.';
+      this.set((s) => ({
+        ...s,
+        org: { ...s.org, sheetSyncError: message },
+      }));
+    }
+  }
+
+  /** Apply Sheet facts locally when the other team accepts (assigner ack triggers SoR write-back). */
   private tryCompleteProposal(proposalId: string): void {
     const p = this.state.proposals.find((x) => x.id === proposalId);
-    if (!p || !p.otherTeamAcceptedAt || p.status !== 'pending') {
+    if (!p || !p.otherTeamAcceptedAt || p.status === 'approved') {
+      return;
+    }
+    if (p.status !== 'pending') {
       return;
     }
     this.set((s) => {
@@ -2511,10 +2562,14 @@ class DemoStore {
             'change_proposed',
             u.uid,
             'Schedule change accepted',
-            'Other team accepted a proposal — acknowledge when you’ve seen it.',
+            'Other team accepted a proposal — acknowledge when you’ve seen it to write back to the Sheet.',
           );
         }
       }
+    }
+    // If assigner already acknowledged, push SoR write-back now.
+    if (p.assignerAckAt) {
+      void this.writebackProposalToSheet(proposalId);
     }
   }
 

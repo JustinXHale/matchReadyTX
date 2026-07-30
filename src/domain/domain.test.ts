@@ -16,6 +16,7 @@ import {
   formatHomeAddress,
   guessNamesFromEmail,
   isProfileComplete,
+  applyFanXorRoleToggle,
   validateProfilePhoto,
 } from '@/domain/profile';
 import { confirmTeam, releaseMatch } from '@/domain/matchTransitions';
@@ -416,6 +417,38 @@ describe('profile helpers', () => {
     expect(validateProfilePhoto(big).ok).toBe(false);
     const gif = new File([new Uint8Array(10)], 'c.gif', { type: 'image/gif' });
     expect(validateProfilePhoto(gif).ok).toBe(false);
+  });
+
+  it('applyFanXorRoleToggle keeps Fan exclusive from working roles', () => {
+    expect(
+      applyFanXorRoleToggle(
+        {
+          roleOfficial: true,
+          roleTeamAdmin: false,
+          roleCmo: false,
+          roleFan: false,
+        },
+        'fan',
+        true,
+      ),
+    ).toEqual({
+      roleOfficial: false,
+      roleTeamAdmin: false,
+      roleCmo: false,
+      roleFan: true,
+    });
+    expect(
+      applyFanXorRoleToggle(
+        {
+          roleOfficial: false,
+          roleTeamAdmin: false,
+          roleCmo: false,
+          roleFan: true,
+        },
+        'official',
+        true,
+      ).roleFan,
+    ).toBe(false);
   });
 });
 

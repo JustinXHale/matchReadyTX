@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
 import { Title } from '@patternfly/react-core';
-import { useApp } from '@/app/AppContext';
 import { PwaInstallCard } from '@/ui/PwaInstallCard';
 
 const TOC = [
@@ -14,7 +13,6 @@ const TOC = [
 type TocId = (typeof TOC)[number]['id'];
 
 export function AboutPage() {
-  const { state } = useApp();
   const [activeId, setActiveId] = useState<TocId>(TOC[0].id);
   const suppressSync = useRef(false);
 
@@ -54,7 +52,7 @@ export function AboutPage() {
   return (
     <div className="rs-stack rs-about">
       <header className="rs-about-hero">
-        <Title headingLevel="h2">About MatchReadyTX</Title>
+        <Title headingLevel="h1">About MatchReadyTX</Title>
         <p>
           MatchReadyTX is a scheduling and match-management app for rugby
           referee organizations.
@@ -72,11 +70,6 @@ export function AboutPage() {
           began; another organization can use the same foundation and make it
           its own.
         </p>
-        <p className="rs-match-card__meta">
-          MatchReadyTX does not process payments. Match fees, flights, housing,
-          and other travel details shown in the app are for planning only.
-        </p>
-        <p className="rs-match-card__meta">Organization: {state.org.name}</p>
       </header>
 
       <PwaInstallCard />
@@ -116,15 +109,14 @@ export function AboutPage() {
           one another.
         </p>
         <p>
-          At the center of it all is often a spreadsheet.
+          At the center of it all is often a spreadsheet…probably Google Sheets
+          as it is familiar and easy to share—especially for volunteer
+          administrators who do not need another complicated system to learn.
         </p>
-        <p>
-          That is not necessarily a problem. Google Sheets is familiar and easy
-          to share—especially for volunteer administrators who do not need
-          another complicated system to learn. The problem is that a spreadsheet
-          was never built to serve everyone involved in a match.
+        <p className="rs-about-lead">
+          MatchReadyTX bridges the gap for modern UI with a familiar
+          spreadsheet.
         </p>
-        <p className="rs-about-lead">MatchReadyTX bridges that gap.</p>
         <p>
           Assigners keep working in tools they already understand. Referees and
           team contacts get a simpler view of what they need to do next. The

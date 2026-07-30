@@ -10,8 +10,10 @@ import { initializeApp } from 'firebase-admin/app';
 import { getAuth } from 'firebase-admin/auth';
 import { getFirestore } from 'firebase-admin/firestore';
 import { logger } from 'firebase-functions';
+import { FieldValue } from 'firebase-admin/firestore';
 import { runSheetSync } from './syncSheet';
 import { runApproveFixtureRequest } from './approveFixtureRequest';
+import { runProposalWriteback } from './proposalWriteback';
 import {
   enqueueMail,
   processMailDocument,
@@ -94,6 +96,13 @@ export const syncSheet = onCall(
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Sheet sync failed';
       logger.error('syncSheet failed', { orgId, sheetId, message });
+      await db.doc(`orgs/${orgId}`).set(
+        {
+          sheetSyncError: message,
+          updatedAt: new Date().toISOString(),
+        },
+        { merge: true },
+      );
       if (
         message.includes('permission') ||
         message.includes('The caller does not have permission')
@@ -108,31 +117,86 @@ export const syncSheet = onCall(
   },
 );
 
-/** Apps Script webhook: POST { secret, rows[] } — timestamp only until full row ingest lands. */
-export const sheetWebhook = onRequest({ cors: true }, async (req, res) => {
-  if (req.method !== 'POST') {
-    res.status(405).send('Method not allowed');
-    return;
-  }
-  const secret = process.env.SHEET_WEBHOOK_SECRET;
-  if (secret && req.get('x-webhook-secret') !== secret) {
-    res.status(401).send('Unauthorized');
-    return;
-  }
-  const orgId = (req.body?.orgId as string) || process.env.DEFAULT_ORG_ID;
-  if (!orgId) {
-    res.status(400).send('orgId required');
-    return;
-  }
-  logger.info('sheetWebhook received', { orgId, rows: req.body?.rows?.length });
-  await db.doc(`orgs/${orgId}`).set(
-    { sheetSyncedAt: new Date().toISOString() },
-    { merge: true },
-  );
-  res.json({ ok: true });
-});
+/**
+ * Apps Script webhook: POST { orgId, rows? } → same ingest as syncSheet / sheetPoll.
+ * Optional auth: SHEET_WEBHOOK_SECRET header x-webhook-secret.
+ */
+export const sheetWebhook = onRequest(
+  {
+    cors: true,
+    secrets: [googleServiceAccountJson],
+    timeoutSeconds: 120,
+    memory: '512MiB',
+  },
+  async (req, res) => {
+    if (req.method !== 'POST') {
+      res.status(405).send('Method not allowed');
+      return;
+    }
+    const secret = process.env.SHEET_WEBHOOK_SECRET;
+    if (secret && req.get('x-webhook-secret') !== secret) {
+      res.status(401).send('Unauthorized');
+      return;
+    }
+    const orgId =
+      String(req.body?.orgId ?? '').trim() ||
+      process.env.DEFAULT_ORG_ID ||
+      '';
+    if (!orgId) {
+      res.status(400).send('orgId required');
+      return;
+    }
 
-/** Poll fallback every 5 minutes — uses same sync when secret + SHEET_ID env set. */
+    const orgSnap = await db.doc(`orgs/${orgId}`).get();
+    const sheetId =
+      String(orgSnap.data()?.sheetId ?? '').trim() ||
+      process.env.SHEET_ID ||
+      '';
+    const sa = googleServiceAccountJson.value();
+    if (!sheetId || !sa) {
+      const message =
+        'Webhook sync skipped — missing sheetId or service account.';
+      logger.warn('sheetWebhook skipped', { orgId, sheetId: Boolean(sheetId) });
+      await db.doc(`orgs/${orgId}`).set(
+        {
+          sheetSyncError: message,
+          updatedAt: new Date().toISOString(),
+        },
+        { merge: true },
+      );
+      res.status(503).json({ ok: false, error: message });
+      return;
+    }
+
+    logger.info('sheetWebhook sync', {
+      orgId,
+      rows: req.body?.rows?.length,
+    });
+    try {
+      const result = await runSheetSync({
+        db,
+        orgId,
+        sheetId,
+        serviceAccountJson: sa,
+      });
+      res.json(result);
+    } catch (err) {
+      const message =
+        err instanceof Error ? err.message : 'Sheet webhook sync failed';
+      logger.error('sheetWebhook failed', { orgId, message });
+      await db.doc(`orgs/${orgId}`).set(
+        {
+          sheetSyncError: message,
+          updatedAt: new Date().toISOString(),
+        },
+        { merge: true },
+      );
+      res.status(500).json({ ok: false, error: message });
+    }
+  },
+);
+
+/** Poll fallback every 5 minutes — same ingest as syncSheet / sheetWebhook. */
 export const sheetPoll = onSchedule(
   {
     schedule: 'every 5 minutes',
@@ -155,7 +219,16 @@ export const sheetPoll = onSchedule(
     try {
       await runSheetSync({ db, orgId, sheetId, serviceAccountJson: sa });
     } catch (err) {
+      const message =
+        err instanceof Error ? err.message : 'Scheduled Sheet sync failed';
       logger.error('sheetPoll failed', err);
+      await db.doc(`orgs/${orgId}`).set(
+        {
+          sheetSyncError: message,
+          updatedAt: new Date().toISOString(),
+        },
+        { merge: true },
+      );
     }
   },
 );
@@ -182,23 +255,93 @@ export const t72Sweep = onSchedule('every 60 minutes', async () => {
   }
 });
 
-/** Write proposal facts back to Sheet (SoR) — stub */
-export const proposalWriteback = onCall(async (request) => {
-  if (!request.auth) throw new HttpsError('unauthenticated', 'Sign in required');
-  const { orgId, matchId, proposalId } = request.data as {
-    orgId: string;
-    matchId: string;
-    proposalId: string;
-  };
-  if (!orgId || !matchId || !proposalId) {
-    throw new HttpsError(
-      'invalid-argument',
-      'orgId, matchId, proposalId required',
-    );
-  }
-  logger.info('proposalWriteback', { orgId, matchId, proposalId });
-  return { ok: true };
-});
+/**
+ * After other-team accept + assigner ack: write approved facts to Schedule + match.
+ * Body: { orgId?, matchId, proposalId, kickoffAt?, venueName?, venueAddress? }
+ */
+export const proposalWriteback = onCall(
+  {
+    secrets: [googleServiceAccountJson],
+    timeoutSeconds: 120,
+    memory: '512MiB',
+  },
+  async (request) => {
+    if (!request.auth?.uid) {
+      throw new HttpsError('unauthenticated', 'Sign in required');
+    }
+    const orgId =
+      String(request.data?.orgId ?? '').trim() ||
+      process.env.DEFAULT_ORG_ID ||
+      'lonestar';
+    const matchId = String(request.data?.matchId ?? '').trim();
+    const proposalId = String(request.data?.proposalId ?? '').trim();
+    if (!matchId || !proposalId) {
+      throw new HttpsError(
+        'invalid-argument',
+        'matchId and proposalId are required.',
+      );
+    }
+    await assertAssigner(request.auth.uid, orgId);
+
+    const sa = googleServiceAccountJson.value();
+    if (!sa) {
+      throw new HttpsError(
+        'failed-precondition',
+        'GOOGLE_SERVICE_ACCOUNT_JSON secret is not set. See docs/SHEET_SYNC.md.',
+      );
+    }
+
+    const kickoffAt = String(request.data?.kickoffAt ?? '').trim() || undefined;
+    const venueName = String(request.data?.venueName ?? '').trim() || undefined;
+    const venueAddress =
+      String(request.data?.venueAddress ?? '').trim() || undefined;
+
+    try {
+      const result = await runProposalWriteback({
+        db,
+        orgId,
+        matchId,
+        serviceAccountJson: sa,
+        kickoffAt,
+        venueName,
+        venueAddress,
+      });
+      await db.doc(`orgs/${orgId}`).set(
+        { sheetSyncError: FieldValue.delete() },
+        { merge: true },
+      );
+      logger.info('proposalWriteback ok', { orgId, matchId, proposalId });
+      return { ...result, proposalId };
+    } catch (err) {
+      if (err instanceof HttpsError) throw err;
+      const message =
+        err instanceof Error ? err.message : 'Proposal write-back failed';
+      logger.error('proposalWriteback failed', {
+        orgId,
+        matchId,
+        proposalId,
+        message,
+      });
+      await db.doc(`orgs/${orgId}`).set(
+        {
+          sheetSyncError: `Write-back failed: ${message}`,
+          updatedAt: new Date().toISOString(),
+        },
+        { merge: true },
+      );
+      if (
+        message.includes('permission') ||
+        message.includes('The caller does not have permission')
+      ) {
+        throw new HttpsError(
+          'permission-denied',
+          'Service account cannot edit this Sheet. Share the workbook as Editor with the service account email.',
+        );
+      }
+      throw new HttpsError('internal', message);
+    }
+  },
+);
 
 /**
  * Assigner approves a Team Admin fixture request:

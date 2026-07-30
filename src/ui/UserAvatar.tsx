@@ -27,11 +27,15 @@ export function UserAvatar({
     className ? ` ${className}` : ''
   }`;
   if (user.photoUrl) {
+    const label =
+      user.displayName?.trim() ||
+      `${user.firstName ?? ''} ${user.lastName ?? ''}`.trim() ||
+      'Member';
     return (
       <img
         className={cls}
         src={user.photoUrl}
-        alt=""
+        alt={label}
         width={size === 'sm' ? 32 : 56}
         height={size === 'sm' ? 32 : 56}
       />

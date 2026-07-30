@@ -32,9 +32,7 @@ export function GlobalDivisionFilters({
           {genderLabel(g)}
         </button>
       ))}
-      <span className="rs-filter-sep" aria-hidden>
-        |
-      </span>
+      <span className="rs-filter-sep" aria-hidden />
       {levels.map((level) => (
         <button
           key={level}

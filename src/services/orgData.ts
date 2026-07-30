@@ -213,6 +213,10 @@ export function orgPatchFromFirestore(
     sheetId: typeof data.sheetId === 'string' ? data.sheetId : undefined,
     sheetSyncedAt:
       typeof data.sheetSyncedAt === 'string' ? data.sheetSyncedAt : undefined,
+    sheetSyncError:
+      typeof data.sheetSyncError === 'string'
+        ? data.sheetSyncError
+        : undefined,
   };
 }
 
@@ -365,6 +369,35 @@ export async function callSyncSheet(input: {
     sheetId: input.sheetId,
   });
   return result.data as SyncSheetResult;
+}
+
+export type ProposalWritebackResult = {
+  ok: true;
+  matchId: string;
+  sheetRowKey: string;
+  updatedAt: string;
+  proposalId: string;
+};
+
+/** Write accepted proposal facts to Schedule Sheet + Firestore match. */
+export async function callProposalWriteback(input: {
+  orgId?: string;
+  matchId: string;
+  proposalId: string;
+  kickoffAt?: string;
+  venueName?: string;
+  venueAddress?: string;
+}): Promise<ProposalWritebackResult> {
+  const fn = httpsCallable(requireFunctions(), 'proposalWriteback');
+  const result = await fn({
+    orgId: input.orgId ?? DEFAULT_ORG,
+    matchId: input.matchId,
+    proposalId: input.proposalId,
+    kickoffAt: input.kickoffAt,
+    venueName: input.venueName,
+    venueAddress: input.venueAddress,
+  });
+  return result.data as ProposalWritebackResult;
 }
 
 /** Persist sheetId on the org doc (assigner write). */

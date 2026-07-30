@@ -1316,6 +1316,11 @@ export function MatchDetailPage() {
               </Button>
             </div>
           )}
+          {isAssigner && state.org.sheetSyncError && (
+            <p className="rs-detail-note" role="alert">
+              Sheet write-back / sync issue: {state.org.sheetSyncError}
+            </p>
+          )}
         </section>
       )}
 

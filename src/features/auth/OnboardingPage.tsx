@@ -10,6 +10,7 @@ import { useNavigate } from 'react-router-dom';
 import { defaultRoleView, ROLE_HOME, useApp } from '@/app/AppContext';
 import { withDemoPrefix } from '@/app/demoPaths';
 import {
+  applyFanXorRoleToggle,
   guessNamesFromEmail,
   hasCompleteHomeAddress,
   readFileAsDataUrl,
@@ -509,23 +510,38 @@ export function OnboardingPage() {
                       : r.id === 'cmo'
                         ? roleCmo
                         : roleFan;
-                const set =
-                  r.id === 'official'
-                    ? setRoleOfficial
-                    : r.id === 'teamAdmin'
-                      ? setRoleTeamAdmin
-                      : r.id === 'cmo'
-                        ? setRoleCmo
-                        : setRoleFan;
+                const workingSelected =
+                  roleOfficial || roleTeamAdmin || roleCmo;
+                const disabled =
+                  (r.id === 'fan' && workingSelected && !roleFan) ||
+                  (r.id !== 'fan' && roleFan && !checked);
                 return (
                   <button
                     key={r.id}
                     type="button"
                     className={`rs-onboard__choice rs-onboard__choice--multi${
                       checked ? ' rs-onboard__choice--selected' : ''
-                    }`}
+                    }${disabled ? ' rs-onboard__choice--disabled' : ''}`}
                     aria-pressed={checked}
-                    onClick={() => set(!checked)}
+                    aria-disabled={disabled || undefined}
+                    disabled={disabled}
+                    onClick={() => {
+                      if (disabled) return;
+                      const next = applyFanXorRoleToggle(
+                        {
+                          roleOfficial,
+                          roleTeamAdmin,
+                          roleCmo,
+                          roleFan,
+                        },
+                        r.id,
+                        !checked,
+                      );
+                      setRoleOfficial(next.roleOfficial);
+                      setRoleTeamAdmin(next.roleTeamAdmin);
+                      setRoleCmo(next.roleCmo);
+                      setRoleFan(next.roleFan);
+                    }}
                   >
                     <span
                       className={`rs-onboard__check${

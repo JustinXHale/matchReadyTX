@@ -19,7 +19,7 @@ import {
   faUser,
   faUsers,
 } from '@fortawesome/free-solid-svg-icons';
-import { ROLE_HOME, useApp, type RoleView } from '@/app/AppContext';
+import { ROLE_HOME, ROLE_VIEW_LABELS, useApp, type RoleView } from '@/app/AppContext';
 import { stripDemoPrefix, withDemoPrefix } from '@/app/demoPaths';
 import { WhistleIcon } from '@/ui/WhistleIcon';
 import './shell.css';
@@ -163,6 +163,7 @@ export function MobileShell() {
     isDemoShowcase,
     hasFirebaseSession,
     canSwitchRoleView,
+    availableLenses,
     roleView,
     setRoleView,
     state,
@@ -242,9 +243,13 @@ export function MobileShell() {
                     aria-label="Role"
                     ouiaId="RoleViewSwitch"
                   >
-                    <FormSelectOption value="referee" label="Referee/CMO" />
-                    <FormSelectOption value="teamAdmin" label="Team Admin" />
-                    <FormSelectOption value="scheduler" label="Scheduler" />
+                    {availableLenses.map((lens) => (
+                      <FormSelectOption
+                        key={lens}
+                        value={lens}
+                        label={ROLE_VIEW_LABELS[lens]}
+                      />
+                    ))}
                   </FormSelect>
                 </div>
               )}

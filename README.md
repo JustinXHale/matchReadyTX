@@ -11,7 +11,7 @@ Product: [`docs/PRD.md`](docs/PRD.md) · Implementation: [`docs/IMPLEMENTATION_S
 - Vite + React 19 + TypeScript
 - PatternFly React v6 (mobile-first cards / bottom nav)
 - Firebase Auth, Firestore, Cloud Functions, Hosting
-- Resend (email) + Twilio (SMS, opt-in only)
+- Resend (email)
 - PWA via `vite-plugin-pwa`
 
 ## Quick start (demo showcase)
@@ -35,7 +35,7 @@ When signed in with Google/Apple, use the masthead **Demo | Live** control to co
 4. **Referee/CMO** → **Appointments** → confirm assignment (badge shows pending accepts) → teams can now see the crew
 5. **Global** → Schedule / Standings / Teams; open a team then a past result for scores
 6. Referee → **Reports** (due badge) for match / coaching stubs
-7. Scheduler → **Queues** → Notifications for the email/SMS log
+7. Scheduler → **Queues** → Notifications for the email log
 
 ### Demo surfaces worth clicking
 
@@ -53,7 +53,7 @@ When signed in with Google/Apple, use the masthead **Demo | Live** control to co
 1. Create a Firebase project; enable Google + Apple auth.
 2. Set `VITE_DEMO_MODE=false` to hide the showcase (optional) and fill `VITE_FIREBASE_*` in `.env.local`.
 3. Deploy rules: `firebase deploy --only firestore:rules`
-4. Configure Functions secrets: `SHEET_ID`, service account, `RESEND_API_KEY`, Twilio, `SHEET_WEBHOOK_SECRET`.
+4. Configure Functions secrets: `SHEET_ID`, service account, `RESEND_API_KEY`, `SHEET_WEBHOOK_SECRET`.
 5. Point Apps Script `onEdit` / time trigger at `sheetWebhook`.
 6. `npm run build` && `firebase deploy --only hosting,functions`
 

@@ -320,6 +320,8 @@ export interface OrgSettings {
   competitions: string[];
   sheetId?: string;
   sheetSyncedAt?: string;
+  /** Last failed auto/manual Sheet sync or write-back (cleared on success). */
+  sheetSyncError?: string;
 }
 
 export interface Team {
