@@ -72,8 +72,26 @@ orgs/{orgId}/matches/{matchId}/proposals/{proposalId}
 orgs/{orgId}/matches/{matchId}/gameRequests/{requestId}
   userId, preferredSlot?, note?, status
 
+orgs/{orgId}/fixtureRequests/{requestId}
+  … (team admin new-fixture requests)
+
+orgs/{orgId}/teamLinkRequests/{requestId}
+  requesterUserId, requesterName, requesterEmail, teamId, teamName,
+  status: pending|approved|denied, autoApproved?, reviewedAt?, denyReason?
+
 orgs/{orgId}/availability/{uid}/ranges/{rangeId}
   startAt, endAt, kind: 'available'|'blocked'
+
+orgs/{orgId}/coachFeedback/{feedbackId}   // id = matchId_reportingTeamId
+  matchId, slot: 'mo', officialUserId, officialName,
+  home/away team ids+names, kickoffAt, competition?, level, score,
+  scales: { breakdown, scrum, lineout, safety, communication,
+            professionalism, overall } → excellent|above_average|average|below_average|poor,
+  commentsOnScores?, areasDoneWell?, areasToImprove?, otherFeedback?,
+  videoLink?, videoNotes?, otherCrewFeedback?,
+  submitterUserId/Name/Email/Phone?, clubRole,
+  reportingTeamId, reportingTeamName, status: 'submitted',
+  createdAt, updatedAt
 
 users/{uid}
   firstName, lastName, displayName (derived), email, phone,
@@ -90,7 +108,7 @@ mail/{mailId}   // outbound queue — Admin SDK only; see docs/EMAIL.md
   to, message: { subject, text?, html? }, uid?, event?, delivery?
 ```
 
-**Onboarding (`/onboarding`):** progressive one-question flow. **Fan XOR** Referee/Team Admin/CMO — picking Fan disables working roles and vice versa. Fan-only: roles → names → favorite team → photo. Working roles: phone + birthday; address + kit when Referee/CMO; referee level optional (“I don’t know”). `fan` lens homes to Global schedule.
+**Onboarding (`/onboarding`):** progressive one-question flow. **Fan XOR** Referee/Team Admin/CMO — picking Fan disables working roles and vice versa. Team Admin adds a **teams** multi-select (individual sides). Fan-only: roles → names → favorite team → photo. Working roles: phone + birthday; address + kit when Referee/CMO; referee level optional (“I don’t know”). Pending Team Admin (no `teamIds`) browses Fan until first club is approved.
 
 **Members directory:** incomplete profiles (`profileComplete === false`) are listed only in Scheduler view (Incomplete badge). Non-schedulers see complete members only. Fan favorite team shown under Fan badge when set.
 
@@ -111,6 +129,7 @@ mail/{mailId}   // outbound queue — Admin SDK only; see docs/EMAIL.md
 - Team admins: read matches for their teams; write confirmations/proposals for those matches; **cannot** read crew `userId`/PII until match status ≥ `mo_confirmed` (or field `crewVisibleToTeams`).
 - Officials: read own assignments + open requestable matches (facts + economics); write own confirm/availability/requests.
 - Assigner: full org read/write for scheduling.
+- **Coach feedback** (`coachFeedback`): assigner reads all; Team Admins read/update when `reportingTeamId` is in their `teamIds` (club-owned, one doc per match×side). **Officials never read**. Create/update binds match facts via `get(matches/…)` (home/away, kickoff, crew-visible status) and requires doc id `matchId_reportingTeamId`.
 
 ---
 
@@ -132,15 +151,24 @@ mail/{mailId}   // outbound queue — Admin SDK only; see docs/EMAIL.md
 | `/referee/reports/coaching` | Coaching Reports |
 | `/global/*` | Schedule / Standings / Teams |
 | `/members` | Society directory (incomplete: Scheduler only) |
-| `/team-admin` | Team Admin home |
+| `/team-admin` | Team Admin Schedule (confirm upcoming) |
+| `/team-admin/report` | Optional MO feedback after past games |
+| `/team-admin/report/:matchId` | Feedback form (create / edit own) |
+| `/team-admin/request-fixture` | Request a new fixture |
 | `/scheduler/queues` | Assigner inbox |
 | `/scheduler/schedule` | All-org match browse |
+| `/scheduler/feedback` | Coach feedback inbox (assigner-only) |
+| `/scheduler/feedback/:id` | Feedback detail |
 | `/scheduler/org` | Sheet link/sync, CSV, release, fees |
 | `/matches/:id` | Canonical match detail |
 
 **Bottom nav (by lens):** About · (Referee/CMO \| Team Admin \| Scheduler home) · Members · Global · Profile  
 
 **Referee/CMO top tabs:** Availability · Appointments · Request · Reports.  
+
+**Team Admin top tabs:** Schedule · Report.
+
+**Scheduler top tabs:** Queues · Schedule · Feedback · Upload.
 
 **Global top tabs:** Schedule · Standings · Teams.
 
@@ -164,6 +192,8 @@ mail/{mailId}   // outbound queue — Admin SDK only; see docs/EMAIL.md
 | `sheetPoll` | Every 5 min → `runSheetSync` when `sheetId` + SA present |
 | `sheetWebhook` | Apps Script push → same `runSheetSync` ingest |
 | `proposalWriteback` | After other-team accept + assigner ack → update Schedule row + Firestore match facts |
+| `submitTeamLinkRequests` | Onboarding/profile: auto-approve via Contacts or create pending |
+| `reviewTeamLinkRequest` | Assigner or club TA: approve (Contacts append) / deny |
 
 See also [`SHEET_SYNC.md`](./SHEET_SYNC.md).
 
@@ -177,6 +207,8 @@ See also [`SHEET_SYNC.md`](./SHEET_SYNC.md).
 | `sheetWebhook` | HTTPS from Apps Script → full sync |
 | `sheetPoll` | Scheduled every 5 min |
 | `proposalWriteback` | Callable on proposal completion |
+| `submitTeamLinkRequests` | Callable (self) |
+| `reviewTeamLinkRequest` | Callable (assigner or team TA) |
 | `notify` / mail queue | Email outbound |
 | `t72Sweep` | Hourly scheduled |
 | `geocodeAddress` | Callable — stub until Maps mileage walkthrough |

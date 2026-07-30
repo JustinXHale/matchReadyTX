@@ -16,6 +16,7 @@ import { signOutFirebase, subscribeAuth, completeRedirectSignIn } from '@/servic
 import { ensureFirebaseUser } from '@/services/userProfile';
 import {
   defaultOrgId,
+  subscribeCoachFeedback,
   subscribeLiveOrg,
 } from '@/services/orgData';
 import { subscribeOrgRoster } from '@/services/orgMembers';
@@ -24,6 +25,10 @@ import {
   subscribeUsersAvailability,
 } from '@/services/availability';
 import { hasRefereeLensRole, type UserProfile } from '@/domain/types';
+import {
+  shouldShowPendingFanBrowse,
+  shouldShowTeamAdminLens,
+} from '@/domain/teamLinkRequests';
 import { withDemoPrefix } from '@/app/demoPaths';
 
 /** Header role switcher — Referee/CMO combined (Q-R6 locked). Team Admin = club lens. */
@@ -48,9 +53,11 @@ export function lensesForUser(user: UserProfile | null): RoleView[] {
   if (!user) return [];
   const out: RoleView[] = [];
   if (hasRefereeLensRole(user.roles)) out.push('referee');
-  if (user.roles.includes('teamAdmin')) out.push('teamAdmin');
+  if (shouldShowTeamAdminLens(user)) out.push('teamAdmin');
   if (user.roles.includes('assigner')) out.push('scheduler');
-  if (user.roles.includes('fan')) out.push('fan');
+  if (user.roles.includes('fan') || shouldShowPendingFanBrowse(user)) {
+    out.push('fan');
+  }
   return out;
 }
 
@@ -145,11 +152,14 @@ function persistDataMode(mode: DataMode): void {
 
 export function defaultRoleView(user: UserProfile | null): RoleView {
   if (!user) return 'referee';
-  // Day-to-day home: Referee/CMO first, then Team Admin, then Scheduler. Fan last.
+  // Day-to-day home: Referee/CMO first, then linked Team Admin, then Scheduler.
+  // Pending Team Admin (no clubs yet) browses as Fan.
   if (hasRefereeLensRole(user.roles)) return 'referee';
-  if (user.roles.includes('teamAdmin')) return 'teamAdmin';
+  if (shouldShowTeamAdminLens(user)) return 'teamAdmin';
   if (user.roles.includes('assigner')) return 'scheduler';
-  if (user.roles.includes('fan')) return 'fan';
+  if (user.roles.includes('fan') || shouldShowPendingFanBrowse(user)) {
+    return 'fan';
+  }
   return 'referee';
 }
 
@@ -331,6 +341,39 @@ export function AppProvider({ children }: { children: ReactNode }) {
     };
   }, [state.currentUserId, dataMode]);
 
+  /** Coach feedback — assigner sees all; Team Admins see club-owned reports. */
+  useEffect(() => {
+    if (!isFirebaseConfigured) return;
+    if (dataMode !== 'live') return;
+    const uid = state.currentUserId;
+    if (!uid || uid.startsWith('u_')) return;
+    const me = state.users.find((u) => u.uid === uid);
+    if (!me) return;
+    const isAssigner = me.roles.includes('assigner');
+    const canRead =
+      isAssigner || me.roles.includes('teamAdmin');
+    if (!canRead) return;
+
+    const unsub = subscribeCoachFeedback(
+      defaultOrgId(),
+      { isAssigner, teamIds: me.teamIds },
+      (feedback) => {
+        if (dataModeRef.current !== 'live') return;
+        demoStore.applyLiveCoachFeedback(feedback);
+        setState(demoStore.getState());
+      },
+      (err) => console.error('Coach feedback subscription failed', err),
+    );
+    return () => unsub();
+  }, [
+    dataMode,
+    state.currentUserId,
+    state.users.find((u) => u.uid === state.currentUserId)?.roles.join(','),
+    state.users
+      .find((u) => u.uid === state.currentUserId)
+      ?.teamIds.join(','),
+  ]);
+
   /**
    * Availability ranges from Firestore.
    * Current user always; assigners also subscribe the full roster for picker hints.
@@ -412,7 +455,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const hasOfficialRole = Boolean(
     currentUser && hasRefereeLensRole(currentUser.roles),
   );
-  const hasTeamAdminRole = Boolean(currentUser?.roles.includes('teamAdmin'));
+  const hasTeamAdminRole = shouldShowTeamAdminLens(currentUser);
   const availableLenses = useMemo(
     () => lensesForUser(currentUser),
     [currentUser],
@@ -444,7 +487,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
     } catch {
       /* ignore */
     }
-  }, [currentUser?.uid, currentUser?.roles.join(',')]);
+  }, [
+    currentUser?.uid,
+    currentUser?.roles.join(','),
+    currentUser?.teamIds?.join(','),
+  ]);
 
   const isRefereeView = roleView === 'referee';
   const isTeamAdminView = roleView === 'teamAdmin';

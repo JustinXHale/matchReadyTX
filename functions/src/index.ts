@@ -15,6 +15,10 @@ import { runSheetSync } from './syncSheet';
 import { runApproveFixtureRequest } from './approveFixtureRequest';
 import { runProposalWriteback } from './proposalWriteback';
 import {
+  runReviewTeamLinkRequest,
+  runSubmitTeamLinkRequests,
+} from './teamLinkRequests';
+import {
   enqueueMail,
   processMailDocument,
   type MailDoc,
@@ -381,6 +385,85 @@ export const approveFixtureRequest = onCall(
       orgId,
       requestId,
       reviewedByUserId: request.auth.uid,
+      serviceAccountJson: sa,
+    });
+  },
+);
+
+/**
+ * Onboarding / profile: request Team Admin access for one or more teams.
+ * Auto-approves when email is already on Contacts for that team.
+ * Body: { orgId?, teamIds: string[] }
+ */
+export const submitTeamLinkRequests = onCall(
+  {
+    secrets: [googleServiceAccountJson],
+    timeoutSeconds: 120,
+    memory: '512MiB',
+  },
+  async (request) => {
+    if (!request.auth?.uid) {
+      throw new HttpsError('unauthenticated', 'Sign in required');
+    }
+    const orgId =
+      String(request.data?.orgId ?? '').trim() ||
+      process.env.DEFAULT_ORG_ID ||
+      'lonestar';
+    const raw = request.data?.teamIds;
+    const teamIds = Array.isArray(raw)
+      ? raw.map((t) => String(t ?? '').trim()).filter(Boolean)
+      : [];
+    const sa = googleServiceAccountJson.value() || undefined;
+    return runSubmitTeamLinkRequests({
+      db,
+      orgId,
+      uid: request.auth.uid,
+      teamIds,
+      serviceAccountJson: sa,
+    });
+  },
+);
+
+/**
+ * Assigner or current Team Admin for the club: approve / deny a link request.
+ * Approve appends Contacts on the Sheet. Body: { orgId?, requestId, decision, denyReason? }
+ */
+export const reviewTeamLinkRequest = onCall(
+  {
+    secrets: [googleServiceAccountJson],
+    timeoutSeconds: 120,
+    memory: '512MiB',
+  },
+  async (request) => {
+    if (!request.auth?.uid) {
+      throw new HttpsError('unauthenticated', 'Sign in required');
+    }
+    const orgId =
+      String(request.data?.orgId ?? '').trim() ||
+      process.env.DEFAULT_ORG_ID ||
+      'lonestar';
+    const requestId = String(request.data?.requestId ?? '').trim();
+    const decision = String(request.data?.decision ?? '').trim();
+    if (!requestId || (decision !== 'approve' && decision !== 'deny')) {
+      throw new HttpsError(
+        'invalid-argument',
+        'requestId and decision (approve|deny) required',
+      );
+    }
+    const sa = googleServiceAccountJson.value();
+    if (!sa) {
+      throw new HttpsError(
+        'failed-precondition',
+        'GOOGLE_SERVICE_ACCOUNT_JSON secret is not set',
+      );
+    }
+    return runReviewTeamLinkRequest({
+      db,
+      orgId,
+      requestId,
+      reviewerUid: request.auth.uid,
+      decision,
+      denyReason: String(request.data?.denyReason ?? '').trim() || undefined,
       serviceAccountJson: sa,
     });
   },

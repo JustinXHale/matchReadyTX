@@ -184,6 +184,25 @@ export interface GameRequest {
   declineReason?: string;
 }
 
+/** Per-team request to become Team Admin for a club side. */
+export type TeamLinkRequestStatus = 'pending' | 'approved' | 'denied';
+
+export interface TeamLinkRequest {
+  id: string;
+  orgId: string;
+  requesterUserId: string;
+  requesterName: string;
+  requesterEmail: string;
+  teamId: string;
+  teamName: string;
+  status: TeamLinkRequestStatus;
+  createdAt: string;
+  reviewedAt?: string;
+  reviewedByUserId?: string;
+  denyReason?: string;
+  autoApproved?: boolean;
+}
+
 /** Team Admin request for a new fixture (not official raise-hand). */
 export type FixtureRequestStatus = 'pending' | 'approved' | 'declined';
 

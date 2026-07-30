@@ -44,6 +44,9 @@ import {
 import { CmoReportPage } from '@/features/referee/reports/CmoReportPage';
 import { CardReportPage } from '@/features/referee/reports/CardReportPage';
 import { TeamAdminHomePage } from '@/features/teamAdmin/TeamAdminHomePage';
+import { TeamAdminLayout } from '@/features/teamAdmin/TeamAdminLayout';
+import { TeamAdminReportPage } from '@/features/teamAdmin/TeamAdminReportPage';
+import { CoachFeedbackFormPage } from '@/features/teamAdmin/CoachFeedbackFormPage';
 import { RequestFixturePage } from '@/features/teamAdmin/RequestFixturePage';
 import {
   SchedulerIndexRedirect,
@@ -52,6 +55,8 @@ import {
 import { SchedulerQueuesPage } from '@/features/scheduler/queues/SchedulerQueuesPage';
 import { SchedulerSchedulePage } from '@/features/scheduler/schedule/SchedulerSchedulePage';
 import { SchedulerUploadPage } from '@/features/scheduler/upload/SchedulerUploadPage';
+import { SchedulerFeedbackPage } from '@/features/scheduler/feedback/SchedulerFeedbackPage';
+import { SchedulerFeedbackDetailPage } from '@/features/scheduler/feedback/SchedulerFeedbackDetailPage';
 import { MatchDetailPage } from '@/features/matches/MatchDetailPage';
 import { MembersPage } from '@/features/members/MembersPage';
 import { MemberDetailPage } from '@/features/members/MemberDetailPage';
@@ -256,16 +261,22 @@ function FeatureRoutes() {
         element={<AppNavigate to="/referee/availability" replace />}
       />
       <Route path="profile" element={<ProfilePage />} />
-      <Route path="team-admin" element={<TeamAdminHomePage />} />
-      <Route
-        path="team-admin/request-fixture"
-        element={<RequestFixturePage />}
-      />
+      <Route path="team-admin" element={<TeamAdminLayout />}>
+        <Route index element={<TeamAdminHomePage />} />
+        <Route path="report" element={<TeamAdminReportPage />} />
+        <Route path="report/:matchId" element={<CoachFeedbackFormPage />} />
+        <Route path="request-fixture" element={<RequestFixturePage />} />
+      </Route>
       <Route path="coach" element={<AppNavigate to="/team-admin" replace />} />
       <Route path="scheduler" element={<SchedulerLayout />}>
         <Route index element={<SchedulerIndexRedirect />} />
         <Route path="queues" element={<SchedulerQueuesPage />} />
         <Route path="schedule" element={<SchedulerSchedulePage />} />
+        <Route path="feedback" element={<SchedulerFeedbackPage />} />
+        <Route
+          path="feedback/:feedbackId"
+          element={<SchedulerFeedbackDetailPage />}
+        />
         <Route path="upload" element={<SchedulerUploadPage />} />
         <Route
           path="org"

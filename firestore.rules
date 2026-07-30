@@ -146,6 +146,84 @@ service cloud.firestore {
             ]);
         allow delete: if isAssigner(orgId);
       }
+      /**
+       * Team Admin referee feedback — club-owned, Scheduler-confidential.
+       * Officials must never read. Doc id = matchId_reportingTeamId.
+       */
+      match /coachFeedback/{feedbackId} {
+        function memberDoc() {
+          return get(/databases/$(database)/documents/orgs/$(orgId)/members/$(request.auth.uid)).data;
+        }
+        function isTeamAdminForReportingTeam() {
+          return isMember(orgId)
+            && 'teamAdmin' in memberDoc().roles
+            && request.resource.data.reportingTeamId in memberDoc().teamIds;
+        }
+        function canReadClubFeedback() {
+          return isMember(orgId)
+            && 'teamAdmin' in memberDoc().roles
+            && resource.data.reportingTeamId in memberDoc().teamIds;
+        }
+        function matchPath() {
+          return /databases/$(database)/documents/orgs/$(orgId)/matches/$(request.resource.data.matchId);
+        }
+        function matchAllowsCoachFeedback() {
+          return exists(matchPath())
+            && get(matchPath()).data.homeTeamId == request.resource.data.homeTeamId
+            && get(matchPath()).data.awayTeamId == request.resource.data.awayTeamId
+            && get(matchPath()).data.kickoffAt == request.resource.data.kickoffAt
+            && !(get(matchPath()).data.status in ['cancelled', 'draft', 'postponed'])
+            && crewVisible(get(matchPath()).data)
+            && (
+              request.resource.data.reportingTeamId == get(matchPath()).data.homeTeamId
+              || request.resource.data.reportingTeamId == get(matchPath()).data.awayTeamId
+            );
+        }
+        function coachFeedbackIdOk() {
+          return request.resource.data.id == feedbackId
+            && feedbackId == request.resource.data.matchId + '_' + request.resource.data.reportingTeamId;
+        }
+        function coachFeedbackCreateShape() {
+          return request.resource.data.keys().hasAll([
+            'id', 'orgId', 'matchId', 'slot', 'officialUserId', 'officialName',
+            'homeTeamId', 'homeTeamName', 'awayTeamId', 'awayTeamName',
+            'kickoffAt', 'level', 'score', 'scales', 'submitterUserId',
+            'submitterName', 'submitterEmail', 'clubRole', 'reportingTeamId',
+            'reportingTeamName', 'status', 'createdAt', 'updatedAt'
+          ])
+          && request.resource.data.orgId == orgId
+          && coachFeedbackIdOk()
+          && request.resource.data.slot == 'mo'
+          && request.resource.data.status == 'submitted'
+          && request.resource.data.submitterUserId == request.auth.uid
+          && request.resource.data.officialUserId is string
+          && request.resource.data.officialUserId.size() > 0
+          && request.resource.data.officialName is string
+          && request.resource.data.officialName.size() > 0
+          && matchAllowsCoachFeedback();
+        }
+        allow read: if isAssigner(orgId) || canReadClubFeedback();
+        allow create: if signedIn()
+          && isTeamAdminForReportingTeam()
+          && coachFeedbackCreateShape();
+        allow update: if signedIn()
+          && isTeamAdminForReportingTeam()
+          && resource.data.matchId == request.resource.data.matchId
+          && resource.data.reportingTeamId == request.resource.data.reportingTeamId
+          && resource.data.orgId == request.resource.data.orgId
+          && resource.data.id == request.resource.data.id
+          && coachFeedbackIdOk()
+          && request.resource.data.slot == 'mo'
+          && request.resource.data.status == 'submitted'
+          && request.resource.data.submitterUserId == request.auth.uid
+          && matchAllowsCoachFeedback();
+        allow delete: if isAssigner(orgId);
+      }
+      /** Team Admin club-link requests — create/review via Admin SDK callables. */
+      match /teamLinkRequests/{requestId} {
+        allow read: if isMember(orgId);
+        allow create, update, delete: if false;
+      }
       match /availability/{uid}/ranges/{rangeId} {
         allow read: if isAssigner(orgId) || request.auth.uid == uid;
         allow write: if request.auth.uid == uid;

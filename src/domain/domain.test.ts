@@ -19,6 +19,12 @@ import {
   applyFanXorRoleToggle,
   validateProfilePhoto,
 } from '@/domain/profile';
+import {
+  emailMatchesTeamContacts,
+  rolesAfterTeamLinkDenial,
+  shouldShowPendingFanBrowse,
+  shouldShowTeamAdminLens,
+} from '@/domain/teamLinkRequests';
 import { confirmTeam, releaseMatch } from '@/domain/matchTransitions';
 import { assignOfficial, confirmOfficialSlot, markUnavailableAndRelease } from '@/domain/crew';
 import { emptyCrew, crewBlocks, crewPeople, emptyCrewBlocks, isCrewVisibleToTeams, type Match, type OrgSettings, type Team, type UserProfile } from '@/domain/types';
@@ -1242,5 +1248,99 @@ describe('member directory helpers', () => {
       ),
     ).toBe('Visiting club');
     expect(fanFavoriteLabel({ ...base, roles: ['fan'] }, teams)).toBeNull();
+  });
+});
+
+describe('teamLinkRequests', () => {
+  const team: Team = {
+    id: 'team_austin',
+    name: 'Austin',
+    contactEmails: ['coach@austin.edu'],
+  };
+
+  it('emailMatchesTeamContacts is case-insensitive', () => {
+    expect(emailMatchesTeamContacts('Coach@Austin.edu', team)).toBe(true);
+    expect(emailMatchesTeamContacts('other@x.com', team)).toBe(false);
+  });
+
+  it('rolesAfterTeamLinkDenial strips TA only; Fan when no working roles', () => {
+    expect(
+      rolesAfterTeamLinkDenial(
+        { roles: ['teamAdmin', 'official'], teamIds: [] },
+        0,
+      ),
+    ).toEqual({ roles: ['official'], teamIds: [] });
+    expect(
+      rolesAfterTeamLinkDenial({ roles: ['teamAdmin'], teamIds: [] }, 0),
+    ).toEqual({ roles: ['fan'], teamIds: [] });
+    expect(
+      rolesAfterTeamLinkDenial({ roles: ['teamAdmin'], teamIds: [] }, 1),
+    ).toEqual({ roles: ['teamAdmin'], teamIds: [] });
+  });
+
+  it('pending Fan browse and Team Admin lens gates', () => {
+    const pending: UserProfile = {
+      uid: 'u1',
+      firstName: 'A',
+      lastName: 'B',
+      displayName: 'A B',
+      email: 'a@b.com',
+      phone: '1',
+      smsOptIn: false,
+      homeStreet: '',
+      homeCity: '',
+      homeRegion: '',
+      homePostalCode: '',
+      homeAddress: '',
+      roles: ['teamAdmin'],
+      teamIds: [],
+      profileComplete: true,
+    };
+    expect(shouldShowTeamAdminLens(pending)).toBe(false);
+    expect(shouldShowPendingFanBrowse(pending)).toBe(true);
+    expect(
+      shouldShowTeamAdminLens({ ...pending, teamIds: ['team_austin'] }),
+    ).toBe(true);
+    expect(
+      shouldShowPendingFanBrowse({
+        ...pending,
+        roles: ['teamAdmin', 'official'],
+      }),
+    ).toBe(false);
+  });
+});
+
+describe('coachFeedback', () => {
+  it('builds deterministic doc ids and requires low-score comments', async () => {
+    const {
+      coachFeedbackDocId,
+      scalesNeedComments,
+      validateCoachFeedbackScales,
+    } = await import('@/domain/coachFeedback');
+    expect(coachFeedbackDocId('m1', 'team_a')).toBe('m1_team_a');
+    expect(
+      scalesNeedComments({
+        breakdown: 'excellent',
+        overall: 'poor',
+      }),
+    ).toBe(true);
+    expect(
+      scalesNeedComments({
+        breakdown: 'average',
+        overall: 'average',
+      }),
+    ).toBe(false);
+    expect(
+      validateCoachFeedbackScales({
+        breakdown: 'excellent',
+        scrum: 'average',
+        lineout: 'average',
+        safety: 'above_average',
+        communication: 'average',
+        professionalism: 'excellent',
+        overall: 'average',
+      }),
+    ).toBe(true);
+    expect(validateCoachFeedbackScales({ overall: 'average' })).toBe(false);
   });
 });

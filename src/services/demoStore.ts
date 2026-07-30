@@ -40,6 +40,12 @@ import {
   syncPendingMatchReports,
 } from '@/domain/reports';
 import { matchFromFixtureRequest, newAppMatchId } from '@/domain/fixtureRequests';
+import {
+  coachFeedbackDocId,
+  type CoachFeedback,
+  type CoachFeedbackScaleKey,
+  type CoachFeedbackScaleValue,
+} from '@/domain/coachFeedback';
 import type {
   AvailabilityRange,
   ChangeProposal,
@@ -53,6 +59,7 @@ import type {
   OrgSettings,
   RequestableSlot,
   Team,
+  TeamLinkRequest,
   UserProfile,
 } from '@/domain/types';
 import {
@@ -66,6 +73,10 @@ import {
   newAssignmentId,
   newCmoId,
 } from '@/domain/types';
+import {
+  emailMatchesTeamContacts,
+  rolesAfterTeamLinkDenial,
+} from '@/domain/teamLinkRequests';
 import { isFirebaseConfigured } from '@/services/firebase';
 import {
   callProposalWriteback,
@@ -1112,6 +1123,10 @@ export interface AppState {
   requests: GameRequest[];
   /** Team Admin requests for new fixtures (not raise-hand). */
   fixtureRequests: FixtureRequest[];
+  /** Pending / resolved Team Admin club-link requests. */
+  teamLinkRequests: TeamLinkRequest[];
+  /** Team Admin referee feedback (scheduler-confidential). */
+  coachFeedback: CoachFeedback[];
   availability: AvailabilityRange[];
   notifications: NotificationLogEntry[];
   officialAlerts: OfficialAlert[];
@@ -1204,6 +1219,59 @@ function seedFixtureRequests(): FixtureRequest[] {
       housingProvided: true,
       status: 'pending',
       createdAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(),
+    },
+  ];
+}
+
+function seedCoachFeedback(matches: Match[]): CoachFeedback[] {
+  const m = matches.find((x) => x.id === 'm_res01');
+  if (!m) return [];
+  const mo = crewPeople(m.crew.mo).find((a) => a.userId && a.userName);
+  if (!mo?.userId || !mo.userName) return [];
+  const avg = 'average' as CoachFeedbackScaleValue;
+  const above = 'above_average' as CoachFeedbackScaleValue;
+  const scales: Record<CoachFeedbackScaleKey, CoachFeedbackScaleValue> = {
+    breakdown: above,
+    scrum: avg,
+    lineout: above,
+    safety: above,
+    communication: avg,
+    professionalism: above,
+    overall: above,
+  };
+  const createdAt = new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString();
+  const id = coachFeedbackDocId(m.id, 'team_austin');
+  return [
+    {
+      id,
+      orgId: 'demo-org',
+      matchId: m.id,
+      slot: 'mo',
+      officialUserId: mo.userId,
+      officialName: mo.userName,
+      homeTeamId: m.homeTeamId,
+      homeTeamName: m.homeTeamName,
+      awayTeamId: m.awayTeamId,
+      awayTeamName: m.awayTeamName,
+      kickoffAt: m.kickoffAt,
+      competition: m.competition,
+      level: m.level,
+      score: `${m.homeScore ?? 0}–${m.awayScore ?? 0}`,
+      scales,
+      commentsOnScores: 'Solid day overall; scrum resets were a touch slow.',
+      areasDoneWell: 'Communication with captains and player management.',
+      areasToImprove: 'Faster reset at scrum; clearer advantage calls.',
+      otherCrewFeedback: 'ARs were well positioned.',
+      submitterUserId: 'u_home',
+      submitterName: 'Austin Admin',
+      submitterEmail: 'austin-admin@example.com',
+      submitterPhone: '+15551110002',
+      clubRole: 'Head Coach',
+      reportingTeamId: 'team_austin',
+      reportingTeamName: 'Austin RFC',
+      status: 'submitted',
+      createdAt,
+      updatedAt: createdAt,
     },
   ];
 }
@@ -1578,6 +1646,8 @@ function createInitialState(): AppState {
     proposals: seeded.proposals,
     requests: seedGameRequests(seeded.matches),
     fixtureRequests: seedFixtureRequests(),
+    teamLinkRequests: [],
+    coachFeedback: seedCoachFeedback(seeded.matches),
     availability: seedDemoAvailability(),
     notifications: [
       {
@@ -1848,6 +1918,7 @@ class DemoStore {
     matches: Match[];
     teams: Team[];
     fixtureRequests?: FixtureRequest[];
+    teamLinkRequests?: TeamLinkRequest[];
   }): void {
     this.set((s) => ({
       ...s,
@@ -1864,11 +1935,18 @@ class DemoStore {
       proposals: [],
       requests: [],
       fixtureRequests: snap.fixtureRequests ?? [],
+      teamLinkRequests: snap.teamLinkRequests ?? [],
+      // Cleared until subscribeCoachFeedback fills (role-scoped).
+      coachFeedback: [],
       matchReports: [],
       cardReports: [],
       coachingReports: [],
       officialAlerts: [],
     }));
+  }
+
+  applyLiveCoachFeedback(coachFeedback: CoachFeedback[]): void {
+    this.set((s) => ({ ...s, coachFeedback }));
   }
 
   /** Replace in-memory roster with live org members (keeps currentUser if missing). */
@@ -3007,6 +3085,60 @@ class DemoStore {
     return req.id;
   }
 
+  /**
+   * Team Admin submits or updates referee (MO) feedback.
+   * One submission per (matchId, reportingTeamId). Returns feedback id or null.
+   */
+  saveCoachFeedback(feedback: CoachFeedback): string | null {
+    const user = this.state.users.find((u) => u.uid === feedback.submitterUserId);
+    if (!user || !user.roles.includes('teamAdmin')) return null;
+    if (!user.teamIds.includes(feedback.reportingTeamId)) return null;
+    if (
+      feedback.reportingTeamId !== feedback.homeTeamId &&
+      feedback.reportingTeamId !== feedback.awayTeamId
+    ) {
+      return null;
+    }
+    const match = this.state.matches.find((m) => m.id === feedback.matchId);
+    if (!match) return null;
+    const expectedId = coachFeedbackDocId(
+      feedback.matchId,
+      feedback.reportingTeamId,
+    );
+    if (feedback.id !== expectedId) return null;
+
+    const existing = this.state.coachFeedback.find((f) => f.id === feedback.id);
+
+    const next: CoachFeedback = {
+      ...feedback,
+      slot: 'mo',
+      status: 'submitted',
+      createdAt: existing?.createdAt ?? feedback.createdAt,
+      updatedAt: new Date().toISOString(),
+    };
+
+    this.set((s) => ({
+      ...s,
+      coachFeedback: existing
+        ? s.coachFeedback.map((f) => (f.id === next.id ? next : f))
+        : [next, ...s.coachFeedback],
+    }));
+    return next.id;
+  }
+
+  /** Optimistic upsert after a live Firestore write (before snapshot arrives). */
+  upsertCoachFeedbackLocal(feedback: CoachFeedback): void {
+    this.set((s) => {
+      const existing = s.coachFeedback.find((f) => f.id === feedback.id);
+      return {
+        ...s,
+        coachFeedback: existing
+          ? s.coachFeedback.map((f) => (f.id === feedback.id ? feedback : f))
+          : [feedback, ...s.coachFeedback],
+      };
+    });
+  }
+
   /** Assigner declines a pending fixture request. */
   declineFixtureRequest(
     requestId: string,
@@ -3091,6 +3223,220 @@ class DemoStore {
       );
     }
     return matchId;
+  }
+
+  /**
+   * Demo: request Team Admin for clubs. Auto-approves when email is on Contacts.
+   */
+  submitTeamLinkRequests(
+    userId: string,
+    teamIds: string[],
+  ): { autoApproved: string[]; pending: string[] } {
+    const user = this.state.users.find((u) => u.uid === userId);
+    if (!user) return { autoApproved: [], pending: [] };
+    const unique = [...new Set(teamIds.filter(Boolean))];
+    const autoApproved: string[] = [];
+    const pending: string[] = [];
+    const now = new Date().toISOString();
+
+    this.set((s) => {
+      let users = s.users.map((u) => {
+        if (u.uid !== userId) return u;
+        const roles = u.roles.includes('teamAdmin')
+          ? u.roles.filter((r) => r !== 'fan')
+          : [...u.roles.filter((r) => r !== 'fan'), 'teamAdmin' as const];
+        return { ...u, roles };
+      });
+      let teamLinkRequests = [...s.teamLinkRequests];
+      let teams = [...s.teams];
+
+      for (const teamId of unique) {
+        const team = teams.find((t) => t.id === teamId);
+        if (!team) continue;
+        if (users.find((u) => u.uid === userId)?.teamIds.includes(teamId)) {
+          autoApproved.push(teamId);
+          continue;
+        }
+        if (
+          teamLinkRequests.some(
+            (r) =>
+              r.requesterUserId === userId &&
+              r.teamId === teamId &&
+              r.status === 'pending',
+          )
+        ) {
+          pending.push(teamId);
+          continue;
+        }
+
+        const onContacts = emailMatchesTeamContacts(user.email, team);
+        const req: TeamLinkRequest = {
+          id: id('tlr'),
+          orgId: s.org.id,
+          requesterUserId: userId,
+          requesterName: user.displayName,
+          requesterEmail: user.email,
+          teamId,
+          teamName: team.name,
+          status: onContacts ? 'approved' : 'pending',
+          createdAt: now,
+          reviewedAt: onContacts ? now : undefined,
+          autoApproved: onContacts || undefined,
+        };
+        teamLinkRequests = [req, ...teamLinkRequests];
+
+        if (onContacts) {
+          users = users.map((u) =>
+            u.uid === userId
+              ? {
+                  ...u,
+                  teamIds: u.teamIds.includes(teamId)
+                    ? u.teamIds
+                    : [...u.teamIds, teamId],
+                }
+              : u,
+          );
+          teams = teams.map((t) => {
+            if (t.id !== teamId) return t;
+            const emails = t.contactEmails.map((e) => e.toLowerCase());
+            if (emails.includes(user.email.trim().toLowerCase())) return t;
+            return {
+              ...t,
+              contactEmails: [...t.contactEmails, user.email.trim()],
+            };
+          });
+          autoApproved.push(teamId);
+        } else {
+          pending.push(teamId);
+          const assigner = users.find((u) => u.roles.includes('assigner'));
+          if (assigner) {
+            // notify after set via side effect below
+          }
+        }
+      }
+
+      return { ...s, users, teams, teamLinkRequests };
+    });
+
+    for (const teamId of pending) {
+      const team = this.state.teams.find((t) => t.id === teamId);
+      for (const u of this.state.users) {
+        const cares =
+          u.roles.includes('assigner') ||
+          (u.roles.includes('teamAdmin') && u.teamIds.includes(teamId));
+        if (!cares) continue;
+        this.notify(
+          'team_link_request',
+          u.uid,
+          'Team Admin request',
+          `${user.displayName} asked to manage ${team?.name ?? teamId}.`,
+        );
+      }
+    }
+
+    return { autoApproved, pending };
+  }
+
+  reviewTeamLinkRequest(
+    requestId: string,
+    reviewerUserId: string,
+    decision: 'approve' | 'deny',
+    denyReason?: string,
+  ): void {
+    const req = this.state.teamLinkRequests.find((r) => r.id === requestId);
+    if (!req || req.status !== 'pending') return;
+    const reviewer = this.state.users.find((u) => u.uid === reviewerUserId);
+    if (!reviewer) return;
+    const canReview =
+      reviewer.roles.includes('assigner') ||
+      (reviewer.roles.includes('teamAdmin') &&
+        reviewer.teamIds.includes(req.teamId));
+    if (!canReview) return;
+
+    const at = new Date().toISOString();
+
+    if (decision === 'approve') {
+      this.set((s) => {
+        const users = s.users.map((u) => {
+          if (u.uid !== req.requesterUserId) return u;
+          const roles = u.roles.includes('teamAdmin')
+            ? u.roles.filter((r) => r !== 'fan')
+            : [...u.roles.filter((r) => r !== 'fan'), 'teamAdmin' as const];
+          const teamIds = u.teamIds.includes(req.teamId)
+            ? u.teamIds
+            : [...u.teamIds, req.teamId];
+          return { ...u, roles, teamIds };
+        });
+        const teams = s.teams.map((t) => {
+          if (t.id !== req.teamId) return t;
+          const e = req.requesterEmail.trim().toLowerCase();
+          if (t.contactEmails.some((c) => c.toLowerCase() === e)) return t;
+          return {
+            ...t,
+            contactEmails: [...t.contactEmails, req.requesterEmail.trim()],
+          };
+        });
+        return {
+          ...s,
+          users,
+          teams,
+          teamLinkRequests: s.teamLinkRequests.map((r) =>
+            r.id === requestId
+              ? {
+                  ...r,
+                  status: 'approved' as const,
+                  reviewedAt: at,
+                  reviewedByUserId: reviewerUserId,
+                }
+              : r,
+          ),
+        };
+      });
+      this.notify(
+        'team_link_approved',
+        req.requesterUserId,
+        'Team Admin approved',
+        `You can manage ${req.teamName}.`,
+      );
+      return;
+    }
+
+    this.set((s) => {
+      const pendingLeft = s.teamLinkRequests.filter(
+        (r) =>
+          r.requesterUserId === req.requesterUserId &&
+          r.id !== requestId &&
+          r.status === 'pending',
+      ).length;
+      const users = s.users.map((u) => {
+        if (u.uid !== req.requesterUserId) return u;
+        const next = rolesAfterTeamLinkDenial(u, pendingLeft);
+        return { ...u, roles: next.roles, teamIds: next.teamIds };
+      });
+      return {
+        ...s,
+        users,
+        teamLinkRequests: s.teamLinkRequests.map((r) =>
+          r.id === requestId
+            ? {
+                ...r,
+                status: 'denied' as const,
+                reviewedAt: at,
+                reviewedByUserId: reviewerUserId,
+                denyReason: denyReason?.trim() || undefined,
+              }
+            : r,
+        ),
+      };
+    });
+    this.notify(
+      'team_link_denied',
+      req.requesterUserId,
+      'Team Admin request denied',
+      denyReason?.trim()
+        ? `${req.teamName}: ${denyReason.trim()}`
+        : `${req.teamName} was not approved.`,
+    );
   }
 
   /** Replace fixture requests from live Firestore snapshot. */

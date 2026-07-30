@@ -3,6 +3,7 @@ import { Title } from '@patternfly/react-core';
 import { Link } from 'react-router-dom';
 import { useApp, useAppHref } from '@/app/AppContext';
 import { isKickoffUpcoming } from '@/domain/requests';
+import { teamLinkRequestsForReviewer } from '@/domain/teamLinkRequests';
 import { applyMatchScope, matchesForUser } from '@/domain/visibility';
 import {
   allPartiesConfirmed,
@@ -12,7 +13,13 @@ import {
   type Team,
 } from '@/domain/types';
 import { GlobalDivisionFilters } from '@/features/global/GlobalDivisionFilters';
+import { TeamLinkRequestQueue } from '@/features/scheduler/queues/TeamLinkRequestQueue';
 import { TeamAdminMatchRow } from '@/features/teamAdmin/TeamAdminMatchRow';
+import { isFirebaseConfigured } from '@/services/firebase';
+import {
+  callReviewTeamLinkRequest,
+  defaultOrgId,
+} from '@/services/orgData';
 
 const TEAM_ADMIN_BACK = {
   label: 'Team Admin',
@@ -44,10 +51,11 @@ function isActionNeeded(match: Match, hasPendingProposal: boolean): boolean {
 }
 
 export function TeamAdminHomePage() {
-  const { currentUser, state, isDemoShowcase } = useApp();
+  const { currentUser, state, store, refresh, dataMode } = useApp();
   const requestFixtureHref = useAppHref('/team-admin/request-fixture');
   const [teamFilter, setTeamFilter] = useState<string | null>(null);
   const [genderFilter, setGenderFilter] = useState<MatchGender | null>(null);
+  const [teamLinkBusyId, setTeamLinkBusyId] = useState<string | null>(null);
   const [levelFilter, setLevelFilter] = useState<string | null>(null);
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
 
@@ -57,6 +65,44 @@ export function TeamAdminHomePage() {
       .map((id) => state.teams.find((t) => t.id === id))
       .filter((t): t is Team => t != null);
   }, [currentUser, state.teams]);
+
+  const linkReviews = useMemo(
+    () => teamLinkRequestsForReviewer(state.teamLinkRequests, currentUser),
+    [state.teamLinkRequests, currentUser],
+  );
+
+  const onReviewTeamLink = async (
+    id: string,
+    decision: 'approve' | 'deny',
+    reason?: string,
+  ) => {
+    const reviewerId = currentUser?.uid;
+    if (!reviewerId) return;
+    setTeamLinkBusyId(id);
+    try {
+      if (dataMode === 'live' && isFirebaseConfigured) {
+        await callReviewTeamLinkRequest({
+          orgId: defaultOrgId(),
+          requestId: id,
+          decision,
+          denyReason: reason,
+        });
+        refresh();
+      } else {
+        store.reviewTeamLinkRequest(id, reviewerId, decision, reason);
+        refresh();
+      }
+    } catch (err) {
+      console.error('Team link review failed', err);
+      window.alert(
+        err instanceof Error
+          ? err.message
+          : 'Failed to review Team Admin request.',
+      );
+    } finally {
+      setTeamLinkBusyId(null);
+    }
+  };
 
   const levels = state.org.matchLevels;
 
@@ -199,19 +245,26 @@ export function TeamAdminHomePage() {
         a change when something’s wrong.
       </p>
 
-      {!hasTeams && !isDemoShowcase && (
+      {!hasTeams && (
         <p className="rs-match-card__meta">
-          No club is linked yet. When your Scheduler adds your email on the
-          Contacts tab of the Sheet (team name + email), you are pre-approved for
-          that team — no separate approval step.
+          No club is linked yet. Pick teams in Profile (or during onboarding).
+          Contacts email match auto-approves; otherwise your Scheduler or a
+          current Team Admin reviews each request. Until then, browse as Fan.
         </p>
       )}
 
-      {!hasTeams && isDemoShowcase && (
-        <p className="rs-match-card__meta">
-          No club is linked to this demo account. Team Admin unlocks when your
-          email is listed on a team’s Contacts (pre-approved from the Sheet).
-        </p>
+      {linkReviews.length > 0 && (
+        <section className="rs-detail-card" aria-labelledby="ta-link-reviews">
+          <h2 id="ta-link-reviews" className="rs-detail-section__label">
+            Team Admin requests for your clubs
+          </h2>
+          <TeamLinkRequestQueue
+            requests={linkReviews}
+            busyId={teamLinkBusyId}
+            onApprove={(id) => void onReviewTeamLink(id, 'approve')}
+            onDeny={(id, reason) => void onReviewTeamLink(id, 'deny', reason)}
+          />
+        </section>
       )}
 
       {hasTeams && (

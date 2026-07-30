@@ -32,7 +32,7 @@ firebase functions:secrets:set GOOGLE_SERVICE_ACCOUNT_JSON --data-file=keys/your
 
 ```bash
 cd functions && npm install && npm run build && cd ..
-firebase deploy --only functions:syncSheet,functions:sheetPoll,functions:sheetWebhook,functions:proposalWriteback,functions:approveFixtureRequest
+firebase deploy --only functions:syncSheet,functions:sheetPoll,functions:sheetWebhook,functions:proposalWriteback,functions:approveFixtureRequest,functions:submitTeamLinkRequests,functions:reviewTeamLinkRequest,firestore:rules
 ```
 
 Always run `npm run build` in `functions/` before deploy — Firebase uploads `lib/`, not `src/`.
@@ -55,6 +55,8 @@ Firebase Console → Authentication → Settings → **Authorized domains** → 
 | `sheetPoll` | Every 5 minutes | Same ingest when `sheetId` + SA present |
 | `sheetWebhook` | Apps Script `onEdit` / timed | Same ingest (no longer timestamp-only) |
 | `proposalWriteback` | Assigner ack after other-team accept | Updates Schedule row + match facts |
+| `submitTeamLinkRequests` | Onboarding / Profile | Auto-approve when email on Contacts; else pending |
+| `reviewTeamLinkRequest` | Assigner or Team Admin for club | Approve → Contacts append + `teamIds`; deny may strip TA / Fan |
 
 Failed poll / webhook / sync / write-back sets `orgs/{orgId}.sheetSyncError` (cleared on success). Scheduler → Upload shows last sync time and that error.
 

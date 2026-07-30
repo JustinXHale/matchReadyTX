@@ -10,6 +10,7 @@ import {
 } from '@/features/scheduler/queues/MatchQueueList';
 import { NotificationsQueue } from '@/features/scheduler/queues/NotificationsQueue';
 import { RaiseHandQueue } from '@/features/scheduler/queues/RaiseHandQueue';
+import { TeamLinkRequestQueue } from '@/features/scheduler/queues/TeamLinkRequestQueue';
 import {
   countSchedulerQueues,
   matchesNeedingOfficials,
@@ -17,12 +18,14 @@ import {
   matchesT72Due,
   pendingFixtureRequests,
   pendingRaiseHandRequests,
+  pendingTeamLinkRequests,
   proposalsAwaitingAck,
 } from '@/features/scheduler/queues/selectors';
 import { isFirebaseConfigured } from '@/services/firebase';
 import { persistCrewAssignmentAndEmail } from '@/services/liveAssignment';
 import {
   callApproveFixtureRequest,
+  callReviewTeamLinkRequest,
   declineFixtureRequestInFirestore,
   defaultOrgId,
   saveMatchCrewAssignment,
@@ -62,11 +65,16 @@ function QueueSection({
 export function SchedulerQueuesPage() {
   const { state, store, dataMode, refresh, currentUser } = useApp();
   const [fixtureBusyId, setFixtureBusyId] = useState<string | null>(null);
+  const [teamLinkBusyId, setTeamLinkBusyId] = useState<string | null>(null);
 
   const counts = useMemo(() => countSchedulerQueues(state), [state]);
   const fixtureReqs = useMemo(
     () => pendingFixtureRequests(state.fixtureRequests),
     [state.fixtureRequests],
+  );
+  const teamLinkReqs = useMemo(
+    () => pendingTeamLinkRequests(state.teamLinkRequests),
+    [state.teamLinkRequests],
   );
   const raiseHand = useMemo(
     () => pendingRaiseHandRequests(state.requests),
@@ -168,6 +176,38 @@ export function SchedulerQueuesPage() {
     }
   };
 
+  const onReviewTeamLink = async (
+    id: string,
+    decision: 'approve' | 'deny',
+    reason?: string,
+  ) => {
+    const reviewerId = currentUser?.uid;
+    if (!reviewerId) return;
+    setTeamLinkBusyId(id);
+    try {
+      if (dataMode === 'live' && isFirebaseConfigured) {
+        await callReviewTeamLinkRequest({
+          requestId: id,
+          decision,
+          denyReason: reason,
+        });
+        refresh();
+      } else {
+        store.reviewTeamLinkRequest(id, reviewerId, decision, reason);
+        refresh();
+      }
+    } catch (err) {
+      console.error('Team link review failed', err);
+      window.alert(
+        err instanceof Error
+          ? err.message
+          : 'Failed to review Team Admin request.',
+      );
+    } finally {
+      setTeamLinkBusyId(null);
+    }
+  };
+
   if (counts.totalActionable === 0 && notifications.length === 0) {
     return (
       <div className="rs-stack">
@@ -204,6 +244,19 @@ export function SchedulerQueuesPage() {
           busyId={fixtureBusyId}
           onApprove={(id) => void onApproveFixture(id)}
           onDecline={(id, reason) => void onDeclineFixture(id, reason)}
+        />
+      </QueueSection>
+
+      <QueueSection
+        id="queue-team-links"
+        title="Team Admin links"
+        count={counts.teamLinkRequests}
+      >
+        <TeamLinkRequestQueue
+          requests={teamLinkReqs}
+          busyId={teamLinkBusyId}
+          onApprove={(id) => void onReviewTeamLink(id, 'approve')}
+          onDeny={(id, reason) => void onReviewTeamLink(id, 'deny', reason)}
         />
       </QueueSection>
 

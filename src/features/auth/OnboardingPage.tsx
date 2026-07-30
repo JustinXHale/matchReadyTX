@@ -19,11 +19,16 @@ import {
 } from '@/domain/profile';
 import { APPAREL_SIZES, type Role } from '@/domain/types';
 import { isFirebaseConfigured } from '@/services/firebase';
+import {
+  callSubmitTeamLinkRequests,
+  defaultOrgId,
+} from '@/services/orgData';
 import { saveFirebaseProfile } from '@/services/userProfile';
 import { RefereeLevelChart } from '@/ui/RefereeLevelChart';
 
 type StepId =
   | 'roles'
+  | 'teams'
   | 'firstName'
   | 'lastName'
   | 'phone'
@@ -61,6 +66,7 @@ const ROLE_OPTIONS = [
 /** Stock rugby stills for step placeholders (from /img → public/img). */
 const STEP_VISUALS: Partial<Record<StepId, string>> = {
   roles: '/img/onboard-4.jpg',
+  teams: '/img/onboard-4.jpg',
   firstName: '/img/onboard-5.jpg',
   lastName: '/img/onboard-1.jpeg',
   phone: '/img/onboard-2.jpeg',
@@ -119,6 +125,7 @@ export function OnboardingPage() {
   const [roleTeamAdmin, setRoleTeamAdmin] = useState(false);
   const [roleCmo, setRoleCmo] = useState(false);
   const [roleFan, setRoleFan] = useState(false);
+  const [selectedTeamIds, setSelectedTeamIds] = useState<string[]>([]);
   const [fanFavoriteChoice, setFanFavoriteChoice] = useState(() => {
     const other = currentUser?.fanTeamOther?.trim();
     if (other) return 'other';
@@ -153,7 +160,9 @@ export function OnboardingPage() {
     if (fanOnly) {
       return ['roles', 'firstName', 'lastName', 'favoriteTeams', 'photo'];
     }
-    const base: StepId[] = ['roles', 'firstName', 'lastName', 'phone'];
+    const base: StepId[] = ['roles'];
+    if (roleTeamAdmin) base.push('teams');
+    base.push('firstName', 'lastName', 'phone');
     if (needsRefDetails) {
       base.push(
         'homeAddress',
@@ -166,7 +175,15 @@ export function OnboardingPage() {
     if (roleFan) base.push('favoriteTeams');
     base.push('photo');
     return base;
-  }, [fanOnly, needsRefDetails, roleFan]);
+  }, [fanOnly, needsRefDetails, roleFan, roleTeamAdmin]);
+
+  const sortedTeams = useMemo(
+    () =>
+      [...state.teams].sort((a, b) =>
+        a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }),
+      ),
+    [state.teams],
+  );
 
   const safeIndex = Math.min(stepIndex, steps.length - 1);
   const step = steps[safeIndex]!;
@@ -182,6 +199,7 @@ export function OnboardingPage() {
     if (
       step === 'photo' ||
       step === 'roles' ||
+      step === 'teams' ||
       step === 'kitSizes' ||
       step === 'favoriteTeams'
     ) {
@@ -230,6 +248,8 @@ export function OnboardingPage() {
         });
       case 'roles':
         return rolesOk;
+      case 'teams':
+        return selectedTeamIds.length > 0;
       case 'birthday':
         return Boolean(birthday.trim());
       case 'refereeLevel':
@@ -301,8 +321,11 @@ export function OnboardingPage() {
       patch.refereeLevel = undefined;
     }
 
-    store.updateProfile(currentUser.uid, patch);
-    const updated =
+    store.updateProfile(currentUser.uid, {
+      ...patch,
+      teamIds: roleTeamAdmin ? [] : currentUser.teamIds,
+    });
+    let updated =
       store.getState().users.find((u) => u.uid === currentUser.uid) ??
       currentUser;
 
@@ -313,6 +336,28 @@ export function OnboardingPage() {
         try {
           const saved = await saveFirebaseProfile(updated);
           store.updateProfile(currentUser.uid, saved);
+          updated =
+            store.getState().users.find((u) => u.uid === currentUser.uid) ??
+            saved;
+          if (roleTeamAdmin && selectedTeamIds.length > 0) {
+            const result = await callSubmitTeamLinkRequests({
+              orgId: defaultOrgId(),
+              teamIds: selectedTeamIds,
+            });
+            if (result.autoApproved.length) {
+              store.updateProfile(currentUser.uid, {
+                teamIds: [
+                  ...new Set([
+                    ...(store
+                      .getState()
+                      .users.find((u) => u.uid === currentUser.uid)?.teamIds ??
+                      []),
+                    ...result.autoApproved,
+                  ]),
+                ],
+              });
+            }
+          }
         } catch (err) {
           setSaveError(
             err instanceof Error
@@ -323,7 +368,12 @@ export function OnboardingPage() {
           return;
         }
         setSaving(false);
+      } else if (roleTeamAdmin && selectedTeamIds.length > 0) {
+        store.submitTeamLinkRequests(currentUser.uid, selectedTeamIds);
       }
+      updated =
+        store.getState().users.find((u) => u.uid === currentUser.uid) ??
+        updated;
       navigate(
         dataMode === 'demo'
           ? withDemoPrefix(ROLE_HOME[defaultRoleView(updated)])
@@ -541,6 +591,7 @@ export function OnboardingPage() {
                       setRoleTeamAdmin(next.roleTeamAdmin);
                       setRoleCmo(next.roleCmo);
                       setRoleFan(next.roleFan);
+                      if (!next.roleTeamAdmin) setSelectedTeamIds([]);
                     }}
                   >
                     <span
@@ -565,6 +616,56 @@ export function OnboardingPage() {
                   </button>
                 );
               })}
+            </div>
+          )}
+          {step === 'teams' && (
+            <div className="rs-onboard__choices" role="group" aria-label="Teams">
+              {sortedTeams.length === 0 ? (
+                <p className="rs-onboard__hint">
+                  No clubs are in the schedule yet. Ask your Scheduler to sync
+                  the Sheet, then return to finish linking.
+                </p>
+              ) : (
+                sortedTeams.map((t) => {
+                  const checked = selectedTeamIds.includes(t.id);
+                  return (
+                    <button
+                      key={t.id}
+                      type="button"
+                      className={`rs-onboard__choice rs-onboard__choice--multi${
+                        checked ? ' rs-onboard__choice--selected' : ''
+                      }`}
+                      aria-pressed={checked}
+                      onClick={() => {
+                        setSelectedTeamIds((prev) =>
+                          checked
+                            ? prev.filter((id) => id !== t.id)
+                            : [...prev, t.id],
+                        );
+                      }}
+                    >
+                      <span
+                        className={`rs-onboard__check${
+                          checked ? ' rs-onboard__check--on' : ''
+                        }`}
+                        aria-hidden
+                      >
+                        {checked ? (
+                          <svg viewBox="0 0 20 20" width="14" height="14">
+                            <path
+                              fill="currentColor"
+                              d="M7.6 13.2 4.4 10l-1.2 1.2 4.4 4.4L17 6.2 15.8 5z"
+                            />
+                          </svg>
+                        ) : null}
+                      </span>
+                      <span className="rs-onboard__choice-text">
+                        <strong>{t.name}</strong>
+                      </span>
+                    </button>
+                  );
+                })
+              )}
             </div>
           )}
           {step === 'favoriteTeams' && (
@@ -840,6 +941,11 @@ function stepCopy(
       return {
         title: 'How will you use MatchReadyTX?',
         hint: 'Select all that apply. Scheduler access is granted by your society.',
+      };
+    case 'teams':
+      return {
+        title: 'Which clubs do you manage?',
+        hint: 'Select each side separately (e.g. Men D1 and Women are different teams). If your email is already on Contacts, you’re approved automatically; otherwise your Scheduler or a current Team Admin reviews each request.',
       };
     case 'firstName':
       return { title: 'What’s your first name?' };

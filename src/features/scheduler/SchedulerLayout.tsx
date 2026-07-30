@@ -9,6 +9,7 @@ export function SchedulerLayout() {
   const { hasAssignerRole, isAssignerView, roleView, state } = useApp();
   const queuesHref = useAppHref('/scheduler/queues');
   const scheduleHref = useAppHref('/scheduler/schedule');
+  const feedbackHref = useAppHref('/scheduler/feedback');
   const uploadHref = useAppHref('/scheduler/upload');
   const roleHome = useAppHref(ROLE_HOME[roleView]);
 
@@ -58,6 +59,12 @@ export function SchedulerLayout() {
           className={({ isActive }) => (isActive ? 'active' : '')}
         >
           Schedule
+        </NavLink>
+        <NavLink
+          to={feedbackHref}
+          className={({ isActive }) => (isActive ? 'active' : '')}
+        >
+          Feedback
         </NavLink>
         <NavLink
           to={uploadHref}

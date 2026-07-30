@@ -16,7 +16,7 @@ This document is the **product** source of truth for what we are building and wh
 | ID | Decision |
 |----|----------|
 | **Name** | **MatchReadyTX** |
-| **Club persona** | **Team Admin** (UI + lens). Domain role `teamAdmin`. Linked via Contacts emails. Club home for confirm / propose / T-72 |
+| **Club persona** | **Team Admin** (UI + lens). Domain role `teamAdmin`. Linked via Contacts email **auto-approve** or per-team request (assigner / existing TA). Club home for confirm / propose / T-72 |
 | **Payments** | **Never** — no Stripe, reimbursements, or fee payouts. Fees (and any future mileage estimates) are **display / budgeting only** |
 | **Q-R3** | **Both** home and away Team Admins (Coaches) confirm date, time, and location |
 | **Q-G3** | Teams **may propose changes in-app**; accepted changes are **written to the Sheet** |
@@ -69,7 +69,7 @@ Assigners currently manage schedules, contacts, and referee assignments across s
 | Role | Who (v1 mental model) | Primary jobs |
 |------|------------------------|--------------|
 | **Assigner / Org Admin** | You (can be same person) | Link schedule, approve for team review, assign crew, handle declines/reassigns, receive alerts |
-| **Team Admin** | Club contact for a side | Confirm date/time/location; **request a new fixture** (assigner approve → Sheet row); propose changes; T-72 yes/no. Linked when email matches team Contacts |
+| **Team Admin** | Club contact for a side | Confirm date/time/location; **request a new fixture** (assigner approve → Sheet row); propose changes; T-72 yes/no; **optional referee (MO) feedback** after a played match (Scheduler-confidential). Onboarding/profile: select **each team** individually. Auto-approved when email is on Contacts; else assigner or current Team Admin for that club approves. Approve appends Contacts on the Sheet. Pending (no clubs yet): Team Admin lens hidden; browse as Fan |
 | **Match Official (MO)** | Required crew member | Set availability ranges; **request games**; confirm assignment; T-72; mark unavailable with reason when needed |
 | **Assistant Referee (AR1 / AR2)** | Optional but supported in v1 | Same availability / request / confirm / T-72 flows when assigned |
 | **Number 4** | Optional fourth official | Same when assigned |
@@ -79,7 +79,7 @@ Assigners currently manage schedules, contacts, and referee assignments across s
 
 **v1 assumption:** Assigner and Org Admin are often the same person. Model capabilities separately for other societies later.
 
-**UI lenses (masthead / bottom nav):** **Referee/CMO | Team Admin | Scheduler | Fan**. Scheduler = Assigner **control center** (Queues · Schedule · Org). Fan home = Global schedule. Referee and CMO share one lens (**Q-R6** locked).
+**UI lenses (masthead / bottom nav):** **Referee/CMO | Team Admin | Scheduler | Fan**. Scheduler = Assigner **control center** (Queues · Schedule · Feedback · Upload). Fan home = Global schedule. Referee and CMO share one lens (**Q-R6** locked). Team Admin tabs: Schedule · Report (optional MO feedback; not visible to officials).
 
 ### Role open items (non-blocking)
 
@@ -107,7 +107,7 @@ Assigners currently manage schedules, contacts, and referee assignments across s
 11. **Lean stack:** Vite + React + PatternFly + Firebase.
 12. **Multi-tenant later** — don’t hard-code a single society into the schema.
 13. **No payments** — the product never processes fees or mileage reimbursements.
-14. **Team Admin** — one club persona (domain `teamAdmin`); Contacts tab emails link admins to clubs.
+14. **Team Admin** — one club persona (domain `teamAdmin`); Contacts email auto-links; otherwise per-team link requests with assigner/TA review and Contacts write-back.
 
 ---
 
@@ -578,7 +578,7 @@ Profile onboarding is incomplete until required fields for the chosen role path 
 
 | ID | Question | Lean |
 |----|----------|------|
-| Q-I1 | Invite path for Coaches (Team Admins)? | Invite from contacts sheet + assigner invite |
+| Q-I1 | Invite path for Coaches (Team Admins)? | **Contacts auto-approve** + **per-team request** (assigner or existing TA); approve writes Contacts |
 | Q-I2 | Phone-only accounts (no Google/Apple)? | Not v1 |
 | Q-I3 | Certification grade on profile? | **Yes** for Referee/CMO onboarding |
 | Q-I4 | Multi-org membership? | **Yes** |
@@ -723,7 +723,8 @@ See [`IMPLEMENTATION_SPEC.md`](./IMPLEMENTATION_SPEC.md).
 | Change proposal | In-app request to alter Sheet facts; requires other team accept + assigner acknowledge (officials do not approve) |
 | Availability check | Official yes/no for a specific match slot (or proposed new slot); not a vote on whether facts should change |
 | Availability range | Start–end datetime window for an open or blocked calendar day (org timezone) |
-| Coach / Team Admin | Same club persona — confirm facts, propose changes, T-72 for their team’s matches |
+| Coach / Team Admin | Same club persona — confirm facts, propose changes, T-72 for their team’s matches; optional post-match MO feedback for the Scheduler |
+| Coach feedback | Team Admin report on Match Official performance (JotForm-style scales). One per club side per match; any Team Admin for that club may edit. Scheduler-confidential; officials never see it. Ratings/trends dashboards later |
 | CMO | Coaching Match Official — optional match contact/slot; shares **Referee/CMO** lens. **Coaching Reports** (not club Coach) are the CMO-side report path; referees use **Match Reports** |
 | Game request | Official expresses interest from **Referee → Request → Global**; assigner approves or declines. Pending lists only **active** requests (upcoming kickoff, open preferred slot) |
 | Match fee (display) | Slot fee from in-app default schedule or match override; never on shared Sheet; **never paid out in-app** |

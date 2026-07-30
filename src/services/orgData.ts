@@ -2,13 +2,22 @@ import {
   collection,
   doc,
   onSnapshot,
+  query,
   setDoc,
   updateDoc,
+  where,
   writeBatch,
   type Unsubscribe,
 } from 'firebase/firestore';
 import { httpsCallable } from 'firebase/functions';
 import { db, functions, isFirebaseConfigured } from '@/services/firebase';
+import {
+  type CoachFeedback,
+  type CoachFeedbackScaleKey,
+  type CoachFeedbackScaleValue,
+  COACH_FEEDBACK_SCALE_KEYS,
+  COACH_FEEDBACK_SCALE_VALUES,
+} from '@/domain/coachFeedback';
 import {
   emptyCrew,
   ensureDefaultMoBlock,
@@ -21,6 +30,7 @@ import {
   type MatchGender,
   type OrgSettings,
   type Team,
+  type TeamLinkRequest,
 } from '@/domain/types';
 import { releaseMatch } from '@/domain/matchTransitions';
 
@@ -225,7 +235,88 @@ export type LiveOrgSnapshot = {
   matches: Match[];
   teams: Team[];
   fixtureRequests: FixtureRequest[];
+  teamLinkRequests: TeamLinkRequest[];
 };
+
+function parseCoachFeedbackScales(
+  raw: unknown,
+): Record<CoachFeedbackScaleKey, CoachFeedbackScaleValue> | null {
+  if (!raw || typeof raw !== 'object') return null;
+  const obj = raw as Record<string, unknown>;
+  const out = {} as Record<CoachFeedbackScaleKey, CoachFeedbackScaleValue>;
+  for (const key of COACH_FEEDBACK_SCALE_KEYS) {
+    const v = obj[key];
+    if (
+      typeof v !== 'string' ||
+      !COACH_FEEDBACK_SCALE_VALUES.includes(v as CoachFeedbackScaleValue)
+    ) {
+      return null;
+    }
+    out[key] = v as CoachFeedbackScaleValue;
+  }
+  return out;
+}
+
+export function coachFeedbackFromFirestore(
+  id: string,
+  data: Record<string, unknown>,
+): CoachFeedback | null {
+  const scales = parseCoachFeedbackScales(data.scales);
+  if (!scales) return null;
+  if (typeof data.matchId !== 'string' || !data.matchId) return null;
+  if (typeof data.submitterUserId !== 'string' || !data.submitterUserId) {
+    return null;
+  }
+  if (typeof data.reportingTeamId !== 'string' || !data.reportingTeamId) {
+    return null;
+  }
+  return {
+    id,
+    orgId: typeof data.orgId === 'string' ? data.orgId : '',
+    matchId: data.matchId,
+    slot: 'mo',
+    officialUserId: String(data.officialUserId ?? ''),
+    officialName: String(data.officialName ?? ''),
+    homeTeamId: String(data.homeTeamId ?? ''),
+    homeTeamName: String(data.homeTeamName ?? ''),
+    awayTeamId: String(data.awayTeamId ?? ''),
+    awayTeamName: String(data.awayTeamName ?? ''),
+    kickoffAt: String(data.kickoffAt ?? ''),
+    competition:
+      typeof data.competition === 'string' ? data.competition : undefined,
+    level: String(data.level ?? ''),
+    score: String(data.score ?? ''),
+    scales,
+    commentsOnScores:
+      typeof data.commentsOnScores === 'string'
+        ? data.commentsOnScores
+        : undefined,
+    areasDoneWell:
+      typeof data.areasDoneWell === 'string' ? data.areasDoneWell : undefined,
+    areasToImprove:
+      typeof data.areasToImprove === 'string' ? data.areasToImprove : undefined,
+    otherFeedback:
+      typeof data.otherFeedback === 'string' ? data.otherFeedback : undefined,
+    videoLink: typeof data.videoLink === 'string' ? data.videoLink : undefined,
+    videoNotes:
+      typeof data.videoNotes === 'string' ? data.videoNotes : undefined,
+    otherCrewFeedback:
+      typeof data.otherCrewFeedback === 'string'
+        ? data.otherCrewFeedback
+        : undefined,
+    submitterUserId: data.submitterUserId,
+    submitterName: String(data.submitterName ?? ''),
+    submitterEmail: String(data.submitterEmail ?? ''),
+    submitterPhone:
+      typeof data.submitterPhone === 'string' ? data.submitterPhone : undefined,
+    clubRole: String(data.clubRole ?? ''),
+    reportingTeamId: data.reportingTeamId,
+    reportingTeamName: String(data.reportingTeamName ?? ''),
+    status: 'submitted',
+    createdAt: String(data.createdAt ?? ''),
+    updatedAt: String(data.updatedAt ?? ''),
+  };
+}
 
 export function fixtureRequestFromFirestore(
   id: string,
@@ -272,7 +363,36 @@ export function fixtureRequestFromFirestore(
   };
 }
 
-/** Subscribe to org + matches + teams + fixture requests. */
+export function teamLinkRequestFromFirestore(
+  id: string,
+  data: Record<string, unknown>,
+): TeamLinkRequest {
+  return {
+    id,
+    orgId: typeof data.orgId === 'string' ? data.orgId : '',
+    requesterUserId: String(data.requesterUserId ?? ''),
+    requesterName: String(data.requesterName ?? ''),
+    requesterEmail: String(data.requesterEmail ?? ''),
+    teamId: String(data.teamId ?? ''),
+    teamName: String(data.teamName ?? ''),
+    status:
+      data.status === 'approved' || data.status === 'denied'
+        ? data.status
+        : 'pending',
+    createdAt: String(data.createdAt ?? ''),
+    reviewedAt:
+      typeof data.reviewedAt === 'string' ? data.reviewedAt : undefined,
+    reviewedByUserId:
+      typeof data.reviewedByUserId === 'string'
+        ? data.reviewedByUserId
+        : undefined,
+    denyReason:
+      typeof data.denyReason === 'string' ? data.denyReason : undefined,
+    autoApproved: Boolean(data.autoApproved),
+  };
+}
+
+/** Subscribe to org + matches + teams + fixture + team-link + coach feedback. */
 export function subscribeLiveOrg(
   orgId: string,
   onData: (snap: LiveOrgSnapshot) => void,
@@ -283,8 +403,16 @@ export function subscribeLiveOrg(
   let matches: Match[] = [];
   let teams: Team[] = [];
   let fixtureRequests: FixtureRequest[] = [];
+  let teamLinkRequests: TeamLinkRequest[] = [];
 
-  const emit = () => onData({ org, matches, teams, fixtureRequests });
+  const emit = () =>
+    onData({
+      org,
+      matches,
+      teams,
+      fixtureRequests,
+      teamLinkRequests,
+    });
 
   const unsubs: Unsubscribe[] = [];
 
@@ -342,9 +470,70 @@ export function subscribeLiveOrg(
     ),
   );
 
+  unsubs.push(
+    onSnapshot(
+      collection(database, 'orgs', orgId, 'teamLinkRequests'),
+      (snap) => {
+        teamLinkRequests = snap.docs.map((d) =>
+          teamLinkRequestFromFirestore(d.id, d.data() as Record<string, unknown>),
+        );
+        emit();
+      },
+      (err) => onError?.(err),
+    ),
+  );
+
   return () => {
     for (const u of unsubs) u();
   };
+}
+
+/**
+ * Coach feedback is assigner-wide or club-owned (reportingTeamId in member teams).
+ * Separate from org schedule so Team Admins do not get a full-collection query denial.
+ */
+export function subscribeCoachFeedback(
+  orgId: string,
+  opts: { isAssigner: boolean; teamIds: string[] },
+  onData: (feedback: CoachFeedback[]) => void,
+  onError?: (err: Error) => void,
+): Unsubscribe {
+  const database = requireDb();
+  const col = collection(database, 'orgs', orgId, 'coachFeedback');
+
+  if (opts.isAssigner) {
+    return onSnapshot(
+      col,
+      (snap) => {
+        const feedback = snap.docs
+          .map((d) =>
+            coachFeedbackFromFirestore(d.id, d.data() as Record<string, unknown>),
+          )
+          .filter((f): f is CoachFeedback => f != null);
+        onData(feedback);
+      },
+      (err) => onError?.(err),
+    );
+  }
+
+  const teamIds = [...new Set(opts.teamIds.filter(Boolean))].slice(0, 30);
+  if (teamIds.length === 0) {
+    onData([]);
+    return () => {};
+  }
+
+  return onSnapshot(
+    query(col, where('reportingTeamId', 'in', teamIds)),
+    (snap) => {
+      const feedback = snap.docs
+        .map((d) =>
+          coachFeedbackFromFirestore(d.id, d.data() as Record<string, unknown>),
+        )
+        .filter((f): f is CoachFeedback => f != null);
+      onData(feedback);
+    },
+    (err) => onError?.(err),
+  );
 }
 
 export type SyncSheetResult = {
@@ -594,4 +783,85 @@ export async function callApproveFixtureRequest(input: {
     requestId: input.requestId,
   });
   return result.data as ApproveFixtureResult;
+}
+
+export type SubmitTeamLinkResult = {
+  ok: true;
+  autoApproved: string[];
+  pending: string[];
+};
+
+/** Request Team Admin access for clubs (auto-approve when on Contacts). */
+export async function callSubmitTeamLinkRequests(input: {
+  orgId?: string;
+  teamIds: string[];
+}): Promise<SubmitTeamLinkResult> {
+  const fn = httpsCallable(requireFunctions(), 'submitTeamLinkRequests');
+  const result = await fn({
+    orgId: input.orgId ?? DEFAULT_ORG,
+    teamIds: input.teamIds,
+  });
+  return result.data as SubmitTeamLinkResult;
+}
+
+/** Assigner or Team Admin reviews a club-link request. */
+export async function callReviewTeamLinkRequest(input: {
+  orgId?: string;
+  requestId: string;
+  decision: 'approve' | 'deny';
+  denyReason?: string;
+}): Promise<{ ok: true }> {
+  const fn = httpsCallable(requireFunctions(), 'reviewTeamLinkRequest');
+  const result = await fn({
+    orgId: input.orgId ?? DEFAULT_ORG,
+    requestId: input.requestId,
+    decision: input.decision,
+    denyReason: input.denyReason,
+  });
+  return result.data as { ok: true };
+}
+
+/** Create or update Team Admin referee feedback (author only). */
+export async function saveCoachFeedbackInFirestore(
+  orgId: string,
+  feedback: CoachFeedback,
+): Promise<void> {
+  const payload = stripUndefined({
+    id: feedback.id,
+    orgId,
+    matchId: feedback.matchId,
+    slot: 'mo' as const,
+    officialUserId: feedback.officialUserId,
+    officialName: feedback.officialName,
+    homeTeamId: feedback.homeTeamId,
+    homeTeamName: feedback.homeTeamName,
+    awayTeamId: feedback.awayTeamId,
+    awayTeamName: feedback.awayTeamName,
+    kickoffAt: feedback.kickoffAt,
+    competition: feedback.competition ?? null,
+    level: feedback.level,
+    score: feedback.score,
+    scales: feedback.scales,
+    commentsOnScores: feedback.commentsOnScores ?? null,
+    areasDoneWell: feedback.areasDoneWell ?? null,
+    areasToImprove: feedback.areasToImprove ?? null,
+    otherFeedback: feedback.otherFeedback ?? null,
+    videoLink: feedback.videoLink ?? null,
+    videoNotes: feedback.videoNotes ?? null,
+    otherCrewFeedback: feedback.otherCrewFeedback ?? null,
+    submitterUserId: feedback.submitterUserId,
+    submitterName: feedback.submitterName,
+    submitterEmail: feedback.submitterEmail,
+    submitterPhone: feedback.submitterPhone ?? null,
+    clubRole: feedback.clubRole,
+    reportingTeamId: feedback.reportingTeamId,
+    reportingTeamName: feedback.reportingTeamName,
+    status: 'submitted' as const,
+    createdAt: feedback.createdAt,
+    updatedAt: feedback.updatedAt,
+  });
+  await setDoc(
+    doc(requireDb(), 'orgs', orgId, 'coachFeedback', feedback.id),
+    payload,
+  );
 }

@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import {
   Button,
   Checkbox,
@@ -22,6 +22,10 @@ import {
 } from '@/domain/profile';
 import { APPAREL_SIZES, type Role } from '@/domain/types';
 import { isFirebaseConfigured } from '@/services/firebase';
+import {
+  callSubmitTeamLinkRequests,
+  defaultOrgId,
+} from '@/services/orgData';
 import { saveFirebaseProfile } from '@/services/userProfile';
 import { RefereeLevelChart } from '@/ui/RefereeLevelChart';
 import { UserAvatar } from '@/ui/UserAvatar';
@@ -90,6 +94,17 @@ export function ProfilePage() {
   const [photoUrl, setPhotoUrl] = useState(currentUser?.photoUrl);
   const [photoError, setPhotoError] = useState<string | null>(null);
   const [savedFlash, setSavedFlash] = useState(false);
+  const [requestTeamIds, setRequestTeamIds] = useState<string[]>([]);
+  const [linkNote, setLinkNote] = useState<string | null>(null);
+  const [linkBusy, setLinkBusy] = useState(false);
+
+  const sortedTeams = useMemo(
+    () =>
+      [...state.teams].sort((a, b) =>
+        a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }),
+      ),
+    [state.teams],
+  );
 
   if (!currentUser) return null;
 
@@ -98,6 +113,23 @@ export function ProfilePage() {
   const fanOnly = roleFan && !needsWorkingFields;
   const levelNum = Number(refereeLevel);
   const rolesOk = roleOfficial || roleTeamAdmin || roleCmo || roleFan;
+
+  const myPendingLinks = state.teamLinkRequests.filter(
+    (r) =>
+      r.requesterUserId === currentUser.uid &&
+      (r.status === 'pending' || r.status === 'denied'),
+  );
+
+  const requestableTeams = sortedTeams.filter(
+    (t) =>
+      !currentUser.teamIds.includes(t.id) &&
+      !state.teamLinkRequests.some(
+        (r) =>
+          r.requesterUserId === currentUser.uid &&
+          r.teamId === t.id &&
+          r.status === 'pending',
+      ),
+  );
   const levelOk =
     levelUnknown ||
     (Number.isFinite(levelNum) && levelNum >= 1 && levelNum <= 20);
@@ -210,6 +242,56 @@ export function ProfilePage() {
     }
     setSavedFlash(true);
     window.setTimeout(() => setSavedFlash(false), 1600);
+  };
+
+  const submitClubLinks = async () => {
+    if (!roleTeamAdmin || requestTeamIds.length === 0) return;
+    setLinkBusy(true);
+    setLinkNote(null);
+    try {
+      if (isFirebaseConfigured && !currentUser.uid.startsWith('u_')) {
+        const result = await callSubmitTeamLinkRequests({
+          orgId: defaultOrgId(),
+          teamIds: requestTeamIds,
+        });
+        setLinkNote(
+          [
+            result.autoApproved.length
+              ? `Approved: ${result.autoApproved.length}`
+              : null,
+            result.pending.length
+              ? `Pending review: ${result.pending.length}`
+              : null,
+          ]
+            .filter(Boolean)
+            .join(' · ') || 'Submitted.',
+        );
+      } else {
+        const result = store.submitTeamLinkRequests(
+          currentUser.uid,
+          requestTeamIds,
+        );
+        setLinkNote(
+          [
+            result.autoApproved.length
+              ? `Approved: ${result.autoApproved.length}`
+              : null,
+            result.pending.length
+              ? `Pending review: ${result.pending.length}`
+              : null,
+          ]
+            .filter(Boolean)
+            .join(' · ') || 'Submitted.',
+        );
+      }
+      setRequestTeamIds([]);
+    } catch (err) {
+      setLinkNote(
+        err instanceof Error ? err.message : 'Could not submit club requests.',
+      );
+    } finally {
+      setLinkBusy(false);
+    }
   };
 
   const previewUser = {
@@ -429,6 +511,69 @@ export function ProfilePage() {
             </FormHelperText>
           )}
         </FormGroup>
+
+        {roleTeamAdmin && (
+          <FormGroup label="Clubs you manage">
+            {currentUser.teamIds.length > 0 ? (
+              <ul className="rs-member-teams">
+                {currentUser.teamIds.map((id) => {
+                  const t = state.teams.find((x) => x.id === id);
+                  return <li key={id}>{t?.name ?? id}</li>;
+                })}
+              </ul>
+            ) : (
+              <p className="rs-match-card__meta">
+                No clubs linked yet. Select sides below — Contacts email
+                auto-approves; otherwise wait for Scheduler / Team Admin review.
+                Browse as Fan until approved.
+              </p>
+            )}
+            {myPendingLinks.length > 0 && (
+              <ul className="rs-match-card__meta">
+                {myPendingLinks.map((r) => (
+                  <li key={r.id}>
+                    {r.teamName}: {r.status}
+                    {r.denyReason ? ` — ${r.denyReason}` : ''}
+                  </li>
+                ))}
+              </ul>
+            )}
+            {requestableTeams.length > 0 && (
+              <>
+                <div className="rs-onboarding__roles" role="group" aria-label="Request clubs">
+                  {requestableTeams.map((t) => (
+                    <Checkbox
+                      key={t.id}
+                      id={`pf-req-team-${t.id}`}
+                      label={t.name}
+                      isChecked={requestTeamIds.includes(t.id)}
+                      onChange={(_, v) => {
+                        setRequestTeamIds((prev) =>
+                          v
+                            ? [...prev, t.id]
+                            : prev.filter((id) => id !== t.id),
+                        );
+                      }}
+                    />
+                  ))}
+                </div>
+                <Button
+                  variant="secondary"
+                  isDisabled={requestTeamIds.length === 0 || linkBusy}
+                  isLoading={linkBusy}
+                  onClick={() => void submitClubLinks()}
+                >
+                  Request selected clubs
+                </Button>
+              </>
+            )}
+            {linkNote && (
+              <p className="rs-match-card__meta" role="status">
+                {linkNote}
+              </p>
+            )}
+          </FormGroup>
+        )}
 
         {roleFan && (
           <FormGroup label="Favorite team">
