@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
 import { Title, EmptyState, EmptyStateBody } from '@patternfly/react-core';
-import { useApp } from '@/app/AppContext';
+import { useApp, useAppHref } from '@/app/AppContext';
 import type { MatchReport } from '@/domain/reports';
 import { crewPeople, type Match } from '@/domain/types';
 import { moDisplayNames } from '@/features/referee/appointments/crewLines';
@@ -55,6 +55,8 @@ export function CoachingReportsPage() {
   const { currentUser, state } = useApp();
   const location = useLocation();
   const pathPane = paneFromPath(location.pathname);
+  const coachingIndexHref = useAppHref('/referee/reports/coaching');
+  const coachingCmoHref = useAppHref('/referee/reports/coaching/cmo');
 
   /** Reports this user files (or must file) as CMO. */
   const toFile = useMemo(() => {
@@ -113,14 +115,14 @@ export function CoachingReportsPage() {
   if (!currentUser) return null;
 
   if (showSubNav && pathPane === 'index') {
-    return <Navigate to="/referee/reports/coaching/cmo" replace />;
+    return <Navigate to={coachingCmoHref} replace />;
   }
 
   if (pathPane === 'cmo' && !showSubNav) {
-    return <Navigate to="/referee/reports/coaching" replace />;
+    return <Navigate to={coachingIndexHref} replace />;
   }
   if (pathPane === 'mine' && !showSubNav) {
-    return <Navigate to="/referee/reports/coaching" replace />;
+    return <Navigate to={coachingIndexHref} replace />;
   }
 
   const pane: CoachingPane =

@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
 import { NavLink } from 'react-router-dom';
-import { useApp } from '@/app/AppContext';
+import { useApp, useAppHref } from '@/app/AppContext';
 import {
   countCardReportsDue,
   countCoachingReportsDue,
@@ -10,6 +10,10 @@ import {
 
 export function ReportsSubNav() {
   const { currentUser, state } = useApp();
+  const matchHref = useAppHref('/referee/reports/match');
+  const cardsHref = useAppHref('/referee/reports/cards');
+  const coachingHref = useAppHref('/referee/reports/coaching');
+
   const matchDue = useMemo(() => {
     if (!currentUser) return 0;
     return countMatchReportsDue(state.matchReports, currentUser.uid);
@@ -30,7 +34,7 @@ export function ReportsSubNav() {
   return (
     <nav className="rs-sub-tabs" aria-label="Reports">
       <NavLink
-        to="/referee/reports/match"
+        to={matchHref}
         className={({ isActive }) =>
           `rs-nav-with-badge${isActive ? ' active' : ''}`
         }
@@ -46,7 +50,7 @@ export function ReportsSubNav() {
         )}
       </NavLink>
       <NavLink
-        to="/referee/reports/cards"
+        to={cardsHref}
         className={({ isActive }) =>
           `rs-nav-with-badge${isActive ? ' active' : ''}`
         }
@@ -62,7 +66,7 @@ export function ReportsSubNav() {
         )}
       </NavLink>
       <NavLink
-        to="/referee/reports/coaching"
+        to={coachingHref}
         className={({ isActive }) =>
           `rs-nav-with-badge${isActive ? ' active' : ''}`
         }
