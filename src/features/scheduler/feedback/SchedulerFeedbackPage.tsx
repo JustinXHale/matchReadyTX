@@ -2,18 +2,25 @@ import { useMemo } from 'react';
 import { EmptyState, EmptyStateBody, Title } from '@patternfly/react-core';
 import { Link } from 'react-router-dom';
 import { useApp, useAppHref } from '@/app/AppContext';
-import { COACH_FEEDBACK_SCALE_LABELS } from '@/domain/coachFeedback';
+import { coachFeedbackAverage } from '@/domain/coachFeedback';
 import { MatchListRow } from '@/ui/MatchListRow';
+
+function formatAvg(avg: number): string {
+  return Number.isInteger(avg) ? String(avg) : avg.toFixed(1);
+}
 
 export function SchedulerFeedbackPage() {
   const { state, hasAssignerRole } = useApp();
   const detailBase = useAppHref('/scheduler/feedback');
+  const memberBase = useAppHref('/members');
 
   const rows = useMemo(() => {
     return [...state.coachFeedback]
+      .filter((f) => f.status === 'submitted')
       .sort(
         (a, b) =>
-          new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+          new Date(b.updatedAt || b.createdAt).getTime() -
+          new Date(a.updatedAt || a.createdAt).getTime(),
       )
       .map((f) => ({
         feedback: f,
@@ -36,7 +43,8 @@ export function SchedulerFeedbackPage() {
       </Title>
       <p className="rs-match-card__meta">
         Confidential Team Admin reports on Match Officials. Officials cannot
-        see these. Use them later for ratings and trends.
+        see these. Drafts and declines stay with the club until submitted. The
+        score on each card is the average of all ratings (1–5).
       </p>
 
       {rows.length === 0 ? (
@@ -49,46 +57,61 @@ export function SchedulerFeedbackPage() {
       ) : (
         <div className="rs-stack">
           {rows.map(({ feedback: f, match }) => {
-            const submitted = new Date(f.createdAt).toLocaleDateString(
-              undefined,
-              { month: 'short', day: 'numeric' },
-            );
-            const trailing = (
-              <span className="rs-pill">
-                {COACH_FEEDBACK_SCALE_LABELS[f.scales.overall]}
-              </span>
-            );
+            const avg = coachFeedbackAverage(f.scales);
+            const detailHref = `${detailBase}/${f.id}`;
+            const officialHref = f.officialUserId
+              ? `${memberBase}/${f.officialUserId}`
+              : null;
             const meta = (
               <span className="rs-match-card__meta">
-                MO {f.officialName} · {f.reportingTeamName} ({f.submitterName})
-                · {submitted}
+                {f.reportingTeamName} · {f.submitterName}
+                {f.clubRole ? ` · ${f.clubRole}` : ''}
               </span>
             );
+            const trailing = (
+              <div className="rs-coach-feedback-trailing">
+                <span className="rs-pill">
+                  {avg != null ? formatAvg(avg) : '—'}
+                </span>
+                {officialHref ? (
+                  <Link
+                    to={officialHref}
+                    className="rs-coach-feedback-trailing__mo"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    MO {f.officialName}
+                  </Link>
+                ) : (
+                  <span className="rs-coach-feedback-trailing__mo">
+                    MO {f.officialName}
+                  </span>
+                )}
+              </div>
+            );
+
             if (match) {
               return (
                 <MatchListRow
                   key={f.id}
                   match={match}
-                  to={`${detailBase}/${f.id}`}
+                  to={detailHref}
+                  split="action"
                   meta={meta}
                   trailing={trailing}
                 />
               );
             }
             return (
-              <div key={f.id} className="rs-detail-card">
-                <Link
-                  to={`${detailBase}/${f.id}`}
-                  className="rs-match-card__link"
-                >
-                  <div className="rs-match-card__main">
+              <div key={f.id} className="rs-list-row rs-list-row--action">
+                <Link to={detailHref} className="rs-list-row__main">
+                  <div className="rs-list-row__body">
                     <span className="rs-match-card__title">
                       {f.homeTeamName} vs {f.awayTeamName}
                     </span>
                     {meta}
                   </div>
-                  {trailing}
                 </Link>
+                <div className="rs-list-row__trailing">{trailing}</div>
               </div>
             );
           })}

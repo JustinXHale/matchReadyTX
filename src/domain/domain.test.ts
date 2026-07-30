@@ -1314,33 +1314,55 @@ describe('coachFeedback', () => {
   it('builds deterministic doc ids and requires low-score comments', async () => {
     const {
       coachFeedbackDocId,
+      normalizeScaleValue,
       scalesNeedComments,
       validateCoachFeedbackScales,
     } = await import('@/domain/coachFeedback');
     expect(coachFeedbackDocId('m1', 'team_a')).toBe('m1_team_a');
+    expect(normalizeScaleValue('poor')).toBe(1);
+    expect(normalizeScaleValue(5)).toBe(5);
     expect(
       scalesNeedComments({
-        breakdown: 'excellent',
-        overall: 'poor',
+        breakdown: 5,
+        overall: 1,
       }),
     ).toBe(true);
     expect(
       scalesNeedComments({
-        breakdown: 'average',
-        overall: 'average',
+        breakdown: 3,
+        overall: 3,
       }),
     ).toBe(false);
     expect(
       validateCoachFeedbackScales({
-        breakdown: 'excellent',
-        scrum: 'average',
-        lineout: 'average',
-        safety: 'above_average',
-        communication: 'average',
-        professionalism: 'excellent',
-        overall: 'average',
+        breakdown: 5,
+        scrum: 3,
+        lineout: 3,
+        safety: 4,
+        communication: 3,
+        professionalism: 5,
+        overall: 3,
       }),
     ).toBe(true);
-    expect(validateCoachFeedbackScales({ overall: 'average' })).toBe(false);
+    expect(validateCoachFeedbackScales({ overall: 3 })).toBe(false);
+  });
+
+  it('averages rated criteria', async () => {
+    const { coachFeedbackAverage, coachFeedbackAverageLabel } = await import(
+      '@/domain/coachFeedback'
+    );
+    expect(
+      coachFeedbackAverage({
+        breakdown: 5,
+        scrum: 3,
+        lineout: 4,
+        safety: 4,
+        communication: 3,
+        professionalism: 5,
+        overall: 4,
+      }),
+    ).toBeCloseTo(4, 5);
+    expect(coachFeedbackAverage({})).toBeNull();
+    expect(coachFeedbackAverageLabel(3.6)).toBe(4);
   });
 });

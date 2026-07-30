@@ -1792,6 +1792,292 @@ input.rs-filter-search {
   min-width: 0;
 }
 
+.rs-list-row__teams--inline {
+  flex-direction: row;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 6px;
+}
+
+.rs-list-row__inline-home,
+.rs-list-row__inline-away {
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 42%;
+}
+
+.rs-list-row__score-sep {
+  color: var(--rs-color-muted);
+  font-weight: 500;
+}
+
+.rs-list-row__card-link {
+  display: flex;
+  flex: 1 1 auto;
+  min-width: 0;
+  color: inherit;
+  text-decoration: none;
+}
+
+.rs-list-row__card-link:hover,
+.rs-list-row__card-link:focus-visible {
+  text-decoration: none;
+  color: inherit;
+}
+
+.rs-list-row__card-link .rs-list-row__main {
+  flex: 3 1 0%;
+}
+
+.rs-list-row--action .rs-list-row__card-link .rs-list-row__main {
+  flex: 4 1 0%;
+}
+
+.rs-list-row__card-link .rs-list-row__trailing {
+  display: flex;
+  align-items: stretch;
+  justify-content: flex-start;
+  flex: 2 1 0%;
+  min-width: 0;
+  padding: 0;
+  border-left: 1px solid var(--rs-color-border);
+}
+
+.rs-list-row--action .rs-list-row__card-link .rs-list-row__trailing {
+  flex: 1.35 1 0%;
+}
+
+@media (max-width: 480px) {
+  .rs-list-row--action .rs-list-row__card-link .rs-list-row__trailing {
+    flex: 1 1 0%;
+    min-width: 7.75rem;
+  }
+}
+
+.rs-list-row__card-link:hover .rs-list-row__main,
+.rs-list-row__card-link:focus-visible .rs-list-row__main {
+  background: var(--rs-color-surface-muted);
+}
+
+.rs-list-row--warn .rs-list-row__card-link:hover .rs-list-row__main,
+.rs-list-row--warn .rs-list-row__card-link:focus-visible .rs-list-row__main {
+  background: color-mix(in srgb, var(--rs-color-warn) 20%, white);
+}
+
+.rs-list-row--with-aside .rs-list-row__card-link {
+  flex: 1 1 auto;
+}
+
+.rs-list-row__aside {
+  display: flex;
+  align-items: stretch;
+  flex: 0 0 auto;
+  border-left: 1px solid var(--rs-color-border);
+}
+
+.rs-coach-feedback-trailing {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  width: 100%;
+  padding: 8px 6px;
+  text-align: center;
+}
+
+.rs-coach-feedback-trailing__hit {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  width: 100%;
+  color: inherit;
+  text-decoration: none;
+}
+
+.rs-coach-feedback-trailing__hit:hover,
+.rs-coach-feedback-trailing__hit:focus-visible {
+  text-decoration: none;
+  color: inherit;
+}
+
+.rs-coach-feedback-trailing__mo {
+  font-size: 11px;
+  line-height: 1.25;
+  color: var(--rs-color-muted);
+  text-decoration: none;
+}
+
+a.rs-coach-feedback-trailing__mo:hover,
+a.rs-coach-feedback-trailing__mo:focus-visible {
+  color: var(--rs-color-ink);
+  text-decoration: underline;
+}
+
+.rs-coach-feedback-trailing__submitter {
+  font-size: 11px;
+  line-height: 1.25;
+  color: var(--rs-color-charcoal);
+}
+
+.rs-coach-feedback-decline {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  margin-top: 2px;
+  padding: 4px 6px;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--rs-color-muted);
+  cursor: pointer;
+  white-space: nowrap;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.rs-coach-feedback-decline:hover,
+.rs-coach-feedback-decline:focus-visible {
+  color: var(--rs-color-ink);
+}
+
+.rs-coach-feedback-decline:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.rs-coach-fb-ratings {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.rs-coach-fb-scale-legend {
+  margin: 0;
+}
+
+.rs-coach-fb-criterion {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-top: 10px;
+  border-top: 1px solid var(--rs-color-border);
+}
+
+.rs-coach-fb-criterion:first-of-type {
+  border-top: 0;
+  padding-top: 0;
+}
+
+.rs-coach-fb-criterion__title {
+  font-weight: 700;
+  font-size: 14px;
+  color: var(--rs-color-ink);
+}
+
+.rs-coach-fb-criterion__hint {
+  margin: 2px 0 0;
+  font-size: 12px;
+  line-height: 1.35;
+  color: var(--rs-color-muted);
+}
+
+.rs-coach-fb-radios {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.rs-coach-fb-radio {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  min-width: 3.25rem;
+  flex: 1 1 3.25rem;
+  max-width: 5rem;
+  padding: 6px 4px;
+  border: 1px solid var(--rs-color-border);
+  border-radius: var(--rs-radius-card);
+  background: var(--rs-color-surface);
+  cursor: pointer;
+  text-align: center;
+}
+
+/* Keep the control in-flow visually hidden so focus does not scroll the page. */
+.rs-coach-fb-radio input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.rs-coach-fb-radio__n {
+  font-size: 15px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--rs-color-ink);
+}
+
+.rs-coach-fb-radio__label {
+  font-size: 9px;
+  line-height: 1.15;
+  color: var(--rs-color-muted);
+}
+
+.rs-coach-fb-radio--selected {
+  border-color: var(--rs-color-ink);
+  background: color-mix(in srgb, var(--rs-color-ink) 6%, white);
+}
+
+.rs-coach-fb-radio--selected .rs-coach-fb-radio__label {
+  color: var(--rs-color-ink);
+}
+
+.rs-coach-fb-toggle {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px 12px;
+}
+
+.rs-coach-fb-toggle__label {
+  flex: 1 1 12rem;
+  min-width: 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--rs-color-ink);
+  line-height: 1.35;
+}
+
+.rs-coach-fb-toggle__btns {
+  display: flex;
+  flex: 0 0 auto;
+  gap: 6px;
+  margin-left: auto;
+}
+
+.rs-coach-fb-comment-block {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.rs-coach-fb-video-hint {
+  margin: 0 0 6px;
+}
+
 .rs-list-row__side {
   display: flex;
   align-items: baseline;

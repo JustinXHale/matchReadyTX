@@ -3,8 +3,6 @@ import {
   Alert,
   Button,
   FormGroup,
-  FormSelect,
-  FormSelectOption,
   TextArea,
   TextInput,
   Title,
@@ -12,35 +10,65 @@ import {
 import { useNavigate, useParams } from 'react-router-dom';
 import { useApp, useAppHref } from '@/app/AppContext';
 import {
+  COACH_FEEDBACK_COMMENT_BLOCKS,
+  COACH_FEEDBACK_CRITERION_HINTS,
   COACH_FEEDBACK_CRITERION_LABELS,
   COACH_FEEDBACK_SCALE_KEYS,
   COACH_FEEDBACK_SCALE_LABELS,
   COACH_FEEDBACK_SCALE_LEGEND,
   COACH_FEEDBACK_SCALE_VALUES,
+  appendCoachFeedbackEdit,
   coachFeedbackDocId,
   existingCoachFeedback,
   formatMatchScore,
   isMatchEligibleForCoachFeedback,
   matchOfficialForFeedback,
   reportingTeamIdForUser,
-  scalesNeedComments,
   validateCoachFeedbackScales,
   type CoachFeedback,
+  type CoachFeedbackCommentKey,
+  type CoachFeedbackEditAction,
   type CoachFeedbackScaleKey,
   type CoachFeedbackScaleValue,
+  type CoachFeedbackStatus,
 } from '@/domain/coachFeedback';
 import { isFirebaseConfigured } from '@/services/firebase';
 import {
   defaultOrgId,
   saveCoachFeedbackInFirestore,
 } from '@/services/orgData';
+import { MatchListRow } from '@/ui/MatchListRow';
+
+const COMMENT_BLOCKS: {
+  key: CoachFeedbackCommentKey;
+  label: string;
+  rows: number;
+  placeholder?: string;
+}[] = COACH_FEEDBACK_COMMENT_BLOCKS.map((block) => {
+  if (block.key === 'otherCrewFeedback') {
+    return {
+      ...block,
+      rows: 2,
+      placeholder: 'AR, No.4, or other crew notes',
+    };
+  }
+  if (block.key === 'videoNotes') {
+    return {
+      ...block,
+      rows: 2,
+      placeholder: 'Timestamps for issues in the video',
+    };
+  }
+  if (block.key === 'otherFeedback') {
+    return { ...block, rows: 2 };
+  }
+  return { ...block, rows: 3 };
+});
 
 function hydrateFromExisting(
   existing: CoachFeedback | undefined,
-  matchScore: string,
   userPhone: string,
 ): {
-  score: string;
   scales: Partial<Record<CoachFeedbackScaleKey, CoachFeedbackScaleValue>>;
   commentsOnScores: string;
   areasDoneWell: string;
@@ -51,20 +79,74 @@ function hydrateFromExisting(
   videoNotes: string;
   clubRole: string;
   phone: string;
+  contactAboutReport: boolean;
+  commentOpen: Record<CoachFeedbackCommentKey, boolean>;
 } {
+  const commentsOnScores = existing?.commentsOnScores ?? '';
+  const areasDoneWell = existing?.areasDoneWell ?? '';
+  const areasToImprove = existing?.areasToImprove ?? '';
+  const otherFeedback = existing?.otherFeedback ?? '';
+  const otherCrewFeedback = existing?.otherCrewFeedback ?? '';
+  const videoNotes = existing?.videoNotes ?? '';
   return {
-    score: existing?.score ?? matchScore,
     scales: existing?.scales ?? {},
-    commentsOnScores: existing?.commentsOnScores ?? '',
-    areasDoneWell: existing?.areasDoneWell ?? '',
-    areasToImprove: existing?.areasToImprove ?? '',
-    otherFeedback: existing?.otherFeedback ?? '',
-    otherCrewFeedback: existing?.otherCrewFeedback ?? '',
+    commentsOnScores,
+    areasDoneWell,
+    areasToImprove,
+    otherFeedback,
+    otherCrewFeedback,
     videoLink: existing?.videoLink ?? '',
-    videoNotes: existing?.videoNotes ?? '',
+    videoNotes,
     clubRole: existing?.clubRole ?? '',
     phone: existing?.submitterPhone ?? userPhone,
+    contactAboutReport: existing?.contactAboutReport === true,
+    commentOpen: {
+      commentsOnScores: Boolean(commentsOnScores),
+      areasDoneWell: Boolean(areasDoneWell),
+      areasToImprove: Boolean(areasToImprove),
+      otherFeedback: Boolean(otherFeedback),
+      otherCrewFeedback: Boolean(otherCrewFeedback),
+      videoNotes: Boolean(videoNotes),
+    },
   };
+}
+
+function YesNoToggle({
+  id,
+  label,
+  open,
+  onChange,
+}: {
+  id: string;
+  label: string;
+  open: boolean;
+  onChange: (open: boolean) => void;
+}) {
+  return (
+    <div className="rs-coach-fb-toggle" role="group" aria-labelledby={`${id}-label`}>
+      <div className="rs-coach-fb-toggle__label" id={`${id}-label`}>
+        {label}
+      </div>
+      <div className="rs-coach-fb-toggle__btns">
+        <button
+          type="button"
+          className={`rs-filter-chip${open ? ' rs-filter-chip--selected' : ''}`}
+          aria-pressed={open}
+          onClick={() => onChange(true)}
+        >
+          Yes
+        </button>
+        <button
+          type="button"
+          className={`rs-filter-chip${!open ? ' rs-filter-chip--selected' : ''}`}
+          aria-pressed={!open}
+          onClick={() => onChange(false)}
+        >
+          No
+        </button>
+      </div>
+    </div>
+  );
 }
 
 export function CoachFeedbackFormPage() {
@@ -95,11 +177,9 @@ export function CoachFeedbackFormPage() {
   }, [currentUser, match, state.coachFeedback]);
 
   const existing = context?.existing;
-  const matchScore = match ? formatMatchScore(match) : '';
   const userPhone = currentUser?.phone ?? '';
 
-  const initial = hydrateFromExisting(existing, matchScore, userPhone);
-  const [score, setScore] = useState(initial.score);
+  const initial = hydrateFromExisting(existing, userPhone);
   const [scales, setScales] = useState(initial.scales);
   const [commentsOnScores, setCommentsOnScores] = useState(
     initial.commentsOnScores,
@@ -114,11 +194,31 @@ export function CoachFeedbackFormPage() {
   const [videoNotes, setVideoNotes] = useState(initial.videoNotes);
   const [clubRole, setClubRole] = useState(initial.clubRole);
   const [phone, setPhone] = useState(initial.phone);
+  const [contactAboutReport, setContactAboutReport] = useState(
+    initial.contactAboutReport,
+  );
+  const [commentOpen, setCommentOpen] = useState(initial.commentOpen);
   const [error, setError] = useState<string | null>(null);
-  const [busy, setBusy] = useState(false);
+  const [busy, setBusy] = useState<'save' | 'submit' | null>(null);
   const hydratedKey = useRef<string | null>(null);
 
-  // Rehydrate when club feedback arrives from live snapshot (or switches docs).
+  const commentValues: Record<CoachFeedbackCommentKey, string> = {
+    commentsOnScores,
+    areasDoneWell,
+    areasToImprove,
+    otherFeedback,
+    otherCrewFeedback,
+    videoNotes,
+  };
+  const commentSetters: Record<CoachFeedbackCommentKey, (v: string) => void> = {
+    commentsOnScores: setCommentsOnScores,
+    areasDoneWell: setAreasDoneWell,
+    areasToImprove: setAreasToImprove,
+    otherFeedback: setOtherFeedback,
+    otherCrewFeedback: setOtherCrewFeedback,
+    videoNotes: setVideoNotes,
+  };
+
   useEffect(() => {
     const key = existing
       ? `${existing.id}:${existing.updatedAt}`
@@ -126,7 +226,6 @@ export function CoachFeedbackFormPage() {
         ? `new:${match.id}`
         : null;
     if (!key || hydratedKey.current === key) return;
-    // Don't clobber in-progress edits after the first hydrate for this key.
     if (
       hydratedKey.current != null &&
       hydratedKey.current.startsWith(`new:`) &&
@@ -134,8 +233,7 @@ export function CoachFeedbackFormPage() {
     ) {
       return;
     }
-    const next = hydrateFromExisting(existing, matchScore, userPhone);
-    setScore(next.score);
+    const next = hydrateFromExisting(existing, userPhone);
     setScales(next.scales);
     setCommentsOnScores(next.commentsOnScores);
     setAreasDoneWell(next.areasDoneWell);
@@ -146,8 +244,10 @@ export function CoachFeedbackFormPage() {
     setVideoNotes(next.videoNotes);
     setClubRole(next.clubRole);
     setPhone(next.phone);
+    setContactAboutReport(next.contactAboutReport);
+    setCommentOpen(next.commentOpen);
     hydratedKey.current = key;
-  }, [existing, match, matchScore, userPhone]);
+  }, [existing, match, userPhone]);
 
   if (!currentUser) return null;
 
@@ -159,7 +259,7 @@ export function CoachFeedbackFormPage() {
           className="rs-detail__back"
           onClick={() => navigate(reportListHref)}
         >
-          ← Report
+          ← Referee Feedback
         </Button>
         <Title headingLevel="h2" size="lg">
           Feedback not available
@@ -173,31 +273,22 @@ export function CoachFeedbackFormPage() {
   }
 
   const { reportingTeamId, reportingTeamName, mo } = context;
-  const when = new Date(match.kickoffAt).toLocaleString(undefined, {
-    weekday: 'short',
-    month: 'short',
-    day: 'numeric',
-    hour: 'numeric',
-    minute: '2-digit',
-  });
 
-  const onSubmit = async () => {
-    setError(null);
-    if (!validateCoachFeedbackScales(scales)) {
-      setError('Rate every criterion.');
-      return;
-    }
-    if (scalesNeedComments(scales) && !commentsOnScores.trim()) {
-      setError('Add comments when any score is Below Average or Poor.');
-      return;
-    }
-    if (!clubRole.trim()) {
-      setError('Enter your role within the club.');
-      return;
-    }
-
+  const buildFeedback = (
+    status: CoachFeedbackStatus,
+    action: CoachFeedbackEditAction,
+  ): CoachFeedback => {
     const now = new Date().toISOString();
-    const feedback: CoachFeedback = {
+    const edit = {
+      at: now,
+      byUserId: currentUser.uid,
+      byName: currentUser.displayName,
+      action,
+    };
+    const textOrUndef = (open: boolean, value: string) =>
+      open && value.trim() ? value.trim() : undefined;
+
+    return {
       id: coachFeedbackDocId(match.id, reportingTeamId),
       orgId: dataMode === 'live' ? defaultOrgId() : state.org.id,
       matchId: match.id,
@@ -211,49 +302,105 @@ export function CoachFeedbackFormPage() {
       kickoffAt: match.kickoffAt,
       competition: match.competition,
       level: match.level,
-      score: score.trim(),
+      score: formatMatchScore(match),
       scales,
-      commentsOnScores: commentsOnScores.trim() || undefined,
-      areasDoneWell: areasDoneWell.trim() || undefined,
-      areasToImprove: areasToImprove.trim() || undefined,
-      otherFeedback: otherFeedback.trim() || undefined,
+      commentsOnScores: textOrUndef(
+        commentOpen.commentsOnScores,
+        commentsOnScores,
+      ),
+      areasDoneWell: textOrUndef(commentOpen.areasDoneWell, areasDoneWell),
+      areasToImprove: textOrUndef(commentOpen.areasToImprove, areasToImprove),
+      otherFeedback: textOrUndef(commentOpen.otherFeedback, otherFeedback),
+      otherCrewFeedback: textOrUndef(
+        commentOpen.otherCrewFeedback,
+        otherCrewFeedback,
+      ),
       videoLink: videoLink.trim() || undefined,
-      videoNotes: videoNotes.trim() || undefined,
-      otherCrewFeedback: otherCrewFeedback.trim() || undefined,
+      videoNotes: textOrUndef(commentOpen.videoNotes, videoNotes),
       submitterUserId: currentUser.uid,
       submitterName: currentUser.displayName,
       submitterEmail: currentUser.email,
       submitterPhone: phone.trim() || undefined,
       clubRole: clubRole.trim(),
+      contactAboutReport,
       reportingTeamId,
       reportingTeamName,
-      status: 'submitted',
+      status,
+      submittedAt:
+        status === 'submitted'
+          ? (existing?.submittedAt ?? now)
+          : existing?.submittedAt,
+      edits: appendCoachFeedbackEdit(existing?.edits, edit),
       createdAt: existing?.createdAt ?? now,
       updatedAt: now,
     };
+  };
 
-    setBusy(true);
-    try {
-      if (dataMode === 'live' && isFirebaseConfigured) {
-        await saveCoachFeedbackInFirestore(defaultOrgId(), feedback);
-        store.upsertCoachFeedbackLocal(feedback);
-      } else {
-        const id = store.saveCoachFeedback(feedback);
-        if (!id) {
-          setError('Could not save feedback. Check your club access.');
-          return;
-        }
+  const persist = async (feedback: CoachFeedback) => {
+    if (dataMode === 'live' && isFirebaseConfigured) {
+      await saveCoachFeedbackInFirestore(defaultOrgId(), feedback);
+      store.upsertCoachFeedbackLocal(feedback);
+    } else {
+      const id = store.saveCoachFeedback(feedback);
+      if (!id) {
+        throw new Error('Could not save feedback. Check your club access.');
       }
-      refresh();
+    }
+    refresh();
+  };
+
+  const onSave = async () => {
+    setError(null);
+    if (!clubRole.trim()) {
+      setError('Enter your role within the club.');
+      return;
+    }
+    setBusy('save');
+    try {
+      // Keep published reports published on Save; otherwise draft.
+      const status: CoachFeedbackStatus =
+        existing?.status === 'submitted' ? 'submitted' : 'draft';
+      await persist(buildFeedback(status, 'save'));
       navigate(reportListHref);
     } catch (err) {
       setError(
         err instanceof Error ? err.message : 'Could not save feedback.',
       );
     } finally {
-      setBusy(false);
+      setBusy(null);
     }
   };
+
+  const onSubmit = async () => {
+    setError(null);
+    if (!clubRole.trim()) {
+      setError('Enter your role within the club.');
+      return;
+    }
+    if (!validateCoachFeedbackScales(scales)) {
+      setError('Rate every criterion (1–5).');
+      return;
+    }
+
+    setBusy('submit');
+    try {
+      await persist(buildFeedback('submitted', 'submit'));
+      navigate(reportListHref);
+    } catch (err) {
+      setError(
+        err instanceof Error ? err.message : 'Could not submit feedback.',
+      );
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const title =
+    existing?.status === 'submitted'
+      ? 'Edit referee feedback'
+      : existing?.status === 'draft'
+        ? 'Continue referee feedback'
+        : 'Referee feedback';
 
   return (
     <div className="rs-stack">
@@ -262,115 +409,62 @@ export function CoachFeedbackFormPage() {
         className="rs-detail__back"
         onClick={() => navigate(reportListHref)}
       >
-        ← Report
+        ← Referee Feedback
       </Button>
       <Title headingLevel="h1" size="lg">
-        {existing ? 'Edit referee feedback' : 'Referee feedback'}
+        {title}
       </Title>
       <p className="rs-match-card__meta">
-        {match.homeTeamName} vs {match.awayTeamName} · {when}
-        <br />
         Match Official: {mo.userName} · Reporting as {reportingTeamName}
       </p>
-      <p className="rs-match-card__meta">{COACH_FEEDBACK_SCALE_LEGEND}</p>
-      <p className="rs-match-card__meta">
-        For Below Average or Poor, add specifics in the comments.
-      </p>
+
+      <MatchListRow match={match} />
 
       <div className="rs-form-stack">
-        <FormGroup label="Score" fieldId="cf-score">
-          <TextInput
-            id="cf-score"
-            value={score}
-            onChange={(_e, v) => setScore(v)}
-            placeholder="e.g. 28–17"
-          />
-        </FormGroup>
-
-        {COACH_FEEDBACK_SCALE_KEYS.map((key) => (
-          <FormGroup
-            key={key}
-            label={COACH_FEEDBACK_CRITERION_LABELS[key]}
-            isRequired
-            fieldId={`cf-scale-${key}`}
-          >
-            <FormSelect
-              id={`cf-scale-${key}`}
-              value={scales[key] ?? ''}
-              onChange={(_e, v) =>
-                setScales((prev) => ({
-                  ...prev,
-                  [key]: v as CoachFeedbackScaleValue,
-                }))
-              }
-              aria-label={COACH_FEEDBACK_CRITERION_LABELS[key]}
-            >
-              <FormSelectOption value="" label="Select…" isDisabled />
-              {COACH_FEEDBACK_SCALE_VALUES.map((v) => (
-                <FormSelectOption
-                  key={v}
-                  value={v}
-                  label={COACH_FEEDBACK_SCALE_LABELS[v]}
-                />
-              ))}
-            </FormSelect>
+        <div className="rs-form-row rs-form-row--2">
+          <FormGroup label="Name" fieldId="cf-name">
+            <TextInput
+              id="cf-name"
+              value={currentUser.displayName}
+              isDisabled
+            />
           </FormGroup>
-        ))}
-
-        <FormGroup
-          label="Comments related to scores"
-          fieldId="cf-comments"
-          isRequired={scalesNeedComments(scales)}
-        >
-          <TextArea
-            id="cf-comments"
-            value={commentsOnScores}
-            onChange={(_e, v) => setCommentsOnScores(v)}
-            rows={3}
-          />
-        </FormGroup>
-
-        <FormGroup label="Areas of the game refereed well" fieldId="cf-well">
-          <TextArea
-            id="cf-well"
-            value={areasDoneWell}
-            onChange={(_e, v) => setAreasDoneWell(v)}
-            rows={3}
-          />
-        </FormGroup>
-
-        <FormGroup label="Areas for improvement" fieldId="cf-improve">
-          <TextArea
-            id="cf-improve"
-            value={areasToImprove}
-            onChange={(_e, v) => setAreasToImprove(v)}
-            rows={3}
-          />
-        </FormGroup>
-
-        <FormGroup label="Other relevant feedback" fieldId="cf-other">
-          <TextArea
-            id="cf-other"
-            value={otherFeedback}
-            onChange={(_e, v) => setOtherFeedback(v)}
-            rows={2}
-          />
-        </FormGroup>
-
-        <FormGroup
-          label="Feedback on other crew (optional)"
-          fieldId="cf-crew"
-        >
-          <TextArea
-            id="cf-crew"
-            value={otherCrewFeedback}
-            onChange={(_e, v) => setOtherCrewFeedback(v)}
-            rows={2}
-            placeholder="AR, No.4, or other crew notes"
-          />
-        </FormGroup>
+          <FormGroup label="Role" fieldId="cf-role" isRequired>
+            <TextInput
+              id="cf-role"
+              value={clubRole}
+              onChange={(_e, v) => setClubRole(v)}
+              placeholder="Head Coach, Captain…"
+            />
+          </FormGroup>
+        </div>
+        <div className="rs-form-row rs-form-row--2">
+          <FormGroup label="Phone" fieldId="cf-phone">
+            <TextInput
+              id="cf-phone"
+              value={phone}
+              onChange={(_e, v) => setPhone(v)}
+            />
+          </FormGroup>
+          <FormGroup label="Email" fieldId="cf-email">
+            <TextInput
+              id="cf-email"
+              value={currentUser.email}
+              isDisabled
+            />
+          </FormGroup>
+        </div>
+        <YesNoToggle
+          id="cf-contact-about"
+          label="Would you like to be contacted about this report?"
+          open={contactAboutReport}
+          onChange={setContactAboutReport}
+        />
 
         <FormGroup label="Video link" fieldId="cf-video">
+          <p className="rs-match-card__meta rs-coach-fb-video-hint">
+            Having video makes it easier for us to review.
+          </p>
           <TextInput
             id="cf-video"
             value={videoLink}
@@ -379,70 +473,128 @@ export function CoachFeedbackFormPage() {
           />
         </FormGroup>
 
-        <FormGroup label="Video notes" fieldId="cf-video-notes">
-          <TextArea
-            id="cf-video-notes"
-            value={videoNotes}
-            onChange={(_e, v) => setVideoNotes(v)}
-            rows={2}
-            placeholder="Timestamps for issues in the video"
-          />
-        </FormGroup>
+        <section className="rs-detail-card rs-coach-fb-ratings" aria-labelledby="cf-ratings">
+          <h2 id="cf-ratings" className="rs-detail-section__label">
+            Performance ratings
+          </h2>
+          <p className="rs-match-card__meta rs-coach-fb-scale-legend">
+            {COACH_FEEDBACK_SCALE_LEGEND}
+          </p>
 
-        <Title headingLevel="h2" size="md">
-          Contact details
-        </Title>
+          {COACH_FEEDBACK_SCALE_KEYS.map((key) => (
+            <div key={key} className="rs-coach-fb-criterion">
+              <div className="rs-coach-fb-criterion__head">
+                <span className="rs-coach-fb-criterion__title">
+                  {COACH_FEEDBACK_CRITERION_LABELS[key]}
+                </span>
+                <p className="rs-coach-fb-criterion__hint">
+                  {COACH_FEEDBACK_CRITERION_HINTS[key]}
+                </p>
+              </div>
+              <div
+                className="rs-coach-fb-radios"
+                role="radiogroup"
+                aria-label={COACH_FEEDBACK_CRITERION_LABELS[key]}
+              >
+                {COACH_FEEDBACK_SCALE_VALUES.map((v) => {
+                  const selected = scales[key] === v;
+                  const inputId = `cf-scale-${key}-${v}`;
+                  return (
+                    <label
+                      key={v}
+                      htmlFor={inputId}
+                      className={`rs-coach-fb-radio${selected ? ' rs-coach-fb-radio--selected' : ''}`}
+                    >
+                      <input
+                        id={inputId}
+                        type="radio"
+                        name={`cf-scale-${key}`}
+                        value={v}
+                        checked={selected}
+                        onChange={() =>
+                          setScales((prev) => ({
+                            ...prev,
+                            [key]: v,
+                          }))
+                        }
+                      />
+                      <span className="rs-coach-fb-radio__n" aria-hidden>
+                        {v}
+                      </span>
+                      <span className="rs-coach-fb-radio__label">
+                        {COACH_FEEDBACK_SCALE_LABELS[v]}
+                      </span>
+                    </label>
+                  );
+                })}
+              </div>
+            </div>
+          ))}
+        </section>
 
-        <FormGroup label="Your name" fieldId="cf-name">
-          <TextInput
-            id="cf-name"
-            value={currentUser.displayName}
-            isDisabled
-          />
-        </FormGroup>
+        {COMMENT_BLOCKS.map((block) => {
+          const open = commentOpen[block.key];
+          return (
+            <div key={block.key} className="rs-coach-fb-comment-block">
+              <YesNoToggle
+                id={`cf-open-${block.key}`}
+                label={block.label}
+                open={open}
+                onChange={(next) => {
+                  setCommentOpen((prev) => ({ ...prev, [block.key]: next }));
+                  if (!next) commentSetters[block.key]('');
+                }}
+              />
+              {open && (
+                <TextArea
+                  id={`cf-${block.key}`}
+                  value={commentValues[block.key]}
+                  onChange={(_e, v) => commentSetters[block.key](v)}
+                  rows={block.rows}
+                  placeholder={block.placeholder}
+                  aria-label={block.label}
+                />
+              )}
+            </div>
+          );
+        })}
 
-        <FormGroup label="Email" fieldId="cf-email">
-          <TextInput id="cf-email" value={currentUser.email} isDisabled />
-        </FormGroup>
-
-        <FormGroup label="Phone" fieldId="cf-phone">
-          <TextInput
-            id="cf-phone"
-            value={phone}
-            onChange={(_e, v) => setPhone(v)}
-          />
-        </FormGroup>
-
-        <FormGroup
-          label="Role within your club"
-          fieldId="cf-role"
-          isRequired
-        >
-          <TextInput
-            id="cf-role"
-            value={clubRole}
-            onChange={(_e, v) => setClubRole(v)}
-            placeholder="Head Coach, Captain, President…"
-          />
-        </FormGroup>
-
-        {error && (
-          <Alert variant="danger" title={error} isInline />
+        {existing && existing.edits.length > 0 && (
+          <p className="rs-match-card__meta">
+            {existing.edits.length} save
+            {existing.edits.length === 1 ? '' : 's'} on record
+            {existing.submittedAt
+              ? ` · First submitted ${new Date(existing.submittedAt).toLocaleString()}`
+              : ''}
+            {existing.updatedAt
+              ? ` · Last updated ${new Date(existing.updatedAt).toLocaleString()}`
+              : ''}
+          </p>
         )}
+
+        {error && <Alert variant="danger" title={error} isInline />}
 
         <div className="rs-actions">
           <Button
             variant="primary"
             onClick={() => void onSubmit()}
-            isDisabled={busy}
-            isLoading={busy}
+            isDisabled={busy != null}
+            isLoading={busy === 'submit'}
           >
-            {existing ? 'Update feedback' : 'Submit feedback'}
+            {existing?.status === 'submitted' ? 'Update & submit' : 'Submit'}
+          </Button>
+          <Button
+            variant="secondary"
+            onClick={() => void onSave()}
+            isDisabled={busy != null}
+            isLoading={busy === 'save'}
+          >
+            Save
           </Button>
           <Button
             variant="link"
             onClick={() => navigate(reportListHref)}
-            isDisabled={busy}
+            isDisabled={busy != null}
           >
             Cancel
           </Button>

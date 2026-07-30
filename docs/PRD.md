@@ -79,7 +79,7 @@ Assigners currently manage schedules, contacts, and referee assignments across s
 
 **v1 assumption:** Assigner and Org Admin are often the same person. Model capabilities separately for other societies later.
 
-**UI lenses (masthead / bottom nav):** **Referee/CMO | Team Admin | Scheduler | Fan**. Scheduler = Assigner **control center** (Queues · Schedule · Feedback · Upload). Fan home = Global schedule. Referee and CMO share one lens (**Q-R6** locked). Team Admin tabs: Schedule · Report (optional MO feedback; not visible to officials).
+**UI lenses (masthead / bottom nav):** **Referee/CMO | Team Admin | Scheduler | Fan**. Scheduler = Assigner **control center** (Queues · Schedule · Feedback · Upload). Fan home = Global schedule. Referee and CMO share one lens (**Q-R6** locked). Team Admin tabs: Schedule · Referee Feedback (optional MO feedback; not visible to officials; home and away each may submit; Save draft / Submit / Decline).
 
 ### Role open items (non-blocking)
 
@@ -724,7 +724,7 @@ See [`IMPLEMENTATION_SPEC.md`](./IMPLEMENTATION_SPEC.md).
 | Availability check | Official yes/no for a specific match slot (or proposed new slot); not a vote on whether facts should change |
 | Availability range | Start–end datetime window for an open or blocked calendar day (org timezone) |
 | Coach / Team Admin | Same club persona — confirm facts, propose changes, T-72 for their team’s matches; optional post-match MO feedback for the Scheduler |
-| Coach feedback | Team Admin report on Match Official performance (JotForm-style scales). One per club side per match; any Team Admin for that club may edit. Scheduler-confidential; officials never see it. Ratings/trends dashboards later |
+| Coach feedback | Team Admin report on Match Official performance (1–5 scales with competency hints). One per club side per match; any Team Admin for that club may save draft, submit, edit after submit (edit history kept), or decline. Scheduler-confidential; officials never see it. Ratings/trends dashboards later |
 | CMO | Coaching Match Official — optional match contact/slot; shares **Referee/CMO** lens. **Coaching Reports** (not club Coach) are the CMO-side report path; referees use **Match Reports** |
 | Game request | Official expresses interest from **Referee → Request → Global**; assigner approves or declines. Pending lists only **active** requests (upcoming kickoff, open preferred slot) |
 | Match fee (display) | Slot fee from in-app default schedule or match override; never on shared Sheet; **never paid out in-app** |

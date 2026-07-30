@@ -1224,56 +1224,227 @@ function seedFixtureRequests(): FixtureRequest[] {
 }
 
 function seedCoachFeedback(matches: Match[]): CoachFeedback[] {
-  const m = matches.find((x) => x.id === 'm_res01');
-  if (!m) return [];
-  const mo = crewPeople(m.crew.mo).find((a) => a.userId && a.userName);
-  if (!mo?.userId || !mo.userName) return [];
-  const avg = 'average' as CoachFeedbackScaleValue;
-  const above = 'above_average' as CoachFeedbackScaleValue;
-  const scales: Record<CoachFeedbackScaleKey, CoachFeedbackScaleValue> = {
-    breakdown: above,
-    scrum: avg,
-    lineout: above,
-    safety: above,
-    communication: avg,
-    professionalism: above,
-    overall: above,
-  };
-  const createdAt = new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString();
-  const id = coachFeedbackDocId(m.id, 'team_austin');
-  return [
-    {
-      id,
+  const byId = (id: string) => matches.find((x) => x.id === id);
+
+  const base = (
+    match: Match,
+    reportingTeamId: string,
+    opts: {
+      status: CoachFeedback['status'];
+      scales: Partial<Record<CoachFeedbackScaleKey, CoachFeedbackScaleValue>>;
+      daysAgo: number;
+      submitter: {
+        uid: string;
+        name: string;
+        email: string;
+        phone: string;
+        clubRole: string;
+      };
+      commentsOnScores?: string;
+      areasDoneWell?: string;
+      areasToImprove?: string;
+      otherFeedback?: string;
+      otherCrewFeedback?: string;
+      videoLink?: string;
+      videoNotes?: string;
+      contactAboutReport?: boolean;
+      edits?: CoachFeedback['edits'];
+    },
+  ): CoachFeedback | null => {
+    const mo = crewPeople(match.crew.mo).find((a) => a.userId && a.userName);
+    if (!mo?.userId || !mo.userName) return null;
+    const reportingTeamName =
+      reportingTeamId === match.homeTeamId
+        ? match.homeTeamName
+        : match.awayTeamName;
+    const at = new Date(
+      Date.now() - opts.daysAgo * 24 * 60 * 60 * 1000,
+    ).toISOString();
+    const lastEdit = opts.edits?.[opts.edits.length - 1];
+    const firstSubmit = opts.edits?.find((e) => e.action === 'submit');
+    return {
+      id: coachFeedbackDocId(match.id, reportingTeamId),
       orgId: 'demo-org',
-      matchId: m.id,
+      matchId: match.id,
       slot: 'mo',
       officialUserId: mo.userId,
       officialName: mo.userName,
-      homeTeamId: m.homeTeamId,
-      homeTeamName: m.homeTeamName,
-      awayTeamId: m.awayTeamId,
-      awayTeamName: m.awayTeamName,
-      kickoffAt: m.kickoffAt,
-      competition: m.competition,
-      level: m.level,
-      score: `${m.homeScore ?? 0}–${m.awayScore ?? 0}`,
-      scales,
-      commentsOnScores: 'Solid day overall; scrum resets were a touch slow.',
-      areasDoneWell: 'Communication with captains and player management.',
-      areasToImprove: 'Faster reset at scrum; clearer advantage calls.',
-      otherCrewFeedback: 'ARs were well positioned.',
-      submitterUserId: 'u_home',
-      submitterName: 'Austin Admin',
-      submitterEmail: 'austin-admin@example.com',
-      submitterPhone: '+15551110002',
-      clubRole: 'Head Coach',
-      reportingTeamId: 'team_austin',
-      reportingTeamName: 'Austin RFC',
-      status: 'submitted',
-      createdAt,
-      updatedAt: createdAt,
-    },
-  ];
+      homeTeamId: match.homeTeamId,
+      homeTeamName: match.homeTeamName,
+      awayTeamId: match.awayTeamId,
+      awayTeamName: match.awayTeamName,
+      kickoffAt: match.kickoffAt,
+      competition: match.competition,
+      level: match.level,
+      score: `${match.homeScore ?? 0}–${match.awayScore ?? 0}`,
+      scales: opts.scales,
+      commentsOnScores: opts.commentsOnScores,
+      areasDoneWell: opts.areasDoneWell,
+      areasToImprove: opts.areasToImprove,
+      otherFeedback: opts.otherFeedback,
+      otherCrewFeedback: opts.otherCrewFeedback,
+      videoLink: opts.videoLink,
+      videoNotes: opts.videoNotes,
+      submitterUserId: opts.submitter.uid,
+      submitterName: opts.submitter.name,
+      submitterEmail: opts.submitter.email,
+      submitterPhone: opts.submitter.phone,
+      clubRole: opts.submitter.clubRole,
+      contactAboutReport: opts.contactAboutReport === true,
+      reportingTeamId,
+      reportingTeamName,
+      status: opts.status,
+      submittedAt:
+        opts.status === 'submitted' ? (firstSubmit?.at ?? at) : undefined,
+      edits: opts.edits ?? [
+        {
+          at,
+          byUserId: opts.submitter.uid,
+          byName: opts.submitter.name,
+          action:
+            opts.status === 'declined'
+              ? 'decline'
+              : opts.status === 'draft'
+                ? 'save'
+                : 'submit',
+        },
+      ],
+      createdAt: opts.edits?.[0]?.at ?? at,
+      updatedAt: lastEdit?.at ?? at,
+    };
+  };
+
+  const austin = {
+    uid: 'u_home',
+    name: 'Austin Admin',
+    email: 'austin-admin@example.com',
+    phone: '+15551110002',
+    clubRole: 'Head Coach',
+  };
+  const dallas = {
+    uid: 'u_away',
+    name: 'Dallas Admin',
+    email: 'dallas-admin@example.com',
+    phone: '+15551110003',
+    clubRole: 'Captain',
+  };
+
+  const out: CoachFeedback[] = [];
+  const push = (row: CoachFeedback | null) => {
+    if (row) out.push(row);
+  };
+
+  const m01 = byId('m_res01');
+  const m02 = byId('m_res02');
+  const m04 = byId('m_res04');
+  const m05 = byId('m_res05');
+
+  // Austin home — submitted (with a later edit that added video)
+  if (m01) {
+    const first = new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString();
+    const edited = new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString();
+    push(
+      base(m01, 'team_austin', {
+        status: 'submitted',
+        daysAgo: 5,
+        submitter: austin,
+        scales: {
+          breakdown: 4,
+          scrum: 3,
+          lineout: 4,
+          safety: 4,
+          communication: 3,
+          professionalism: 4,
+          overall: 4,
+        },
+        commentsOnScores: 'Solid day overall; scrum resets were a touch slow.',
+        areasDoneWell: 'Communication with captains and player management.',
+        areasToImprove: 'Faster reset at scrum; clearer advantage calls.',
+        otherCrewFeedback: 'ARs were well positioned.',
+        videoLink: 'https://example.com/demo/austin-dallas-m-res01',
+        videoNotes: 'Scrum reset around 34:20; late advantage at 61:05.',
+        contactAboutReport: true,
+        edits: [
+          {
+            at: first,
+            byUserId: austin.uid,
+            byName: austin.name,
+            action: 'submit',
+          },
+          {
+            at: edited,
+            byUserId: austin.uid,
+            byName: austin.name,
+            action: 'save',
+          },
+        ],
+      }),
+    );
+    // Dallas away — also submitted (both sides can report)
+    push(
+      base(m01, 'team_dallas', {
+        status: 'submitted',
+        daysAgo: 4,
+        submitter: dallas,
+        scales: {
+          breakdown: 3,
+          scrum: 4,
+          lineout: 3,
+          safety: 5,
+          communication: 4,
+          professionalism: 4,
+          overall: 4,
+        },
+        areasDoneWell: 'Strong foul-play management; game felt safe.',
+        areasToImprove: 'A few late advantage calls at midfield.',
+        contactAboutReport: false,
+      }),
+    );
+  }
+
+  // Austin away — draft in progress (partial ratings)
+  if (m02) {
+    push(
+      base(m02, 'team_austin', {
+        status: 'draft',
+        daysAgo: 1,
+        submitter: austin,
+        scales: {
+          breakdown: 3,
+          scrum: 3,
+          overall: 3,
+        },
+        commentsOnScores: 'Still filling this in after the trip home.',
+      }),
+    );
+  }
+
+  // Austin home — declined (clears Needs feedback)
+  if (m04) {
+    push(
+      base(m04, 'team_austin', {
+        status: 'declined',
+        daysAgo: 3,
+        submitter: austin,
+        scales: {},
+      }),
+    );
+  }
+
+  // Dallas home on m_res05 — declined; Austin away left open (Needs feedback)
+  if (m05) {
+    push(
+      base(m05, 'team_dallas', {
+        status: 'declined',
+        daysAgo: 2,
+        submitter: dallas,
+        scales: {},
+      }),
+    );
+  }
+
+  // m_res05 Austin away intentionally unseeded → Needs feedback in Team Admin demo
+  return out;
 }
 
 function seedMatchReports(matches: Match[]): MatchReport[] {
@@ -3086,8 +3257,8 @@ class DemoStore {
   }
 
   /**
-   * Team Admin submits or updates referee (MO) feedback.
-   * One submission per (matchId, reportingTeamId). Returns feedback id or null.
+   * Team Admin saves, submits, or declines referee (MO) feedback.
+   * One document per (matchId, reportingTeamId). Returns feedback id or null.
    */
   saveCoachFeedback(feedback: CoachFeedback): string | null {
     const user = this.state.users.find((u) => u.uid === feedback.submitterUserId);
@@ -3112,7 +3283,7 @@ class DemoStore {
     const next: CoachFeedback = {
       ...feedback,
       slot: 'mo',
-      status: 'submitted',
+      edits: feedback.edits ?? existing?.edits ?? [],
       createdAt: existing?.createdAt ?? feedback.createdAt,
       updatedAt: new Date().toISOString(),
     };

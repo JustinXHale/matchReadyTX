@@ -86,12 +86,16 @@ orgs/{orgId}/coachFeedback/{feedbackId}   // id = matchId_reportingTeamId
   matchId, slot: 'mo', officialUserId, officialName,
   home/away team ids+names, kickoffAt, competition?, level, score,
   scales: { breakdown, scrum, lineout, safety, communication,
-            professionalism, overall } → excellent|above_average|average|below_average|poor,
+            professionalism, overall } → 1|2|3|4|5 (Poor→Excellent),
   commentsOnScores?, areasDoneWell?, areasToImprove?, otherFeedback?,
   videoLink?, videoNotes?, otherCrewFeedback?,
-  submitterUserId/Name/Email/Phone?, clubRole,
-  reportingTeamId, reportingTeamName, status: 'submitted',
+  submitterUserId/Name/Email/Phone?, clubRole, contactAboutReport?,
+  reportingTeamId, reportingTeamName,
+  status: draft|submitted|declined,
+  submittedAt?, edits: [{ at, byUserId, byName, action: save|submit|decline }],
   createdAt, updatedAt
+  // One doc per match × reporting side (home and away each may submit).
+  // Officials never read. Scheduler inbox shows submitted only.
 
 users/{uid}
   firstName, lastName, displayName (derived), email, phone,
@@ -152,7 +156,7 @@ mail/{mailId}   // outbound queue — Admin SDK only; see docs/EMAIL.md
 | `/global/*` | Schedule / Standings / Teams |
 | `/members` | Society directory (incomplete: Scheduler only) |
 | `/team-admin` | Team Admin Schedule (confirm upcoming) |
-| `/team-admin/report` | Optional MO feedback after past games |
+| `/team-admin/report` | Optional MO feedback after past games (tab: Referee Feedback) |
 | `/team-admin/report/:matchId` | Feedback form (create / edit own) |
 | `/team-admin/request-fixture` | Request a new fixture |
 | `/scheduler/queues` | Assigner inbox |

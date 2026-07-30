@@ -13,10 +13,12 @@ import { httpsCallable } from 'firebase/functions';
 import { db, functions, isFirebaseConfigured } from '@/services/firebase';
 import {
   type CoachFeedback,
+  type CoachFeedbackEdit,
   type CoachFeedbackScaleKey,
   type CoachFeedbackScaleValue,
+  type CoachFeedbackStatus,
   COACH_FEEDBACK_SCALE_KEYS,
-  COACH_FEEDBACK_SCALE_VALUES,
+  normalizeScaleValue,
 } from '@/domain/coachFeedback';
 import {
   emptyCrew,
@@ -240,29 +242,50 @@ export type LiveOrgSnapshot = {
 
 function parseCoachFeedbackScales(
   raw: unknown,
-): Record<CoachFeedbackScaleKey, CoachFeedbackScaleValue> | null {
-  if (!raw || typeof raw !== 'object') return null;
+): Partial<Record<CoachFeedbackScaleKey, CoachFeedbackScaleValue>> {
+  if (!raw || typeof raw !== 'object') return {};
   const obj = raw as Record<string, unknown>;
-  const out = {} as Record<CoachFeedbackScaleKey, CoachFeedbackScaleValue>;
+  const out: Partial<Record<CoachFeedbackScaleKey, CoachFeedbackScaleValue>> =
+    {};
   for (const key of COACH_FEEDBACK_SCALE_KEYS) {
-    const v = obj[key];
-    if (
-      typeof v !== 'string' ||
-      !COACH_FEEDBACK_SCALE_VALUES.includes(v as CoachFeedbackScaleValue)
-    ) {
-      return null;
-    }
-    out[key] = v as CoachFeedbackScaleValue;
+    const v = normalizeScaleValue(obj[key]);
+    if (v != null) out[key] = v;
   }
   return out;
+}
+
+function parseCoachFeedbackEdits(raw: unknown): CoachFeedbackEdit[] {
+  if (!Array.isArray(raw)) return [];
+  const out: CoachFeedbackEdit[] = [];
+  for (const item of raw) {
+    if (!item || typeof item !== 'object') continue;
+    const row = item as Record<string, unknown>;
+    const action = row.action;
+    if (action !== 'save' && action !== 'submit' && action !== 'decline') {
+      continue;
+    }
+    if (typeof row.at !== 'string' || typeof row.byUserId !== 'string') {
+      continue;
+    }
+    out.push({
+      at: row.at,
+      byUserId: row.byUserId,
+      byName: typeof row.byName === 'string' ? row.byName : '',
+      action,
+    });
+  }
+  return out;
+}
+
+function parseCoachFeedbackStatus(raw: unknown): CoachFeedbackStatus {
+  if (raw === 'draft' || raw === 'declined' || raw === 'submitted') return raw;
+  return 'submitted';
 }
 
 export function coachFeedbackFromFirestore(
   id: string,
   data: Record<string, unknown>,
 ): CoachFeedback | null {
-  const scales = parseCoachFeedbackScales(data.scales);
-  if (!scales) return null;
   if (typeof data.matchId !== 'string' || !data.matchId) return null;
   if (typeof data.submitterUserId !== 'string' || !data.submitterUserId) {
     return null;
@@ -270,6 +293,8 @@ export function coachFeedbackFromFirestore(
   if (typeof data.reportingTeamId !== 'string' || !data.reportingTeamId) {
     return null;
   }
+  const status = parseCoachFeedbackStatus(data.status);
+  const scales = parseCoachFeedbackScales(data.scales);
   return {
     id,
     orgId: typeof data.orgId === 'string' ? data.orgId : '',
@@ -310,9 +335,13 @@ export function coachFeedbackFromFirestore(
     submitterPhone:
       typeof data.submitterPhone === 'string' ? data.submitterPhone : undefined,
     clubRole: String(data.clubRole ?? ''),
+    contactAboutReport: data.contactAboutReport === true,
     reportingTeamId: data.reportingTeamId,
     reportingTeamName: String(data.reportingTeamName ?? ''),
-    status: 'submitted',
+    status,
+    submittedAt:
+      typeof data.submittedAt === 'string' ? data.submittedAt : undefined,
+    edits: parseCoachFeedbackEdits(data.edits),
     createdAt: String(data.createdAt ?? ''),
     updatedAt: String(data.updatedAt ?? ''),
   };
@@ -854,9 +883,12 @@ export async function saveCoachFeedbackInFirestore(
     submitterEmail: feedback.submitterEmail,
     submitterPhone: feedback.submitterPhone ?? null,
     clubRole: feedback.clubRole,
+    contactAboutReport: feedback.contactAboutReport === true,
     reportingTeamId: feedback.reportingTeamId,
     reportingTeamName: feedback.reportingTeamName,
-    status: 'submitted' as const,
+    status: feedback.status,
+    submittedAt: feedback.submittedAt ?? null,
+    edits: feedback.edits,
     createdAt: feedback.createdAt,
     updatedAt: feedback.updatedAt,
   });

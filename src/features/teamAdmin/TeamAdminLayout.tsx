@@ -1,7 +1,7 @@
 import { NavLink, Outlet } from 'react-router-dom';
 import { useAppHref } from '@/app/AppContext';
 
-/** Top tabs for Team Admin — Schedule vs Report. */
+/** Top tabs for Team Admin — Schedule vs Referee Feedback. */
 export function TeamAdminLayout() {
   const scheduleHref = useAppHref('/team-admin');
   const reportHref = useAppHref('/team-admin/report');
@@ -20,7 +20,7 @@ export function TeamAdminLayout() {
           to={reportHref}
           className={({ isActive }) => (isActive ? 'active' : '')}
         >
-          Report
+          Referee Feedback
         </NavLink>
       </nav>
       <Outlet />
