@@ -76,6 +76,6 @@ jobs:
           echo "Wrote functions/.env.matchreadytx (RESEND_FROM_EMAIL only)"
 
       - name: Deploy to Firebase
-        run: npx firebase-tools@13 deploy --only hosting,firestore,functions --project matchreadytx --non-interactive
+        run: npx firebase-tools@13 deploy --only hosting,firestore,functions --project matchreadytx --non-interactive --force
         env:
           FIREBASE_TOKEN: ${{ secrets.FIREBASE_TOKEN }}
