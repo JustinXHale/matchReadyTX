@@ -17,6 +17,7 @@ import {
 import { matchesForUser } from '@/domain/visibility';
 import type { MatchGender, Team } from '@/domain/types';
 import { GlobalDivisionFilters } from '@/features/global/GlobalDivisionFilters';
+import { divisionFilterOptionsFromMatches } from '@/domain/divisionFilters';
 import { isFirebaseConfigured } from '@/services/firebase';
 import { defaultOrgId, saveCoachFeedbackInFirestore } from '@/services/orgData';
 import { MatchListRow } from '@/ui/MatchListRow';
@@ -42,6 +43,9 @@ export function TeamAdminReportPage() {
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
   const [genderFilter, setGenderFilter] = useState<MatchGender | null>(null);
   const [levelFilter, setLevelFilter] = useState<string | null>(null);
+  const [competitionFilter, setCompetitionFilter] = useState<string | null>(
+    null,
+  );
   const [busyId, setBusyId] = useState<string | null>(null);
 
   const myTeams = useMemo((): Team[] => {
@@ -50,14 +54,6 @@ export function TeamAdminReportPage() {
       .map((id) => state.teams.find((t) => t.id === id))
       .filter((t): t is Team => t != null);
   }, [currentUser, state.teams]);
-
-  const levels = useMemo(() => {
-    const set = new Set<string>();
-    for (const m of state.matches) {
-      if (m.level) set.add(m.level);
-    }
-    return [...set].sort();
-  }, [state.matches]);
 
   const rows = useMemo(() => {
     if (!currentUser) return [];
@@ -81,11 +77,19 @@ export function TeamAdminReportPage() {
       );
   }, [currentUser, state.matches, state.coachFeedback]);
 
+  const filterOptions = useMemo(
+    () => divisionFilterOptionsFromMatches(rows.map((r) => r.match)),
+    [rows],
+  );
+
   const filtered = useMemo(() => {
     return rows.filter(({ match, reportingTeamId, existing }) => {
       if (teamFilter && reportingTeamId !== teamFilter) return false;
       if (genderFilter && match.gender !== genderFilter) return false;
       if (levelFilter && match.level !== levelFilter) return false;
+      if (competitionFilter && match.competition !== competitionFilter) {
+        return false;
+      }
       if (statusFilter === 'needs') {
         return coachFeedbackNeedsAttention(existing);
       }
@@ -100,13 +104,21 @@ export function TeamAdminReportPage() {
       }
       return true;
     });
-  }, [rows, teamFilter, statusFilter, genderFilter, levelFilter]);
+  }, [
+    rows,
+    teamFilter,
+    statusFilter,
+    genderFilter,
+    levelFilter,
+    competitionFilter,
+  ]);
 
   const hasFilters =
     teamFilter != null ||
     statusFilter !== 'all' ||
     genderFilter != null ||
-    levelFilter != null;
+    levelFilter != null ||
+    competitionFilter != null;
 
   const onDecline = async (matchId: string, reportingTeamId: string) => {
     if (!currentUser) return;
@@ -255,11 +267,13 @@ export function TeamAdminReportPage() {
       </div>
 
       <GlobalDivisionFilters
-        levels={levels}
+        options={filterOptions}
         genderFilter={genderFilter}
         levelFilter={levelFilter}
+        competitionFilter={competitionFilter}
         onGenderChange={setGenderFilter}
         onLevelChange={setLevelFilter}
+        onCompetitionChange={setCompetitionFilter}
         ariaLabel="Filter by division"
       />
 

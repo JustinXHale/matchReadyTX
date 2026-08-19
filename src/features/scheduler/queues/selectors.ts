@@ -4,8 +4,35 @@ import {
   type FixtureRequest,
   type GameRequest,
   type Match,
+  type MatchGender,
 } from '@/domain/types';
+import {
+  fixtureMatchesDivisionFilters,
+  matchMatchesDivisionFilters,
+} from '@/domain/divisionFilters';
 import type { AppState } from '@/services/demoStore';
+
+export { fixtureMatchesDivisionFilters, matchMatchesDivisionFilters };
+
+export function proposalMatchesDivisionFilters(
+  proposal: ChangeProposal,
+  matches: Match[],
+  genderFilter: MatchGender | null,
+  levelFilter: string | null,
+  competitionFilter: string | null = null,
+): boolean {
+  if (!genderFilter && !levelFilter && !competitionFilter) return true;
+  const m = matches.find((x) => x.id === proposal.matchId);
+  return (
+    m != null &&
+    matchMatchesDivisionFilters(
+      m,
+      genderFilter,
+      levelFilter,
+      competitionFilter,
+    )
+  );
+}
 
 /** Released matches still missing Match Official (not already in reassignment). */
 export function matchesNeedingOfficials(matches: Match[]): Match[] {

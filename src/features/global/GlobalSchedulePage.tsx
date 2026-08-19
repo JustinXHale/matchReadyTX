@@ -3,6 +3,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Navigate, useParams } from 'react-router-dom';
 import { useApp, useAppHref } from '@/app/AppContext';
 import { isKickoffUpcoming } from '@/domain/requests';
+import { divisionFilterOptionsFromMatches } from '@/domain/divisionFilters';
 import { isTeamMatch, releasedMatches } from '@/domain/visibility';
 import { MatchListRow } from '@/ui/MatchListRow';
 import { MatchCrewTrailing } from '@/ui/MatchCrewTrailing';
@@ -41,6 +42,9 @@ export function GlobalSchedulePage() {
   const completedHref = useAppHref('/global/schedule/completed');
   const [genderFilter, setGenderFilter] = useState<MatchGender | null>(null);
   const [levelFilter, setLevelFilter] = useState<string | null>(null);
+  const [competitionFilter, setCompetitionFilter] = useState<string | null>(
+    null,
+  );
   const [sortDir, setSortDir] = useState<SortDir>('asc');
   const [myTeamsOnly, setMyTeamsOnly] = useState(false);
 
@@ -53,7 +57,20 @@ export function GlobalSchedulePage() {
     setSortDir(pane === 'completed' ? 'desc' : 'asc');
   }, [pane]);
 
-  const levels = state.org.matchLevels;
+  const paneMatches = useMemo(() => {
+    if (!pane) return [] as Match[];
+    return releasedMatches(state.matches).filter((m) => {
+      const upcoming = isKickoffUpcoming(m);
+      if (pane === 'upcoming' && !upcoming) return false;
+      if (pane === 'completed' && upcoming) return false;
+      return true;
+    });
+  }, [state.matches, pane]);
+
+  const filterOptions = useMemo(
+    () => divisionFilterOptionsFromMatches(paneMatches),
+    [paneMatches],
+  );
 
   const scheduleBack: BackNav = useMemo(
     () => ({
@@ -66,13 +83,13 @@ export function GlobalSchedulePage() {
   const list = useMemo(() => {
     if (!pane) return [];
     const dir = sortDir === 'asc' ? 1 : -1;
-    return [...releasedMatches(state.matches)]
+    return [...paneMatches]
       .filter((m) => {
-        const upcoming = isKickoffUpcoming(m);
-        if (pane === 'upcoming' && !upcoming) return false;
-        if (pane === 'completed' && upcoming) return false;
         if (genderFilter && m.gender !== genderFilter) return false;
         if (levelFilter && m.level !== levelFilter) return false;
+        if (competitionFilter && m.competition !== competitionFilter) {
+          return false;
+        }
         if (myTeamsOnly && fanFavorites && fanFavorites.length > 0) {
           if (!isTeamMatch(m, fanFavorites)) return false;
         }
@@ -84,9 +101,10 @@ export function GlobalSchedulePage() {
           (new Date(a.kickoffAt).getTime() - new Date(b.kickoffAt).getTime()),
       );
   }, [
-    state.matches,
+    paneMatches,
     genderFilter,
     levelFilter,
+    competitionFilter,
     pane,
     sortDir,
     myTeamsOnly,
@@ -123,11 +141,13 @@ export function GlobalSchedulePage() {
       {hasBase && (
         <>
           <GlobalDivisionFilters
-            levels={levels}
+            options={filterOptions}
             genderFilter={genderFilter}
             levelFilter={levelFilter}
+            competitionFilter={competitionFilter}
             onGenderChange={setGenderFilter}
             onLevelChange={setLevelFilter}
+            onCompetitionChange={setCompetitionFilter}
             ariaLabel="Filter schedule"
           />
           <div
@@ -172,7 +192,7 @@ export function GlobalSchedulePage() {
       ) : list.length === 0 ? (
         <EmptyState titleText={emptyTitle} headingLevel="h3">
           <EmptyStateBody>
-            {genderFilter || levelFilter || myTeamsOnly
+            {genderFilter || levelFilter || competitionFilter || myTeamsOnly
               ? 'No games match these filters. Tap a chip again to clear it.'
               : emptyBody}
           </EmptyStateBody>

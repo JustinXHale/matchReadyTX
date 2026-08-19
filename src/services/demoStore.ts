@@ -8,6 +8,12 @@ import {
   withCrewBlockRemoved,
   withCrewRoleAdded,
 } from '@/domain/crewSize';
+import {
+  applyLevelCrewDefaults,
+  applyLevelCrewDefaultsIfStock,
+  matchEligibleForCrewDefaultsReapply,
+  type DefaultCrewByLevel,
+} from '@/domain/crewDefaults';
 import { defaultFees, demoGeocode } from '@/domain/economics';
 import {
   applySheetFacts,
@@ -2345,6 +2351,13 @@ class DemoStore {
           delete next.assessedLevel;
         }
         if (
+          Object.prototype.hasOwnProperty.call(patch, 'requestedAssessedLevel') &&
+          (patch.requestedAssessedLevel == null ||
+            Number.isNaN(patch.requestedAssessedLevel as number))
+        ) {
+          delete next.requestedAssessedLevel;
+        }
+        if (
           Object.prototype.hasOwnProperty.call(patch, 'fanTeamOther') &&
           !next.fanTeamOther?.trim()
         ) {
@@ -2509,7 +2522,11 @@ class DemoStore {
             return m;
           }
         }
-        const released = releaseMatch(m);
+        let released = applyLevelCrewDefaultsIfStock(
+          m,
+          s.org.defaultCrewByLevel,
+        );
+        released = releaseMatch(released);
         const homeAdmins = s.users.filter(
           (u) => u.roles.includes('teamAdmin') && u.teamIds.includes(m.homeTeamId),
         );
@@ -3228,6 +3245,30 @@ class DemoStore {
         matchLevels: cleaned.length ? cleaned : [...DEFAULT_MATCH_LEVELS],
       },
     }));
+  }
+
+  setOrgCrewDefaults(defaultCrewByLevel: DefaultCrewByLevel): void {
+    this.set((s) => ({
+      ...s,
+      org: { ...s.org, defaultCrewByLevel },
+    }));
+  }
+
+  applyCrewDefaultsToStockMatches(
+    defaultCrewByLevel?: DefaultCrewByLevel,
+  ): number {
+    const configured =
+      defaultCrewByLevel ?? this.state.org.defaultCrewByLevel;
+    let count = 0;
+    this.set((s) => ({
+      ...s,
+      matches: s.matches.map((m) => {
+        if (!matchEligibleForCrewDefaultsReapply(m)) return m;
+        count += 1;
+        return applyLevelCrewDefaults(m, configured);
+      }),
+    }));
+    return count;
   }
 
   setOrgCompetitions(competitions: string[]): void {

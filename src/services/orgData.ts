@@ -2,6 +2,7 @@ import {
   collection,
   collectionGroup,
   doc,
+  getDoc,
   onSnapshot,
   query,
   setDoc,
@@ -21,6 +22,8 @@ import {
   COACH_FEEDBACK_SCALE_KEYS,
   normalizeScaleValue,
 } from '@/domain/coachFeedback';
+import { applyLevelCrewDefaultsIfStock, applyLevelCrewDefaults, matchEligibleForCrewDefaultsReapply } from '@/domain/crewDefaults';
+import { releaseMatch } from '@/domain/matchTransitions';
 import {
   emptyCrew,
   ensureDefaultMoBlock,
@@ -36,7 +39,6 @@ import {
   type Team,
   type TeamLinkRequest,
 } from '@/domain/types';
-import { releaseMatch } from '@/domain/matchTransitions';
 
 const DEFAULT_ORG =
   import.meta.env.VITE_DEFAULT_ORG_ID?.trim() || 'lonestar';
@@ -189,6 +191,10 @@ export function teamFromFirestore(
   return {
     id,
     name: String(data.name ?? id),
+    competition:
+      typeof data.competition === 'string' && data.competition.trim()
+        ? data.competition.trim()
+        : undefined,
     contactEmails: Array.isArray(data.contactEmails)
       ? (data.contactEmails as string[])
       : [],
@@ -221,6 +227,10 @@ export function orgPatchFromFirestore(
     matchLevels: Array.isArray(data.matchLevels)
       ? (data.matchLevels as string[])
       : undefined,
+    defaultCrewByLevel:
+      data.defaultCrewByLevel && typeof data.defaultCrewByLevel === 'object'
+        ? (data.defaultCrewByLevel as OrgSettings['defaultCrewByLevel'])
+        : undefined,
     competitions: Array.isArray(data.competitions)
       ? (data.competitions as string[])
       : undefined,
@@ -765,6 +775,19 @@ export async function saveOrgSheetId(
   );
 }
 
+/** Persist crew defaults and/or match levels (assigner write). */
+export async function saveOrgCrewSettings(
+  orgId: string,
+  patch: Partial<Pick<OrgSettings, 'defaultCrewByLevel' | 'matchLevels'>>,
+): Promise<void> {
+  const database = requireDb();
+  await setDoc(
+    doc(database, 'orgs', orgId),
+    { ...patch, updatedAt: new Date().toISOString() },
+    { merge: true },
+  );
+}
+
 /** Release draft matches in Firestore (assigner). */
 export async function releaseDraftMatchesInFirestore(
   orgId: string,
@@ -786,22 +809,38 @@ export async function releaseDraftMatchesInFirestore(
 
   if (toRelease.length === 0) return 0;
 
+  const orgSnap = await getDoc(doc(database, 'orgs', orgId));
+  const defaultCrewByLevel = orgSnap.data()?.defaultCrewByLevel as
+    | OrgSettings['defaultCrewByLevel']
+    | undefined;
+
   let batch = writeBatch(database);
   let ops = 0;
   let released = 0;
 
   for (const m of toRelease) {
-    const next = releaseMatch(m);
+    let next = applyLevelCrewDefaultsIfStock(m, defaultCrewByLevel);
+    next = releaseMatch(next);
     const ref = doc(database, 'orgs', orgId, 'matches', m.id);
+    const crewPatch = crewForFirestore(next.crew);
     batch.set(
       ref,
-      {
+      stripUndefined({
         status: next.status,
         releasedAt: next.releasedAt ?? null,
         homeConfirmedAt: null,
         awayConfirmedAt: null,
+        crew: crewPatch,
+        rolesNeeded: next.rolesNeeded ?? null,
+        cmo: next.cmo?.length
+          ? next.cmo.map((c) => ({
+              id: c.id,
+              userId: c.userId ?? null,
+              userName: c.userName ?? null,
+            }))
+          : null,
         updatedAt: new Date().toISOString(),
-      },
+      }),
       { merge: true },
     );
     ops += 1;
@@ -814,6 +853,45 @@ export async function releaseDraftMatchesInFirestore(
   }
   if (ops > 0) await batch.commit();
   return released;
+}
+
+/** Re-apply org crew defaults to matches that still use stock MO-only setup. */
+export async function applyCrewDefaultsToStockMatchesInFirestore(
+  orgId: string,
+  matches: Match[],
+  defaultCrewByLevel: OrgSettings['defaultCrewByLevel'],
+): Promise<number> {
+  const database = requireDb();
+  const toUpdate = matches.filter((m) => matchEligibleForCrewDefaultsReapply(m));
+  if (toUpdate.length === 0) return 0;
+
+  let batch = writeBatch(database);
+  let ops = 0;
+  let updated = 0;
+
+  for (const m of toUpdate) {
+    const next = applyLevelCrewDefaults(m, defaultCrewByLevel);
+    const ref = doc(database, 'orgs', orgId, 'matches', m.id);
+    batch.set(
+      ref,
+      stripUndefined({
+        crew: crewForFirestore(next.crew),
+        rolesNeeded: next.rolesNeeded ?? null,
+        cmo: cmoForFirestore(next.cmo),
+        updatedAt: new Date().toISOString(),
+      }),
+      { merge: true },
+    );
+    ops += 1;
+    updated += 1;
+    if (ops >= 400) {
+      await batch.commit();
+      batch = writeBatch(database);
+      ops = 0;
+    }
+  }
+  if (ops > 0) await batch.commit();
+  return updated;
 }
 
 /** Firestore rejects `undefined` — omit those keys (shallow). */

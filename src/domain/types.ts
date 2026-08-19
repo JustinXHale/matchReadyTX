@@ -290,9 +290,11 @@ export interface UserProfile {
   refereeLevel?: number;
   /**
    * CMO/society-assessed grade — true level independent of self-reported refereeLevel.
-   * Officials see this read-only on Profile; Schedulers can set it on member detail.
+   * Only schedulers set this; members may request via requestedAssessedLevel.
    */
   assessedLevel?: number;
+  /** Pending society level request — official asks scheduler to assess at this grade. */
+  requestedAssessedLevel?: number;
   /**
    * Competitions this user may manage as assigner. Omit/empty = all org competitions.
    * Used for future delegate scoping; sole assigners leave unset.
@@ -335,6 +337,8 @@ export interface OrgSettings {
   defaultFees: FeeTable;
   /** Admin-managed level options; defaults D1/D2/D3/Exhibition/Tourney */
   matchLevels: string[];
+  /** Default crew roles per competition level (Scheduler → Queues → Crew). */
+  defaultCrewByLevel?: Record<string, { roles: RequestableSlot[] }>;
   /** Admin-managed competition list (e.g. Lonestar Women / Lonestar Men). */
   competitions: string[];
   sheetId?: string;
@@ -346,6 +350,8 @@ export interface OrgSettings {
 export interface Team {
   id: string;
   name: string;
+  /** Optional conference/competition label from sync (e.g. Lonestar Men). */
+  competition?: string;
   contactEmails: string[];
   contactPhones?: string[];
 }

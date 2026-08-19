@@ -111,6 +111,10 @@ export function profileFromFirestore(
       typeof data.refereeLevel === 'number' ? data.refereeLevel : undefined,
     assessedLevel:
       typeof data.assessedLevel === 'number' ? data.assessedLevel : undefined,
+    requestedAssessedLevel:
+      typeof data.requestedAssessedLevel === 'number'
+        ? data.requestedAssessedLevel
+        : undefined,
     competitionAccess: Array.isArray(data.competitionAccess)
       ? (data.competitionAccess as string[])
       : undefined,
@@ -198,6 +202,7 @@ function stripUndefined<T extends Record<string, unknown>>(obj: T): T {
 /** Persist profile fields to users/{uid} and mirror roles onto org membership. */
 export async function saveFirebaseProfile(
   profile: UserProfile,
+  opts?: { includeAssessedLevel?: boolean },
 ): Promise<UserProfile> {
   const database = requireDb();
   const complete = isProfileComplete(profile);
@@ -232,7 +237,6 @@ export async function saveFirebaseProfile(
     fanTeamOther: next.fanTeamOther?.trim() || null,
     profileComplete: next.profileComplete,
     refereeLevel: next.refereeLevel,
-    assessedLevel: next.assessedLevel,
     competitionAccess: next.competitionAccess,
     refereeingSince: next.refereeingSince,
     birthday: next.birthday,
@@ -241,6 +245,10 @@ export async function saveFirebaseProfile(
     photoUrl,
     updatedAt: serverTimestamp(),
   } as Record<string, unknown>);
+
+  if (opts?.includeAssessedLevel) {
+    payload.assessedLevel = next.assessedLevel ?? null;
+  }
 
   await setDoc(doc(database, 'users', next.uid), payload, { merge: true });
 

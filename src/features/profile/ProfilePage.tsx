@@ -21,13 +21,18 @@ import {
   validateProfilePhoto,
 } from '@/domain/profile';
 import { APPAREL_SIZES, type Role } from '@/domain/types';
+import { conferenceTeamOptions } from '@/domain/teams';
 import { isFirebaseConfigured } from '@/services/firebase';
 import {
   callSubmitTeamLinkRequests,
   defaultOrgId,
 } from '@/services/orgData';
 import { saveFirebaseProfile } from '@/services/userProfile';
+import { saveAssessedLevelRequest } from '@/services/orgMembers';
 import { RefereeLevelChart } from '@/ui/RefereeLevelChart';
+import {
+  ConferenceTeamPicker,
+} from '@/ui/ConferenceTeamPicker';
 import { UserAvatar } from '@/ui/UserAvatar';
 
 export function ProfilePage() {
@@ -94,6 +99,9 @@ export function ProfilePage() {
   const [photoUrl, setPhotoUrl] = useState(currentUser?.photoUrl);
   const [photoError, setPhotoError] = useState<string | null>(null);
   const [savedFlash, setSavedFlash] = useState(false);
+  const [requestLevelDraft, setRequestLevelDraft] = useState('');
+  const [requestLevelBusy, setRequestLevelBusy] = useState(false);
+  const [requestLevelNote, setRequestLevelNote] = useState<string | null>(null);
   const [requestTeamIds, setRequestTeamIds] = useState<string[]>([]);
   const [linkNote, setLinkNote] = useState<string | null>(null);
   const [linkBusy, setLinkBusy] = useState(false);
@@ -129,6 +137,15 @@ export function ProfilePage() {
           r.teamId === t.id &&
           r.status === 'pending',
       ),
+  );
+  const requestableTeamOptions = useMemo(
+    () =>
+      conferenceTeamOptions(
+        state.matches,
+        state.teams,
+        new Set(requestableTeams.map((team) => team.id)),
+      ),
+    [requestableTeams, state.matches, state.teams],
   );
   const levelOk =
     levelUnknown ||
@@ -242,6 +259,53 @@ export function ProfilePage() {
     }
     setSavedFlash(true);
     window.setTimeout(() => setSavedFlash(false), 1600);
+  };
+
+  const submitLevelRequest = async () => {
+    const trimmed = requestLevelDraft.trim();
+    if (!trimmed) {
+      setRequestLevelNote('Enter a level from 1–20.');
+      return;
+    }
+    const n = Number(trimmed);
+    if (!Number.isFinite(n) || n < 1 || n > 20) {
+      setRequestLevelNote('Level must be between 1 and 20.');
+      return;
+    }
+    setRequestLevelBusy(true);
+    setRequestLevelNote(null);
+    try {
+      store.updateProfile(currentUser.uid, { requestedAssessedLevel: n });
+      if (isFirebaseConfigured && !currentUser.uid.startsWith('u_')) {
+        await saveAssessedLevelRequest(currentUser.uid, n);
+      }
+      setRequestLevelNote('Level request sent to your scheduler for review.');
+    } catch (err) {
+      setRequestLevelNote(
+        err instanceof Error ? err.message : 'Could not submit level request.',
+      );
+    } finally {
+      setRequestLevelBusy(false);
+    }
+  };
+
+  const withdrawLevelRequest = async () => {
+    setRequestLevelBusy(true);
+    setRequestLevelNote(null);
+    try {
+      store.updateProfile(currentUser.uid, { requestedAssessedLevel: undefined });
+      if (isFirebaseConfigured && !currentUser.uid.startsWith('u_')) {
+        await saveAssessedLevelRequest(currentUser.uid, null);
+      }
+      setRequestLevelDraft('');
+      setRequestLevelNote('Level request withdrawn.');
+    } catch (err) {
+      setRequestLevelNote(
+        err instanceof Error ? err.message : 'Could not withdraw request.',
+      );
+    } finally {
+      setRequestLevelBusy(false);
+    }
   };
 
   const submitClubLinks = async () => {
@@ -540,23 +604,12 @@ export function ProfilePage() {
             )}
             {requestableTeams.length > 0 && (
               <>
-                <div className="rs-onboarding__roles" role="group" aria-label="Request clubs">
-                  {requestableTeams.map((t) => (
-                    <Checkbox
-                      key={t.id}
-                      id={`pf-req-team-${t.id}`}
-                      label={t.name}
-                      isChecked={requestTeamIds.includes(t.id)}
-                      onChange={(_, v) => {
-                        setRequestTeamIds((prev) =>
-                          v
-                            ? [...prev, t.id]
-                            : prev.filter((id) => id !== t.id),
-                        );
-                      }}
-                    />
-                  ))}
-                </div>
+                <ConferenceTeamPicker
+                  options={requestableTeamOptions}
+                  selectedIds={requestTeamIds}
+                  onChange={setRequestTeamIds}
+                  ariaLabel="Request clubs by conference"
+                />
                 <Button
                   variant="secondary"
                   isDisabled={requestTeamIds.length === 0 || linkBusy}
@@ -700,6 +753,67 @@ export function ProfilePage() {
                   if (v) setRefereeLevel('');
                 }}
               />
+              <FormHelperText>
+                <HelperText>
+                  <HelperTextItem>
+                    Self-reported grade for your profile — not the society
+                    assessed level.
+                  </HelperTextItem>
+                </HelperText>
+              </FormHelperText>
+            </FormGroup>
+
+            <FormGroup
+              label="Society assessed level"
+              fieldId="pf-assessed-level"
+            >
+              <p className="rs-match-card__meta">
+                {currentUser.assessedLevel != null
+                  ? `Your assessed level is ${currentUser.assessedLevel}.`
+                  : 'Not assessed yet — your scheduler sets this after review.'}
+              </p>
+              {currentUser.requestedAssessedLevel != null ? (
+                <div className="rs-stack">
+                  <p className="rs-match-card__meta" role="status">
+                    Pending request: level {currentUser.requestedAssessedLevel}
+                  </p>
+                  <Button
+                    variant="link"
+                    isDisabled={requestLevelBusy}
+                    onClick={() => void withdrawLevelRequest()}
+                  >
+                    Withdraw request
+                  </Button>
+                </div>
+              ) : (
+                <div className="rs-form-row rs-form-row--2">
+                  <TextInput
+                    id="pf-assessed-level"
+                    type="number"
+                    min={1}
+                    max={20}
+                    value={requestLevelDraft}
+                    placeholder="e.g. 5"
+                    onChange={(_, v) => {
+                      setRequestLevelDraft(v);
+                      setRequestLevelNote(null);
+                    }}
+                  />
+                  <Button
+                    variant="secondary"
+                    isDisabled={requestLevelBusy}
+                    isLoading={requestLevelBusy}
+                    onClick={() => void submitLevelRequest()}
+                  >
+                    Request assessed level
+                  </Button>
+                </div>
+              )}
+              {requestLevelNote && (
+                <p className="rs-match-card__meta" role="status">
+                  {requestLevelNote}
+                </p>
+              )}
             </FormGroup>
             <FormGroup label="Year started refereeing" isRequired>
               <TextInput

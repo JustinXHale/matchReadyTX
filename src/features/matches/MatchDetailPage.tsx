@@ -475,9 +475,7 @@ export function MatchDetailPage() {
     Boolean(mySlot);
 
   const feeParts =
-    isAssigner || isOfficial
-      ? matchFeeBreakdown(match, state.org)
-      : [];
+    isAssigner ? matchFeeBreakdown(match, state.org) : [];
   const showFees = feeParts.length > 0;
   const matchRoles = rolesNeededForMatch(match);
   const canAlertCoverage =
@@ -1529,30 +1527,12 @@ export function MatchDetailPage() {
               )}
             </div>
           </div>
-          {showFees && !isAssigner && (
-            <div className="rs-detail-meta__row">
-              <span className="rs-detail-meta__label">Match fee</span>
-              <span className="rs-detail-fees">
-                {feeParts.map((p, i) => (
-                  <span key={p.label}>
-                    {i > 0 ? ' · ' : ''}
-                    {p.label}: ${p.amount.toFixed(0)}
-                  </span>
-                ))}
-                {match.flightProvided ? (
-                  <span className="rs-detail-meta__perks"> · Flight</span>
-                ) : null}
-                {match.housingProvided ? (
-                  <span className="rs-detail-meta__perks"> · Housing</span>
-                ) : null}
-              </span>
-            </div>
-          )}
           {isAssigner && (
             <>
-              <div className="rs-detail-meta__row rs-detail-meta__row--fees">
-                <span className="rs-detail-meta__label">Match fee</span>
-                <div className="rs-detail-fee-edit">
+              {showFees && (
+                <div className="rs-detail-meta__row rs-detail-meta__row--fees">
+                  <span className="rs-detail-meta__label">Match fee</span>
+                  <div className="rs-detail-fee-edit">
                   {matchRoles
                     .filter((r) => r === 'cmo' || isCrewSlot(r))
                     .map((slot) => {
@@ -1580,6 +1560,7 @@ export function MatchDetailPage() {
                     })}
                 </div>
               </div>
+              )}
               <div className="rs-detail-meta__row">
                 <span className="rs-detail-meta__label">Flight</span>
                 <div

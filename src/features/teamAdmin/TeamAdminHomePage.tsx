@@ -13,6 +13,7 @@ import {
   type Team,
 } from '@/domain/types';
 import { GlobalDivisionFilters } from '@/features/global/GlobalDivisionFilters';
+import { divisionFilterOptionsFromMatches } from '@/domain/divisionFilters';
 import { TeamLinkRequestQueue } from '@/features/scheduler/queues/TeamLinkRequestQueue';
 import { TeamAdminMatchRow } from '@/features/teamAdmin/TeamAdminMatchRow';
 import { isFirebaseConfigured } from '@/services/firebase';
@@ -57,6 +58,9 @@ export function TeamAdminHomePage() {
   const [genderFilter, setGenderFilter] = useState<MatchGender | null>(null);
   const [teamLinkBusyId, setTeamLinkBusyId] = useState<string | null>(null);
   const [levelFilter, setLevelFilter] = useState<string | null>(null);
+  const [competitionFilter, setCompetitionFilter] = useState<string | null>(
+    null,
+  );
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
 
   const myTeams = useMemo((): Team[] => {
@@ -104,7 +108,20 @@ export function TeamAdminHomePage() {
     }
   };
 
-  const levels = state.org.matchLevels;
+  const filterPool = useMemo(() => {
+    if (!currentUser) return [];
+    return applyMatchScope(
+      matchesForUser(state.matches, currentUser, 'teamAdmin'),
+      currentUser,
+      'mine',
+      'teamAdmin',
+    ).filter((m) => isKickoffUpcoming(m) && m.status !== 'cancelled');
+  }, [currentUser, state.matches]);
+
+  const filterOptions = useMemo(
+    () => divisionFilterOptionsFromMatches(filterPool),
+    [filterPool],
+  );
 
   const pendingByMatch = useMemo(() => {
     const map = new Map<string, boolean>();
@@ -116,12 +133,7 @@ export function TeamAdminHomePage() {
 
   const listed = useMemo((): ListedMatch[] => {
     if (!currentUser) return [];
-    const visible = applyMatchScope(
-      matchesForUser(state.matches, currentUser, 'teamAdmin'),
-      currentUser,
-      'mine',
-      'teamAdmin',
-    ).filter((m) => isKickoffUpcoming(m) && m.status !== 'cancelled');
+    const visible = filterPool;
 
     const rows: ListedMatch[] = [];
     for (const teamId of currentUser.teamIds) {
@@ -132,6 +144,9 @@ export function TeamAdminHomePage() {
         }
         if (genderFilter && match.gender !== genderFilter) continue;
         if (levelFilter && match.level !== levelFilter) continue;
+        if (competitionFilter && match.competition !== competitionFilter) {
+          continue;
+        }
         const hasPendingProposal = Boolean(pendingByMatch.get(match.id));
         const needsAction = isActionNeeded(match, hasPendingProposal);
         if (statusFilter === 'needs_confirm' && !needsAction) continue;
@@ -157,11 +172,12 @@ export function TeamAdminHomePage() {
     return rows;
   }, [
     currentUser,
-    state.matches,
+    filterPool,
     pendingByMatch,
     teamFilter,
     genderFilter,
     levelFilter,
+    competitionFilter,
     statusFilter,
   ]);
 
@@ -235,6 +251,7 @@ export function TeamAdminHomePage() {
     teamFilter != null ||
     genderFilter != null ||
     levelFilter != null ||
+    competitionFilter != null ||
     statusFilter !== 'all';
 
   return (
@@ -320,11 +337,13 @@ export function TeamAdminHomePage() {
           </div>
 
           <GlobalDivisionFilters
-            levels={levels}
+            options={filterOptions}
             genderFilter={genderFilter}
             levelFilter={levelFilter}
+            competitionFilter={competitionFilter}
             onGenderChange={setGenderFilter}
             onLevelChange={setLevelFilter}
+            onCompetitionChange={setCompetitionFilter}
             ariaLabel="Filter by division"
           />
 

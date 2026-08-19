@@ -9,6 +9,7 @@ import {
 } from '@patternfly/react-core';
 import { useApp } from '@/app/AppContext';
 import { statusLabel } from '@/domain/matchTransitions';
+import { divisionFilterOptionsFromMatches } from '@/domain/divisionFilters';
 import {
   crewPeople,
   rolesNeededForMatch,
@@ -19,10 +20,6 @@ import {
 } from '@/domain/types';
 import { GlobalDivisionFilters } from '@/features/global/GlobalDivisionFilters';
 import { appointmentMySlot } from '@/features/referee/appointments/crewLines';
-import {
-  SchedulerCompetitionFilter,
-  useSchedulerCompetition,
-} from '@/features/scheduler/SchedulerCompetitionFilter';
 import type { BackNav } from '@/nav/backNav';
 import { IconDateInput } from '@/ui/IconDateInput';
 import { MatchCrewTrailing } from '@/ui/MatchCrewTrailing';
@@ -88,23 +85,30 @@ function inDateRange(kickoffAt: string, from: string, to: string): boolean {
 /** Assigner schedule browse — all org matches, not only released. */
 export function SchedulerSchedulePage() {
   const { currentUser, state } = useApp();
-  const competition = useSchedulerCompetition();
   const [genderFilter, setGenderFilter] = useState<MatchGender | null>(null);
   const [levelFilter, setLevelFilter] = useState<string | null>(null);
+  const [competitionFilter, setCompetitionFilter] = useState<string | null>(
+    null,
+  );
   const [statusFilter, setStatusFilter] = useState<
     MatchStatus | 'open_slots' | 'all'
   >('all');
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
 
-  const levels = state.org.matchLevels;
+  const filterOptions = useMemo(
+    () => divisionFilterOptionsFromMatches(state.matches),
+    [state.matches],
+  );
 
   const list = useMemo(() => {
-    return competition
-      .filterMatches(state.matches)
+    return state.matches
       .filter((m) => {
         if (genderFilter && m.gender !== genderFilter) return false;
         if (levelFilter && m.level !== levelFilter) return false;
+        if (competitionFilter && m.competition !== competitionFilter) {
+          return false;
+        }
         if (!inDateRange(m.kickoffAt, dateFrom, dateTo)) return false;
         if (statusFilter === 'open_slots') return hasOpenCrewSlot(m);
         if (statusFilter !== 'all' && m.status !== statusFilter) return false;
@@ -116,9 +120,9 @@ export function SchedulerSchedulePage() {
       );
   }, [
     state.matches,
-    competition.selected,
     genderFilter,
     levelFilter,
+    competitionFilter,
     statusFilter,
     dateFrom,
     dateTo,
@@ -141,15 +145,9 @@ export function SchedulerSchedulePage() {
         Schedule
       </Title>
       <p className="rs-match-card__meta">
-        Society matches for the selected competition. Tap a game to assign crew
-        or edit.
+        Society matches — filter by competition, level, or gender. Tap a game to
+        assign crew or edit.
       </p>
-      <SchedulerCompetitionFilter
-        options={competition.options}
-        selected={competition.selected}
-        setSelected={competition.setSelected}
-        showControl={competition.showControl}
-      />
       <Link to="/scheduler/upload">
         <Button variant="secondary" isBlock>
           Sync Sheet &amp; release drafts
@@ -191,11 +189,13 @@ export function SchedulerSchedulePage() {
       </div>
 
       <GlobalDivisionFilters
-        levels={levels}
+        options={filterOptions}
         genderFilter={genderFilter}
         levelFilter={levelFilter}
+        competitionFilter={competitionFilter}
         onGenderChange={setGenderFilter}
         onLevelChange={setLevelFilter}
+        onCompetitionChange={setCompetitionFilter}
         ariaLabel="Filter schedule by division"
       />
 

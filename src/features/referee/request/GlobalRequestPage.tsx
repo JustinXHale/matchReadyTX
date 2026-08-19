@@ -2,12 +2,19 @@ import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { EmptyState, EmptyStateBody, Title } from '@patternfly/react-core';
 import { useApp } from '@/app/AppContext';
+import {
+  divisionFilterOptionsFromMatches,
+  divisionFiltersActive,
+  matchMatchesDivisionFilters,
+} from '@/domain/divisionFilters';
+import { GlobalDivisionFilters } from '@/features/global/GlobalDivisionFilters';
 import { RequestSubNav } from '@/features/referee/request/RequestSubNav';
 import { MatchListRow } from '@/ui/MatchListRow';
 import { canOfficialRequestMatch, openRequestSlots } from '@/domain/requests';
 import {
   REQUESTABLE_SLOT_SHORT,
   type Match,
+  type MatchGender,
   type RequestableSlot,
 } from '@/domain/types';
 import { backState, type BackNav } from '@/nav/backNav';
@@ -16,8 +23,6 @@ const GLOBAL_REQUEST_BACK: BackNav = {
   to: '/referee/request/global',
   label: 'Global',
 };
-
-const DAY_MS = 24 * 60 * 60 * 1000;
 
 type RoleFilter = 'mo' | 'ar' | 'cmo' | 'no4';
 
@@ -82,6 +87,39 @@ function RaiseHandTrailing({ match }: { match: Match }) {
 export function GlobalRequestPage() {
   const { currentUser, state } = useApp();
   const [roleFilter, setRoleFilter] = useState<RoleFilter | null>(null);
+  const [genderFilter, setGenderFilter] = useState<MatchGender | null>(null);
+  const [levelFilter, setLevelFilter] = useState<string | null>(null);
+  const [competitionFilter, setCompetitionFilter] = useState<string | null>(
+    null,
+  );
+
+  const filterPool = useMemo(() => {
+    if (!currentUser) return [] as Match[];
+    const now = Date.now();
+    return state.matches.filter((m) =>
+      canOfficialRequestMatch(m, currentUser.uid, state.requests, now),
+    );
+  }, [currentUser, state.matches, state.requests]);
+
+  const filterOptions = useMemo(
+    () => divisionFilterOptionsFromMatches(filterPool),
+    [filterPool],
+  );
+
+  const divisionActive = divisionFiltersActive({
+    gender: genderFilter,
+    level: levelFilter,
+    competition: competitionFilter,
+  });
+
+  const matchesDivision = (m: Match) =>
+    !divisionActive ||
+    matchMatchesDivisionFilters(
+      m,
+      genderFilter,
+      levelFilter,
+      competitionFilter,
+    );
 
   const urgentMatches = useMemo(() => {
     if (!currentUser) return [] as Match[];
@@ -100,11 +138,21 @@ export function GlobalRequestPage() {
       if (!canOfficialRequestMatch(match, currentUser.uid, state.requests)) {
         continue;
       }
+      if (!matchesDivision(match)) continue;
       seen.add(a.matchId);
       list.push(match);
     }
     return list;
-  }, [currentUser, state.officialAlerts, state.matches, state.requests]);
+  }, [
+    currentUser,
+    state.officialAlerts,
+    state.matches,
+    state.requests,
+    divisionActive,
+    genderFilter,
+    levelFilter,
+    competitionFilter,
+  ]);
 
   const urgentIds = useMemo(
     () => new Set(urgentMatches.map((m) => m.id)),
@@ -119,13 +167,22 @@ export function GlobalRequestPage() {
         (m) =>
           !urgentIds.has(m.id) &&
           canOfficialRequestMatch(m, currentUser.uid, state.requests, now) &&
-          new Date(m.kickoffAt).getTime() - now < 30 * DAY_MS,
+          matchesDivision(m),
       )
       .sort(
         (a, b) =>
           new Date(a.kickoffAt).getTime() - new Date(b.kickoffAt).getTime(),
       );
-  }, [currentUser, state.matches, state.requests, urgentIds]);
+  }, [
+    currentUser,
+    state.matches,
+    state.requests,
+    urgentIds,
+    divisionActive,
+    genderFilter,
+    levelFilter,
+    competitionFilter,
+  ]);
 
   const filteredUrgent = useMemo(
     () =>
@@ -163,6 +220,17 @@ export function GlobalRequestPage() {
     <div className="rs-stack">
       <RequestSubNav />
 
+      <GlobalDivisionFilters
+        options={filterOptions}
+        genderFilter={genderFilter}
+        levelFilter={levelFilter}
+        competitionFilter={competitionFilter}
+        onGenderChange={setGenderFilter}
+        onLevelChange={setLevelFilter}
+        onCompetitionChange={setCompetitionFilter}
+        ariaLabel="Filter requestable games"
+      />
+
       {hasBase && (
         <div
           className="rs-filter-chips"
@@ -188,13 +256,13 @@ export function GlobalRequestPage() {
       {!hasBase ? (
         <EmptyState titleText="No open games" headingLevel="h3">
           <EmptyStateBody>
-            There are no requestable games in the next 30 days.
+            There are no requestable games with open positions right now.
           </EmptyStateBody>
         </EmptyState>
       ) : !hasAny ? (
         <EmptyState titleText="No matching games" headingLevel="h3">
           <EmptyStateBody>
-            No open games match this position filter. Tap the chip again to clear.
+            No open games match this filter. Tap a chip again to clear.
           </EmptyStateBody>
         </EmptyState>
       ) : (

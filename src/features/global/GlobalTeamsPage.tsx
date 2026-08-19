@@ -3,6 +3,7 @@ import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useApp } from '@/app/AppContext';
 import { releasedMatches } from '@/domain/visibility';
+import { divisionFilterOptionsFromMatches } from '@/domain/divisionFilters';
 import {
   genderLabel,
   type MatchGender,
@@ -15,6 +16,7 @@ type TeamListItem = {
   team: Team;
   genders: MatchGender[];
   levels: string[];
+  competitions: string[];
   matchCount: number;
 };
 
@@ -25,12 +27,23 @@ export function GlobalTeamsPage() {
   const { state } = useApp();
   const [genderFilter, setGenderFilter] = useState<MatchGender | null>(null);
   const [levelFilter, setLevelFilter] = useState<string | null>(null);
+  const [competitionFilter, setCompetitionFilter] = useState<string | null>(
+    null,
+  );
 
-  const levels = state.org.matchLevels;
+  const released = useMemo(
+    () => releasedMatches(state.matches),
+    [state.matches],
+  );
+
+  const filterOptions = useMemo(
+    () => divisionFilterOptionsFromMatches(released),
+    [released],
+  );
 
   const teams = useMemo(() => {
     const byId = new Map<string, TeamListItem>();
-    for (const m of releasedMatches(state.matches)) {
+    for (const m of released) {
       for (const side of [
         { id: m.homeTeamId, name: m.homeTeamName },
         { id: m.awayTeamId, name: m.awayTeamName },
@@ -46,6 +59,7 @@ export function GlobalTeamsPage() {
             },
             genders: [],
             levels: [],
+            competitions: [],
             matchCount: 0,
           };
           byId.set(side.id, entry);
@@ -53,6 +67,9 @@ export function GlobalTeamsPage() {
         entry.matchCount += 1;
         if (!entry.genders.includes(m.gender)) entry.genders.push(m.gender);
         if (!entry.levels.includes(m.level)) entry.levels.push(m.level);
+        if (m.competition && !entry.competitions.includes(m.competition)) {
+          entry.competitions.push(m.competition);
+        }
       }
     }
 
@@ -60,22 +77,33 @@ export function GlobalTeamsPage() {
       .filter((item) => {
         if (genderFilter && !item.genders.includes(genderFilter)) return false;
         if (levelFilter && !item.levels.includes(levelFilter)) return false;
+        if (competitionFilter && !item.competitions.includes(competitionFilter)) {
+          return false;
+        }
         return true;
       })
       .sort((a, b) => a.team.name.localeCompare(b.team.name));
-  }, [state.matches, state.teams, genderFilter, levelFilter]);
+  }, [
+    released,
+    state.teams,
+    genderFilter,
+    levelFilter,
+    competitionFilter,
+  ]);
 
-  const hasBase = state.teams.length > 0 || releasedMatches(state.matches).length > 0;
+  const hasBase = state.teams.length > 0 || released.length > 0;
 
   return (
     <>
       {hasBase && (
         <GlobalDivisionFilters
-          levels={levels}
+          options={filterOptions}
           genderFilter={genderFilter}
           levelFilter={levelFilter}
+          competitionFilter={competitionFilter}
           onGenderChange={setGenderFilter}
           onLevelChange={setLevelFilter}
+          onCompetitionChange={setCompetitionFilter}
           ariaLabel="Filter teams"
         />
       )}

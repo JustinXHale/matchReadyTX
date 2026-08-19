@@ -7,8 +7,13 @@ import {
 } from 'firebase-admin/firestore';
 import { logger } from 'firebase-functions';
 import {
+  buildCrewFieldsForLevel,
+  hasStockCrewInFirestore,
+  mergeMatchLevels,
+  type DefaultCrewByLevel,
+} from './crewDefaults';
+import {
   competitionForGender,
-  emptyCrew,
   lookupLocation,
   normalizeGender,
   parseContactRows,
@@ -90,6 +95,54 @@ function stripUndefined<T extends Record<string, unknown>>(obj: T): T {
   return out;
 }
 
+type TeamShape = {
+  id: string;
+  name: string;
+  competition?: string;
+  contactEmails: Set<string>;
+  contactPhones: Set<string>;
+};
+
+function normNameKey(name: string): string {
+  return name.trim().toLowerCase();
+}
+
+function resolvedCompetition(row: {
+  competition?: string;
+  gender?: string;
+}): string {
+  return row.competition?.trim() || competitionForGender(normalizeGender(row.gender));
+}
+
+function buildTeamIdResolver(rows: ReturnType<typeof parseScheduleRows>) {
+  const compsByName = new Map<string, Set<string>>();
+  for (const row of rows) {
+    const comp = resolvedCompetition(row);
+    for (const name of [row.home_team, row.away_team]) {
+      const key = normNameKey(name);
+      if (!key) continue;
+      const set = compsByName.get(key) ?? new Set<string>();
+      set.add(comp);
+      compsByName.set(key, set);
+    }
+  }
+
+  const splitNames = new Set<string>();
+  for (const [nameKey, comps] of compsByName) {
+    if (comps.size > 1) splitNames.add(nameKey);
+  }
+
+  return (teamName: string, row: { competition?: string; gender?: string }) => {
+    const key = normNameKey(teamName);
+    if (!key) return slugTeamId('unknown');
+    if (splitNames.has(key)) {
+      const comp = resolvedCompetition(row);
+      return slugTeamId(`${teamName} ${comp}`);
+    }
+    return slugTeamId(teamName);
+  };
+}
+
 /**
  * Pull Schedule (+ optional Contacts / Locations) into Firestore.
  * Preserves workflow fields (status, crew, confirmations) on existing matches;
@@ -116,13 +169,72 @@ export async function runSheetSync(opts: {
   const locations = parseLocationRows(
     await readTab(sheets, sheetId, 'Locations'),
   );
+  const resolveTeamId = buildTeamIdResolver(rows);
 
-  const teamNames = new Set<string>();
+  const orgSnap = await db.doc(`orgs/${orgId}`).get();
+  const orgData = orgSnap.data() ?? {};
+  const defaultCrewByLevel = (orgData.defaultCrewByLevel ??
+    undefined) as DefaultCrewByLevel | undefined;
+  const existingMatchLevels = Array.isArray(orgData.matchLevels)
+    ? (orgData.matchLevels as string[])
+    : [];
+  const sheetLevels = rows
+    .map((r) => (r.level ?? '').trim())
+    .filter(Boolean);
+  const mergedMatchLevels = mergeMatchLevels(existingMatchLevels, sheetLevels);
+
+  const teamsById = new Map<string, TeamShape>();
+  const getOrCreateTeam = (id: string, name: string, competition?: string) => {
+    const existing = teamsById.get(id);
+    if (existing) return existing;
+    const next: TeamShape = {
+      id,
+      name,
+      competition,
+      contactEmails: new Set<string>(),
+      contactPhones: new Set<string>(),
+    };
+    teamsById.set(id, next);
+    return next;
+  };
   for (const row of rows) {
-    if (row.home_team) teamNames.add(row.home_team);
-    if (row.away_team) teamNames.add(row.away_team);
+    const comp = resolvedCompetition(row);
+    for (const teamName of [row.home_team, row.away_team]) {
+      const id = resolveTeamId(teamName, row);
+      getOrCreateTeam(id, teamName, comp);
+    }
   }
-  for (const c of contacts) teamNames.add(c.team_name);
+  const teamIdsByName = new Map<string, string[]>();
+  for (const team of teamsById.values()) {
+    const key = normNameKey(team.name);
+    const ids = teamIdsByName.get(key) ?? [];
+    ids.push(team.id);
+    teamIdsByName.set(key, ids);
+  }
+  for (const c of contacts) {
+    const key = normNameKey(c.team_name);
+    const ids = teamIdsByName.get(key) ?? [];
+    if (ids.length === 1) {
+      const team = teamsById.get(ids[0]!);
+      if (team) {
+        team.contactEmails.add(c.email);
+        if (c.phone) team.contactPhones.add(c.phone);
+      }
+      continue;
+    }
+    if (ids.length === 0) {
+      const id = slugTeamId(c.team_name);
+      const team = getOrCreateTeam(id, c.team_name);
+      team.contactEmails.add(c.email);
+      if (c.phone) team.contactPhones.add(c.phone);
+      continue;
+    }
+    logger.warn('Skipped ambiguous contact team link', {
+      orgId,
+      teamName: c.team_name,
+      candidateIds: ids,
+    });
+  }
 
   let batch = db.batch();
   let batchOps = 0;
@@ -142,17 +254,13 @@ export async function runSheetSync(opts: {
   };
 
   // Teams
-  for (const name of teamNames) {
-    const id = slugTeamId(name);
-    const emails = contacts
-      .filter((c) => c.team_name === name)
-      .map((c) => c.email);
-    const phones = contacts
-      .filter((c) => c.team_name === name && c.phone)
-      .map((c) => c.phone!);
-    setDoc(db.doc(`orgs/${orgId}/teams/${id}`), {
-      id,
-      name,
+  for (const team of teamsById.values()) {
+    const emails = [...team.contactEmails];
+    const phones = [...team.contactPhones];
+    setDoc(db.doc(`orgs/${orgId}/teams/${team.id}`), {
+      id: team.id,
+      name: team.name,
+      competition: team.competition ?? null,
       contactEmails: emails,
       ...(phones.length ? { contactPhones: phones } : {}),
       updatedAt: FieldValue.serverTimestamp(),
@@ -182,8 +290,8 @@ export async function runSheetSync(opts: {
     const venueName = loc?.venue_name || row.location || 'TBD';
     const venueAddress = loc?.address || row.location || '';
     const kickoffAt = rowToKickoffIso(row);
-    const homeTeamId = slugTeamId(row.home_team);
-    const awayTeamId = slugTeamId(row.away_team);
+    const homeTeamId = resolveTeamId(row.home_team, row);
+    const awayTeamId = resolveTeamId(row.away_team, row);
     const competition =
       row.competition || competitionForGender(gender);
     const level = row.level || 'Tier 1';
@@ -201,6 +309,7 @@ export async function runSheetSync(opts: {
 
     if (!snap.exists) {
       const status = sheetCancelled ? 'cancelled' : 'draft';
+      const crewFields = buildCrewFieldsForLevel(level, defaultCrewByLevel);
       setDoc(
         ref,
         {
@@ -218,7 +327,7 @@ export async function runSheetSync(opts: {
           notes: row.notes || null,
           flightProvided: false,
           housingProvided: false,
-          crew: emptyCrew(),
+          ...crewFields,
           ...(sheetCancelled
             ? { cancelledAt: new Date().toISOString() }
             : {}),
@@ -243,6 +352,18 @@ export async function runSheetSync(opts: {
       };
       if (loc?.lat != null) patch.venueLat = loc.lat;
       if (loc?.lng != null) patch.venueLng = loc.lng;
+
+      if (
+        existing?.status === 'draft' &&
+        !sheetCancelled &&
+        (hasStockCrewInFirestore(existing) || String(existing.level ?? '') !== level)
+      ) {
+        const crewFields = buildCrewFieldsForLevel(level, defaultCrewByLevel);
+        patch.crew = crewFields.crew;
+        patch.rolesNeeded = crewFields.rolesNeeded;
+        if (crewFields.cmo) patch.cmo = crewFields.cmo;
+        else patch.cmo = FieldValue.delete();
+      }
 
       if (sheetCancelled && existing?.status !== 'cancelled') {
         patch.status = 'cancelled';
@@ -295,6 +416,7 @@ export async function runSheetSync(opts: {
     sheetId,
     sheetSyncedAt,
     sheetSyncError: FieldValue.delete(),
+    ...(mergedMatchLevels.length > 0 ? { matchLevels: mergedMatchLevels } : {}),
     updatedAt: FieldValue.serverTimestamp(),
   });
   await flushBatch();
@@ -306,7 +428,7 @@ export async function runSheetSync(opts: {
     upserted,
     cancelled,
     removed,
-    teams: teamNames.size,
+    teams: teamsById.size,
   });
 
   return {
@@ -317,7 +439,7 @@ export async function runSheetSync(opts: {
     upserted,
     cancelled,
     removed,
-    teams: teamNames.size,
+    teams: teamsById.size,
     sheetSyncedAt,
   };
 }

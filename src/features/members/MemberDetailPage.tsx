@@ -32,15 +32,25 @@ import {
   syncHomeAddressLine,
 } from '@/domain/profile';
 import { APPAREL_SIZES, type Role, type UserProfile } from '@/domain/types';
+import {
+  conferenceTeamOptions,
+  scheduleTeamEntries,
+  teamConferenceLabel,
+} from '@/domain/teams';
 import { isFirebaseConfigured } from '@/services/firebase';
 import {
   defaultOrgId,
   deleteOrgMemberAccount,
+  dismissAssessedLevelRequest,
   saveAssessedLevel,
   saveAssignerMemberProfile,
 } from '@/services/orgMembers';
 import { readBackNav, type BackNav } from '@/nav/backNav';
 import { MatchListRow } from '@/ui/MatchListRow';
+import {
+  ConferenceTeamPicker,
+} from '@/ui/ConferenceTeamPicker';
+import { RefereeLevelChart } from '@/ui/RefereeLevelChart';
 import { UserAvatar } from '@/ui/UserAvatar';
 
 const FALLBACK_BACK: BackNav = { to: '/members', label: 'Members' };
@@ -82,6 +92,7 @@ type EditDraft = {
   roleFan: boolean;
   refereeLevel: string;
   levelUnknown: boolean;
+  teamIds: string[];
   refereeingSince: string;
   jerseySize: string;
   shortsSize: string;
@@ -108,6 +119,7 @@ function draftFromUser(user: UserProfile): EditDraft {
     levelUnknown:
       (user.roles.includes('official') || user.roles.includes('cmo')) &&
       user.refereeLevel == null,
+    teamIds: [...user.teamIds],
     refereeingSince: (() => {
       const raw = user.refereeingSince?.trim() ?? '';
       const y = raw.slice(0, 4);
@@ -139,6 +151,11 @@ export function MemberDetailPage() {
   const user = useMemo(
     () => state.users.find((u) => u.uid === userId) ?? null,
     [state.users, userId],
+  );
+
+  const assignableTeams = useMemo(
+    () => scheduleTeamEntries(state.matches, state.teams),
+    [state.matches, state.teams],
   );
 
   const teams = useMemo(
@@ -234,6 +251,40 @@ export function MemberDetailPage() {
     !editDraft!.roleCmo &&
     !editDraft!.roleAssigner;
 
+  const onApproveRequestedLevel = () => {
+    const requested = user.requestedAssessedLevel;
+    if (requested == null) return;
+    setAssessedDraft(String(requested));
+    setAssessedError(null);
+    store.updateProfile(user.uid, {
+      assessedLevel: requested,
+      requestedAssessedLevel: undefined,
+    });
+    if (isFirebaseConfigured && !user.uid.startsWith('u_')) {
+      void saveAssessedLevel(user.uid, requested)
+        .then(() => setAssessedSaved(true))
+        .catch((err) => {
+          setAssessedError(
+            err instanceof Error ? err.message : 'Could not approve level.',
+          );
+        });
+    } else {
+      setAssessedSaved(true);
+    }
+  };
+
+  const onDismissLevelRequest = () => {
+    setAssessedError(null);
+    store.updateProfile(user.uid, { requestedAssessedLevel: undefined });
+    if (isFirebaseConfigured && !user.uid.startsWith('u_')) {
+      void dismissAssessedLevelRequest(user.uid).catch((err) => {
+        setAssessedError(
+          err instanceof Error ? err.message : 'Could not dismiss request.',
+        );
+      });
+    }
+  };
+
   const onSaveAssessedLevel = () => {
     const trimmed = assessedDraft.trim();
     let next: number | undefined;
@@ -248,7 +299,10 @@ export function MemberDetailPage() {
       next = n;
     }
     setAssessedError(null);
-    store.updateProfile(user.uid, { assessedLevel: next });
+    store.updateProfile(user.uid, {
+      assessedLevel: next,
+      requestedAssessedLevel: undefined,
+    });
     if (isFirebaseConfigured && !user.uid.startsWith('u_')) {
       void saveAssessedLevel(user.uid, next)
         .then(() => setAssessedSaved(true))
@@ -354,6 +408,7 @@ export function MemberDetailPage() {
         ? undefined
         : editDraft.birthday.trim() || undefined,
       roles,
+      teamIds: editDraft.roleTeamAdmin ? [...editDraft.teamIds] : [],
       homeStreet: needsRef ? editDraft.homeStreet.trim() : '',
       homeUnit: needsRef
         ? editDraft.homeUnit.trim() || undefined
@@ -435,6 +490,12 @@ export function MemberDetailPage() {
     setEditError(null);
   };
 
+  const teamPickerOptions = useMemo(
+    () =>
+      conferenceTeamOptions(state.matches, state.teams),
+    [state.matches, state.teams],
+  );
+
   return (
     <div className="rs-stack">
       <button type="button" className="rs-detail__back" onClick={goBack}>
@@ -457,11 +518,13 @@ export function MemberDetailPage() {
               {canManage && !user.profileComplete && (
                 <span className="rs-pill">Incomplete</span>
               )}
-              {user.refereeLevel != null && (
-                <span className="rs-pill">Level {user.refereeLevel}</span>
-              )}
               {user.assessedLevel != null && (
                 <span className="rs-pill">Assessed {user.assessedLevel}</span>
+              )}
+              {user.assessedLevel == null && user.refereeLevel != null && (
+                <span className="rs-pill">
+                  Self-assessed lvl {user.refereeLevel}
+                </span>
               )}
             </div>
             {joinedLabel ? (
@@ -506,10 +569,10 @@ export function MemberDetailPage() {
                 {user.assessedLevel != null
                   ? user.assessedLevel
                   : 'Not assessed'}
-                {user.refereeLevel != null && (
+                {user.assessedLevel == null && user.refereeLevel != null && (
                   <span className="rs-member-dl__hint">
                     {' '}
-                    · self-reported {user.refereeLevel}
+                    · self-assessed lvl {user.refereeLevel}
                   </span>
                 )}
               </dd>
@@ -524,8 +587,27 @@ export function MemberDetailPage() {
             Set Assessed Level
           </h2>
           <p className="rs-detail-note">
-            Society / CMO grade shown read-only on the official’s profile.
+            Society / CMO grade — only schedulers set this. Officials may
+            request a level from their profile.
           </p>
+          <RefereeLevelChart
+            className="pf-v6-u-mb-md"
+            caption="Tap chart to compare competencies by level."
+          />
+          {user.requestedAssessedLevel != null && (
+            <div className="rs-actions pf-v6-u-mb-md">
+              <p className="rs-match-card__meta" role="status">
+                Requested assessed level:{' '}
+                <strong>{user.requestedAssessedLevel}</strong>
+              </p>
+              <Button variant="primary" onClick={onApproveRequestedLevel}>
+                Approve level {user.requestedAssessedLevel}
+              </Button>
+              <Button variant="link" onClick={onDismissLevelRequest}>
+                Dismiss request
+              </Button>
+            </div>
+          )}
           <FormGroup label="Assessed Level" fieldId="member-assessed-input">
             <TextInput
               id="member-assessed-input"
@@ -627,7 +709,12 @@ export function MemberDetailPage() {
                     id="member-role-team"
                     label="Team Admin"
                     isChecked={editDraft.roleTeamAdmin}
-                    onChange={(_, v) => patchDraft({ roleTeamAdmin: v })}
+                    onChange={(_, v) =>
+                      patchDraft({
+                        roleTeamAdmin: v,
+                        teamIds: v ? editDraft.teamIds : [],
+                      })
+                    }
                   />
                   <Checkbox
                     id="member-role-cmo"
@@ -649,6 +736,53 @@ export function MemberDetailPage() {
                   />
                 </div>
               </FormGroup>
+              {editDraft.roleTeamAdmin && (
+                <FormGroup label="Clubs they manage" isRequired>
+                  {assignableTeams.length === 0 ? (
+                    <p className="rs-match-card__meta">
+                      Sync the schedule first to list clubs.
+                    </p>
+                  ) : (
+                    <div className="rs-stack">
+                      <ConferenceTeamPicker
+                        options={teamPickerOptions}
+                        selectedIds={editDraft.teamIds}
+                        onChange={(teamIds) => patchDraft({ teamIds })}
+                        ariaLabel="Assign clubs by conference"
+                      />
+
+                      {editDraft.teamIds.length > 0 && (
+                        <div className="rs-filter-chips" role="group" aria-label="Assigned clubs">
+                          {editDraft.teamIds.map((id) => {
+                            const entry = assignableTeams.find((t) => t.team.id === id);
+                            const label = entry
+                              ? `${entry.team.name} (${teamConferenceLabel(entry.competitions)})`
+                              : id;
+                            return (
+                              <button
+                                key={id}
+                                type="button"
+                                className="rs-filter-chip rs-filter-chip--selected"
+                                onClick={() =>
+                                  patchDraft({
+                                    teamIds: editDraft.teamIds.filter((tid) => tid !== id),
+                                  })
+                                }
+                                title="Remove club"
+                              >
+                                {label} ×
+                              </button>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                  <p className="rs-match-card__meta pf-v6-u-mt-sm">
+                    Direct assignment — no link request needed.
+                  </p>
+                </FormGroup>
+              )}
               <FormGroup label="Birthday" isRequired={!editFanOnly}>
                 <TextInput
                   type="date"

@@ -224,10 +224,30 @@ export async function saveAssessedLevel(
     doc(database, 'users', uid),
     {
       assessedLevel: assessedLevel ?? null,
+      requestedAssessedLevel: null,
       updatedAt: new Date().toISOString(),
     },
     { merge: true },
   );
+}
+
+export async function saveAssessedLevelRequest(
+  uid: string,
+  requestedLevel: number | null,
+): Promise<void> {
+  const database = requireDb();
+  await setDoc(
+    doc(database, 'users', uid),
+    {
+      requestedAssessedLevel: requestedLevel,
+      updatedAt: new Date().toISOString(),
+    },
+    { merge: true },
+  );
+}
+
+export async function dismissAssessedLevelRequest(uid: string): Promise<void> {
+  return saveAssessedLevelRequest(uid, null);
 }
 
 /**
@@ -237,7 +257,7 @@ export async function saveAssignerMemberProfile(
   orgId: string,
   profile: UserProfile,
 ): Promise<UserProfile> {
-  const saved = await saveFirebaseProfile(profile);
+  const saved = await saveFirebaseProfile(profile, { includeAssessedLevel: true });
   const database = requireDb();
   await setDoc(
     doc(database, 'orgs', orgId, 'members', profile.uid),

@@ -3,6 +3,7 @@ import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useApp } from '@/app/AppContext';
 import { standingsByDivision } from '@/domain/standings';
+import { divisionFilterOptionsFromMatches } from '@/domain/divisionFilters';
 import type { MatchGender } from '@/domain/types';
 import { GlobalDivisionFilters } from '@/features/global/GlobalDivisionFilters';
 import { backState } from '@/nav/backNav';
@@ -12,8 +13,14 @@ export function GlobalStandingsPage() {
   const navigate = useNavigate();
   const [genderFilter, setGenderFilter] = useState<MatchGender | null>(null);
   const [levelFilter, setLevelFilter] = useState<string | null>(null);
+  const [competitionFilter, setCompetitionFilter] = useState<string | null>(
+    null,
+  );
 
-  const levels = state.org.matchLevels;
+  const filterOptions = useMemo(
+    () => divisionFilterOptionsFromMatches(state.matches),
+    [state.matches],
+  );
 
   const allGroups = useMemo(
     () => standingsByDivision(state.matches),
@@ -24,9 +31,20 @@ export function GlobalStandingsPage() {
     return allGroups.filter((g) => {
       if (genderFilter && g.gender !== genderFilter) return false;
       if (levelFilter && g.level !== levelFilter) return false;
+      if (competitionFilter) {
+        const inComp = state.matches.some(
+          (m) =>
+            m.level === g.level &&
+            m.gender === g.gender &&
+            m.competition === competitionFilter &&
+            typeof m.homeScore === 'number' &&
+            typeof m.awayScore === 'number',
+        );
+        if (!inComp) return false;
+      }
       return true;
     });
-  }, [allGroups, genderFilter, levelFilter]);
+  }, [allGroups, genderFilter, levelFilter, competitionFilter, state.matches]);
 
   const hasBase = allGroups.length > 0;
 
@@ -34,11 +52,13 @@ export function GlobalStandingsPage() {
     <>
       {hasBase && (
         <GlobalDivisionFilters
-          levels={levels}
+          options={filterOptions}
           genderFilter={genderFilter}
           levelFilter={levelFilter}
+          competitionFilter={competitionFilter}
           onGenderChange={setGenderFilter}
           onLevelChange={setLevelFilter}
+          onCompetitionChange={setCompetitionFilter}
           ariaLabel="Filter standings"
         />
       )}

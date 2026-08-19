@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { EmptyState, EmptyStateBody, Title } from '@patternfly/react-core';
+import { EmptyState, EmptyStateBody } from '@patternfly/react-core';
 import { useApp } from '@/app/AppContext';
 import {
   formatMemberScheduleHint,
@@ -60,16 +60,25 @@ function MemberRow({
           {showIncomplete && !user.profileComplete && (
             <span className="rs-pill rs-list-row__chip">Incomplete</span>
           )}
-          {user.refereeLevel != null && tab !== 'teamAdmins' && (
-            <span className="rs-pill rs-list-row__chip">
-              Level {user.refereeLevel}
-            </span>
-          )}
           {user.assessedLevel != null && tab !== 'teamAdmins' && (
             <span className="rs-pill rs-list-row__chip">
               Assessed {user.assessedLevel}
             </span>
           )}
+          {user.assessedLevel == null &&
+            user.refereeLevel != null &&
+            tab !== 'teamAdmins' && (
+              <span className="rs-pill rs-list-row__chip">
+                Self-assessed lvl {user.refereeLevel}
+              </span>
+            )}
+          {user.requestedAssessedLevel != null &&
+            tab !== 'teamAdmins' &&
+            user.assessedLevel !== user.requestedAssessedLevel && (
+              <span className="rs-pill rs-list-row__chip">
+                Requested {user.requestedAssessedLevel}
+              </span>
+            )}
         </div>
         {teamMeta != null && teamMeta !== '' && (
           <p className="rs-member-row__meta">{teamMeta}</p>
@@ -89,10 +98,14 @@ function MemberRow({
 export function MembersPage() {
   const { state, hasAssignerRole, isAssignerView } = useApp();
   const showIncomplete = hasAssignerRole && isAssignerView;
+  const canFilterCompleteness = showIncomplete;
   const [tab, setTab] = useState<MemberTab>('referees');
   const [teamAdminSort, setTeamAdminSort] =
     useState<TeamAdminSort>('contact');
   const [genderFilter, setGenderFilter] = useState<MatchGender | null>(null);
+  const [completeness, setCompleteness] = useState<
+    'all' | 'complete' | 'incomplete'
+  >('all');
 
   const teamGenders = useMemo(
     () => teamGendersFromMatches(state.matches),
@@ -103,6 +116,11 @@ export function MembersPage() {
     let list = membersForTab(state.users, tab, {
       includeIncomplete: showIncomplete,
     });
+    if (canFilterCompleteness && completeness === 'complete') {
+      list = list.filter((u) => u.profileComplete);
+    } else if (canFilterCompleteness && completeness === 'incomplete') {
+      list = list.filter((u) => !u.profileComplete);
+    }
     if (tab === 'teamAdmins' && genderFilter) {
       list = list.filter((u) =>
         teamAdminMatchesGender(u, genderFilter, teamGenders),
@@ -121,6 +139,8 @@ export function MembersPage() {
     teamGenders,
     teamAdminSort,
     showIncomplete,
+    canFilterCompleteness,
+    completeness,
   ]);
 
   const teamGroups = useMemo(() => {
@@ -140,12 +160,9 @@ export function MembersPage() {
 
   return (
     <div className="rs-stack">
-      <Title headingLevel="h1" size="lg">
-        Members
-      </Title>
       <p className="rs-match-card__meta">
-        Society directory — open someone to set assessed level or remove them
-        from the org.
+        Society directory — open someone to review level requests, set assessed
+        level, assign clubs, or remove them from the org.
       </p>
 
       <div
@@ -168,6 +185,29 @@ export function MembersPage() {
           </button>
         ))}
       </div>
+      {canFilterCompleteness && (
+        <div className="rs-filter-chips" role="group" aria-label="Profile status">
+          {(
+            [
+              { id: 'all' as const, label: 'All profiles' },
+              { id: 'complete' as const, label: 'Complete' },
+              { id: 'incomplete' as const, label: 'Incomplete' },
+            ] as const
+          ).map((opt) => (
+            <button
+              key={opt.id}
+              type="button"
+              className={`rs-filter-chip${
+                completeness === opt.id ? ' rs-filter-chip--selected' : ''
+              }`}
+              aria-pressed={completeness === opt.id}
+              onClick={() => setCompleteness(opt.id)}
+            >
+              {opt.label}
+            </button>
+          ))}
+        </div>
+      )}
 
       {tab === 'teamAdmins' && (
         <div className="rs-members-admin-controls">

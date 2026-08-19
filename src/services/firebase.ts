@@ -75,8 +75,17 @@ if (isFirebaseConfigured) {
   const recaptchaSiteKey = (
     import.meta.env.VITE_RECAPTCHA_ENTERPRISE_SITE_KEY as string | undefined
   )?.trim();
-  if (recaptchaSiteKey) {
-    if (import.meta.env.DEV && import.meta.env.VITE_APP_CHECK_DEBUG === 'true') {
+  const isLocalHost =
+    typeof window !== 'undefined' &&
+    (window.location.hostname === 'localhost' ||
+      window.location.hostname === '127.0.0.1');
+  const appCheckDebug =
+    import.meta.env.DEV && import.meta.env.VITE_APP_CHECK_DEBUG === 'true';
+  // Skip App Check on localhost unless debug mode — reCAPTCHA Enterprise 400s without a registered debug token.
+  const shouldInitAppCheck =
+    recaptchaSiteKey && (!isLocalHost || appCheckDebug);
+  if (shouldInitAppCheck) {
+    if (appCheckDebug) {
       // Register debug token in Firebase Console → App Check when enforcing locally.
       (globalThis as { FIREBASE_APPCHECK_DEBUG_TOKEN?: boolean }).FIREBASE_APPCHECK_DEBUG_TOKEN =
         true;

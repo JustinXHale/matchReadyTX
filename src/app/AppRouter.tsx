@@ -1,4 +1,4 @@
-import { useEffect, type ReactNode } from 'react';
+import { lazy, Suspense, useEffect, type ReactNode } from 'react';
 import {
   BrowserRouter,
   Navigate,
@@ -19,47 +19,213 @@ import {
   stripDemoPrefix,
   withDemoPrefix,
 } from '@/app/demoPaths';
-import { LoginPage } from '@/features/auth/LoginPage';
-import { OnboardingPage } from '@/features/auth/OnboardingPage';
-import { AboutPage } from '@/features/about/AboutPage';
-import { GlobalLayout } from '@/features/global/GlobalLayout';
-import { GlobalSchedulePage } from '@/features/global/GlobalSchedulePage';
-import { GlobalStandingsPage } from '@/features/global/GlobalStandingsPage';
-import { GlobalTeamsPage } from '@/features/global/GlobalTeamsPage';
-import { GlobalTeamDetailPage } from '@/features/global/GlobalTeamDetailPage';
-import { ProfilePage } from '@/features/profile/ProfilePage';
-import { AvailabilityPage } from '@/features/availability/AvailabilityPage';
-import { RefereeLayout } from '@/features/referee/RefereeLayout';
-import { AppointmentsPage } from '@/features/referee/appointments/AppointmentsPage';
-import { PendingRequestsPage } from '@/features/referee/request/PendingRequestsPage';
-import { GlobalRequestPage } from '@/features/referee/request/GlobalRequestPage';
-import { MatchReportsPage } from '@/features/referee/reports/MatchReportsPage';
-import { CardReportsPage } from '@/features/referee/reports/CardReportsPage';
-import { CoachingReportsPage } from '@/features/referee/reports/CoachingReportsPage';
-import { MatchReportFlowPage } from '@/features/referee/reports/MatchReportFlowPage';
-import {
-  CmoReportViewPage,
-  MatchReportViewPage,
-} from '@/features/referee/reports/MatchReportViewPage';
-import { CmoReportPage } from '@/features/referee/reports/CmoReportPage';
-import { CardReportPage } from '@/features/referee/reports/CardReportPage';
-import { TeamAdminHomePage } from '@/features/teamAdmin/TeamAdminHomePage';
-import { TeamAdminLayout } from '@/features/teamAdmin/TeamAdminLayout';
-import { TeamAdminReportPage } from '@/features/teamAdmin/TeamAdminReportPage';
-import { CoachFeedbackFormPage } from '@/features/teamAdmin/CoachFeedbackFormPage';
-import { RequestFixturePage } from '@/features/teamAdmin/RequestFixturePage';
-import {
-  SchedulerIndexRedirect,
-  SchedulerLayout,
-} from '@/features/scheduler/SchedulerLayout';
-import { SchedulerQueuesPage } from '@/features/scheduler/queues/SchedulerQueuesPage';
-import { SchedulerSchedulePage } from '@/features/scheduler/schedule/SchedulerSchedulePage';
-import { SchedulerUploadPage } from '@/features/scheduler/upload/SchedulerUploadPage';
-import { SchedulerFeedbackPage } from '@/features/scheduler/feedback/SchedulerFeedbackPage';
-import { SchedulerFeedbackDetailPage } from '@/features/scheduler/feedback/SchedulerFeedbackDetailPage';
-import { MatchDetailPage } from '@/features/matches/MatchDetailPage';
-import { MembersPage } from '@/features/members/MembersPage';
-import { MemberDetailPage } from '@/features/members/MemberDetailPage';
+
+const LoginPage = lazy(() =>
+  import('@/features/auth/LoginPage').then((m) => ({ default: m.LoginPage })),
+);
+const OnboardingPage = lazy(() =>
+  import('@/features/auth/OnboardingPage').then((m) => ({
+    default: m.OnboardingPage,
+  })),
+);
+const AboutPage = lazy(() =>
+  import('@/features/about/AboutPage').then((m) => ({ default: m.AboutPage })),
+);
+const GlobalLayout = lazy(() =>
+  import('@/features/global/GlobalLayout').then((m) => ({
+    default: m.GlobalLayout,
+  })),
+);
+const GlobalSchedulePage = lazy(() =>
+  import('@/features/global/GlobalSchedulePage').then((m) => ({
+    default: m.GlobalSchedulePage,
+  })),
+);
+const GlobalStandingsPage = lazy(() =>
+  import('@/features/global/GlobalStandingsPage').then((m) => ({
+    default: m.GlobalStandingsPage,
+  })),
+);
+const GlobalTeamsPage = lazy(() =>
+  import('@/features/global/GlobalTeamsPage').then((m) => ({
+    default: m.GlobalTeamsPage,
+  })),
+);
+const GlobalTeamDetailPage = lazy(() =>
+  import('@/features/global/GlobalTeamDetailPage').then((m) => ({
+    default: m.GlobalTeamDetailPage,
+  })),
+);
+const ProfilePage = lazy(() =>
+  import('@/features/profile/ProfilePage').then((m) => ({
+    default: m.ProfilePage,
+  })),
+);
+const AvailabilityPage = lazy(() =>
+  import('@/features/availability/AvailabilityPage').then((m) => ({
+    default: m.AvailabilityPage,
+  })),
+);
+const RefereeLayout = lazy(() =>
+  import('@/features/referee/RefereeLayout').then((m) => ({
+    default: m.RefereeLayout,
+  })),
+);
+const AppointmentsPage = lazy(() =>
+  import('@/features/referee/appointments/AppointmentsPage').then((m) => ({
+    default: m.AppointmentsPage,
+  })),
+);
+const PendingRequestsPage = lazy(() =>
+  import('@/features/referee/request/PendingRequestsPage').then((m) => ({
+    default: m.PendingRequestsPage,
+  })),
+);
+const GlobalRequestPage = lazy(() =>
+  import('@/features/referee/request/GlobalRequestPage').then((m) => ({
+    default: m.GlobalRequestPage,
+  })),
+);
+const MatchReportsPage = lazy(() =>
+  import('@/features/referee/reports/MatchReportsPage').then((m) => ({
+    default: m.MatchReportsPage,
+  })),
+);
+const CardReportsPage = lazy(() =>
+  import('@/features/referee/reports/CardReportsPage').then((m) => ({
+    default: m.CardReportsPage,
+  })),
+);
+const CoachingReportsPage = lazy(() =>
+  import('@/features/referee/reports/CoachingReportsPage').then((m) => ({
+    default: m.CoachingReportsPage,
+  })),
+);
+const MatchReportFlowPage = lazy(() =>
+  import('@/features/referee/reports/MatchReportFlowPage').then((m) => ({
+    default: m.MatchReportFlowPage,
+  })),
+);
+const MatchReportViewPage = lazy(() =>
+  import('@/features/referee/reports/MatchReportViewPage').then((m) => ({
+    default: m.MatchReportViewPage,
+  })),
+);
+const CmoReportViewPage = lazy(() =>
+  import('@/features/referee/reports/MatchReportViewPage').then((m) => ({
+    default: m.CmoReportViewPage,
+  })),
+);
+const CmoReportPage = lazy(() =>
+  import('@/features/referee/reports/CmoReportPage').then((m) => ({
+    default: m.CmoReportPage,
+  })),
+);
+const CardReportPage = lazy(() =>
+  import('@/features/referee/reports/CardReportPage').then((m) => ({
+    default: m.CardReportPage,
+  })),
+);
+const TeamAdminHomePage = lazy(() =>
+  import('@/features/teamAdmin/TeamAdminHomePage').then((m) => ({
+    default: m.TeamAdminHomePage,
+  })),
+);
+const TeamAdminLayout = lazy(() =>
+  import('@/features/teamAdmin/TeamAdminLayout').then((m) => ({
+    default: m.TeamAdminLayout,
+  })),
+);
+const TeamAdminReportPage = lazy(() =>
+  import('@/features/teamAdmin/TeamAdminReportPage').then((m) => ({
+    default: m.TeamAdminReportPage,
+  })),
+);
+const CoachFeedbackFormPage = lazy(() =>
+  import('@/features/teamAdmin/CoachFeedbackFormPage').then((m) => ({
+    default: m.CoachFeedbackFormPage,
+  })),
+);
+const RequestFixturePage = lazy(() =>
+  import('@/features/teamAdmin/RequestFixturePage').then((m) => ({
+    default: m.RequestFixturePage,
+  })),
+);
+const SchedulerLayout = lazy(() =>
+  import('@/features/scheduler/SchedulerLayout').then((m) => ({
+    default: m.SchedulerLayout,
+  })),
+);
+const SchedulerIndexRedirect = lazy(() =>
+  import('@/features/scheduler/SchedulerLayout').then((m) => ({
+    default: m.SchedulerIndexRedirect,
+  })),
+);
+const SchedulerCrewDefaultsPage = lazy(() =>
+  import('@/features/scheduler/queues/SchedulerCrewDefaultsPage').then((m) => ({
+    default: m.SchedulerCrewDefaultsPage,
+  })),
+);
+const SchedulerQueuesLayout = lazy(() =>
+  import('@/features/scheduler/queues/SchedulerQueuesLayout').then((m) => ({
+    default: m.SchedulerQueuesLayout,
+  })),
+);
+const SchedulerQueuesWorkPage = lazy(() =>
+  import('@/features/scheduler/queues/SchedulerQueuesWorkPage').then((m) => ({
+    default: m.SchedulerQueuesWorkPage,
+  })),
+);
+const SchedulerSchedulePage = lazy(() =>
+  import('@/features/scheduler/schedule/SchedulerSchedulePage').then((m) => ({
+    default: m.SchedulerSchedulePage,
+  })),
+);
+const SchedulerUploadPage = lazy(() =>
+  import('@/features/scheduler/upload/SchedulerUploadPage').then((m) => ({
+    default: m.SchedulerUploadPage,
+  })),
+);
+const SchedulerFeedbackPage = lazy(() =>
+  import('@/features/scheduler/feedback/SchedulerFeedbackPage').then((m) => ({
+    default: m.SchedulerFeedbackPage,
+  })),
+);
+const SchedulerFeedbackDetailPage = lazy(() =>
+  import('@/features/scheduler/feedback/SchedulerFeedbackDetailPage').then(
+    (m) => ({ default: m.SchedulerFeedbackDetailPage }),
+  ),
+);
+const MatchDetailPage = lazy(() =>
+  import('@/features/matches/MatchDetailPage').then((m) => ({
+    default: m.MatchDetailPage,
+  })),
+);
+const MembersPage = lazy(() =>
+  import('@/features/members/MembersPage').then((m) => ({
+    default: m.MembersPage,
+  })),
+);
+const MembersLayout = lazy(() =>
+  import('@/features/members/MembersLayout').then((m) => ({
+    default: m.MembersLayout,
+  })),
+);
+const MemberDetailPage = lazy(() =>
+  import('@/features/members/MemberDetailPage').then((m) => ({
+    default: m.MemberDetailPage,
+  })),
+);
+const SchedulerTeamsPage = lazy(() =>
+  import('@/features/members/SchedulerTeamsPage').then((m) => ({
+    default: m.SchedulerTeamsPage,
+  })),
+);
+const SchedulerTeamDetailPage = lazy(() =>
+  import('@/features/members/SchedulerTeamDetailPage').then((m) => ({
+    default: m.SchedulerTeamDetailPage,
+  })),
+);
 
 /** Demo-aware absolute redirect (prefixes `/demo` while in the showcase). */
 function AppNavigate({
@@ -252,8 +418,10 @@ function FeatureRoutes() {
           <Route path=":teamId" element={<GlobalTeamDetailPage />} />
         </Route>
       </Route>
-      <Route path="members">
+      <Route path="members" element={<MembersLayout />}>
         <Route index element={<MembersPage />} />
+        <Route path="teams" element={<SchedulerTeamsPage />} />
+        <Route path="teams/:teamId" element={<SchedulerTeamDetailPage />} />
         <Route path=":userId" element={<MemberDetailPage />} />
       </Route>
       <Route
@@ -270,7 +438,10 @@ function FeatureRoutes() {
       <Route path="coach" element={<AppNavigate to="/team-admin" replace />} />
       <Route path="scheduler" element={<SchedulerLayout />}>
         <Route index element={<SchedulerIndexRedirect />} />
-        <Route path="queues" element={<SchedulerQueuesPage />} />
+        <Route path="queues" element={<SchedulerQueuesLayout />}>
+          <Route index element={<SchedulerQueuesWorkPage />} />
+          <Route path="crew" element={<SchedulerCrewDefaultsPage />} />
+        </Route>
         <Route path="schedule" element={<SchedulerSchedulePage />} />
         <Route path="feedback" element={<SchedulerFeedbackPage />} />
         <Route
@@ -302,32 +473,34 @@ export function AppRouter() {
   return (
     <AppProvider>
       <BrowserRouter>
-        <Routes>
-          <Route
-            element={
-              <DemoPrefixSync>
-                <MobileShell />
-              </DemoPrefixSync>
-            }
-          >
-            <Route path="/login" element={<LoginPage />} />
-            <Route element={<RequireProfileIncomplete />}>
-              <Route path="/onboarding" element={<OnboardingPage />} />
+        <Suspense fallback={<div className="rs-stack">Loading...</div>}>
+          <Routes>
+            <Route
+              element={
+                <DemoPrefixSync>
+                  <MobileShell />
+                </DemoPrefixSync>
+              }
+            >
+              <Route path="/login" element={<LoginPage />} />
+              <Route element={<RequireProfileIncomplete />}>
+                <Route path="/onboarding" element={<OnboardingPage />} />
+              </Route>
+
+              <Route path="/demo" element={<DemoShowcaseLayout />}>
+                <Route index element={<DemoHomeRedirect />} />
+                <Route path="onboarding" element={<DemoOnboardingPage />} />
+                {FeatureRoutes()}
+                <Route path="*" element={<DemoHomeRedirect />} />
+              </Route>
+
+              <Route element={<RequireAuth />}>{FeatureRoutes()}</Route>
+
+              <Route path="/" element={<RootRedirect />} />
+              <Route path="*" element={<RootRedirect />} />
             </Route>
-
-            <Route path="/demo" element={<DemoShowcaseLayout />}>
-              <Route index element={<DemoHomeRedirect />} />
-              <Route path="onboarding" element={<DemoOnboardingPage />} />
-              {FeatureRoutes()}
-              <Route path="*" element={<DemoHomeRedirect />} />
-            </Route>
-
-            <Route element={<RequireAuth />}>{FeatureRoutes()}</Route>
-
-            <Route path="/" element={<RootRedirect />} />
-            <Route path="*" element={<RootRedirect />} />
-          </Route>
-        </Routes>
+          </Routes>
+        </Suspense>
       </BrowserRouter>
     </AppProvider>
   );

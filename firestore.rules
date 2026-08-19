@@ -39,7 +39,7 @@ service cloud.firestore {
           'homeStreet', 'homeUnit', 'homeCity', 'homeRegion', 'homePostalCode',
           'homeAddress', 'homeLat', 'homeLng',
           'roles', 'teamIds', 'fanTeamIds', 'fanTeamOther',
-          'refereeLevel', 'assessedLevel',
+          'refereeLevel', 'assessedLevel', 'requestedAssessedLevel',
           'refereeingSince', 'birthday', 'jerseySize', 'shortsSize',
           'photoUrl', 'competitionAccess', 'profileComplete', 'updatedAt'
         ]);
@@ -54,7 +54,7 @@ service cloud.firestore {
           'homeStreet', 'homeUnit', 'homeCity', 'homeRegion', 'homePostalCode',
           'homeAddress', 'homeLat', 'homeLng',
           'roles', 'teamIds', 'fanTeamIds', 'fanTeamOther',
-          'refereeLevel', 'assessedLevel',
+          'refereeLevel', 'requestedAssessedLevel',
           'refereeingSince', 'birthday', 'jerseySize', 'shortsSize',
           'photoUrl', 'competitionAccess', 'profileComplete', 'updatedAt'
         ])
@@ -123,6 +123,17 @@ service cloud.firestore {
         );
     }
 
+    function selfAssessedRequestOk() {
+      return !request.resource.data.diff(resource.data).affectedKeys()
+          .hasAny(['requestedAssessedLevel'])
+        || request.resource.data.requestedAssessedLevel == null
+        || (
+          request.resource.data.requestedAssessedLevel is int
+          && request.resource.data.requestedAssessedLevel >= 1
+          && request.resource.data.requestedAssessedLevel <= 20
+        );
+    }
+
     match /users/{uid} {
       // Org directory: any member may read fellow members' profiles (names, roles).
       // Address/phone stay UI-gated for Scheduler where needed.
@@ -135,7 +146,8 @@ service cloud.firestore {
       allow update: if signedIn() && (
         (request.auth.uid == uid
           && selfUserPatch()
-          && selfProfileCompleteOk())
+          && selfProfileCompleteOk()
+          && selfAssessedRequestOk())
         || (isAssigner(defaultOrgId())
           && isOrgMember(defaultOrgId(), uid)
           && assignerMemberPatch())

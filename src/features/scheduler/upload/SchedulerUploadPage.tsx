@@ -7,6 +7,7 @@ import {
 } from '@patternfly/react-core';
 import { useApp } from '@/app/AppContext';
 import { parseGoogleSheetId } from '@/domain/sheetLink';
+import { formatDueBadge } from '@/features/referee/reports/dueCounts';
 import { isFirebaseConfigured } from '@/services/firebase';
 import {
   callSyncSheet,
@@ -66,6 +67,23 @@ export function SchedulerUploadPage() {
     () => parseGoogleSheetId(sheetLink),
     [sheetLink],
   );
+
+  const draftCount = useMemo(
+    () => state.matches.filter((m) => m.status === 'draft').length,
+    [state.matches],
+  );
+
+  const draftInRange = useMemo(() => {
+    if (!from || !to) return 0;
+    const start = new Date(from).getTime();
+    const end = new Date(to).getTime();
+    if (Number.isNaN(start) || Number.isNaN(end)) return 0;
+    return state.matches.filter((m) => {
+      if (m.status !== 'draft') return false;
+      const t = new Date(m.kickoffAt).getTime();
+      return t >= start && t <= end;
+    }).length;
+  }, [state.matches, from, to]);
 
   const syncSchedule = async () => {
     const id = parsedId ?? linkedId ?? null;
@@ -226,11 +244,16 @@ export function SchedulerUploadPage() {
         <div className="rs-actions">
           <Button
             variant="secondary"
-            isDisabled={busy != null}
+            isDisabled={busy != null || draftCount === 0}
             isLoading={busy === 'release'}
             onClick={() => void release({ all: true })}
           >
             Release all drafts
+            {draftCount > 0 && (
+              <span className="rs-nav-badge rs-nav-badge--inline" aria-hidden>
+                {formatDueBadge(draftCount)}
+              </span>
+            )}
           </Button>
         </div>
         <p className="rs-match-card__meta pf-v6-u-mt-sm">
@@ -256,10 +279,15 @@ export function SchedulerUploadPage() {
           <Button
             variant="link"
             isInline
-            isDisabled={!from || !to || busy != null}
+            isDisabled={!from || !to || busy != null || draftInRange === 0}
             onClick={() => void release({ from, to })}
           >
             Release this range
+            {from && to && draftInRange > 0 && (
+              <span className="rs-nav-badge rs-nav-badge--inline" aria-hidden>
+                {formatDueBadge(draftInRange)}
+              </span>
+            )}
           </Button>
         </div>
       </section>

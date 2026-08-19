@@ -59,7 +59,14 @@ export function parseScheduleRows(values: string[][]): ScheduleRow[] {
   };
 
   const col = {
-    match_id: alias(['match_id', 'matchid', 'id']),
+    match_id: alias([
+      'match_id',
+      'matchid',
+      'id',
+      'game_id',
+      'game_code',
+      'fixture_id',
+    ]),
     date: alias(['date', 'match_date', 'kickoff_date']),
     kickoff_time: alias([
       'kickoff_time',
@@ -71,10 +78,18 @@ export function parseScheduleRows(values: string[][]): ScheduleRow[] {
     ]),
     location: alias(['location', 'venue', 'field']),
     home_team: alias(['home_team', 'home', 'home_club']),
-    away_team: alias(['away_team', 'away', 'away_club']),
-    competition: alias(['competition', 'comp']),
-    level: alias(['level', 'tier', 'division']),
-    gender: alias(['gender', 'side']),
+    away_team: alias([
+      'away_team',
+      'away',
+      'away_club',
+      'opponent',
+      'opp',
+      'visitor',
+      'visiting_team',
+    ]),
+    competition: alias(['competition', 'comp', 'league', 'conf']),
+    level: alias(['level', 'tier', 'division', 'match_level', 'game_level']),
+    gender: alias(['gender', 'side', 'sex']),
     notes: alias(['notes', 'note', 'comments']),
     status: alias(['status', 'state']),
   };
