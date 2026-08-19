@@ -22,6 +22,7 @@ import {
 import { ROLE_HOME, ROLE_VIEW_LABELS, useApp, type RoleView } from '@/app/AppContext';
 import { stripDemoPrefix, withDemoPrefix } from '@/app/demoPaths';
 import { WhistleIcon } from '@/ui/WhistleIcon';
+import { UpdatePrompt } from '@/pwa/UpdatePrompt';
 import './shell.css';
 
 const navIconClass = 'rs-bottom-nav__icon';
@@ -160,8 +161,12 @@ function navForRole(roleView: RoleView, demo: boolean): NavItem[] {
 export function MobileShell() {
   const {
     currentUser,
+    isDemoMode,
     isDemoShowcase,
+    dataMode,
     hasFirebaseSession,
+    enterDemoShowcase,
+    enterLive,
     canSwitchRoleView,
     availableLenses,
     roleView,
@@ -225,6 +230,31 @@ export function MobileShell() {
               </MastheadBrand>
             </MastheadMain>
             <MastheadContent className="rs-masthead__content">
+              {isDemoMode && hasFirebaseSession && dataMode === 'live' && (
+                <Button
+                  variant="link"
+                  className="rs-demo-open"
+                  onClick={() => {
+                    enterDemoShowcase();
+                    navigate(withDemoPrefix(ROLE_HOME[roleView]));
+                  }}
+                >
+                  Open demo
+                </Button>
+              )}
+              {isDemoShowcase && hasFirebaseSession && (
+                <Button
+                  variant="link"
+                  className="rs-demo-live"
+                  onClick={() => {
+                    if (enterLive()) {
+                      navigate(ROLE_HOME[roleView]);
+                    }
+                  }}
+                >
+                  Back to live
+                </Button>
+              )}
               {isDemoShowcase && !hasFirebaseSession && (
                 <Button
                   variant="link"
@@ -259,8 +289,15 @@ export function MobileShell() {
       }
     >
       <PageSection className="rs-page-body" isFilled>
+        {isDemoShowcase && (
+          <div className="rs-demo-mode-banner" role="status">
+            <strong>Demo showcase</strong>
+            <span>Sample schedule and members — not your live org.</span>
+          </div>
+        )}
         <Outlet />
       </PageSection>
+      <UpdatePrompt />
       {showChrome && (
         <nav className="rs-bottom-nav" aria-label="Primary">
           {bottomNav.map((item) => (

@@ -179,6 +179,14 @@ async function bootstrapOrgMembership(uid: string): Promise<Role[]> {
   return roles;
 }
 
+/** Reload profile from Firestore (e.g. after onboarding save). */
+export async function loadFirebaseProfile(uid: string): Promise<UserProfile | null> {
+  const database = requireDb();
+  const snap = await getDoc(doc(database, 'users', uid));
+  if (!snap.exists()) return null;
+  return profileFromFirestore(uid, snap.data() as Record<string, unknown>);
+}
+
 function stripUndefined<T extends Record<string, unknown>>(obj: T): T {
   const out = { ...obj };
   for (const k of Object.keys(out)) {

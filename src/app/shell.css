@@ -1146,12 +1146,90 @@ input.rs-filter-search {
 }
 
 .rs-demo-badge {
-  font: var(--rs-font-chip);
-  background: var(--rs-color-surface-muted);
-  color: var(--rs-color-charcoal);
-  border: 1px solid var(--rs-color-border);
+  font-size: 0.72rem;
+  font-weight: 700;
   padding: 2px 8px;
+  border-radius: var(--rs-radius-pill);
+  background: var(--rs-color-warn);
+  color: #000;
+  letter-spacing: 0.02em;
+}
+
+.rs-demo-mode-banner {
+  margin: 0 0 12px;
+  padding: 10px 12px;
   border-radius: var(--rs-radius-chip);
+  background: color-mix(in srgb, var(--rs-color-warn) 18%, var(--rs-color-surface));
+  border: 1px solid color-mix(in srgb, var(--rs-color-warn) 45%, var(--rs-color-border));
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font: var(--rs-font-body);
+}
+
+.rs-demo-mode-banner strong {
+  font-weight: 700;
+}
+
+.rs-demo-open,
+.rs-demo-live {
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+/* PWA: new build available — sits above bottom nav when chrome is shown */
+.rs-update-toast {
+  position: fixed;
+  left: 50%;
+  transform: translateX(-50%);
+  bottom: calc(var(--rs-bottom-nav-height) + env(safe-area-inset-bottom, 0px) + 12px);
+  z-index: 10200;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.6rem 0.75rem 0.6rem 1rem;
+  background: var(--rs-color-surface);
+  border: 1px solid var(--rs-color-border);
+  border-radius: var(--rs-radius-chip);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+  animation: rs-update-toast-in 0.3s ease-out;
+  max-width: calc(100vw - 2rem);
+  box-sizing: border-box;
+}
+
+.rs-update-toast__text {
+  font: var(--rs-font-body);
+  color: var(--rs-color-charcoal);
+  white-space: nowrap;
+}
+
+.rs-update-toast__btn {
+  flex: 0 0 auto;
+  background: var(--rs-color-primary);
+  color: var(--rs-color-on-primary);
+  border: none;
+  border-radius: 6px;
+  padding: 0.35rem 0.75rem;
+  font: var(--rs-font-body);
+  font-weight: 600;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  min-height: 32px;
+}
+
+.rs-update-toast__btn:active {
+  opacity: 0.85;
+}
+
+@keyframes rs-update-toast-in {
+  from {
+    opacity: 0;
+    transform: translateX(-50%) translateY(1rem);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
 }
 
 .rs-bottom-nav {

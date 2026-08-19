@@ -37,11 +37,33 @@ firebase deploy --only functions:syncSheet,functions:sheetPoll,functions:sheetWe
 
 Always run `npm run build` in `functions/` before deploy — Firebase uploads `lib/`, not `src/`.
 
-Optional env for poll / webhook:
+Optional secrets / params:
 
 - `DEFAULT_ORG_ID=lonestar` (Functions runtime)
 - `SHEET_ID` fallback if org doc has no `sheetId`
-- `SHEET_WEBHOOK_SECRET` — if set, Apps Script must send header `x-webhook-secret`
+- `SHEET_WEBHOOK_SECRET` — **required** after deploy; Apps Script must send header `x-webhook-secret`
+
+### Webhook URL + secret (Apps Script)
+
+1. Firebase Console → **Functions** → `sheetWebhook` → copy the **Trigger URL** (e.g. `https://sheetwebhook-….run.app`).
+2. Create a long random string (password generator). This is **not** auto-created — you choose it.
+3. Store it:
+
+```bash
+firebase functions:secrets:set SHEET_WEBHOOK_SECRET
+# paste the same random string when prompted
+firebase deploy --only functions:sheetWebhook
+```
+
+4. In the Google Sheet → **Extensions → Apps Script** → **Project settings → Script properties**:
+
+| Property | Value |
+|----------|--------|
+| `WEBHOOK_URL` | `sheetWebhook` trigger URL from step 1 |
+| `WEBHOOK_SECRET` | same string as step 2 |
+| `ORG_ID` | `lonestar` (or your `VITE_DEFAULT_ORG_ID`) |
+
+The function name `sheetWebhook` is not the secret — only the shared `WEBHOOK_SECRET` / `SHEET_WEBHOOK_SECRET` value authenticates calls.
 
 ### 5. Auth domain (phone / LAN)
 

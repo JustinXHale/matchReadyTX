@@ -26,6 +26,7 @@ export type SyncSheetResult = {
   matched: number;
   upserted: number;
   cancelled: number;
+  removed: number;
   teams: number;
   sheetSyncedAt: string;
 };
@@ -161,6 +162,14 @@ export async function runSheetSync(opts: {
 
   let upserted = 0;
   let cancelled = 0;
+  let removed = 0;
+
+  const syncedIds = new Set<string>();
+  const syncedKeys = new Set<string>();
+  for (const row of rows) {
+    syncedIds.add(sanitizeMatchId(row.match_id));
+    syncedKeys.add(row.match_id.trim());
+  }
 
   for (const row of rows) {
     const matchId = sanitizeMatchId(row.match_id);
@@ -258,6 +267,29 @@ export async function runSheetSync(opts: {
     if (batchOps >= 400) await flushBatch();
   }
 
+  const existingMatches = await db.collection(`orgs/${orgId}/matches`).get();
+  for (const docSnap of existingMatches.docs) {
+    const data = docSnap.data();
+    const sheetRowKey = String(data.sheetRowKey ?? '').trim();
+    const tracked = sheetRowKey.length > 0 || syncedIds.has(docSnap.id);
+    if (!tracked) continue;
+    const inSheet =
+      syncedIds.has(docSnap.id) ||
+      (sheetRowKey.length > 0 && syncedKeys.has(sheetRowKey));
+    if (inSheet) continue;
+
+    const proposals = await docSnap.ref.collection('proposals').get();
+    for (const p of proposals.docs) {
+      batch.delete(p.ref);
+      batchOps += 1;
+      if (batchOps >= 400) await flushBatch();
+    }
+    batch.delete(docSnap.ref);
+    batchOps += 1;
+    removed += 1;
+    if (batchOps >= 400) await flushBatch();
+  }
+
   const sheetSyncedAt = new Date().toISOString();
   setDoc(db.doc(`orgs/${orgId}`), {
     sheetId,
@@ -273,6 +305,7 @@ export async function runSheetSync(opts: {
     matched: rows.length,
     upserted,
     cancelled,
+    removed,
     teams: teamNames.size,
   });
 
@@ -283,6 +316,7 @@ export async function runSheetSync(opts: {
     matched: rows.length,
     upserted,
     cancelled,
+    removed,
     teams: teamNames.size,
     sheetSyncedAt,
   };

@@ -80,8 +80,20 @@ import {
 import { isFirebaseConfigured } from '@/services/firebase';
 import {
   callProposalWriteback,
+  createChangeProposalInFirestore,
   defaultOrgId,
+  saveMatchTeamConfirmation,
+  updateChangeProposalInFirestore,
 } from '@/services/orgData';
+
+function isLiveDataMode(): boolean {
+  if (!isFirebaseConfigured) return false;
+  try {
+    return sessionStorage.getItem('rs-data-mode') !== 'demo';
+  } catch {
+    return true;
+  }
+}
 
 /** Urgent assigner → official alert shown atop Request → Pending. */
 export interface OfficialAlert {
@@ -2090,6 +2102,7 @@ class DemoStore {
     teams: Team[];
     fixtureRequests?: FixtureRequest[];
     teamLinkRequests?: TeamLinkRequest[];
+    proposals?: ChangeProposal[];
   }): void {
     this.set((s) => ({
       ...s,
@@ -2102,8 +2115,7 @@ class DemoStore {
       } as OrgSettings,
       matches: snap.matches,
       teams: snap.teams.length > 0 ? snap.teams : s.teams,
-      // Live org: clear demo-only queues that reference seed match ids
-      proposals: [],
+      proposals: snap.proposals ?? [],
       requests: [],
       fixtureRequests: snap.fixtureRequests ?? [],
       teamLinkRequests: snap.teamLinkRequests ?? [],
@@ -2529,10 +2541,12 @@ class DemoStore {
     side: 'home' | 'away',
     confirmed: boolean,
   ): void {
+    let persisted: Match | null = null;
     this.set((s) => {
       const matches = s.matches.map((m) => {
         if (m.id !== matchId) return m;
         const next = applyTeamDetailsConfirmed(m, side, confirmed);
+        persisted = next;
         if (
           confirmed &&
           (next.status === 'team_confirmed' || next.status === 'crew_pending')
@@ -2567,6 +2581,11 @@ class DemoStore {
       });
       return { ...s, matches };
     });
+    if (isLiveDataMode() && persisted) {
+      void saveMatchTeamConfirmation(defaultOrgId(), persisted).catch((err) =>
+        console.error('saveMatchTeamConfirmation failed', err),
+      );
+    }
   }
 
   proposeChange(
@@ -2600,6 +2619,11 @@ class DemoStore {
         m.id === matchId ? beginChangeProposed(m) : m,
       ),
     }));
+    if (isLiveDataMode()) {
+      void createChangeProposalInFirestore(defaultOrgId(), proposal).catch(
+        (err) => console.error('createChangeProposalInFirestore failed', err),
+      );
+    }
     const otherTeamId =
       teamId === match.homeTeamId ? match.awayTeamId : match.homeTeamId;
     for (const u of this.state.users) {
@@ -2615,6 +2639,7 @@ class DemoStore {
   acceptProposalOtherTeam(proposalId: string, userId: string): void {
     const user = this.state.users.find((u) => u.uid === userId);
     const at = new Date().toISOString();
+    const existing = this.state.proposals.find((x) => x.id === proposalId);
     this.set((s) => ({
       ...s,
       proposals: s.proposals.map((p) =>
@@ -2628,6 +2653,20 @@ class DemoStore {
           : p,
       ),
     }));
+    if (isLiveDataMode() && existing) {
+      void updateChangeProposalInFirestore(
+        defaultOrgId(),
+        existing.matchId,
+        proposalId,
+        {
+          otherTeamAcceptedAt: at,
+          otherTeamAcceptedByUserId: userId,
+          otherTeamAcceptedByName: user?.displayName,
+        },
+      ).catch((err) =>
+        console.error('updateChangeProposalInFirestore failed', err),
+      );
+    }
     this.tryCompleteProposal(proposalId);
   }
 
@@ -2673,6 +2712,29 @@ class DemoStore {
       }),
     }));
 
+    if (isLiveDataMode()) {
+      void updateChangeProposalInFirestore(
+        defaultOrgId(),
+        existing.matchId,
+        proposalId,
+        {
+          status: 'rejected_by_other_team',
+          otherTeamDeniedAt: at,
+          otherTeamDeniedByUserId: userId,
+          otherTeamDeniedByName: user?.displayName,
+          denyReason: trimmed,
+        },
+      ).catch((err) =>
+        console.error('updateChangeProposalInFirestore failed', err),
+      );
+      const nextMatch = this.state.matches.find((m) => m.id === existing.matchId);
+      if (nextMatch) {
+        void saveMatchTeamConfirmation(defaultOrgId(), nextMatch).catch((err) =>
+          console.error('saveMatchTeamConfirmation failed', err),
+        );
+      }
+    }
+
     for (const u of this.state.users) {
       if (
         u.roles.includes('teamAdmin') &&
@@ -2692,6 +2754,7 @@ class DemoStore {
     const user = userId
       ? this.state.users.find((u) => u.uid === userId)
       : undefined;
+    const existing = this.state.proposals.find((x) => x.id === proposalId);
     const at = new Date().toISOString();
     this.set((s) => ({
       ...s,
@@ -2706,14 +2769,28 @@ class DemoStore {
           : p,
       ),
     }));
+    if (isLiveDataMode() && existing) {
+      void updateChangeProposalInFirestore(
+        defaultOrgId(),
+        existing.matchId,
+        proposalId,
+        {
+          assignerAckAt: at,
+          assignerAckByUserId: userId,
+          assignerAckByName: user?.displayName,
+        },
+      ).catch((err) =>
+        console.error('updateChangeProposalInFirestore failed', err),
+      );
+    }
     // If other team already accepted, apply local facts (idempotent) + Sheet write-back.
     this.tryCompleteProposal(proposalId);
     void this.writebackProposalToSheet(proposalId);
   }
 
   /**
-   * When both other-team accept + assigner ack are done, push facts to Schedule SoR.
-   * Demo-only mode skips the callable (local applySheetFacts is enough).
+   * When both other-team accept + assigner ack are done, push facts to Schedule SoR
+   * via Admin SDK (live). Demo mode applies facts locally in tryCompleteProposal.
    */
   private async writebackProposalToSheet(proposalId: string): Promise<void> {
     const p = this.state.proposals.find((x) => x.id === proposalId);
@@ -2729,14 +2806,43 @@ class DemoStore {
         venueName: p.venueName,
         venueAddress: p.venueAddress,
       });
+      let appliedMatch: Match | undefined;
       this.set((s) => ({
         ...s,
+        proposals: s.proposals.map((x) =>
+          x.id === proposalId ? { ...x, status: 'approved' as const } : x,
+        ),
+        matches: s.matches.map((m) => {
+          if (m.id !== p.matchId) return m;
+          appliedMatch = applySheetFacts(m, {
+            kickoffAt: p.kickoffAt,
+            venueName: p.venueName,
+            venueAddress: p.venueAddress,
+          });
+          return appliedMatch!;
+        }),
         org: {
           ...s.org,
           sheetSyncedAt: new Date().toISOString(),
           sheetSyncError: undefined,
         },
       }));
+      if (appliedMatch) {
+        this.notifyOfficialsReconfirmAfterProposal(appliedMatch, p);
+        for (const u of this.state.users) {
+          if (
+            u.roles.includes('teamAdmin') &&
+            u.teamIds.includes(p.proposedByTeamId)
+          ) {
+            this.notify(
+              'change_proposed',
+              u.uid,
+              'Schedule change applied',
+              'The assigner wrote the accepted change back to the Sheet.',
+            );
+          }
+        }
+      }
     } catch (err) {
       const message =
         err && typeof err === 'object' && 'message' in err
@@ -2751,7 +2857,66 @@ class DemoStore {
     }
   }
 
-  /** Apply Sheet facts locally when the other team accepts (assigner ack triggers SoR write-back). */
+  private notifyProposalOtherTeamAccepted(p: ChangeProposal): void {
+    for (const u of this.state.users) {
+      if (
+        u.roles.includes('teamAdmin') &&
+        u.teamIds.includes(p.proposedByTeamId)
+      ) {
+        this.notify(
+          'change_proposed',
+          u.uid,
+          'Change proposal accepted',
+          p.otherTeamAcceptedByName
+            ? `Accepted by ${p.otherTeamAcceptedByName}. Awaiting assigner write-back.`
+            : 'The other team accepted. Awaiting assigner write-back.',
+        );
+      }
+      if (u.roles.includes('assigner') && !p.assignerAckAt) {
+        this.notify(
+          'change_proposed',
+          u.uid,
+          'Schedule change accepted',
+          'Other team accepted a proposal — acknowledge when you’ve seen it to write back to the Sheet.',
+        );
+      }
+    }
+  }
+
+  private notifyOfficialsReconfirmAfterProposal(
+    match: Match,
+    p: ChangeProposal,
+  ): void {
+    for (const slot of ['mo', 'ar1', 'ar2', 'no4'] as CrewSlot[]) {
+      for (const c of crewPeople(match.crew[slot])) {
+        if (c.userId) {
+          this.notify(
+            'availability_check',
+            c.userId,
+            'Reconfirm your appointment',
+            `${match.homeTeamName} vs ${match.awayTeamName} changed — confirm or decline the new details.`,
+          );
+        }
+      }
+    }
+    for (const u of this.state.users) {
+      if (
+        u.roles.includes('teamAdmin') &&
+        u.teamIds.includes(p.proposedByTeamId)
+      ) {
+        this.notify(
+          'change_proposed',
+          u.uid,
+          'Change proposal accepted',
+          p.otherTeamAcceptedByName
+            ? `Accepted by ${p.otherTeamAcceptedByName}. Schedule updated.`
+            : 'The other team accepted. Schedule updated.',
+        );
+      }
+    }
+  }
+
+  /** Demo: apply facts when other team accepts. Live: defer until assigner write-back. */
   private tryCompleteProposal(proposalId: string): void {
     const p = this.state.proposals.find((x) => x.id === proposalId);
     if (!p || !p.otherTeamAcceptedAt || p.status === 'approved') {
@@ -2760,6 +2925,15 @@ class DemoStore {
     if (p.status !== 'pending') {
       return;
     }
+
+    if (isLiveDataMode()) {
+      this.notifyProposalOtherTeamAccepted(p);
+      if (p.assignerAckAt) {
+        void this.writebackProposalToSheet(proposalId);
+      }
+      return;
+    }
+
     this.set((s) => {
       const matches = s.matches.map((m) => {
         if (m.id !== p.matchId) return m;
@@ -2780,32 +2954,8 @@ class DemoStore {
     });
     const match = this.state.matches.find((m) => m.id === p.matchId);
     if (match) {
-      for (const slot of ['mo', 'ar1', 'ar2', 'no4'] as CrewSlot[]) {
-        for (const c of crewPeople(match.crew[slot])) {
-          if (c.userId) {
-            this.notify(
-              'availability_check',
-              c.userId,
-              'Reconfirm your appointment',
-              `${match.homeTeamName} vs ${match.awayTeamName} changed — confirm or decline the new details.`,
-            );
-          }
-        }
-      }
+      this.notifyOfficialsReconfirmAfterProposal(match, p);
       for (const u of this.state.users) {
-        if (
-          u.roles.includes('teamAdmin') &&
-          u.teamIds.includes(p.proposedByTeamId)
-        ) {
-          this.notify(
-            'change_proposed',
-            u.uid,
-            'Change proposal accepted',
-            p.otherTeamAcceptedByName
-              ? `Accepted by ${p.otherTeamAcceptedByName}. Schedule updated.`
-              : 'The other team accepted. Schedule updated.',
-          );
-        }
         if (u.roles.includes('assigner') && !p.assignerAckAt) {
           this.notify(
             'change_proposed',
@@ -2816,7 +2966,6 @@ class DemoStore {
         }
       }
     }
-    // If assigner already acknowledged, push SoR write-back now.
     if (p.assignerAckAt) {
       void this.writebackProposalToSheet(proposalId);
     }

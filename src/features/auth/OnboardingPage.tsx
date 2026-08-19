@@ -82,7 +82,7 @@ const STEP_VISUALS: Partial<Record<StepId, string>> = {
 const PHOTO_PLACEHOLDER = STEP_VISUALS.photo!;
 
 export function OnboardingPage() {
-  const { currentUser, store, dataMode, state } = useApp();
+  const { currentUser, store, dataMode, state, refreshLiveProfile } = useApp();
   const navigate = useNavigate();
   const inputRef = useRef<HTMLInputElement>(null);
   const photoRef = useRef<HTMLInputElement>(null);
@@ -368,6 +368,7 @@ export function OnboardingPage() {
           return;
         }
         setSaving(false);
+        await refreshLiveProfile();
       } else if (roleTeamAdmin && selectedTeamIds.length > 0) {
         store.submitTeamLinkRequests(currentUser.uid, selectedTeamIds);
       }

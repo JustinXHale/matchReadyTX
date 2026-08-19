@@ -4,13 +4,21 @@ service cloud.firestore {
     function signedIn() {
       return request.auth != null;
     }
-    function isAssigner(orgId) {
+    function userDoc() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+    }
+    function onboardingComplete() {
       return signedIn()
+        && exists(/databases/$(database)/documents/users/$(request.auth.uid))
+        && userDoc().get('profileComplete', false) == true;
+    }
+    function isAssigner(orgId) {
+      return onboardingComplete()
         && exists(/databases/$(database)/documents/orgs/$(orgId)/members/$(request.auth.uid))
         && 'assigner' in get(/databases/$(database)/documents/orgs/$(orgId)/members/$(request.auth.uid)).data.roles;
     }
     function isMember(orgId) {
-      return signedIn()
+      return onboardingComplete()
         && exists(/databases/$(database)/documents/orgs/$(orgId)/members/$(request.auth.uid));
     }
     function isOrgMember(orgId, uid) {
@@ -37,6 +45,84 @@ service cloud.firestore {
         ]);
     }
 
+    /** Fields a user may patch on their own users/{uid} document. */
+    function selfUserPatch() {
+      return request.resource.data.diff(resource.data).affectedKeys()
+        .hasOnly([
+          'uid', 'firstName', 'lastName', 'preferredName', 'displayName',
+          'email', 'phone', 'smsOptIn',
+          'homeStreet', 'homeUnit', 'homeCity', 'homeRegion', 'homePostalCode',
+          'homeAddress', 'homeLat', 'homeLng',
+          'roles', 'teamIds', 'fanTeamIds', 'fanTeamOther',
+          'refereeLevel', 'assessedLevel',
+          'refereeingSince', 'birthday', 'jerseySize', 'shortsSize',
+          'photoUrl', 'competitionAccess', 'profileComplete', 'updatedAt'
+        ])
+        && request.resource.data.roles is list
+        && ('assigner' in resource.data.roles) == ('assigner' in request.resource.data.roles);
+    }
+    function requestHasWorkingSocietyRole() {
+      return request.resource.data.roles is list
+        && (
+          'official' in request.resource.data.roles
+          || 'teamAdmin' in request.resource.data.roles
+          || 'cmo' in request.resource.data.roles
+          || 'assigner' in request.resource.data.roles
+        );
+    }
+    function requestHasRefereeLensRole() {
+      return request.resource.data.roles is list
+        && (
+          'official' in request.resource.data.roles
+          || 'cmo' in request.resource.data.roles
+        );
+    }
+    /** profileComplete: true only when required profile fields are present. */
+    function selfProfileCompleteOk() {
+      return !request.resource.data.diff(resource.data).affectedKeys()
+          .hasAny(['profileComplete'])
+        || request.resource.data.profileComplete == resource.data.profileComplete
+        || (
+          request.resource.data.profileComplete == true
+          && request.resource.data.firstName is string
+          && request.resource.data.firstName.size() > 0
+          && request.resource.data.lastName is string
+          && request.resource.data.lastName.size() > 0
+          && request.resource.data.email is string
+          && request.resource.data.email.size() > 0
+          && request.resource.data.roles is list
+          && request.resource.data.roles.size() > 0
+          && (
+            !requestHasWorkingSocietyRole()
+            || (
+              request.resource.data.phone is string
+              && request.resource.data.phone.size() > 0
+              && request.resource.data.birthday is string
+              && request.resource.data.birthday.size() > 0
+            )
+          )
+          && (
+            !requestHasRefereeLensRole()
+            || (
+              request.resource.data.homeStreet is string
+              && request.resource.data.homeStreet.size() > 0
+              && request.resource.data.homeCity is string
+              && request.resource.data.homeCity.size() > 0
+              && request.resource.data.homeRegion is string
+              && request.resource.data.homeRegion.size() > 0
+              && request.resource.data.homePostalCode is string
+              && request.resource.data.homePostalCode.size() > 0
+              && request.resource.data.refereeingSince is string
+              && request.resource.data.refereeingSince.size() > 0
+              && request.resource.data.jerseySize is string
+              && request.resource.data.jerseySize.size() > 0
+              && request.resource.data.shortsSize is string
+              && request.resource.data.shortsSize.size() > 0
+            )
+          )
+        );
+    }
+
     match /users/{uid} {
       // Org directory: any member may read fellow members' profiles (names, roles).
       // Address/phone stay UI-gated for Scheduler where needed.
@@ -44,11 +130,12 @@ service cloud.firestore {
         request.auth.uid == uid
         || (isMember(defaultOrgId()) && isOrgMember(defaultOrgId(), uid))
       );
-      allow create: if signedIn() && request.auth.uid == uid;
+      allow create: if signedIn() && request.auth.uid == uid
+        && request.resource.data.get('profileComplete', false) == false;
       allow update: if signedIn() && (
         (request.auth.uid == uid
-          && request.resource.data.email is string
-          && request.resource.data.phone is string)
+          && selfUserPatch()
+          && selfProfileCompleteOk())
         || (isAssigner(defaultOrgId())
           && isOrgMember(defaultOrgId(), uid)
           && assignerMemberPatch())
@@ -97,14 +184,25 @@ service cloud.firestore {
         allow delete: if isAssigner(orgId);
       }
       match /teams/{teamId} {
-        allow read: if isMember(orgId);
+        allow read: if signedIn();
         allow write: if isAssigner(orgId);
       }
       match /matches/{matchId} {
         allow read: if isMember(orgId);
         allow write: if isAssigner(orgId)
-          || (isMember(orgId) && request.resource.data.diff(resource.data).affectedKeys()
-                .hasOnly(['homeConfirmedAt', 'awayConfirmedAt', 'status', 't72TeamHome', 't72TeamAway']));
+          || (isMember(orgId) && memberMatchSelfServicePatch());
+
+        function memberMatchSelfServicePatch() {
+          let diff = request.resource.data.diff(resource.data).affectedKeys();
+          return diff.hasOnly(['homeConfirmedAt', 'awayConfirmedAt', 'status', 't72TeamHome', 't72TeamAway', 'updatedAt'])
+            && (
+              request.resource.data.status == resource.data.status
+              || request.resource.data.status in [
+                'pending_team_review', 'team_confirmed', 'crew_pending',
+                'needs_reconfirmation', 'change_proposed'
+              ]
+            );
+        }
 
         match /crew/{slot} {
           allow read: if isAssigner(orgId)
@@ -114,8 +212,92 @@ service cloud.firestore {
             || (signedIn() && resource.data.userId == request.auth.uid);
         }
         match /proposals/{proposalId} {
+          function proposalMemberDoc() {
+            return get(/databases/$(database)/documents/orgs/$(orgId)/members/$(request.auth.uid)).data;
+          }
+          function isTeamAdminForTeam(teamId) {
+            return isMember(orgId)
+              && 'teamAdmin' in proposalMemberDoc().roles
+              && teamId in proposalMemberDoc().teamIds;
+          }
+          function proposalOtherTeamId() {
+            let matchData = get(/databases/$(database)/documents/orgs/$(orgId)/matches/$(matchId)).data;
+            return resource.data.proposedByTeamId == matchData.homeTeamId
+              ? matchData.awayTeamId
+              : matchData.homeTeamId;
+          }
+          function proposalImmutableOk() {
+            return resource.data.matchId == request.resource.data.matchId
+              && resource.data.orgId == request.resource.data.orgId
+              && resource.data.proposedByTeamId == request.resource.data.proposedByTeamId
+              && resource.data.proposedByUserId == request.resource.data.proposedByUserId
+              && resource.data.kickoffAt == request.resource.data.kickoffAt
+              && resource.data.venueName == request.resource.data.venueName
+              && resource.data.venueAddress == request.resource.data.venueAddress
+              && resource.data.previousKickoffAt == request.resource.data.previousKickoffAt
+              && resource.data.previousVenueName == request.resource.data.previousVenueName
+              && resource.data.previousVenueAddress == request.resource.data.previousVenueAddress
+              && resource.data.createdAt == request.resource.data.createdAt;
+          }
+          function proposalCreateShape() {
+            let matchData = get(/databases/$(database)/documents/orgs/$(orgId)/matches/$(matchId)).data;
+            return (
+                request.resource.data.proposedByTeamId == matchData.homeTeamId
+                || request.resource.data.proposedByTeamId == matchData.awayTeamId
+              )
+              && request.resource.data.get('otherTeamAcceptedAt', null) == null
+              && request.resource.data.get('otherTeamDeniedAt', null) == null
+              && request.resource.data.get('assignerAckAt', null) == null;
+          }
+
           allow read: if isMember(orgId);
-          allow write: if isMember(orgId);
+          allow create: if isMember(orgId)
+            && request.resource.data.matchId == matchId
+            && request.resource.data.orgId == orgId
+            && request.resource.data.status == 'pending'
+            && request.resource.data.proposedByUserId == request.auth.uid
+            && isTeamAdminForTeam(request.resource.data.proposedByTeamId)
+            && proposalCreateShape();
+          allow update: if isMember(orgId)
+            && resource.data.matchId == matchId
+            && resource.data.orgId == orgId
+            && proposalImmutableOk()
+            && resource.data.status == 'pending'
+            && (
+              (
+                isTeamAdminForTeam(proposalOtherTeamId())
+                && request.resource.data.status == 'pending'
+                && !resource.data.otherTeamAcceptedAt
+                && request.resource.data.diff(resource.data).affectedKeys()
+                  .hasOnly([
+                    'otherTeamAcceptedAt', 'otherTeamAcceptedByUserId',
+                    'otherTeamAcceptedByName', 'updatedAt'
+                  ])
+                && request.resource.data.otherTeamAcceptedByUserId == request.auth.uid
+              )
+              || (
+                isTeamAdminForTeam(proposalOtherTeamId())
+                && request.resource.data.status == 'rejected_by_other_team'
+                && request.resource.data.denyReason is string
+                && request.resource.data.denyReason.size() > 0
+                && request.resource.data.diff(resource.data).affectedKeys()
+                  .hasOnly([
+                    'status', 'otherTeamDeniedAt', 'otherTeamDeniedByUserId',
+                    'otherTeamDeniedByName', 'denyReason', 'updatedAt'
+                  ])
+                && request.resource.data.otherTeamDeniedByUserId == request.auth.uid
+              )
+              || (
+                isAssigner(orgId)
+                && request.resource.data.status == 'pending'
+                && request.resource.data.diff(resource.data).affectedKeys()
+                  .hasOnly([
+                    'assignerAckAt', 'assignerAckByUserId', 'assignerAckByName', 'updatedAt'
+                  ])
+                && request.resource.data.assignerAckByUserId == request.auth.uid
+              )
+            );
+          allow delete: if isAssigner(orgId);
         }
         match /gameRequests/{requestId} {
           allow read: if isAssigner(orgId)
@@ -137,12 +319,12 @@ service cloud.firestore {
             'venueAddress', 'level', 'gender', 'flightProvided',
             'housingProvided', 'status', 'createdAt'
           ]);
-        // Assigner may decline; approve/match create is Admin SDK only.
+        // Assigner may decline; approve + Sheet append is Admin SDK only.
         allow update: if isAssigner(orgId)
           && request.resource.data.diff(resource.data).affectedKeys()
             .hasOnly([
               'status', 'declineReason', 'reviewedAt', 'reviewedByUserId',
-              'updatedAt', 'matchId', 'sheetRowKey'
+              'updatedAt'
             ]);
         allow delete: if isAssigner(orgId);
       }

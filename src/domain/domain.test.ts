@@ -74,7 +74,7 @@ function baseMatch(): Match {
     id: 'm1',
     sheetRowKey: 's1',
     status: 'draft',
-    kickoffAt: new Date('2026-08-01T19:00:00Z').toISOString(),
+    kickoffAt: new Date('2027-08-01T19:00:00Z').toISOString(),
     venueName: 'Field',
     venueAddress: 'Austin, TX',
     venueLat: 30.27,

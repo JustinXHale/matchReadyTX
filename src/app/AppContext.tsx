@@ -13,7 +13,7 @@ import type { AppState } from '@/services/demoStore';
 import { demoStore } from '@/services/demoStore';
 import { isDemoMode, isFirebaseConfigured } from '@/services/firebase';
 import { signOutFirebase, subscribeAuth, completeRedirectSignIn } from '@/services/auth';
-import { ensureFirebaseUser } from '@/services/userProfile';
+import { ensureFirebaseUser, loadFirebaseProfile } from '@/services/userProfile';
 import {
   defaultOrgId,
   subscribeCoachFeedback,
@@ -82,6 +82,7 @@ interface AppContextValue {
   liveProfile: UserProfile | null;
   enterDemoShowcase: (opts?: { onboarding?: boolean }) => void;
   enterLive: () => boolean;
+  refreshLiveProfile: () => Promise<void>;
   setDataMode: (mode: DataMode) => void;
   refresh: () => void;
   /** Sign in and flush React state before navigation (avoids auth guard bounce). */
@@ -310,12 +311,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
     };
   }, []);
 
-  /** Firestore org schedule — live mode + real Firebase uid only. */
+  /** Firestore org schedule — live mode + real Firebase uid + completed profile. */
   useEffect(() => {
     if (!isFirebaseConfigured) return;
     if (dataMode !== 'live') return;
     const uid = state.currentUserId;
     if (!uid || uid.startsWith('u_')) return;
+    const me = state.users.find((u) => u.uid === uid);
+    if (!me?.profileComplete) return;
 
     const unsubOrg = subscribeLiveOrg(
       defaultOrgId(),
@@ -339,7 +342,30 @@ export function AppProvider({ children }: { children: ReactNode }) {
       unsubOrg();
       unsubRoster();
     };
-  }, [state.currentUserId, dataMode]);
+  }, [
+    state.currentUserId,
+    dataMode,
+    state.users.find((u) => u.uid === state.currentUserId)?.profileComplete,
+  ]);
+
+  const refreshLiveProfile = useCallback(async () => {
+    const uid =
+      liveProfile?.uid ?? demoStore.getState().currentUserId ?? '';
+    if (!uid || uid.startsWith('u_')) return;
+    try {
+      const profile = await loadFirebaseProfile(uid);
+      if (!profile) return;
+      setLiveProfile(profile);
+      if (dataModeRef.current === 'live') {
+        flushSync(() => {
+          demoStore.upsertAndSignIn(profile);
+          setState(demoStore.getState());
+        });
+      }
+    } catch (err) {
+      console.error('refreshLiveProfile failed', err);
+    }
+  }, [liveProfile?.uid]);
 
   /** Coach feedback — assigner sees all; Team Admins see club-owned reports. */
   useEffect(() => {
@@ -513,6 +539,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       liveProfile,
       enterDemoShowcase,
       enterLive,
+      refreshLiveProfile,
       setDataMode,
       refresh,
       signInAs,
@@ -543,6 +570,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       liveProfile,
       enterDemoShowcase,
       enterLive,
+      refreshLiveProfile,
       setDataMode,
       refresh,
       signInAs,

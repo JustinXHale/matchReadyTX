@@ -1,5 +1,6 @@
 import {
   collection,
+  collectionGroup,
   doc,
   onSnapshot,
   query,
@@ -25,6 +26,7 @@ import {
   ensureDefaultMoBlock,
   newAssignmentId,
   newCmoId,
+  type ChangeProposal,
   type CrewAssignment,
   type CmoContact,
   type FixtureRequest,
@@ -238,6 +240,7 @@ export type LiveOrgSnapshot = {
   teams: Team[];
   fixtureRequests: FixtureRequest[];
   teamLinkRequests: TeamLinkRequest[];
+  proposals: ChangeProposal[];
 };
 
 function parseCoachFeedbackScales(
@@ -392,6 +395,118 @@ export function fixtureRequestFromFirestore(
   };
 }
 
+export function proposalFromFirestore(
+  id: string,
+  matchId: string,
+  data: Record<string, unknown>,
+): ChangeProposal {
+  const status =
+    data.status === 'rejected_by_other_team' ||
+    data.status === 'approved' ||
+    data.status === 'withdrawn'
+      ? data.status
+      : 'pending';
+  return {
+    id,
+    matchId: String(data.matchId ?? matchId),
+    proposedByTeamId: String(data.proposedByTeamId ?? ''),
+    proposedByUserId:
+      typeof data.proposedByUserId === 'string'
+        ? data.proposedByUserId
+        : undefined,
+    proposedByName:
+      typeof data.proposedByName === 'string' ? data.proposedByName : undefined,
+    kickoffAt:
+      typeof data.kickoffAt === 'string' ? data.kickoffAt : undefined,
+    venueName:
+      typeof data.venueName === 'string' ? data.venueName : undefined,
+    venueAddress:
+      typeof data.venueAddress === 'string' ? data.venueAddress : undefined,
+    previousKickoffAt:
+      typeof data.previousKickoffAt === 'string'
+        ? data.previousKickoffAt
+        : undefined,
+    previousVenueName:
+      typeof data.previousVenueName === 'string'
+        ? data.previousVenueName
+        : undefined,
+    previousVenueAddress:
+      typeof data.previousVenueAddress === 'string'
+        ? data.previousVenueAddress
+        : undefined,
+    status,
+    otherTeamAcceptedAt:
+      typeof data.otherTeamAcceptedAt === 'string'
+        ? data.otherTeamAcceptedAt
+        : undefined,
+    otherTeamAcceptedByUserId:
+      typeof data.otherTeamAcceptedByUserId === 'string'
+        ? data.otherTeamAcceptedByUserId
+        : undefined,
+    otherTeamAcceptedByName:
+      typeof data.otherTeamAcceptedByName === 'string'
+        ? data.otherTeamAcceptedByName
+        : undefined,
+    otherTeamDeniedAt:
+      typeof data.otherTeamDeniedAt === 'string'
+        ? data.otherTeamDeniedAt
+        : undefined,
+    otherTeamDeniedByUserId:
+      typeof data.otherTeamDeniedByUserId === 'string'
+        ? data.otherTeamDeniedByUserId
+        : undefined,
+    otherTeamDeniedByName:
+      typeof data.otherTeamDeniedByName === 'string'
+        ? data.otherTeamDeniedByName
+        : undefined,
+    denyReason:
+      typeof data.denyReason === 'string' ? data.denyReason : undefined,
+    assignerAckAt:
+      typeof data.assignerAckAt === 'string' ? data.assignerAckAt : undefined,
+    assignerAckByUserId:
+      typeof data.assignerAckByUserId === 'string'
+        ? data.assignerAckByUserId
+        : undefined,
+    assignerAckByName:
+      typeof data.assignerAckByName === 'string'
+        ? data.assignerAckByName
+        : undefined,
+    createdAt: String(data.createdAt ?? ''),
+  };
+}
+
+function proposalForFirestore(
+  orgId: string,
+  proposal: ChangeProposal,
+): Record<string, unknown> {
+  return stripUndefined({
+    orgId,
+    matchId: proposal.matchId,
+    proposedByTeamId: proposal.proposedByTeamId,
+    proposedByUserId: proposal.proposedByUserId ?? null,
+    proposedByName: proposal.proposedByName ?? null,
+    kickoffAt: proposal.kickoffAt ?? null,
+    venueName: proposal.venueName ?? null,
+    venueAddress: proposal.venueAddress ?? null,
+    previousKickoffAt: proposal.previousKickoffAt ?? null,
+    previousVenueName: proposal.previousVenueName ?? null,
+    previousVenueAddress: proposal.previousVenueAddress ?? null,
+    status: proposal.status,
+    otherTeamAcceptedAt: proposal.otherTeamAcceptedAt ?? null,
+    otherTeamAcceptedByUserId: proposal.otherTeamAcceptedByUserId ?? null,
+    otherTeamAcceptedByName: proposal.otherTeamAcceptedByName ?? null,
+    otherTeamDeniedAt: proposal.otherTeamDeniedAt ?? null,
+    otherTeamDeniedByUserId: proposal.otherTeamDeniedByUserId ?? null,
+    otherTeamDeniedByName: proposal.otherTeamDeniedByName ?? null,
+    denyReason: proposal.denyReason ?? null,
+    assignerAckAt: proposal.assignerAckAt ?? null,
+    assignerAckByUserId: proposal.assignerAckByUserId ?? null,
+    assignerAckByName: proposal.assignerAckByName ?? null,
+    createdAt: proposal.createdAt,
+    updatedAt: new Date().toISOString(),
+  });
+}
+
 export function teamLinkRequestFromFirestore(
   id: string,
   data: Record<string, unknown>,
@@ -433,6 +548,7 @@ export function subscribeLiveOrg(
   let teams: Team[] = [];
   let fixtureRequests: FixtureRequest[] = [];
   let teamLinkRequests: TeamLinkRequest[] = [];
+  let proposals: ChangeProposal[] = [];
 
   const emit = () =>
     onData({
@@ -441,6 +557,7 @@ export function subscribeLiveOrg(
       teams,
       fixtureRequests,
       teamLinkRequests,
+      proposals,
     });
 
   const unsubs: Unsubscribe[] = [];
@@ -506,6 +623,23 @@ export function subscribeLiveOrg(
         teamLinkRequests = snap.docs.map((d) =>
           teamLinkRequestFromFirestore(d.id, d.data() as Record<string, unknown>),
         );
+        emit();
+      },
+      (err) => onError?.(err),
+    ),
+  );
+
+  unsubs.push(
+    onSnapshot(
+      collectionGroup(database, 'proposals'),
+      (snap) => {
+        proposals = snap.docs
+          .filter((d) => d.ref.path.startsWith(`orgs/${orgId}/matches/`))
+          .map((d) => {
+            const parts = d.ref.path.split('/');
+            const matchId = parts[3] ?? '';
+            return proposalFromFirestore(d.id, matchId, d.data() as Record<string, unknown>);
+          });
         emit();
       },
       (err) => onError?.(err),
@@ -739,6 +873,109 @@ export async function saveMatchCrewAssignment(
   await setDoc(doc(requireDb(), 'orgs', orgId, 'matches', match.id), payload, {
     merge: true,
   });
+}
+
+/** Persist team confirmation timestamps + workflow status (live mode). */
+export async function saveMatchTeamConfirmation(
+  orgId: string,
+  match: Pick<
+    Match,
+    'id' | 'status' | 'homeConfirmedAt' | 'awayConfirmedAt'
+  >,
+): Promise<void> {
+  await setDoc(
+    doc(requireDb(), 'orgs', orgId, 'matches', match.id),
+    stripUndefined({
+      status: match.status,
+      homeConfirmedAt: match.homeConfirmedAt ?? null,
+      awayConfirmedAt: match.awayConfirmedAt ?? null,
+      updatedAt: new Date().toISOString(),
+    }),
+    { merge: true },
+  );
+}
+
+/** Create a schedule-change proposal under the match. */
+export async function createChangeProposalInFirestore(
+  orgId: string,
+  proposal: ChangeProposal,
+): Promise<void> {
+  await setDoc(
+    doc(
+      requireDb(),
+      'orgs',
+      orgId,
+      'matches',
+      proposal.matchId,
+      'proposals',
+      proposal.id,
+    ),
+    proposalForFirestore(orgId, proposal),
+  );
+  await setDoc(
+    doc(requireDb(), 'orgs', orgId, 'matches', proposal.matchId),
+    {
+      status: 'change_proposed',
+      updatedAt: new Date().toISOString(),
+    },
+    { merge: true },
+  );
+}
+
+/** Patch proposal fields (accept / deny / acknowledge). */
+export async function updateChangeProposalInFirestore(
+  orgId: string,
+  matchId: string,
+  proposalId: string,
+  patch: Partial<ChangeProposal>,
+): Promise<void> {
+  const payload = stripUndefined({
+    status: patch.status,
+    otherTeamAcceptedAt: patch.otherTeamAcceptedAt ?? undefined,
+    otherTeamAcceptedByUserId: patch.otherTeamAcceptedByUserId ?? undefined,
+    otherTeamAcceptedByName: patch.otherTeamAcceptedByName ?? undefined,
+    otherTeamDeniedAt: patch.otherTeamDeniedAt ?? undefined,
+    otherTeamDeniedByUserId: patch.otherTeamDeniedByUserId ?? undefined,
+    otherTeamDeniedByName: patch.otherTeamDeniedByName ?? undefined,
+    denyReason: patch.denyReason ?? undefined,
+    assignerAckAt: patch.assignerAckAt ?? undefined,
+    assignerAckByUserId: patch.assignerAckByUserId ?? undefined,
+    assignerAckByName: patch.assignerAckByName ?? undefined,
+    updatedAt: new Date().toISOString(),
+  });
+  await updateDoc(
+    doc(
+      requireDb(),
+      'orgs',
+      orgId,
+      'matches',
+      matchId,
+      'proposals',
+      proposalId,
+    ),
+    payload,
+  );
+}
+
+/** Apply accepted proposal facts to the parent match document. */
+export async function saveMatchScheduleFacts(
+  orgId: string,
+  match: Pick<
+    Match,
+    'id' | 'status' | 'kickoffAt' | 'venueName' | 'venueAddress'
+  >,
+): Promise<void> {
+  await setDoc(
+    doc(requireDb(), 'orgs', orgId, 'matches', match.id),
+    stripUndefined({
+      status: match.status,
+      kickoffAt: match.kickoffAt,
+      venueName: match.venueName,
+      venueAddress: match.venueAddress,
+      updatedAt: new Date().toISOString(),
+    }),
+    { merge: true },
+  );
 }
 
 /** Create a pending fixture request (team admin). */

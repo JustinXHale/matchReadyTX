@@ -31,6 +31,7 @@ const auth = getAuth();
 
 const googleServiceAccountJson = defineSecret('GOOGLE_SERVICE_ACCOUNT_JSON');
 const resendApiKey = defineSecret('RESEND_API_KEY');
+const sheetWebhookSecret = defineSecret('SHEET_WEBHOOK_SECRET');
 /** Verified sender, e.g. MatchReadyTX <noreply@yourdomain.com> */
 const resendFromEmail = defineString('RESEND_FROM_EMAIL', {
   default: 'MatchReadyTX <onboarding@resend.dev>',
@@ -128,7 +129,7 @@ export const syncSheet = onCall(
 export const sheetWebhook = onRequest(
   {
     cors: true,
-    secrets: [googleServiceAccountJson],
+    secrets: [googleServiceAccountJson, sheetWebhookSecret],
     timeoutSeconds: 120,
     memory: '512MiB',
   },
@@ -137,8 +138,8 @@ export const sheetWebhook = onRequest(
       res.status(405).send('Method not allowed');
       return;
     }
-    const secret = process.env.SHEET_WEBHOOK_SECRET;
-    if (secret && req.get('x-webhook-secret') !== secret) {
+    const secret = sheetWebhookSecret.value();
+    if (!secret || req.get('x-webhook-secret') !== secret) {
       res.status(401).send('Unauthorized');
       return;
     }
@@ -305,6 +306,7 @@ export const proposalWriteback = onCall(
         db,
         orgId,
         matchId,
+        proposalId,
         serviceAccountJson: sa,
         kickoffAt,
         venueName,
@@ -587,14 +589,6 @@ export const sendTestEmail = onCall(async (request) => {
     event: 'test',
   });
   return { ok: true, mailId, to: email };
-});
-
-/** Geocode stub — replace with Maps Geocoding API */
-export const geocodeAddress = onCall(async (request) => {
-  if (!request.auth) throw new HttpsError('unauthenticated', 'Sign in required');
-  const address = String(request.data?.address ?? '');
-  if (!address) throw new HttpsError('invalid-argument', 'address required');
-  return { lat: 30.2672, lng: -97.7431, address };
 });
 
 /**

@@ -15,6 +15,6 @@ functions/lib
 functions/node_modules
 .DS_Store
 *.tsbuildinfo
-keys/*.json
-keys/*.p8
+keys/*
+!keys/README.md
 *-firebase-adminsdk*.json

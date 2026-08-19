@@ -56,6 +56,7 @@ export type ProposalWritebackInput = {
   db: Firestore;
   orgId: string;
   matchId: string;
+  proposalId: string;
   serviceAccountJson: string;
   /** Optional overrides (from accepted proposal). */
   kickoffAt?: string;
@@ -76,7 +77,33 @@ export type ProposalWritebackResult = {
 export async function runProposalWriteback(
   opts: ProposalWritebackInput,
 ): Promise<ProposalWritebackResult> {
-  const { db, orgId, matchId, serviceAccountJson } = opts;
+  const { db, orgId, matchId, proposalId, serviceAccountJson } = opts;
+  const proposalRef = db.doc(
+    `orgs/${orgId}/matches/${matchId}/proposals/${proposalId}`,
+  );
+  const proposalSnap = await proposalRef.get();
+  if (!proposalSnap.exists) {
+    throw new HttpsError('not-found', 'Change proposal not found.');
+  }
+  const proposal = proposalSnap.data() as Record<string, unknown>;
+  if (!proposal.otherTeamAcceptedAt) {
+    throw new HttpsError(
+      'failed-precondition',
+      'Other team must accept the proposal before write-back.',
+    );
+  }
+  if (!proposal.assignerAckAt) {
+    throw new HttpsError(
+      'failed-precondition',
+      'Assigner must acknowledge the proposal before write-back.',
+    );
+  }
+  if (proposal.status === 'rejected_by_other_team') {
+    throw new HttpsError(
+      'failed-precondition',
+      'Proposal was denied — cannot write back.',
+    );
+  }
 
   const orgSnap = await db.doc(`orgs/${orgId}`).get();
   if (!orgSnap.exists) {
@@ -106,10 +133,14 @@ export async function runProposalWriteback(
     );
   }
 
-  const kickoffAt = String(opts.kickoffAt ?? match.kickoffAt ?? '').trim();
-  const venueName = String(opts.venueName ?? match.venueName ?? '').trim();
+  const kickoffAt = String(
+    opts.kickoffAt ?? proposal.kickoffAt ?? match.kickoffAt ?? '',
+  ).trim();
+  const venueName = String(
+    opts.venueName ?? proposal.venueName ?? match.venueName ?? '',
+  ).trim();
   const venueAddress = String(
-    opts.venueAddress ?? match.venueAddress ?? '',
+    opts.venueAddress ?? proposal.venueAddress ?? match.venueAddress ?? '',
   ).trim();
   const homeTeam = String(match.homeTeamName ?? '').trim();
   const awayTeam = String(match.awayTeamName ?? '').trim();
@@ -206,8 +237,18 @@ export async function runProposalWriteback(
       kickoffAt,
       venueName,
       venueAddress,
+      status: 'needs_reconfirmation',
+      homeConfirmedAt: FieldValue.delete(),
+      awayConfirmedAt: FieldValue.delete(),
       updatedAt,
       sheetSyncedAt: updatedAt,
+    },
+    { merge: true },
+  );
+  await proposalRef.set(
+    {
+      status: 'approved',
+      updatedAt,
     },
     { merge: true },
   );

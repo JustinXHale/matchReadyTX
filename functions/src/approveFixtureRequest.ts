@@ -26,6 +26,8 @@ export type FixtureRequestDoc = {
   notes?: string | null;
   flightProvided?: boolean;
   housingProvided?: boolean;
+  matchId?: string;
+  sheetRowKey?: string;
 };
 
 function sheetsClient(serviceAccountJson: string) {
@@ -105,6 +107,24 @@ async function readTab(
     logger.warn(`Tab ${tabName} not readable`, { err });
     return [];
   }
+}
+
+async function scheduleRowExists(
+  sheets: ReturnType<typeof sheetsClient>,
+  spreadsheetId: string,
+  matchKey: string,
+): Promise<boolean> {
+  const values = await readTab(sheets, spreadsheetId, 'Schedule');
+  if (!values.length) return false;
+  const headers = values[0] ?? [];
+  const idIdx = headerIndex(headers, ['match_id', 'matchid', 'id']);
+  if (idIdx < 0) return false;
+  const normKey = matchKey.trim().toLowerCase();
+  for (let i = 1; i < values.length; i++) {
+    const cell = String(values[i]?.[idIdx] ?? '').trim().toLowerCase();
+    if (cell === normKey) return true;
+  }
+  return false;
 }
 
 async function appendScheduleRow(
@@ -253,6 +273,13 @@ export async function runApproveFixtureRequest(opts: {
     throw new HttpsError('not-found', 'Fixture request not found.');
   }
   const req = reqSnap.data() as FixtureRequestDoc;
+  if (req.status === 'approved' && req.matchId) {
+    return {
+      ok: true,
+      matchId: String(req.matchId),
+      sheetRowKey: String(req.sheetRowKey ?? req.matchId),
+    };
+  }
   if (req.status !== 'pending') {
     throw new HttpsError(
       'failed-precondition',
@@ -274,26 +301,60 @@ export async function runApproveFixtureRequest(opts: {
   const sheets = sheetsClient(serviceAccountJson);
   const gender = req.gender === 'women' ? 'women' : 'men';
 
-  try {
-    await upsertLocationsRow(
-      sheets,
-      sheetId,
-      req.venueName,
-      req.venueAddress,
-      gender,
-    );
-    await appendScheduleRow(sheets, sheetId, {
-      matchId: sheetRowKey,
-      date,
-      time,
-      location: req.venueName,
-      homeTeam: req.homeTeamName,
-      awayTeam: req.awayTeamName,
-      competition: req.competition ?? undefined,
+  const matchRef = db.doc(`orgs/${orgId}/matches/${matchId}`);
+  const existingMatch = await matchRef.get();
+  if (!existingMatch.exists) {
+    const at = new Date().toISOString();
+    const matchDoc: Record<string, unknown> = {
+      id: matchId,
+      sheetRowKey,
+      status: 'pending_team_review',
+      kickoffAt: req.kickoffAt,
+      venueName: req.venueName,
+      venueAddress: req.venueAddress,
+      homeTeamId: req.homeTeamId,
+      awayTeamId: req.awayTeamId,
+      homeTeamName: req.homeTeamName,
+      awayTeamName: req.awayTeamName,
+      competition: req.competition || null,
       level: req.level,
       gender,
-      notes: req.notes ?? undefined,
-    });
+      notes: req.notes || null,
+      flightProvided: Boolean(req.flightProvided),
+      housingProvided: Boolean(req.housingProvided),
+      crew: emptyCrew(),
+      rolesNeeded: ['mo'],
+      releasedAt: at,
+      homeConfirmedAt: req.side === 'home' ? at : null,
+      awayConfirmedAt: req.side === 'away' ? at : null,
+      createdAt: FieldValue.serverTimestamp(),
+      updatedAt: FieldValue.serverTimestamp(),
+    };
+    await matchRef.set(matchDoc);
+  }
+
+  try {
+    if (!(await scheduleRowExists(sheets, sheetId, sheetRowKey))) {
+      await upsertLocationsRow(
+        sheets,
+        sheetId,
+        req.venueName,
+        req.venueAddress,
+        gender,
+      );
+      await appendScheduleRow(sheets, sheetId, {
+        matchId: sheetRowKey,
+        date,
+        time,
+        location: req.venueName,
+        homeTeam: req.homeTeamName,
+        awayTeam: req.awayTeamName,
+        competition: req.competition ?? undefined,
+        level: req.level,
+        gender,
+        notes: req.notes ?? undefined,
+      });
+    }
   } catch (err) {
     if (err instanceof HttpsError) throw err;
     logger.error('Sheet write failed for fixture approve', err);
@@ -306,36 +367,7 @@ export async function runApproveFixtureRequest(opts: {
   }
 
   const at = new Date().toISOString();
-  const matchRef = db.doc(`orgs/${orgId}/matches/${matchId}`);
-  const matchDoc: Record<string, unknown> = {
-    id: matchId,
-    sheetRowKey,
-    status: 'pending_team_review',
-    kickoffAt: req.kickoffAt,
-    venueName: req.venueName,
-    venueAddress: req.venueAddress,
-    homeTeamId: req.homeTeamId,
-    awayTeamId: req.awayTeamId,
-    homeTeamName: req.homeTeamName,
-    awayTeamName: req.awayTeamName,
-    competition: req.competition || null,
-    level: req.level,
-    gender,
-    notes: req.notes || null,
-    flightProvided: Boolean(req.flightProvided),
-    housingProvided: Boolean(req.housingProvided),
-    crew: emptyCrew(),
-    rolesNeeded: ['mo'],
-    releasedAt: at,
-    homeConfirmedAt: req.side === 'home' ? at : null,
-    awayConfirmedAt: req.side === 'away' ? at : null,
-    createdAt: FieldValue.serverTimestamp(),
-    updatedAt: FieldValue.serverTimestamp(),
-  };
-
-  const batch = db.batch();
-  batch.set(matchRef, matchDoc);
-  batch.update(reqRef, {
+  await reqRef.update({
     status: 'approved',
     matchId,
     sheetRowKey,
@@ -343,7 +375,6 @@ export async function runApproveFixtureRequest(opts: {
     reviewedByUserId,
     updatedAt: at,
   });
-  await batch.commit();
 
   logger.info('approveFixtureRequest', { orgId, requestId, matchId });
   return { ok: true, matchId, sheetRowKey };
