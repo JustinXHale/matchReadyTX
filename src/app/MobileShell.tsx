@@ -161,11 +161,8 @@ function navForRole(roleView: RoleView, demo: boolean): NavItem[] {
 export function MobileShell() {
   const {
     currentUser,
-    isDemoMode,
     isDemoShowcase,
-    dataMode,
     hasFirebaseSession,
-    enterDemoShowcase,
     enterLive,
     canSwitchRoleView,
     availableLenses,
@@ -230,18 +227,6 @@ export function MobileShell() {
               </MastheadBrand>
             </MastheadMain>
             <MastheadContent className="rs-masthead__content">
-              {isDemoMode && hasFirebaseSession && dataMode === 'live' && (
-                <Button
-                  variant="link"
-                  className="rs-demo-open"
-                  onClick={() => {
-                    enterDemoShowcase();
-                    navigate(withDemoPrefix(ROLE_HOME[roleView]));
-                  }}
-                >
-                  Open demo
-                </Button>
-              )}
               {isDemoShowcase && hasFirebaseSession && (
                 <Button
                   variant="link"

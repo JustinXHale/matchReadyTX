@@ -7,12 +7,17 @@ import { formatDueBadge } from '@/features/referee/reports/dueCounts';
 export function QueuesSubNav() {
   const { state } = useApp();
   const workHref = useAppHref('/scheduler/queues');
+  const requestsHref = useAppHref('/scheduler/queues/requests');
   const crewHref = useAppHref('/scheduler/queues/crew');
 
   const queueTotal = useMemo(
     () => countSchedulerQueues(state).totalActionable,
     [state],
   );
+  const requestTotal = useMemo(() => {
+    const counts = countSchedulerQueues(state);
+    return counts.fixtureRequests + counts.teamLinkRequests + counts.raiseHand;
+  }, [state]);
 
   return (
     <nav className="rs-sub-tabs" aria-label="Queues">
@@ -32,6 +37,24 @@ export function QueuesSubNav() {
         {queueTotal > 0 && (
           <span className="rs-nav-badge rs-nav-badge--inline" aria-hidden>
             {formatDueBadge(queueTotal)}
+          </span>
+        )}
+      </NavLink>
+      <NavLink
+        to={requestsHref}
+        className={({ isActive }) =>
+          `rs-nav-with-badge${isActive ? ' active' : ''}`
+        }
+        aria-label={
+          requestTotal > 0
+            ? `Requests, ${requestTotal} needing review`
+            : 'Requests'
+        }
+      >
+        Requests
+        {requestTotal > 0 && (
+          <span className="rs-nav-badge rs-nav-badge--inline" aria-hidden>
+            {formatDueBadge(requestTotal)}
           </span>
         )}
       </NavLink>

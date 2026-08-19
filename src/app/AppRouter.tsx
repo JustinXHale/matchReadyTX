@@ -176,6 +176,13 @@ const SchedulerQueuesWorkPage = lazy(() =>
     default: m.SchedulerQueuesWorkPage,
   })),
 );
+const SchedulerQueuesRequestsPage = lazy(() =>
+  import('@/features/scheduler/queues/SchedulerQueuesRequestsPage').then(
+    (m) => ({
+      default: m.SchedulerQueuesRequestsPage,
+    }),
+  ),
+);
 const SchedulerSchedulePage = lazy(() =>
   import('@/features/scheduler/schedule/SchedulerSchedulePage').then((m) => ({
     default: m.SchedulerSchedulePage,
@@ -440,6 +447,7 @@ function FeatureRoutes() {
         <Route index element={<SchedulerIndexRedirect />} />
         <Route path="queues" element={<SchedulerQueuesLayout />}>
           <Route index element={<SchedulerQueuesWorkPage />} />
+          <Route path="requests" element={<SchedulerQueuesRequestsPage />} />
           <Route path="crew" element={<SchedulerCrewDefaultsPage />} />
         </Route>
         <Route path="schedule" element={<SchedulerSchedulePage />} />
@@ -461,7 +469,7 @@ function FeatureRoutes() {
       />
       <Route
         path="requests"
-        element={<AppNavigate to="/scheduler/queues" replace />}
+        element={<AppNavigate to="/scheduler/queues/requests" replace />}
       />
       <Route path="matches" element={<RoleHomeRedirect />} />
       <Route path="settings" element={<AppNavigate to="/profile" replace />} />

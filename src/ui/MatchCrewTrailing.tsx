@@ -1,5 +1,9 @@
 import { Link } from 'react-router-dom';
-import type { CrewSlot, Match } from '@/domain/types';
+import {
+  rolesNeededForMatch,
+  type CrewSlot,
+  type Match,
+} from '@/domain/types';
 import {
   APPOINTMENT_CREW_ORDER,
   crewKeyShortLabel,
@@ -19,6 +23,11 @@ export function MatchCrewTrailing({
   highlightSlot?: CrewSlot | null;
   back?: BackNav;
 }) {
+  const activeRoles = new Set(rolesNeededForMatch(match));
+  const visibleKeys = APPOINTMENT_CREW_ORDER.filter((key) =>
+    key === 'cmo' ? activeRoles.has('cmo') : activeRoles.has(key),
+  );
+
   return (
     <Link
       to={`/matches/${match.id}`}
@@ -27,7 +36,7 @@ export function MatchCrewTrailing({
       aria-label="Open match crew"
       onClick={(e) => e.stopPropagation()}
     >
-      {APPOINTMENT_CREW_ORDER.map((key: AppointmentCrewKey) => {
+      {visibleKeys.map((key: AppointmentCrewKey) => {
         const isMine = Boolean(highlightSlot && key === highlightSlot);
         const label = crewKeyShortLabel(key);
         if (isMine) {
