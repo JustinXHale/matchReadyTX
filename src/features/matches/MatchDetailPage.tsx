@@ -67,7 +67,7 @@ import {
 import { openGroupMailto, uniqueEmails } from '@/services/mailto';
 import { mapsDirectionsUrl } from '@/services/maps';
 import { persistCrewAssignmentAndEmail, persistCrewUnassignmentAndEmail, resendCrewAssignmentEmail } from '@/services/liveAssignment';
-import { defaultOrgId, saveMatchCrewAssignment } from '@/services/orgData';
+import { defaultOrgId, createGameRequestInFirestore, saveMatchCrewAssignment } from '@/services/orgData';
 import { isFirebaseConfigured } from '@/services/firebase';
 import { backState, readBackNav } from '@/nav/backNav';
 import {
@@ -977,14 +977,34 @@ export function MatchDetailPage() {
     !canRequest &&
     !stickyPrimary;
 
-  const submitRequest = () => {
-    if (!requestSlot || !canSubmitRequest) return;
-    store.requestGame(
+  const submitRequest = async () => {
+    if (!requestSlot || !canSubmitRequest || !currentUser || !match) return;
+    const reqId = store.requestGame(
       match.id,
       currentUser.uid,
       requestSlot,
       requestNote.trim() || undefined,
     );
+    if (!reqId) return;
+
+    if (dataMode === 'live' && isFirebaseConfigured) {
+      const created = store.getState().requests.find((r) => r.id === reqId);
+      if (created) {
+        try {
+          await createGameRequestInFirestore(defaultOrgId(), match.id, created);
+        } catch (err) {
+          console.error('Raise-hand request failed', err);
+          store.withdrawRequest(reqId, currentUser.uid);
+          window.alert(
+            err instanceof Error
+              ? err.message
+              : 'Could not save your request. Try again.',
+          );
+          return;
+        }
+      }
+    }
+
     setRequestSlot('');
     setRequestNote('');
   };
@@ -2163,7 +2183,7 @@ export function MatchDetailPage() {
                 ? undefined
                 : 'rs-detail-sticky__submit--disabled'
             }
-            onClick={submitRequest}
+            onClick={() => void submitRequest()}
           >
             {canSubmitRequest ? 'Submit request' : 'Select one role'}
           </Button>

@@ -43,7 +43,7 @@ function AppointmentRow({
       match={match}
       to={`/matches/${match.id}`}
       showTime
-      split="action"
+      split="appt"
       urgent={urgent}
       back={APPOINTMENTS_BACK}
       trailing={

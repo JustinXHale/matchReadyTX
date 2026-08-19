@@ -18,6 +18,11 @@ import type { GameRequest, Match } from '@/domain/types';
 import { REQUESTABLE_SLOT_SHORT } from '@/domain/types';
 import { isPendingRequestActive } from '@/domain/requests';
 import type { BackNav } from '@/nav/backNav';
+import { isFirebaseConfigured } from '@/services/firebase';
+import {
+  defaultOrgId,
+  deleteGameRequestInFirestore,
+} from '@/services/orgData';
 
 const PENDING_BACK: BackNav = {
   to: '/referee/request/pending',
@@ -73,7 +78,7 @@ function RequestStatusTrailing({
 }
 
 export function PendingRequestsPage() {
-  const { currentUser, state, store, refresh } = useApp();
+  const { currentUser, state, store, refresh, dataMode } = useApp();
   const [pendingRemoval, setPendingRemoval] = useState<{
     request: GameRequest;
     match: Match;
@@ -121,11 +126,29 @@ export function PendingRequestsPage() {
   const confirmRemove = () => {
     if (!pendingRemoval) return;
     const { request } = pendingRemoval;
-    flushSync(() => {
-      store.withdrawRequest(request.id, currentUser.uid);
-      refresh();
-      setPendingRemoval(null);
-    });
+    void (async () => {
+      flushSync(() => {
+        store.withdrawRequest(request.id, currentUser!.uid);
+        refresh();
+        setPendingRemoval(null);
+      });
+      if (dataMode === 'live' && isFirebaseConfigured) {
+        try {
+          await deleteGameRequestInFirestore(
+            defaultOrgId(),
+            request.matchId,
+            request.id,
+          );
+        } catch (err) {
+          console.error('Withdraw request failed', err);
+          window.alert(
+            err instanceof Error
+              ? err.message
+              : 'Could not remove your request. Try again.',
+          );
+        }
+      }
+    })();
   };
 
   return (

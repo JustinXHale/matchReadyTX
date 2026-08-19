@@ -2109,6 +2109,7 @@ class DemoStore {
     fixtureRequests?: FixtureRequest[];
     teamLinkRequests?: TeamLinkRequest[];
     proposals?: ChangeProposal[];
+    gameRequests?: GameRequest[];
   }): void {
     this.set((s) => ({
       ...s,
@@ -2122,7 +2123,7 @@ class DemoStore {
       matches: snap.matches,
       teams: snap.teams.length > 0 ? snap.teams : s.teams,
       proposals: snap.proposals ?? [],
-      requests: [],
+      requests: snap.gameRequests ?? [],
       fixtureRequests: snap.fixtureRequests ?? [],
       teamLinkRequests: snap.teamLinkRequests ?? [],
       // Cleared until subscribeCoachFeedback fills (role-scoped).
@@ -3342,14 +3343,14 @@ class DemoStore {
     userId: string,
     preferredSlot: RequestableSlot,
     note?: string,
-  ): void {
+  ): string | null {
     const user = this.state.users.find((u) => u.uid === userId);
-    if (!user) return;
-    if (!preferredSlot) return;
+    if (!user) return null;
+    if (!preferredSlot) return null;
     const existing = this.state.requests.find(
       (r) => r.matchId === matchId && r.userId === userId && r.status === 'pending',
     );
-    if (existing) return;
+    if (existing) return null;
     const req: GameRequest = {
       id: id('gr'),
       matchId,
@@ -3370,6 +3371,7 @@ class DemoStore {
         `${user.displayName} requested a match.`,
       );
     }
+    return req.id;
   }
 
   /**

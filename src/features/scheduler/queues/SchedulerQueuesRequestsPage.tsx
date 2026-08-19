@@ -21,14 +21,16 @@ import {
   pendingTeamLinkRequests,
 } from '@/features/scheduler/queues/selectors';
 import { isFirebaseConfigured } from '@/services/firebase';
-import { persistCrewAssignmentAndEmail } from '@/services/liveAssignment';
 import {
   callApproveFixtureRequest,
   callReviewTeamLinkRequest,
   declineFixtureRequestInFirestore,
   defaultOrgId,
-  saveMatchCrewAssignment,
 } from '@/services/orgData';
+import {
+  approveRaiseHandRequest,
+  declineRaiseHandRequest,
+} from '@/features/scheduler/queues/raiseHandActions';
 
 function RequestSection({
   id,
@@ -136,31 +138,17 @@ export function SchedulerQueuesRequestsPage() {
   ]);
 
   const onApproveRaiseHand = (id: string, slot?: RequestableSlot) => {
-    const before = state.requests.find((r) => r.id === id);
-    store.approveRequest(id, slot);
-    if (dataMode !== 'live' || !before) return;
-    const chosen = slot ?? before.preferredSlot;
-    if (!chosen || chosen === 'cmo') {
-      const next = store.getState().matches.find((m) => m.id === before.matchId);
-      if (next) {
-        void saveMatchCrewAssignment(defaultOrgId(), next).catch((err) =>
-          console.error('Failed to save CMO approve', err),
-        );
-      }
-      return;
-    }
-    const next = store.getState().matches.find((m) => m.id === before.matchId);
-    if (!next) return;
-    void persistCrewAssignmentAndEmail({
-      match: next,
-      slot: chosen,
-      userId: before.userId,
+    void approveRaiseHandRequest({
+      store,
+      dataMode,
+      requestId: id,
+      slot,
     }).catch((err) => {
       console.error('Failed to save/email raise-hand approve', err);
       window.alert(
         err instanceof Error
-          ? `Approved locally, but email/save failed: ${err.message}`
-          : 'Approved locally, but email/save failed.',
+          ? `Approved locally, but save failed: ${err.message}`
+          : 'Approved locally, but save failed.',
       );
     });
   };
@@ -312,7 +300,14 @@ export function SchedulerQueuesRequestsPage() {
         <RaiseHandQueue
           requests={raiseHand}
           onApprove={onApproveRaiseHand}
-          onDecline={(id, reason) => store.declineRequest(id, reason)}
+          onDecline={(id, reason) =>
+            void declineRaiseHandRequest({
+              store,
+              dataMode,
+              requestId: id,
+              reason,
+            }).catch((err) => console.error('Decline raise-hand failed', err))
+          }
         />
       </RequestSection>
     </>

@@ -49,7 +49,7 @@ export function MatchListRow({
    * `inline` = one line: home name · home score — away score · away name.
    */
   teamsLayout = 'stack',
-  /** Event | trailing split. `crew` = 3/5·2/5, `action` = 4/5·1/5 (raise-hand). */
+  /** Event | trailing split. `crew` = 3/5·2/5, `action` = 4/5·1/5 (raise-hand), `appt` = tighter crew column. */
   split = 'crew',
   /**
    * When true and `to` is set, the link wraps main + trailing so the whole
@@ -72,7 +72,7 @@ export function MatchListRow({
   showTime?: boolean;
   hideScore?: boolean;
   teamsLayout?: 'stack' | 'inline';
-  split?: 'crew' | 'action';
+  split?: 'crew' | 'action' | 'appt';
   linkWholeCard?: boolean;
   urgent?: boolean;
   warn?: boolean;
@@ -168,6 +168,7 @@ export function MatchListRow({
   const rowClass = [
     'rs-list-row',
     split === 'action' ? 'rs-list-row--action' : '',
+    split === 'appt' ? 'rs-list-row--appt' : '',
     aside ? 'rs-list-row--with-aside' : '',
     urgent ? 'rs-list-row--urgent' : '',
     !urgent && warn ? 'rs-list-row--warn' : '',

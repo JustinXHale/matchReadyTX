@@ -1,6 +1,7 @@
 import {
   collection,
   collectionGroup,
+  deleteDoc,
   doc,
   getDoc,
   onSnapshot,
@@ -33,6 +34,7 @@ import {
   type CrewAssignment,
   type CmoContact,
   type FixtureRequest,
+  type GameRequest,
   type Match,
   type MatchGender,
   type OrgSettings,
@@ -251,6 +253,7 @@ export type LiveOrgSnapshot = {
   fixtureRequests: FixtureRequest[];
   teamLinkRequests: TeamLinkRequest[];
   proposals: ChangeProposal[];
+  gameRequests: GameRequest[];
 };
 
 function parseCoachFeedbackScales(
@@ -517,6 +520,36 @@ function proposalForFirestore(
   });
 }
 
+export function gameRequestFromFirestore(
+  id: string,
+  matchId: string,
+  data: Record<string, unknown>,
+): GameRequest {
+  const preferredSlot = data.preferredSlot;
+  return {
+    id,
+    matchId,
+    userId: String(data.userId ?? ''),
+    userName: String(data.userName ?? ''),
+    preferredSlot:
+      preferredSlot === 'mo' ||
+      preferredSlot === 'ar1' ||
+      preferredSlot === 'ar2' ||
+      preferredSlot === 'no4' ||
+      preferredSlot === 'cmo'
+        ? preferredSlot
+        : undefined,
+    note: typeof data.note === 'string' ? data.note : undefined,
+    status:
+      data.status === 'approved' || data.status === 'declined'
+        ? data.status
+        : 'pending',
+    createdAt: String(data.createdAt ?? ''),
+    declineReason:
+      typeof data.declineReason === 'string' ? data.declineReason : undefined,
+  };
+}
+
 export function teamLinkRequestFromFirestore(
   id: string,
   data: Record<string, unknown>,
@@ -559,6 +592,7 @@ export function subscribeLiveOrg(
   let fixtureRequests: FixtureRequest[] = [];
   let teamLinkRequests: TeamLinkRequest[] = [];
   let proposals: ChangeProposal[] = [];
+  let gameRequests: GameRequest[] = [];
 
   const emit = () =>
     onData({
@@ -568,6 +602,7 @@ export function subscribeLiveOrg(
       fixtureRequests,
       teamLinkRequests,
       proposals,
+      gameRequests,
     });
 
   const unsubs: Unsubscribe[] = [];
@@ -649,6 +684,27 @@ export function subscribeLiveOrg(
             const parts = d.ref.path.split('/');
             const matchId = parts[3] ?? '';
             return proposalFromFirestore(d.id, matchId, d.data() as Record<string, unknown>);
+          });
+        emit();
+      },
+      (err) => onError?.(err),
+    ),
+  );
+
+  unsubs.push(
+    onSnapshot(
+      collectionGroup(database, 'gameRequests'),
+      (snap) => {
+        gameRequests = snap.docs
+          .filter((d) => d.ref.path.startsWith(`orgs/${orgId}/matches/`))
+          .map((d) => {
+            const parts = d.ref.path.split('/');
+            const matchId = parts[3] ?? '';
+            return gameRequestFromFirestore(
+              d.id,
+              matchId,
+              d.data() as Record<string, unknown>,
+            );
           });
         emit();
       },
@@ -1053,6 +1109,81 @@ export async function saveMatchScheduleFacts(
       updatedAt: new Date().toISOString(),
     }),
     { merge: true },
+  );
+}
+
+/** Official raises hand for a match (pending assigner review). */
+export async function createGameRequestInFirestore(
+  orgId: string,
+  matchId: string,
+  req: GameRequest,
+): Promise<void> {
+  await setDoc(
+    doc(
+      requireDb(),
+      'orgs',
+      orgId,
+      'matches',
+      matchId,
+      'gameRequests',
+      req.id,
+    ),
+    stripUndefined({
+      userId: req.userId,
+      userName: req.userName,
+      preferredSlot: req.preferredSlot ?? null,
+      note: req.note?.trim() || null,
+      status: 'pending',
+      createdAt: req.createdAt,
+      updatedAt: new Date().toISOString(),
+    }),
+  );
+}
+
+/** Assigner approves or declines a raise-hand request. */
+export async function updateGameRequestInFirestore(
+  orgId: string,
+  matchId: string,
+  requestId: string,
+  patch: {
+    status: 'approved' | 'declined';
+    declineReason?: string;
+  },
+): Promise<void> {
+  await updateDoc(
+    doc(
+      requireDb(),
+      'orgs',
+      orgId,
+      'matches',
+      matchId,
+      'gameRequests',
+      requestId,
+    ),
+    stripUndefined({
+      status: patch.status,
+      declineReason: patch.declineReason?.trim() || null,
+      updatedAt: new Date().toISOString(),
+    }),
+  );
+}
+
+/** Official withdraws their own pending raise-hand request. */
+export async function deleteGameRequestInFirestore(
+  orgId: string,
+  matchId: string,
+  requestId: string,
+): Promise<void> {
+  await deleteDoc(
+    doc(
+      requireDb(),
+      'orgs',
+      orgId,
+      'matches',
+      matchId,
+      'gameRequests',
+      requestId,
+    ),
   );
 }
 
