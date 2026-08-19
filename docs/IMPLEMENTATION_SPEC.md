@@ -193,7 +193,7 @@ mail/{mailId}   // outbound queue — Admin SDK only; see docs/EMAIL.md
 | Path | Behavior |
 |------|----------|
 | `syncSheet` (callable) | Assigner-triggered full ingest via `runSheetSync` |
-| `sheetPoll` | Every 5 min → `runSheetSync` when `sheetId` + SA present |
+| `sheetPoll` | Daily (~06:00 UTC) → `runSheetSync` when `sheetId` + SA present |
 | `sheetWebhook` | Apps Script push → same `runSheetSync` ingest |
 | `proposalWriteback` | After other-team accept + assigner ack → update Schedule row + Firestore match facts |
 | `submitTeamLinkRequests` | Onboarding/profile: auto-approve via Contacts or create pending |
@@ -209,7 +209,7 @@ See also [`SHEET_SYNC.md`](./SHEET_SYNC.md).
 |----------|---------|
 | `syncSheet` | Callable (assigner) |
 | `sheetWebhook` | HTTPS from Apps Script → full sync |
-| `sheetPoll` | Scheduled every 5 min |
+| `sheetPoll` | Scheduled daily (~06:00 UTC); assigner manual Sync anytime |
 | `proposalWriteback` | Callable on proposal completion |
 | `submitTeamLinkRequests` | Callable (self) |
 | `reviewTeamLinkRequest` | Callable (assigner or team TA) |

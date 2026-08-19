@@ -201,10 +201,10 @@ export const sheetWebhook = onRequest(
   },
 );
 
-/** Poll fallback every 5 minutes — same ingest as syncSheet / sheetWebhook. */
+/** Daily poll fallback — same ingest as syncSheet / sheetWebhook. Manual Sync is primary. */
 export const sheetPoll = onSchedule(
   {
-    schedule: 'every 5 minutes',
+    schedule: 'every day 06:00',
     secrets: [googleServiceAccountJson],
     timeoutSeconds: 120,
     memory: '512MiB',

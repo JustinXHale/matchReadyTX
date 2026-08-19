@@ -74,7 +74,7 @@ Firebase Console → Authentication → Settings → **Authorized domains** → 
 | Path | Trigger | Behavior |
 |------|---------|----------|
 | `syncSheet` | Assigner → Upload → Sync | Full Schedule (+ Contacts / Locations) → Firestore |
-| `sheetPoll` | Every 5 minutes | Same ingest when `sheetId` + SA present |
+| `sheetPoll` | Daily (~06:00 UTC) | Fallback ingest when `sheetId` + SA present; use Upload → Sync anytime |
 | `sheetWebhook` | Apps Script `onEdit` / timed | Same ingest (no longer timestamp-only) |
 | `proposalWriteback` | Assigner ack after other-team accept | Updates Schedule row + match facts |
 | `submitTeamLinkRequests` | Onboarding / Profile | Auto-approve when email on Contacts; else pending |
