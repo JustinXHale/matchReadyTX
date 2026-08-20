@@ -614,6 +614,12 @@ export function subscribeLiveOrg(
       ...(gameRequestsHydrated ? { gameRequests } : {}),
     });
 
+  const onSnapError =
+    (label: string) => (err: Error) =>
+      onError?.(
+        new Error(`${label}: ${err.message}`, { cause: err }),
+      );
+
   const unsubs: Unsubscribe[] = [];
 
   unsubs.push(
@@ -627,7 +633,7 @@ export function subscribeLiveOrg(
         }
         emit();
       },
-      (err) => onError?.(err),
+      (err) => onSnapError('org')(err),
     ),
   );
 
@@ -640,7 +646,7 @@ export function subscribeLiveOrg(
         );
         emit();
       },
-      (err) => onError?.(err),
+      (err) => onSnapError('matches')(err),
     ),
   );
 
@@ -653,7 +659,7 @@ export function subscribeLiveOrg(
         );
         emit();
       },
-      (err) => onError?.(err),
+      (err) => onSnapError('teams')(err),
     ),
   );
 
@@ -666,7 +672,7 @@ export function subscribeLiveOrg(
         );
         emit();
       },
-      (err) => onError?.(err),
+      (err) => onSnapError('fixtureRequests')(err),
     ),
   );
 
@@ -679,7 +685,7 @@ export function subscribeLiveOrg(
         );
         emit();
       },
-      (err) => onError?.(err),
+      (err) => onSnapError('teamLinkRequests')(err),
     ),
   );
 
@@ -705,7 +711,7 @@ export function subscribeLiveOrg(
         proposalsHydrated = true;
         emit();
       },
-      (err) => onError?.(err),
+      (err) => onSnapError('proposals')(err),
     ),
   );
 
@@ -737,7 +743,7 @@ export function subscribeLiveOrg(
           gameRequestsHydrated = true;
           emit();
         },
-        (err) => onError?.(err),
+        (err) => onSnapError('gameRequests')(err),
       ),
     );
   }

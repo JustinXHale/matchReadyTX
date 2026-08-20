@@ -434,5 +434,21 @@ service cloud.firestore {
         allow write: if request.auth.uid == uid;
       }
     }
+
+    // Collection-group queries (raise-hand + proposals) need recursive read rules.
+    match /{path=**}/gameRequests/{requestId} {
+      allow read: if signedIn()
+        && resource.data.orgId is string
+        && (
+          isAssigner(resource.data.orgId)
+          || resource.data.userId == request.auth.uid
+        );
+    }
+
+    match /{path=**}/proposals/{proposalId} {
+      allow read: if signedIn()
+        && resource.data.orgId is string
+        && isMember(resource.data.orgId);
+    }
   }
 }

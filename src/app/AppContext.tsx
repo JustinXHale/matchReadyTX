@@ -378,6 +378,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
     state.currentUserId,
     dataMode,
     state.users.find((u) => u.uid === state.currentUserId)?.profileComplete,
+    state.users
+      .find((u) => u.uid === state.currentUserId)
+      ?.roles.join(','),
   ]);
 
   const refreshLiveProfile = useCallback(async () => {
