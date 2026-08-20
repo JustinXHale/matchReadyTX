@@ -692,9 +692,8 @@ body {
 .rs-queue-decision__dist {
   margin: 0;
   font-size: 12px;
-  font-weight: 700;
-  font-variant-numeric: tabular-nums;
-  color: var(--rs-color-ink);
+  font-weight: 500;
+  color: var(--rs-color-muted);
 }
 
 .rs-queue-decision__dist--unknown {
@@ -1085,6 +1084,22 @@ input.rs-filter-search {
 
 .rs-filter-field .rs-icon-field {
   width: 100%;
+}
+
+.rs-filter-date.pf-v6-c-date-picker,
+.rs-filter-field .pf-v6-c-date-picker {
+  width: 100%;
+  max-width: 100%;
+}
+
+.rs-filter-field .pf-v6-c-date-picker .pf-v6-c-input-group {
+  width: 100%;
+}
+
+.rs-filter-field .pf-v6-c-date-picker__input {
+  flex: 1 1 auto;
+  min-width: 0;
+  width: auto;
 }
 
 .rs-filter-chip {
@@ -4445,9 +4460,8 @@ button.rs-detail-people__confirm:focus-visible {
 .rs-official-picker__dist {
   flex-shrink: 0;
   font-size: 13px;
-  font-weight: 700;
-  font-variant-numeric: tabular-nums;
-  color: var(--rs-color-ink);
+  font-weight: 500;
+  color: var(--rs-color-muted);
 }
 
 .rs-official-picker__dist--unknown {

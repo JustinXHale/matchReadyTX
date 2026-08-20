@@ -4,12 +4,12 @@ import { useApp, useAppHref } from '@/app/AppContext';
 import { formatDueBadge } from '@/features/referee/reports/dueCounts';
 import { countSchedulerQueues } from '@/features/scheduler/queues/selectors';
 
-/** Fixtures | Team links | Raise-hand under Requests. */
+/** Raise-hand | Fixtures | Team links under Requests. */
 export function RequestsQueuesSubNav() {
   const { state } = useApp();
+  const raiseHandHref = useAppHref('/scheduler/queues/requests/raise-hand');
   const fixturesHref = useAppHref('/scheduler/queues/requests/fixtures');
   const teamLinksHref = useAppHref('/scheduler/queues/requests/team-links');
-  const raiseHandHref = useAppHref('/scheduler/queues/requests/raise-hand');
 
   const counts = useMemo(() => countSchedulerQueues(state), [state]);
 
@@ -18,6 +18,24 @@ export function RequestsQueuesSubNav() {
       className="rs-sub-tabs rs-sub-tabs--tertiary"
       aria-label="Request type"
     >
+      <NavLink
+        to={raiseHandHref}
+        className={({ isActive }) =>
+          `rs-nav-with-badge${isActive ? ' active' : ''}`
+        }
+        aria-label={
+          counts.raiseHand > 0
+            ? `Raise-hand, ${counts.raiseHand} pending`
+            : 'Raise-hand'
+        }
+      >
+        Raise-hand
+        {counts.raiseHand > 0 && (
+          <span className="rs-nav-badge rs-nav-badge--inline" aria-hidden>
+            {formatDueBadge(counts.raiseHand)}
+          </span>
+        )}
+      </NavLink>
       <NavLink
         to={fixturesHref}
         className={({ isActive }) =>
@@ -51,24 +69,6 @@ export function RequestsQueuesSubNav() {
         {counts.teamLinkRequests > 0 && (
           <span className="rs-nav-badge rs-nav-badge--inline" aria-hidden>
             {formatDueBadge(counts.teamLinkRequests)}
-          </span>
-        )}
-      </NavLink>
-      <NavLink
-        to={raiseHandHref}
-        className={({ isActive }) =>
-          `rs-nav-with-badge${isActive ? ' active' : ''}`
-        }
-        aria-label={
-          counts.raiseHand > 0
-            ? `Raise-hand, ${counts.raiseHand} pending`
-            : 'Raise-hand'
-        }
-      >
-        Raise-hand
-        {counts.raiseHand > 0 && (
-          <span className="rs-nav-badge rs-nav-badge--inline" aria-hidden>
-            {formatDueBadge(counts.raiseHand)}
           </span>
         )}
       </NavLink>

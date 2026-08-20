@@ -26,8 +26,6 @@ import {
   shouldShowCrewStatusChips,
 } from '@/domain/crewChips';
 import {
-  formatDistanceMi,
-  matchEconomicsForUser,
   matchFeeBreakdown,
 } from '@/domain/economics';
 import {
@@ -59,6 +57,7 @@ import { namedOfficialsNeedingAvailability } from '@/domain/crew';
 import { availableCrewRolesToAdd, roleHasAssignee } from '@/domain/crewSize';
 import { UserAvatar } from '@/ui/UserAvatar';
 import { IconDateInput } from '@/ui/IconDateInput';
+import { formatMemberCityState } from '@/domain/members';
 import {
   canOfficialRequestMatch,
   isPendingRequestActive,
@@ -689,8 +688,6 @@ export function MatchDetailPage() {
     return [...levels].sort((a, b) => a - b);
   })();
   const pickQuery = pickSearch.trim().toLowerCase();
-  const pickFeeSlot: CrewSlot =
-    pickTarget && pickTarget.slot !== 'cmo' ? pickTarget.slot : 'mo';
   const orgTz = state.org.timezone || 'America/Chicago';
   const filteredOfficials = officials
     .filter((o) => {
@@ -712,12 +709,7 @@ export function MatchDetailPage() {
       return {
         official: o,
         availStatus,
-        roundTripMiles: matchEconomicsForUser(
-          match,
-          state.org,
-          o,
-          pickFeeSlot,
-        ).roundTripMiles,
+        location: formatMemberCityState(o),
       };
     })
     .sort((a, b) => {
@@ -725,11 +717,8 @@ export function MatchDetailPage() {
         availabilitySortRank(a.availStatus) -
         availabilitySortRank(b.availStatus);
       if (availCmp !== 0) return availCmp;
-      if (a.roundTripMiles != null && b.roundTripMiles != null) {
-        return a.roundTripMiles - b.roundTripMiles;
-      }
-      if (a.roundTripMiles != null) return -1;
-      if (b.roundTripMiles != null) return 1;
+      const locCmp = (a.location ?? '').localeCompare(b.location ?? '');
+      if (locCmp !== 0) return locCmp;
       return a.official.displayName.localeCompare(b.official.displayName);
     });
 
@@ -2459,10 +2448,9 @@ export function MatchDetailPage() {
           ) : (
             <ul className="rs-official-picker">
               {filteredOfficials.map(
-                ({ official: o, roundTripMiles, availStatus }) => {
+                ({ official: o, location, availStatus }) => {
                 const isCurrent = currentPickUserId === o.uid;
                 const availLabel = availabilityStatusLabel(availStatus);
-                const distLabel = formatDistanceMi(roundTripMiles);
                 return (
                   <li key={o.uid}>
                     <button
@@ -2481,17 +2469,11 @@ export function MatchDetailPage() {
                               ? ` (${o.refereeLevel})`
                               : ''}
                           </span>
-                          <span
-                            className={`rs-official-picker__dist${
-                              roundTripMiles == null
-                                ? ' rs-official-picker__dist--unknown'
-                                : ''
-                            }`}
-                          >
-                            {roundTripMiles != null
-                              ? `${distLabel} RT`
-                              : distLabel}
-                          </span>
+                          {location ? (
+                            <span className="rs-official-picker__dist">
+                              {location}
+                            </span>
+                          ) : null}
                         </span>
                       </span>
                       <span className="rs-official-picker__meta">

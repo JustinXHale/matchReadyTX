@@ -7,6 +7,7 @@ import {
   formatTeamAddress,
   scheduleTeamEntries,
   teamConferenceLabel,
+  teamHomeMapsUrl,
   teamsFromSchedule,
   teamAdminsForTeam,
   teamContactEmails,
@@ -14,6 +15,7 @@ import {
 import { readBackNav, backState, type BackNav } from '@/nav/backNav';
 import { UserAvatar } from '@/ui/UserAvatar';
 import { MatchListRow } from '@/ui/MatchListRow';
+import { MapsAddressLink } from '@/ui/MapsAddressLink';
 
 const FALLBACK_BACK: BackNav = { to: '/members/teams', label: 'Teams' };
 
@@ -38,6 +40,10 @@ export function SchedulerTeamDetailPage() {
 
   const address = useMemo(
     () => (team ? formatTeamAddress(team, state.matches) : '—'),
+    [team, state.matches],
+  );
+  const mapsUrl = useMemo(
+    () => (team ? teamHomeMapsUrl(team, state.matches) : null),
     [team, state.matches],
   );
   const competitions = useMemo(() => {
@@ -108,11 +114,13 @@ export function SchedulerTeamDetailPage() {
           </div>
           <div>
             <dt>Home location</dt>
-            <dd>{address}</dd>
+            <dd>
+              <MapsAddressLink href={mapsUrl}>{address}</MapsAddressLink>
+            </dd>
           </div>
           {team.abbreviation?.trim() ? (
             <div>
-              <dt>Abbreviation</dt>
+              <dt>Abbr.</dt>
               <dd>{team.abbreviation.trim()}</dd>
             </div>
           ) : null}

@@ -79,6 +79,25 @@ export function matchOnCalendarDate(
   return matchLocalCalendarDate(match.kickoffAt) === yyyyMmDd;
 }
 
+/** Local YYYY-MM-DD from a Date (calendar cells are local midnight). */
+export function calendarDateKey(date: Date): string {
+  if (Number.isNaN(date.getTime())) return '';
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, '0');
+  const d = String(date.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+}
+
+/** Distinct local calendar days that have a kickoff in `matches`. */
+export function uniqueMatchCalendarDates(matches: Match[]): string[] {
+  const dates = new Set<string>();
+  for (const m of matches) {
+    const key = matchLocalCalendarDate(m.kickoffAt);
+    if (key) dates.add(key);
+  }
+  return [...dates].sort();
+}
+
 export function divisionFilterOptionsFromFixtureRequests(
   requests: FixtureRequest[],
 ): DivisionFilterOptions {

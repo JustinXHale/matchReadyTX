@@ -33,7 +33,7 @@ export function QueuesSubNav() {
   const { state } = useApp();
   const workHref = useAppHref('/scheduler/queues/coverage');
   const queuesBaseHref = useAppHref('/scheduler/queues');
-  const requestsHref = useAppHref('/scheduler/queues/requests/fixtures');
+  const requestsHref = useAppHref('/scheduler/queues/requests/raise-hand');
   const requestsBaseHref = useAppHref('/scheduler/queues/requests');
   const crewHref = useAppHref('/scheduler/queues/crew');
   const workActive = useWorkQueuesActive(queuesBaseHref);

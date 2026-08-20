@@ -13,7 +13,7 @@ import {
   type Team,
 } from '@/domain/types';
 import { GlobalDivisionFilters } from '@/features/global/GlobalDivisionFilters';
-import { divisionFilterOptionsFromMatches, matchOnCalendarDate } from '@/domain/divisionFilters';
+import { divisionFilterOptionsFromMatches, matchOnCalendarDate, uniqueMatchCalendarDates } from '@/domain/divisionFilters';
 import { TeamLinkRequestQueue } from '@/features/scheduler/queues/TeamLinkRequestQueue';
 import { TeamAdminMatchRow } from '@/features/teamAdmin/TeamAdminMatchRow';
 import { isFirebaseConfigured } from '@/services/firebase';
@@ -184,6 +184,39 @@ export function TeamAdminHomePage() {
     statusFilter,
   ]);
 
+  const availableDates = useMemo(() => {
+    if (!currentUser) return [];
+    const out: Match[] = [];
+    for (const teamId of currentUser.teamIds) {
+      if (teamFilter && teamId !== teamFilter) continue;
+      for (const match of filterPool) {
+        if (match.homeTeamId !== teamId && match.awayTeamId !== teamId) {
+          continue;
+        }
+        if (genderFilter && match.gender !== genderFilter) continue;
+        if (levelFilter && match.level !== levelFilter) continue;
+        if (competitionFilter && match.competition !== competitionFilter) {
+          continue;
+        }
+        const hasPendingProposal = Boolean(pendingByMatch.get(match.id));
+        const needsAction = isActionNeeded(match, hasPendingProposal);
+        if (statusFilter === 'needs_confirm' && !needsAction) continue;
+        if (statusFilter === 'confirmed' && needsAction) continue;
+        out.push(match);
+      }
+    }
+    return uniqueMatchCalendarDates(out);
+  }, [
+    currentUser,
+    filterPool,
+    pendingByMatch,
+    teamFilter,
+    genderFilter,
+    levelFilter,
+    competitionFilter,
+    statusFilter,
+  ]);
+
   const needsAction = useMemo(
     () =>
       listed.filter(({ match, hasPendingProposal }) =>
@@ -351,6 +384,7 @@ export function TeamAdminHomePage() {
             showDate
             dateFilter={dateFilter}
             onDateChange={setDateFilter}
+            availableDates={availableDates}
             ariaLabel="Filter by division"
           />
 

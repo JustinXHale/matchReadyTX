@@ -3,7 +3,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Navigate, useParams } from 'react-router-dom';
 import { useApp, useAppHref } from '@/app/AppContext';
 import { isKickoffUpcoming } from '@/domain/requests';
-import { divisionFilterOptionsFromMatches, matchOnCalendarDate } from '@/domain/divisionFilters';
+import { divisionFilterOptionsFromMatches, matchOnCalendarDate, uniqueMatchCalendarDates } from '@/domain/divisionFilters';
 import { isTeamMatch, releasedMatches } from '@/domain/visibility';
 import { MatchListRow } from '@/ui/MatchListRow';
 import { MatchCrewTrailing } from '@/ui/MatchCrewTrailing';
@@ -114,6 +114,31 @@ export function GlobalSchedulePage() {
     fanFavorites,
   ]);
 
+  const availableDates = useMemo(
+    () =>
+      uniqueMatchCalendarDates(
+        paneMatches.filter((m) => {
+          if (genderFilter && m.gender !== genderFilter) return false;
+          if (levelFilter && m.level !== levelFilter) return false;
+          if (competitionFilter && m.competition !== competitionFilter) {
+            return false;
+          }
+          if (myTeamsOnly && fanFavorites && fanFavorites.length > 0) {
+            if (!isTeamMatch(m, fanFavorites)) return false;
+          }
+          return true;
+        }),
+      ),
+    [
+      paneMatches,
+      genderFilter,
+      levelFilter,
+      competitionFilter,
+      myTeamsOnly,
+      fanFavorites,
+    ],
+  );
+
   const byMonth = useMemo(() => {
     const groups: { key: string; label: string; matches: Match[] }[] = [];
     for (const m of list) {
@@ -154,6 +179,7 @@ export function GlobalSchedulePage() {
             showDate
             dateFilter={dateFilter}
             onDateChange={setDateFilter}
+            availableDates={availableDates}
             ariaLabel="Filter schedule"
           />
           <div

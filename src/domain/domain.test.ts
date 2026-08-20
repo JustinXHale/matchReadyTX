@@ -58,9 +58,10 @@ import {
   zonedLocalToUtcIso,
 } from '@/domain/availability';
 import { matchesForUser, applyMatchScope } from '@/domain/visibility';
-import { matchOnCalendarDate } from '@/domain/divisionFilters';
+import { matchOnCalendarDate, uniqueMatchCalendarDates } from '@/domain/divisionFilters';
 import {
   fanFavoriteLabel,
+  formatMemberCityState,
   formatMemberJoinedAt,
   memberListName,
   memberMatchesTab,
@@ -240,6 +241,10 @@ describe('crew visibility gate', () => {
     expect(matchOnCalendarDate(match, null)).toBe(true);
     expect(matchOnCalendarDate(match, `${yyyy}-${mm}-${dd}`)).toBe(true);
     expect(matchOnCalendarDate(match, '1999-01-01')).toBe(false);
+    expect(uniqueMatchCalendarDates([match])).toEqual([`${yyyy}-${mm}-${dd}`]);
+    expect(uniqueMatchCalendarDates([match, match])).toEqual([
+      `${yyyy}-${mm}-${dd}`,
+    ]);
   });
 });
 
@@ -1242,6 +1247,16 @@ describe('member directory helpers', () => {
         email: '',
       }),
     ).toBe('Pending profile');
+  });
+
+  it('formatMemberCityState uses profile city and state', () => {
+    expect(formatMemberCityState(base)).toBe('Austin, TX');
+    expect(
+      formatMemberCityState({ ...base, homeCity: '', homeRegion: '' }),
+    ).toBeNull();
+    expect(
+      formatMemberCityState({ ...base, homeCity: 'Dallas', homeRegion: '' }),
+    ).toBe('Dallas');
   });
 
   it('membersForTab hides incomplete unless includeIncomplete', () => {

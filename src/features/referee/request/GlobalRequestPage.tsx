@@ -7,6 +7,7 @@ import {
   divisionFiltersActive,
   matchMatchesDivisionFilters,
   matchOnCalendarDate,
+  uniqueMatchCalendarDates,
 } from '@/domain/divisionFilters';
 import { GlobalDivisionFilters } from '@/features/global/GlobalDivisionFilters';
 import { MatchListRow } from '@/ui/MatchListRow';
@@ -123,6 +124,35 @@ export function GlobalRequestPage() {
         competitionFilter,
       ));
 
+  const availableDates = useMemo(
+    () =>
+      uniqueMatchCalendarDates(
+        filterPool.filter((m) => {
+          if (
+            divisionActive &&
+            !matchMatchesDivisionFilters(
+              m,
+              genderFilter,
+              levelFilter,
+              competitionFilter,
+            )
+          ) {
+            return false;
+          }
+          if (roleFilter && !matchHasOpenRole(m, roleFilter)) return false;
+          return true;
+        }),
+      ),
+    [
+      filterPool,
+      divisionActive,
+      genderFilter,
+      levelFilter,
+      competitionFilter,
+      roleFilter,
+    ],
+  );
+
   const urgentMatches = useMemo(() => {
     if (!currentUser) return [] as Match[];
     const seen = new Set<string>();
@@ -233,6 +263,7 @@ export function GlobalRequestPage() {
         showDate
         dateFilter={dateFilter}
         onDateChange={setDateFilter}
+        availableDates={availableDates}
         ariaLabel="Filter requestable games"
       />
 

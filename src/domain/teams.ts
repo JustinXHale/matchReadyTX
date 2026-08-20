@@ -1,5 +1,6 @@
 import type { Match, Team, UserProfile } from '@/domain/types';
 import { memberListName } from '@/domain/members';
+import { mapsDirectionsUrl } from '@/services/maps';
 
 export type TeamVenue = {
   venueName: string;
@@ -171,6 +172,13 @@ export function formatTeamAddress(team: Team, matches: Match[]): string {
   const direct = team.address?.trim();
   if (direct) return direct;
   return formatTeamVenue(primaryHomeVenueForTeam(team.id, matches));
+}
+
+/** Google Maps directions URL for the club’s home field, when we have an address. */
+export function teamHomeMapsUrl(team: Team, matches: Match[]): string | null {
+  const formatted = formatTeamAddress(team, matches);
+  if (!formatted || formatted === '—') return null;
+  return mapsDirectionsUrl({ name: team.name, address: formatted });
 }
 
 /** Registered team admins linked to this club. */

@@ -12,16 +12,12 @@ import {
   Title,
 } from '@patternfly/react-core';
 import { useApp } from '@/app/AppContext';
-import {
-  formatDistanceMi,
-  matchEconomicsForUser,
-} from '@/domain/economics';
+import { formatMemberCityState } from '@/domain/members';
 import type { CoachingReportStub } from '@/services/demoStore';
 import {
   CREW_SLOTS,
   REQUESTABLE_SLOT_LABELS,
   crewPeople,
-  isCrewSlot,
   type GameRequest,
   type Match,
   type RequestableSlot,
@@ -104,32 +100,14 @@ export function RaiseHandQueue({
   const [declineTarget, setDeclineTarget] = useState<GameRequest | null>(null);
   const [declineReason, setDeclineReason] = useState('');
   const [profileUserId, setProfileUserId] = useState<string | null>(null);
-  const [profileMatchId, setProfileMatchId] = useState<string | null>(null);
 
   const profileUser = useMemo(
     () => state.users.find((u) => u.uid === profileUserId) ?? null,
     [state.users, profileUserId],
   );
-  const profileMatch = useMemo(
-    () => state.matches.find((m) => m.id === profileMatchId) ?? null,
-    [state.matches, profileMatchId],
-  );
-  const profileDistance = useMemo(() => {
-    if (!profileUser || !profileMatch) return undefined;
-    const req = requests.find(
-      (r) => r.userId === profileUser.uid && r.matchId === profileMatch.id,
-    );
-    const feeSlot =
-      req?.preferredSlot && isCrewSlot(req.preferredSlot)
-        ? req.preferredSlot
-        : 'mo';
-    return matchEconomicsForUser(
-      profileMatch,
-      state.org,
-      profileUser,
-      feeSlot,
-    ).roundTripMiles;
-  }, [profileUser, profileMatch, requests, state.org]);
+  const profileCityState = profileUser
+    ? formatMemberCityState(profileUser)
+    : null;
   const recentMatches = useMemo(
     () =>
       profileUserId
@@ -184,7 +162,6 @@ export function RaiseHandQueue({
             }}
             onOpenProfile={() => {
               setProfileUserId(r.userId);
-              setProfileMatchId(r.matchId);
             }}
           />
           );
@@ -242,7 +219,6 @@ export function RaiseHandQueue({
         isOpen={Boolean(profileUserId)}
         onClose={() => {
           setProfileUserId(null);
-          setProfileMatchId(null);
         }}
         aria-labelledby="ref-profile-title"
       >
@@ -270,12 +246,12 @@ export function RaiseHandQueue({
                     <dt>Started refereeing</dt>
                     <dd>{formatBegan(profileUser.refereeingSince)}</dd>
                   </div>
-                  {profileMatch && (
+                  {profileCityState ? (
                     <div>
-                      <dt>Distance (round-trip)</dt>
-                      <dd>{formatDistanceMi(profileDistance)}</dd>
+                      <dt>Location</dt>
+                      <dd>{profileCityState}</dd>
                     </div>
-                  )}
+                  ) : null}
                 </dl>
 
                 <div className="rs-ref-profile__coaching-col">
@@ -389,6 +365,7 @@ function RaiseHandItem({
     : 'Position TBD';
   const name = user?.displayName ?? request.userName;
   const level = levelLabel(user?.refereeLevel);
+  const cityState = user ? formatMemberCityState(user) : null;
 
   if (!match) {
     return (
@@ -412,14 +389,6 @@ function RaiseHandItem({
       </li>
     );
   }
-
-  const feeSlot =
-    request.preferredSlot && isCrewSlot(request.preferredSlot)
-      ? request.preferredSlot
-      : 'mo';
-  const roundTripMiles = user
-    ? matchEconomicsForUser(match, state.org, user, feeSlot).roundTripMiles
-    : undefined;
 
   return (
     <li>
@@ -450,17 +419,9 @@ function RaiseHandItem({
             >
               {name} ({level})
             </button>
-            <p
-              className={`rs-queue-decision__dist${
-                roundTripMiles == null
-                  ? ' rs-queue-decision__dist--unknown'
-                  : ''
-              }`}
-            >
-              {roundTripMiles != null
-                ? `${formatDistanceMi(roundTripMiles)} RT`
-                : formatDistanceMi(roundTripMiles)}
-            </p>
+            {cityState ? (
+              <p className="rs-queue-decision__dist">{cityState}</p>
+            ) : null}
             <div className="rs-queue-decision__actions">
               <Button size="sm" variant="primary" onClick={onApprove}>
                 Approve

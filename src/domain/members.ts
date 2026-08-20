@@ -197,6 +197,15 @@ export function groupTeamAdminsByTeam(
   return groups;
 }
 
+/** City and state from the official’s profile (e.g. Austin, TX). */
+export function formatMemberCityState(user: UserProfile): string | null {
+  const line = [user.homeCity, user.homeRegion]
+    .map((p) => p?.trim())
+    .filter(Boolean)
+    .join(', ');
+  return line || null;
+}
+
 /** Home address — assigners only in UI. */
 export function formatMemberAddress(user: UserProfile): string | null {
   const line = [

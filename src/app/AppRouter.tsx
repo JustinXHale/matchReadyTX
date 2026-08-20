@@ -522,7 +522,7 @@ function FeatureRoutes() {
               index
               element={
                 <AppNavigate
-                  to="/scheduler/queues/requests/fixtures"
+                  to="/scheduler/queues/requests/raise-hand"
                   replace
                 />
               }
@@ -561,7 +561,7 @@ function FeatureRoutes() {
       />
       <Route
         path="requests"
-        element={<AppNavigate to="/scheduler/queues/requests/fixtures" replace />}
+        element={<AppNavigate to="/scheduler/queues/requests/raise-hand" replace />}
       />
       <Route path="matches" element={<RoleHomeRedirect />} />
       <Route path="settings" element={<AppNavigate to="/profile" replace />} />

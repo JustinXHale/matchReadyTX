@@ -7,8 +7,9 @@ import { genderLabel, type Match } from '@/domain/types';
 import { MatchListRow } from '@/ui/MatchListRow';
 import { MatchCrewTrailing } from '@/ui/MatchCrewTrailing';
 import { appointmentMySlot } from '@/features/referee/appointments/crewLines';
-import { formatTeamAddress } from '@/domain/teams';
+import { formatTeamAddress, teamHomeMapsUrl } from '@/domain/teams';
 import { readBackNav, type BackNav } from '@/nav/backNav';
+import { MapsAddressLink } from '@/ui/MapsAddressLink';
 
 function monthKey(iso: string): string {
   const d = new Date(iso);
@@ -88,6 +89,7 @@ export function GlobalTeamDetailPage() {
   }, [matches]);
 
   const address = team ? formatTeamAddress(team, matches) : '—';
+  const mapsUrl = team ? teamHomeMapsUrl(team, matches) : null;
 
   if (!team) {
     return (
@@ -133,7 +135,9 @@ export function GlobalTeamDetailPage() {
         ))}
       </div>
       {address !== '—' ? (
-        <p className="rs-team-card__hint">{address}</p>
+        <p className="rs-team-card__hint">
+          <MapsAddressLink href={mapsUrl}>{address}</MapsAddressLink>
+        </p>
       ) : null}
 
       {matches.length === 0 ? (

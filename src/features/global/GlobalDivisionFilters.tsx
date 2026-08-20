@@ -1,9 +1,14 @@
+import { useEffect, useMemo } from 'react';
+import { DatePicker } from '@patternfly/react-core';
 import {
   genderLabel,
   type MatchGender,
 } from '@/domain/types';
-import type { DivisionFilterOptions } from '@/domain/divisionFilters';
-import { competitionsEncodeGender } from '@/domain/divisionFilters';
+import {
+  calendarDateKey,
+  competitionsEncodeGender,
+  type DivisionFilterOptions,
+} from '@/domain/divisionFilters';
 import { IconDateInput } from '@/ui/IconDateInput';
 
 /** Comp / level / gender filters derived from the current dataset. */
@@ -23,6 +28,7 @@ export function GlobalDivisionFilters({
   showDate = false,
   dateFilter = null,
   onDateChange,
+  availableDates,
 }: {
   options: DivisionFilterOptions;
   genderFilter: MatchGender | null;
@@ -44,6 +50,8 @@ export function GlobalDivisionFilters({
   showDate?: boolean;
   dateFilter?: string | null;
   onDateChange?: (next: string | null) => void;
+  /** YYYY-MM-DD days that have games — other calendar days are unselectable. */
+  availableDates?: string[];
 }) {
   const showCompetitionSelect = options.competitions.length > 1;
   const secondaryUnlocked =
@@ -60,6 +68,25 @@ export function GlobalDivisionFilters({
     secondaryUnlocked &&
     options.genders.length > 1 &&
     !genderInCompetitionNames;
+
+  const availableSet = useMemo(
+    () => new Set(availableDates ?? []),
+    [availableDates],
+  );
+
+  useEffect(() => {
+    if (!onDateChange || !dateFilter) return;
+    if (availableDates == null) return;
+    if (!availableSet.has(dateFilter)) onDateChange(null);
+  }, [availableDates, availableSet, dateFilter, onDateChange]);
+
+  const dateValidators = useMemo(() => {
+    if (availableDates == null) return [];
+    return [
+      (date: Date) =>
+        availableSet.has(calendarDateKey(date)) ? '' : 'No games on this date.',
+    ];
+  }, [availableDates, availableSet]);
 
   if (!showCompetitionSelect && !showLevels && !showGenders && !showDate) {
     return null;
@@ -101,12 +128,34 @@ export function GlobalDivisionFilters({
           {showDate && onDateChange && (
             <label className="rs-filter-field">
               <span className="rs-filter-field__label">Date</span>
-              <IconDateInput
-                aria-label="Filter by date"
-                type="date"
-                value={dateFilter ?? ''}
-                onChange={(_, v) => onDateChange(v || null)}
-              />
+              {availableDates != null ? (
+                <DatePicker
+                  className="rs-filter-date"
+                  value={dateFilter ?? ''}
+                  placeholder="YYYY-MM-DD"
+                  aria-label="Filter by date"
+                  buttonAriaLabel="Open calendar"
+                  appendTo={() => document.body}
+                  validators={dateValidators}
+                  onChange={(_, value, date) => {
+                    if (!value.trim()) {
+                      onDateChange(null);
+                      return;
+                    }
+                    if (!date || Number.isNaN(date.getTime())) return;
+                    const key = calendarDateKey(date);
+                    if (availableSet.size > 0 && !availableSet.has(key)) return;
+                    onDateChange(key);
+                  }}
+                />
+              ) : (
+                <IconDateInput
+                  aria-label="Filter by date"
+                  type="date"
+                  value={dateFilter ?? ''}
+                  onChange={(_, v) => onDateChange(v || null)}
+                />
+              )}
             </label>
           )}
         </div>
