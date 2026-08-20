@@ -356,6 +356,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
         setState(demoStore.getState());
       },
       (err) => console.error('Live org subscription failed', err),
+      {
+        viewerUid: uid,
+        isAssigner: Boolean(me?.roles.includes('assigner')),
+      },
     );
     const unsubRoster = subscribeOrgRoster(
       defaultOrgId(),

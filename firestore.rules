@@ -314,7 +314,10 @@ service cloud.firestore {
         match /gameRequests/{requestId} {
           allow read: if isAssigner(orgId)
             || (signedIn() && resource.data.userId == request.auth.uid);
-          allow create: if signedIn() && request.resource.data.userId == request.auth.uid;
+          allow create: if signedIn()
+            && request.resource.data.userId == request.auth.uid
+            && request.resource.data.orgId == orgId
+            && request.resource.data.matchId == matchId;
           allow update: if isAssigner(orgId)
             || (signedIn() && resource.data.userId == request.auth.uid);
           allow delete: if signedIn()

@@ -16,6 +16,24 @@
         { "fieldPath": "requesterUserId", "order": "ASCENDING" },
         { "fieldPath": "status", "order": "ASCENDING" }
       ]
+    },
+    {
+      "collectionGroup": "gameRequests",
+      "queryScope": "COLLECTION_GROUP",
+      "fields": [{ "fieldPath": "orgId", "order": "ASCENDING" }]
+    },
+    {
+      "collectionGroup": "gameRequests",
+      "queryScope": "COLLECTION_GROUP",
+      "fields": [
+        { "fieldPath": "orgId", "order": "ASCENDING" },
+        { "fieldPath": "userId", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "proposals",
+      "queryScope": "COLLECTION_GROUP",
+      "fields": [{ "fieldPath": "orgId", "order": "ASCENDING" }]
     }
   ],
   "fieldOverrides": []

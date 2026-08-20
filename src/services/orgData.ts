@@ -579,11 +579,18 @@ export function teamLinkRequestFromFirestore(
   };
 }
 
+export type LiveOrgSubscribeOpts = {
+  viewerUid: string;
+  /** Assigner may list all raise-hand requests in the org. */
+  isAssigner: boolean;
+};
+
 /** Subscribe to org + matches + teams + fixture + team-link + coach feedback. */
 export function subscribeLiveOrg(
   orgId: string,
   onData: (snap: LiveOrgSnapshot) => void,
   onError?: (err: Error) => void,
+  opts?: LiveOrgSubscribeOpts,
 ): Unsubscribe {
   const database = requireDb();
   let org: Partial<OrgSettings> & { id: string } = { id: orgId };
@@ -676,17 +683,25 @@ export function subscribeLiveOrg(
     ),
   );
 
+  // Collection-group queries must filter by orgId so rules can authorize them.
+  const proposalsQuery = query(
+    collectionGroup(database, 'proposals'),
+    where('orgId', '==', orgId),
+  );
+
   unsubs.push(
     onSnapshot(
-      collectionGroup(database, 'proposals'),
+      proposalsQuery,
       (snap) => {
-        proposals = snap.docs
-          .filter((d) => d.ref.path.startsWith(`orgs/${orgId}/matches/`))
-          .map((d) => {
-            const parts = d.ref.path.split('/');
-            const matchId = parts[3] ?? '';
-            return proposalFromFirestore(d.id, matchId, d.data() as Record<string, unknown>);
-          });
+        proposals = snap.docs.map((d) => {
+          const parts = d.ref.path.split('/');
+          const matchId = parts[3] ?? '';
+          return proposalFromFirestore(
+            d.id,
+            matchId,
+            d.data() as Record<string, unknown>,
+          );
+        });
         proposalsHydrated = true;
         emit();
       },
@@ -694,13 +709,23 @@ export function subscribeLiveOrg(
     ),
   );
 
-  unsubs.push(
-    onSnapshot(
-      collectionGroup(database, 'gameRequests'),
-      (snap) => {
-        gameRequests = snap.docs
-          .filter((d) => d.ref.path.startsWith(`orgs/${orgId}/matches/`))
-          .map((d) => {
+  if (opts?.viewerUid) {
+    const gameRequestsQuery = opts.isAssigner
+      ? query(
+          collectionGroup(database, 'gameRequests'),
+          where('orgId', '==', orgId),
+        )
+      : query(
+          collectionGroup(database, 'gameRequests'),
+          where('orgId', '==', orgId),
+          where('userId', '==', opts.viewerUid),
+        );
+
+    unsubs.push(
+      onSnapshot(
+        gameRequestsQuery,
+        (snap) => {
+          gameRequests = snap.docs.map((d) => {
             const parts = d.ref.path.split('/');
             const matchId = parts[3] ?? '';
             return gameRequestFromFirestore(
@@ -709,12 +734,13 @@ export function subscribeLiveOrg(
               d.data() as Record<string, unknown>,
             );
           });
-        gameRequestsHydrated = true;
-        emit();
-      },
-      (err) => onError?.(err),
-    ),
-  );
+          gameRequestsHydrated = true;
+          emit();
+        },
+        (err) => onError?.(err),
+      ),
+    );
+  }
 
   return () => {
     for (const u of unsubs) u();
@@ -1133,6 +1159,8 @@ export async function createGameRequestInFirestore(
       req.id,
     ),
     stripUndefined({
+      orgId,
+      matchId,
       userId: req.userId,
       userName: req.userName,
       preferredSlot: req.preferredSlot ?? null,
