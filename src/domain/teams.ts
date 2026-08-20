@@ -163,6 +163,13 @@ export function formatTeamVenue(venue: TeamVenue | null): string {
   return parts.join(' · ') || '—';
 }
 
+/** Locations-tab address when synced; otherwise the usual home venue from matches. */
+export function formatTeamAddress(team: Team, matches: Match[]): string {
+  const direct = team.address?.trim();
+  if (direct) return direct;
+  return formatTeamVenue(primaryHomeVenueForTeam(team.id, matches));
+}
+
 /** Registered team admins linked to this club. */
 export function teamAdminsForTeam(
   teamId: string,

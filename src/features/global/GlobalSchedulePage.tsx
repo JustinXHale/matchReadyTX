@@ -3,7 +3,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Navigate, useParams } from 'react-router-dom';
 import { useApp, useAppHref } from '@/app/AppContext';
 import { isKickoffUpcoming } from '@/domain/requests';
-import { divisionFilterOptionsFromMatches } from '@/domain/divisionFilters';
+import { divisionFilterOptionsFromMatches, matchOnCalendarDate } from '@/domain/divisionFilters';
 import { isTeamMatch, releasedMatches } from '@/domain/visibility';
 import { MatchListRow } from '@/ui/MatchListRow';
 import { MatchCrewTrailing } from '@/ui/MatchCrewTrailing';
@@ -45,6 +45,7 @@ export function GlobalSchedulePage() {
   const [competitionFilter, setCompetitionFilter] = useState<string | null>(
     null,
   );
+  const [dateFilter, setDateFilter] = useState<string | null>(null);
   const [sortDir, setSortDir] = useState<SortDir>('asc');
   const [myTeamsOnly, setMyTeamsOnly] = useState(false);
 
@@ -68,8 +69,8 @@ export function GlobalSchedulePage() {
   }, [state.matches, pane]);
 
   const filterOptions = useMemo(
-    () => divisionFilterOptionsFromMatches(paneMatches),
-    [paneMatches],
+    () => divisionFilterOptionsFromMatches(paneMatches, competitionFilter),
+    [paneMatches, competitionFilter],
   );
 
   const scheduleBack: BackNav = useMemo(
@@ -90,6 +91,7 @@ export function GlobalSchedulePage() {
         if (competitionFilter && m.competition !== competitionFilter) {
           return false;
         }
+        if (!matchOnCalendarDate(m, dateFilter)) return false;
         if (myTeamsOnly && fanFavorites && fanFavorites.length > 0) {
           if (!isTeamMatch(m, fanFavorites)) return false;
         }
@@ -105,6 +107,7 @@ export function GlobalSchedulePage() {
     genderFilter,
     levelFilter,
     competitionFilter,
+    dateFilter,
     pane,
     sortDir,
     myTeamsOnly,
@@ -148,6 +151,9 @@ export function GlobalSchedulePage() {
             onGenderChange={setGenderFilter}
             onLevelChange={setLevelFilter}
             onCompetitionChange={setCompetitionFilter}
+            showDate
+            dateFilter={dateFilter}
+            onDateChange={setDateFilter}
             ariaLabel="Filter schedule"
           />
           <div
@@ -192,8 +198,12 @@ export function GlobalSchedulePage() {
       ) : list.length === 0 ? (
         <EmptyState titleText={emptyTitle} headingLevel="h3">
           <EmptyStateBody>
-            {genderFilter || levelFilter || competitionFilter || myTeamsOnly
-              ? 'No games match these filters. Tap a chip again to clear it.'
+            {genderFilter ||
+            levelFilter ||
+            competitionFilter ||
+            dateFilter ||
+            myTeamsOnly
+              ? 'No games match these filters. Clear competition, date, or chips to widen.'
               : emptyBody}
           </EmptyStateBody>
         </EmptyState>

@@ -12,6 +12,7 @@ export type ScheduleRow = {
   gender?: string;
   notes?: string;
   status?: string;
+  title?: string;
 };
 
 export type ContactRow = {
@@ -23,6 +24,8 @@ export type ContactRow = {
 export type LocationRow = {
   abbreviation: string;
   gender?: string;
+  /** Full club name from the Name column (e.g. University of North Texas). */
+  teamName?: string;
   venue_name?: string;
   address?: string;
   lat?: number;
@@ -92,6 +95,7 @@ export function parseScheduleRows(values: string[][]): ScheduleRow[] {
     gender: alias(['gender', 'side', 'sex']),
     notes: alias(['notes', 'note', 'comments']),
     status: alias(['status', 'state']),
+    title: alias(['title', 'event', 'event_name', 'match_title']),
   };
 
   for (const key of [
@@ -125,6 +129,7 @@ export function parseScheduleRows(values: string[][]): ScheduleRow[] {
         gender: get('gender') || undefined,
         notes: get('notes') || undefined,
         status: get('status') || undefined,
+        title: get('title') || undefined,
       };
     })
     .filter((row) => row.match_id);
@@ -152,16 +157,29 @@ export function parseLocationRows(values: string[][]): LocationRow[] {
       ? 'location'
       : null;
   if (!abbrKey) return [];
+
+  const composeAddress = (r: Record<string, string>): string => {
+    const full = (r.full_address || r.fulladdress || '').trim();
+    if (full) return full;
+    const zip = r.zip_code || r.zip || r.zipcode || '';
+    return [r.address, r.city, r.state, zip].filter(Boolean).join(', ');
+  };
+
   return rowsFromValues(values)
     .filter((r) => r[abbrKey])
-    .map((r) => ({
-      abbreviation: (r[abbrKey] ?? '').toUpperCase(),
-      gender: r.gender || undefined,
-      venue_name: r.venue_name || r.name || r.location_name || undefined,
-      address: r.address || r.venue_address || undefined,
-      lat: r.lat ? Number(r.lat) : undefined,
-      lng: r.lng ? Number(r.lng) : undefined,
-    }));
+    .map((r) => {
+      const fieldOrStreet = (r.address || r.venue_name || r.subvenue || '').trim();
+      const mailing = composeAddress(r);
+      return {
+        abbreviation: (r[abbrKey] ?? '').toUpperCase(),
+        gender: r.gender || undefined,
+        teamName: (r.name || r.team_name || r.full_name || '').trim() || undefined,
+        venue_name: fieldOrStreet || undefined,
+        address: mailing || fieldOrStreet || undefined,
+        lat: r.lat ? Number(r.lat) : undefined,
+        lng: r.lng ? Number(r.lng) : undefined,
+      };
+    });
 }
 
 export function normalizeGender(raw?: string): 'men' | 'women' {
@@ -327,5 +345,7 @@ export function lookupLocation(
       normalizeGender(l.gender) === gender,
   );
   if (gendered) return gendered;
-  return locations.find((l) => l.abbreviation === abbr && !l.gender);
+  const ungendered = locations.find((l) => l.abbreviation === abbr && !l.gender);
+  if (ungendered) return ungendered;
+  return locations.find((l) => l.abbreviation === abbr);
 }

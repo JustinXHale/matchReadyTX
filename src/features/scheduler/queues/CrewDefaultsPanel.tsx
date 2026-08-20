@@ -201,6 +201,7 @@ export function CrewDefaultsPanel() {
         onLevelChange={setLevelFilter}
         onCompetitionChange={setCompetitionFilter}
         showSingleLevel
+        stageSecondary={false}
         ariaLabel="Pick level and filter from synced schedule"
       />
 

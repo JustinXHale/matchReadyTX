@@ -3,8 +3,7 @@ import { Link } from 'react-router-dom';
 import { EmptyState, EmptyStateBody } from '@patternfly/react-core';
 import { useApp, useAppHref } from '@/app/AppContext';
 import {
-  formatTeamVenue,
-  primaryHomeVenueForTeam,
+  formatTeamAddress,
   scheduleTeamEntries,
   teamAdminsForTeam,
   teamConferenceLabel,
@@ -44,7 +43,7 @@ export function SchedulerTeamsPage() {
       </p>
       <ul className="rs-list" aria-label="Teams">
         {entries.map(({ team, matchCount, competitions }) => {
-          const venue = primaryHomeVenueForTeam(team.id, state.matches);
+          const address = formatTeamAddress(team, state.matches);
           const admins = teamAdminsForTeam(team.id, state.users);
           const contacts = teamContactEmails(team);
           const adminLabel =
@@ -63,12 +62,15 @@ export function SchedulerTeamsPage() {
               >
                 <div className="rs-team-card__head">
                   <p className="rs-team-card__name">{team.name}</p>
+                  {team.abbreviation?.trim() ? (
+                    <p className="rs-team-card__abbr">{team.abbreviation.trim()}</p>
+                  ) : null}
                 </div>
                 <p className="rs-team-card__hint">
                   {teamConferenceLabel(competitions)}
                 </p>
                 <p className="rs-team-card__hint">
-                  {formatTeamVenue(venue)}
+                  {address}
                 </p>
                 <p className="rs-team-card__hint">
                   {matchCount} match{matchCount === 1 ? '' : 'es'} ·{' '}

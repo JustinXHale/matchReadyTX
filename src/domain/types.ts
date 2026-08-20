@@ -99,6 +99,8 @@ export interface Match {
   awayTeamId: string;
   homeTeamName: string;
   awayTeamName: string;
+  /** Optional event name from the Schedule sheet `title` column. */
+  title?: string;
   competition?: string;
   /** Competition level — defaults from org.matchLevels (e.g. D1, D2, D3) */
   level: string;
@@ -352,6 +354,11 @@ export interface Team {
   name: string;
   /** Optional conference/competition label from sync (e.g. Lonestar Men). */
   competition?: string;
+  /** Schedule / Locations abbreviation (e.g. UNT). */
+  abbreviation?: string;
+  gender?: MatchGender;
+  /** Home mailing / field address from the Locations tab. */
+  address?: string;
   contactEmails: string[];
   contactPhones?: string[];
 }

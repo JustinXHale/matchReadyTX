@@ -66,6 +66,18 @@ async function readTab(
   }
 }
 
+async function readFirstTab(
+  sheets: ReturnType<typeof sheetsClient>,
+  spreadsheetId: string,
+  tabNames: string[],
+): Promise<string[][]> {
+  for (const tabName of tabNames) {
+    const values = await readTab(sheets, spreadsheetId, tabName);
+    if (values.length > 0) return values;
+  }
+  return [];
+}
+
 function sheetFactsChanged(
   existing: DocumentData | undefined,
   next: {
@@ -99,9 +111,19 @@ type TeamShape = {
   id: string;
   name: string;
   competition?: string;
+  abbreviation?: string;
+  gender?: 'men' | 'women';
+  address?: string;
   contactEmails: Set<string>;
   contactPhones: Set<string>;
 };
+
+function genderForRow(row: { competition?: string; gender?: string }): 'men' | 'women' {
+  if (row.gender?.trim()) return normalizeGender(row.gender);
+  const comp = row.competition ?? '';
+  if (/\bwomen\b|\bfemale\b/i.test(comp)) return 'women';
+  return 'men';
+}
 
 function normNameKey(name: string): string {
   return name.trim().toLowerCase();
@@ -157,7 +179,10 @@ export async function runSheetSync(opts: {
   const { db, orgId, sheetId, serviceAccountJson } = opts;
   const sheets = sheetsClient(serviceAccountJson);
 
-  const scheduleValues = await readTab(sheets, sheetId, 'Schedule');
+  const scheduleValues = await readFirstTab(sheets, sheetId, [
+    'Schedule',
+    'schedule',
+  ]);
   if (!scheduleValues.length) {
     throw new Error(
       'No Schedule tab (or empty). Add a tab named “Schedule” with the required columns.',
@@ -165,9 +190,16 @@ export async function runSheetSync(opts: {
   }
 
   const rows = parseScheduleRows(scheduleValues);
-  const contacts = parseContactRows(await readTab(sheets, sheetId, 'Contacts'));
+  const contacts = parseContactRows(
+    await readFirstTab(sheets, sheetId, [
+      'Contacts',
+      'contacts',
+      'teamContacts',
+      'TeamContacts',
+    ]),
+  );
   const locations = parseLocationRows(
-    await readTab(sheets, sheetId, 'Locations'),
+    await readFirstTab(sheets, sheetId, ['Locations', 'locations']),
   );
   const resolveTeamId = buildTeamIdResolver(rows);
 
@@ -184,13 +216,26 @@ export async function runSheetSync(opts: {
   const mergedMatchLevels = mergeMatchLevels(existingMatchLevels, sheetLevels);
 
   const teamsById = new Map<string, TeamShape>();
-  const getOrCreateTeam = (id: string, name: string, competition?: string) => {
+  const getOrCreateTeam = (
+    id: string,
+    name: string,
+    competition?: string,
+    extra?: { abbreviation?: string; gender?: 'men' | 'women' },
+  ) => {
     const existing = teamsById.get(id);
-    if (existing) return existing;
+    if (existing) {
+      if (!existing.abbreviation && extra?.abbreviation) {
+        existing.abbreviation = extra.abbreviation;
+      }
+      if (!existing.gender && extra?.gender) existing.gender = extra.gender;
+      return existing;
+    }
     const next: TeamShape = {
       id,
       name,
       competition,
+      abbreviation: extra?.abbreviation,
+      gender: extra?.gender,
       contactEmails: new Set<string>(),
       contactPhones: new Set<string>(),
     };
@@ -199,9 +244,13 @@ export async function runSheetSync(opts: {
   };
   for (const row of rows) {
     const comp = resolvedCompetition(row);
+    const gender = genderForRow(row);
     for (const teamName of [row.home_team, row.away_team]) {
       const id = resolveTeamId(teamName, row);
-      getOrCreateTeam(id, teamName, comp);
+      getOrCreateTeam(id, teamName, comp, {
+        abbreviation: teamName.trim().toUpperCase(),
+        gender,
+      });
     }
   }
   const teamIdsByName = new Map<string, string[]>();
@@ -236,6 +285,19 @@ export async function runSheetSync(opts: {
     });
   }
 
+  for (const team of teamsById.values()) {
+    const loc = lookupLocation(
+      locations,
+      team.abbreviation || team.name,
+      team.gender ?? 'men',
+    );
+    if (loc?.teamName) team.name = loc.teamName;
+    if (loc?.address) team.address = loc.address;
+    if (!team.abbreviation && loc?.abbreviation) {
+      team.abbreviation = loc.abbreviation;
+    }
+  }
+
   let batch = db.batch();
   let batchOps = 0;
   const flushBatch = async () => {
@@ -261,6 +323,9 @@ export async function runSheetSync(opts: {
       id: team.id,
       name: team.name,
       competition: team.competition ?? null,
+      ...(team.abbreviation ? { abbreviation: team.abbreviation } : {}),
+      ...(team.gender ? { gender: team.gender } : {}),
+      ...(team.address ? { address: team.address } : {}),
       contactEmails: emails,
       ...(phones.length ? { contactPhones: phones } : {}),
       updatedAt: FieldValue.serverTimestamp(),
@@ -306,6 +371,7 @@ export async function runSheetSync(opts: {
       homeTeamName: row.home_team,
       awayTeamName: row.away_team,
     };
+    const sheetTitle = (row.title ?? '').trim();
 
     if (!snap.exists) {
       const status = sheetCancelled ? 'cancelled' : 'draft';
@@ -325,6 +391,7 @@ export async function runSheetSync(opts: {
           level,
           gender,
           notes: row.notes || null,
+          ...(sheetTitle ? { title: sheetTitle } : {}),
           flightProvided: false,
           housingProvided: false,
           ...crewFields,
@@ -348,6 +415,7 @@ export async function runSheetSync(opts: {
         level,
         gender,
         notes: row.notes || null,
+        title: sheetTitle ? sheetTitle : FieldValue.delete(),
         updatedAt: FieldValue.serverTimestamp(),
       };
       if (loc?.lat != null) patch.venueLat = loc.lat;

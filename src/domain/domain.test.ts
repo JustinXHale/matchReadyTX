@@ -58,6 +58,7 @@ import {
   zonedLocalToUtcIso,
 } from '@/domain/availability';
 import { matchesForUser, applyMatchScope } from '@/domain/visibility';
+import { matchOnCalendarDate } from '@/domain/divisionFilters';
 import {
   fanFavoriteLabel,
   formatMemberJoinedAt,
@@ -205,6 +206,39 @@ describe('crew visibility gate', () => {
     expect(m.crew.mo[0]?.id).toBeTruthy();
     expect(Array.isArray(m.cmo)).toBe(true);
     expect(m.cmo?.[0]?.userId).toBe('c1');
+  });
+
+  it('reads optional match title from Firestore', () => {
+    const m = matchFromFirestore('m_title', {
+      sheetRowKey: 's1',
+      status: 'crew_pending',
+      kickoffAt: new Date().toISOString(),
+      venueName: 'Field',
+      venueAddress: 'Austin',
+      homeTeamId: 'h',
+      awayTeamId: 'a',
+      homeTeamName: 'Home',
+      awayTeamName: 'Away',
+      title: '  Conference final  ',
+      level: 'D1',
+      gender: 'men',
+      flightProvided: false,
+      housingProvided: false,
+      crew: {},
+    });
+    expect(m.title).toBe('Conference final');
+  });
+
+  it('filters matches by local calendar date', () => {
+    const d = new Date();
+    d.setHours(15, 0, 0, 0);
+    const yyyy = d.getFullYear();
+    const mm = String(d.getMonth() + 1).padStart(2, '0');
+    const dd = String(d.getDate()).padStart(2, '0');
+    const match = { kickoffAt: d.toISOString() } as Match;
+    expect(matchOnCalendarDate(match, null)).toBe(true);
+    expect(matchOnCalendarDate(match, `${yyyy}-${mm}-${dd}`)).toBe(true);
+    expect(matchOnCalendarDate(match, '1999-01-01')).toBe(false);
   });
 });
 

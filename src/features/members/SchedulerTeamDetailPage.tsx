@@ -4,8 +4,7 @@ import { EmptyState, EmptyStateBody } from '@patternfly/react-core';
 import { useApp, useAppHref } from '@/app/AppContext';
 import { memberListName } from '@/domain/members';
 import {
-  formatTeamVenue,
-  primaryHomeVenueForTeam,
+  formatTeamAddress,
   scheduleTeamEntries,
   teamConferenceLabel,
   teamsFromSchedule,
@@ -37,9 +36,9 @@ export function SchedulerTeamDetailPage() {
     );
   }, [teamId, state.matches, state.teams]);
 
-  const venue = useMemo(
-    () => (teamId ? primaryHomeVenueForTeam(teamId, state.matches) : null),
-    [teamId, state.matches],
+  const address = useMemo(
+    () => (team ? formatTeamAddress(team, state.matches) : '—'),
+    [team, state.matches],
   );
   const competitions = useMemo(() => {
     if (!teamId) return [] as string[];
@@ -109,8 +108,14 @@ export function SchedulerTeamDetailPage() {
           </div>
           <div>
             <dt>Home location</dt>
-            <dd>{formatTeamVenue(venue)}</dd>
+            <dd>{address}</dd>
           </div>
+          {team.abbreviation?.trim() ? (
+            <div>
+              <dt>Abbreviation</dt>
+              <dd>{team.abbreviation.trim()}</dd>
+            </div>
+          ) : null}
         </dl>
       </section>
 

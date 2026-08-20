@@ -6,6 +6,7 @@ import {
   divisionFilterOptionsFromMatches,
   divisionFiltersActive,
   matchMatchesDivisionFilters,
+  matchOnCalendarDate,
 } from '@/domain/divisionFilters';
 import { GlobalDivisionFilters } from '@/features/global/GlobalDivisionFilters';
 import { MatchListRow } from '@/ui/MatchListRow';
@@ -91,6 +92,7 @@ export function GlobalRequestPage() {
   const [competitionFilter, setCompetitionFilter] = useState<string | null>(
     null,
   );
+  const [dateFilter, setDateFilter] = useState<string | null>(null);
 
   const filterPool = useMemo(() => {
     if (!currentUser) return [] as Match[];
@@ -101,8 +103,8 @@ export function GlobalRequestPage() {
   }, [currentUser, state.matches, state.requests]);
 
   const filterOptions = useMemo(
-    () => divisionFilterOptionsFromMatches(filterPool),
-    [filterPool],
+    () => divisionFilterOptionsFromMatches(filterPool, competitionFilter),
+    [filterPool, competitionFilter],
   );
 
   const divisionActive = divisionFiltersActive({
@@ -112,13 +114,14 @@ export function GlobalRequestPage() {
   });
 
   const matchesDivision = (m: Match) =>
-    !divisionActive ||
-    matchMatchesDivisionFilters(
-      m,
-      genderFilter,
-      levelFilter,
-      competitionFilter,
-    );
+    matchOnCalendarDate(m, dateFilter) &&
+    (!divisionActive ||
+      matchMatchesDivisionFilters(
+        m,
+        genderFilter,
+        levelFilter,
+        competitionFilter,
+      ));
 
   const urgentMatches = useMemo(() => {
     if (!currentUser) return [] as Match[];
@@ -151,6 +154,7 @@ export function GlobalRequestPage() {
     genderFilter,
     levelFilter,
     competitionFilter,
+    dateFilter,
   ]);
 
   const urgentIds = useMemo(
@@ -181,6 +185,7 @@ export function GlobalRequestPage() {
     genderFilter,
     levelFilter,
     competitionFilter,
+    dateFilter,
   ]);
 
   const filteredUrgent = useMemo(
@@ -225,6 +230,9 @@ export function GlobalRequestPage() {
         onGenderChange={setGenderFilter}
         onLevelChange={setLevelFilter}
         onCompetitionChange={setCompetitionFilter}
+        showDate
+        dateFilter={dateFilter}
+        onDateChange={setDateFilter}
         ariaLabel="Filter requestable games"
       />
 

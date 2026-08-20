@@ -98,6 +98,7 @@ Failed poll / webhook / sync / write-back sets `orgs/{orgId}.sheetSyncError` (cl
 | `level` | no |
 | `gender` | no (men/women) |
 | `notes` | no |
+| `title` | no (event name on the match card; blank clears it on sync) |
 | `status` | no (`CANCELLED` marks cancelled) |
 
 App-created fixtures (Team Admin request → assigner approve) use `match_id` values like `APP-20260728-ABC123` and append a Schedule row (plus a Locations row for venue address).
@@ -106,8 +107,8 @@ Proposal write-back finds the row by `match_id` / `sheetRowKey` and updates date
 
 Optional tabs:
 
-- **Contacts** — `team_name`, `email`, `phone` → team contact emails
-- **Locations** — `abbreviation` (+ optional `gender`, `venue_name`, `address`, `lat`, `lng`) joined on Schedule `location`
+- **Contacts** — `team_name`, `email`, `phone` → team contact emails. Tab aliases: `Contacts`, `contacts`, `teamContacts`
+- **Locations** — `abbreviation` (+ `Name` / full team name, `gender`, `address` or `Full Address`, `city`, `state`, `ZIP`). Joined on Schedule `location` for venue, and on team abbreviation for the Teams page. Tab aliases: `Locations`, `locations`
 
 Timezone for kickoff: America/Chicago (−06:00) for v1.
 

@@ -1049,9 +1049,13 @@ export function MatchDetailPage() {
 
       <div className="rs-detail__title-row">
         <Title headingLevel="h2" className="rs-detail__title">
-          <span className="rs-detail__home">{match.homeTeamName}</span>
+          <span className="rs-detail__home">
+            <span className="rs-detail__ha">(H)</span> {match.homeTeamName}
+          </span>
           <span className="rs-detail__vs">vs</span>
-          <span className="rs-detail__away">{match.awayTeamName}</span>
+          <span className="rs-detail__away">
+            <span className="rs-detail__ha">(A)</span> {match.awayTeamName}
+          </span>
         </Title>
         <div className="rs-detail__title-actions">
           {headerReportLinks.map((link) => (
@@ -1104,6 +1108,10 @@ export function MatchDetailPage() {
           )}
         </div>
       </div>
+
+      {match.title?.trim() ? (
+        <p className="rs-detail__event-title">{match.title.trim()}</p>
+      ) : null}
 
       {isAssigner ? (
         <div className="rs-detail__top-chips" aria-label="Match division">

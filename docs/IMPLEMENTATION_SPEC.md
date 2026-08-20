@@ -184,8 +184,9 @@ mail/{mailId}   // outbound queue — Admin SDK only; see docs/EMAIL.md
 
 ## 6. Sheet contract
 
-**Schedule columns:** `match_id`, `date`, `kickoff_time`, `location`, `home_team`, `away_team`, `competition?`, `level?`, `gender?`, `notes?`, `status?`  
+**Schedule columns:** `match_id`, `date`, `kickoff_time`, `location`, `home_team`, `away_team`, `competition?`, `level?`, `gender?`, `notes?`, `title?`, `status?`  
 **Contacts:** `team_name`, `email`, `phone`  
+**Locations:** `abbreviation`, `name?` (full team name), `gender?`, address fields  
 **Never on Sheet:** fees, mileage, flight, housing, official names for pay.
 
 ### Sync & write-back

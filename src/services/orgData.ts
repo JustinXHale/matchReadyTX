@@ -143,6 +143,10 @@ export function matchFromFirestore(
     awayTeamId: String(data.awayTeamId ?? ''),
     homeTeamName: String(data.homeTeamName ?? ''),
     awayTeamName: String(data.awayTeamName ?? ''),
+    title:
+      typeof data.title === 'string' && data.title.trim()
+        ? data.title.trim()
+        : undefined,
     competition:
       typeof data.competition === 'string' ? data.competition : undefined,
     level: String(data.level ?? 'Tier 1'),
@@ -196,6 +200,15 @@ export function teamFromFirestore(
     competition:
       typeof data.competition === 'string' && data.competition.trim()
         ? data.competition.trim()
+        : undefined,
+    abbreviation:
+      typeof data.abbreviation === 'string' && data.abbreviation.trim()
+        ? data.abbreviation.trim()
+        : undefined,
+    gender: data.gender === 'women' ? 'women' : data.gender === 'men' ? 'men' : undefined,
+    address:
+      typeof data.address === 'string' && data.address.trim()
+        ? data.address.trim()
         : undefined,
     contactEmails: Array.isArray(data.contactEmails)
       ? (data.contactEmails as string[])

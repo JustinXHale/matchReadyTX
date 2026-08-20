@@ -97,8 +97,8 @@ export function SchedulerSchedulePage() {
   const [dateTo, setDateTo] = useState('');
 
   const filterOptions = useMemo(
-    () => divisionFilterOptionsFromMatches(state.matches),
-    [state.matches],
+    () => divisionFilterOptionsFromMatches(state.matches, competitionFilter),
+    [state.matches, competitionFilter],
   );
 
   const list = useMemo(() => {

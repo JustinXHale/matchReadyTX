@@ -20,8 +20,8 @@ export function useWorkDivisionFilters(state: AppState) {
   );
 
   const filterOptions = useMemo(
-    () => divisionFilterOptionsFromMatches(state.matches),
-    [state.matches],
+    () => divisionFilterOptionsFromMatches(state.matches, competitionFilter),
+    [state.matches, competitionFilter],
   );
 
   const divisionActive = divisionFiltersActive({

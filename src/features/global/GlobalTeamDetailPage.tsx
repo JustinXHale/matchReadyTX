@@ -7,6 +7,7 @@ import { genderLabel, type Match } from '@/domain/types';
 import { MatchListRow } from '@/ui/MatchListRow';
 import { MatchCrewTrailing } from '@/ui/MatchCrewTrailing';
 import { appointmentMySlot } from '@/features/referee/appointments/crewLines';
+import { formatTeamAddress } from '@/domain/teams';
 import { readBackNav, type BackNav } from '@/nav/backNav';
 
 function monthKey(iso: string): string {
@@ -80,18 +81,13 @@ export function GlobalTeamDetailPage() {
     return groups;
   }, [matches]);
 
-  const divisionChips = useMemo(() => {
+  const divisionGenders = useMemo(() => {
     const genders = new Set<string>();
-    const levels = new Set<string>();
-    for (const m of matches) {
-      genders.add(m.gender);
-      levels.add(m.level);
-    }
-    return {
-      genders: [...genders],
-      levels: [...levels].sort(),
-    };
+    for (const m of matches) genders.add(m.gender);
+    return [...genders];
   }, [matches]);
+
+  const address = team ? formatTeamAddress(team, matches) : '—';
 
   if (!team) {
     return (
@@ -125,19 +121,20 @@ export function GlobalTeamDetailPage() {
       <Title headingLevel="h1" className="rs-team-detail__title">
         {team.name}
       </Title>
+      {team.abbreviation?.trim() ? (
+        <p className="rs-team-card__abbr">{team.abbreviation.trim()}</p>
+      ) : null}
 
-      <div className="rs-label-row" aria-label="Divisions">
-        {divisionChips.genders.map((g) => (
+      <div className="rs-label-row" aria-label="Gender">
+        {divisionGenders.map((g) => (
           <span key={g} className="rs-pill rs-pill--ink">
             {genderLabel(g as 'men' | 'women')}
           </span>
         ))}
-        {divisionChips.levels.map((lv) => (
-          <span key={lv} className="rs-pill rs-pill--ink">
-            {lv}
-          </span>
-        ))}
       </div>
+      {address !== '—' ? (
+        <p className="rs-team-card__hint">{address}</p>
+      ) : null}
 
       {matches.length === 0 ? (
         <EmptyState titleText="No matches" headingLevel="h3">

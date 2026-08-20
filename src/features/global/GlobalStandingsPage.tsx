@@ -18,8 +18,8 @@ export function GlobalStandingsPage() {
   );
 
   const filterOptions = useMemo(
-    () => divisionFilterOptionsFromMatches(state.matches),
-    [state.matches],
+    () => divisionFilterOptionsFromMatches(state.matches, competitionFilter),
+    [state.matches, competitionFilter],
   );
 
   const allGroups = useMemo(

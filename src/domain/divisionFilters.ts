@@ -26,10 +26,7 @@ function sortedUnique(values: string[]): string[] {
   );
 }
 
-/** Unique filter chips from match facts — only values that appear in the dataset. */
-export function divisionFilterOptionsFromMatches(
-  matches: Match[],
-): DivisionFilterOptions {
+function optionsFromMatches(matches: Match[]): DivisionFilterOptions {
   const genders = new Set<MatchGender>();
   const levels: string[] = [];
   const competitions: string[] = [];
@@ -45,6 +42,41 @@ export function divisionFilterOptionsFromMatches(
     levels: sortedUnique(levels),
     competitions: sortedUnique(competitions),
   };
+}
+
+/** Unique filter chips from match facts — only values that appear in the dataset. */
+export function divisionFilterOptionsFromMatches(
+  matches: Match[],
+  competitionFilter?: string | null,
+): DivisionFilterOptions {
+  const all = optionsFromMatches(matches);
+  if (!competitionFilter) return all;
+  const scoped = optionsFromMatches(
+    matches.filter((m) => m.competition === competitionFilter),
+  );
+  return {
+    competitions: all.competitions,
+    levels: scoped.levels,
+    genders: scoped.genders,
+  };
+}
+
+/** Local calendar YYYY-MM-DD for a kickoff instant. */
+export function matchLocalCalendarDate(iso: string): string {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '';
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+
+export function matchOnCalendarDate(
+  match: Match,
+  yyyyMmDd: string | null,
+): boolean {
+  if (!yyyyMmDd) return true;
+  return matchLocalCalendarDate(match.kickoffAt) === yyyyMmDd;
 }
 
 export function divisionFilterOptionsFromFixtureRequests(

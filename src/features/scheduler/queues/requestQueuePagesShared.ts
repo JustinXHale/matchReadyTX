@@ -40,12 +40,12 @@ export function useRequestDivisionFilters(state: AppState) {
   const filterOptions = useMemo(
     () =>
       mergeDivisionFilterOptions(
-        divisionFilterOptionsFromMatches(state.matches),
+        divisionFilterOptionsFromMatches(state.matches, competitionFilter),
         divisionFilterOptionsFromFixtureRequests(
           pendingFixtureRequests(state.fixtureRequests),
         ),
       ),
-    [state.matches, state.fixtureRequests],
+    [state.matches, state.fixtureRequests, competitionFilter],
   );
 
   const divisionActive = divisionFiltersActive({

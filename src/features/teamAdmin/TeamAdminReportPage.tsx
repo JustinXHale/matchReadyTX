@@ -78,8 +78,12 @@ export function TeamAdminReportPage() {
   }, [currentUser, state.matches, state.coachFeedback]);
 
   const filterOptions = useMemo(
-    () => divisionFilterOptionsFromMatches(rows.map((r) => r.match)),
-    [rows],
+    () =>
+      divisionFilterOptionsFromMatches(
+        rows.map((r) => r.match),
+        competitionFilter,
+      ),
+    [rows, competitionFilter],
   );
 
   const filtered = useMemo(() => {

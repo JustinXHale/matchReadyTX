@@ -13,7 +13,7 @@ import {
   type Team,
 } from '@/domain/types';
 import { GlobalDivisionFilters } from '@/features/global/GlobalDivisionFilters';
-import { divisionFilterOptionsFromMatches } from '@/domain/divisionFilters';
+import { divisionFilterOptionsFromMatches, matchOnCalendarDate } from '@/domain/divisionFilters';
 import { TeamLinkRequestQueue } from '@/features/scheduler/queues/TeamLinkRequestQueue';
 import { TeamAdminMatchRow } from '@/features/teamAdmin/TeamAdminMatchRow';
 import { isFirebaseConfigured } from '@/services/firebase';
@@ -61,6 +61,7 @@ export function TeamAdminHomePage() {
   const [competitionFilter, setCompetitionFilter] = useState<string | null>(
     null,
   );
+  const [dateFilter, setDateFilter] = useState<string | null>(null);
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
 
   const myTeams = useMemo((): Team[] => {
@@ -119,8 +120,8 @@ export function TeamAdminHomePage() {
   }, [currentUser, state.matches]);
 
   const filterOptions = useMemo(
-    () => divisionFilterOptionsFromMatches(filterPool),
-    [filterPool],
+    () => divisionFilterOptionsFromMatches(filterPool, competitionFilter),
+    [filterPool, competitionFilter],
   );
 
   const pendingByMatch = useMemo(() => {
@@ -147,6 +148,7 @@ export function TeamAdminHomePage() {
         if (competitionFilter && match.competition !== competitionFilter) {
           continue;
         }
+        if (!matchOnCalendarDate(match, dateFilter)) continue;
         const hasPendingProposal = Boolean(pendingByMatch.get(match.id));
         const needsAction = isActionNeeded(match, hasPendingProposal);
         if (statusFilter === 'needs_confirm' && !needsAction) continue;
@@ -178,6 +180,7 @@ export function TeamAdminHomePage() {
     genderFilter,
     levelFilter,
     competitionFilter,
+    dateFilter,
     statusFilter,
   ]);
 
@@ -252,6 +255,7 @@ export function TeamAdminHomePage() {
     genderFilter != null ||
     levelFilter != null ||
     competitionFilter != null ||
+    dateFilter != null ||
     statusFilter !== 'all';
 
   return (
@@ -344,6 +348,9 @@ export function TeamAdminHomePage() {
             onGenderChange={setGenderFilter}
             onLevelChange={setLevelFilter}
             onCompetitionChange={setCompetitionFilter}
+            showDate
+            dateFilter={dateFilter}
+            onDateChange={setDateFilter}
             ariaLabel="Filter by division"
           />
 

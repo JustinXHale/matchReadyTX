@@ -26,6 +26,25 @@ function formatKickoffTime(iso: string): string {
   });
 }
 
+function SideLabel({
+  name,
+  ha,
+  className,
+}: {
+  name: string;
+  ha: 'H' | 'A';
+  className: string;
+}) {
+  return (
+    <span className="rs-list-row__name">
+      <span className="rs-list-row__ha" aria-hidden>
+        ({ha})
+      </span>
+      <span className={className}>{name}</span>
+    </span>
+  );
+}
+
 function hasMatchScore(match: Match): boolean {
   return (
     match.homeScore != null &&
@@ -90,11 +109,15 @@ export function MatchListRow({
         className="rs-list-row__teams rs-list-row__teams--inline"
         aria-label={
           scored
-            ? `Score ${match.homeScore} to ${match.awayScore}`
-            : undefined
+            ? `Home ${match.homeTeamName} ${match.homeScore}, away ${match.awayTeamName} ${match.awayScore}`
+            : `Home ${match.homeTeamName}, away ${match.awayTeamName}`
         }
       >
-        <span className="rs-list-row__inline-home">{match.homeTeamName}</span>
+        <SideLabel
+          name={match.homeTeamName}
+          ha="H"
+          className="rs-list-row__inline-home"
+        />
         <span
           className={`rs-list-row__score${scored ? '' : ' rs-list-row__score--empty'}`}
         >
@@ -108,19 +131,29 @@ export function MatchListRow({
         >
           {awayScoreLabel}
         </span>
-        <span className="rs-list-row__inline-away">{match.awayTeamName}</span>
+        <span className="rs-list-row__inline-away-wrap">
+          <SideLabel
+            name={match.awayTeamName}
+            ha="A"
+            className="rs-list-row__inline-away"
+          />
+        </span>
       </p>
     ) : (
       <p
         className="rs-list-row__teams"
         aria-label={
           scored
-            ? `Score ${match.homeScore} to ${match.awayScore}`
-            : undefined
+            ? `Home ${match.homeTeamName} ${match.homeScore}, away ${match.awayTeamName} ${match.awayScore}`
+            : `Home ${match.homeTeamName}, away ${match.awayTeamName}`
         }
       >
         <span className="rs-list-row__side">
-          <span className="rs-list-row__home">{match.homeTeamName}</span>
+          <SideLabel
+            name={match.homeTeamName}
+            ha="H"
+            className="rs-list-row__home"
+          />
           <span
             className={`rs-list-row__score${scored ? '' : ' rs-list-row__score--empty'}`}
           >
@@ -128,7 +161,11 @@ export function MatchListRow({
           </span>
         </span>
         <span className="rs-list-row__side">
-          <span className="rs-list-row__away">{match.awayTeamName}</span>
+          <SideLabel
+            name={match.awayTeamName}
+            ha="A"
+            className="rs-list-row__away"
+          />
           <span
             className={`rs-list-row__score${scored ? '' : ' rs-list-row__score--empty'}`}
           >
@@ -160,6 +197,9 @@ export function MatchListRow({
         {showTime && (
           <p className="rs-list-row__time">{formatKickoffTime(match.kickoffAt)}</p>
         )}
+        {match.title?.trim() ? (
+          <p className="rs-list-row__event-title">{match.title.trim()}</p>
+        ) : null}
         {meta && <div className="rs-list-row__meta">{meta}</div>}
       </div>
     </>

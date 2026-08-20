@@ -290,25 +290,37 @@ function seedTeams(): Team[] {
   return [
     {
       id: 'team_austin',
-      name: 'Austin RFC',
+      name: 'Austin Rugby Football Club',
+      abbreviation: 'AUS',
+      gender: 'men',
+      address: 'Westlake Fields, Austin, TX',
       contactEmails: ['austin-admin@example.com', 'assigner@example.com'],
       contactPhones: ['+15551110002'],
     },
     {
       id: 'team_austin_2nds',
-      name: 'Austin RFC 2nds',
+      name: 'Austin Rugby Football Club 2nds',
+      abbreviation: 'AUS 2',
+      gender: 'men',
+      address: 'Westlake Fields, Austin, TX',
       contactEmails: ['austin-admin@example.com', 'assigner@example.com'],
       contactPhones: ['+15551110002'],
     },
     {
       id: 'team_dallas',
-      name: 'Dallas RFC',
+      name: 'Dallas Rugby Football Club',
+      abbreviation: 'DAL',
+      gender: 'men',
+      address: 'Dallas Rugby Grounds, Dallas, TX',
       contactEmails: ['dallas-admin@example.com'],
       contactPhones: ['+15551110003'],
     },
     {
       id: 'team_houston',
-      name: 'Houston Athletic',
+      name: 'Houston Athletic Rugby Club',
+      abbreviation: 'HOU',
+      gender: 'men',
+      address: 'Memorial Park, Houston, TX',
       contactEmails: ['houston@example.com'],
       contactPhones: ['+15551110006'],
     },
@@ -1123,9 +1135,24 @@ function seedMatches(): Match[] {
     ...results,
   ];
 
+  const demoTitles: Record<string, string> = {
+    m_a01: 'Season opener',
+    m_a02: 'Conference play',
+    m_a02b: 'Rivalry weekend',
+    m_a03: 'Homecoming',
+    m_a04: 'Derby day',
+    m_a08: 'Tourney final',
+    m_g01: 'Midseason',
+    m_g02: 'Conference play',
+    m_tc01: 'Team review',
+    m_res01: 'Playoff',
+    m_res02: 'Conference final',
+  };
+
   return all.map((m) => ({
     ...m,
     competition: competitionForGender(m.gender),
+    title: demoTitles[m.id],
     level:
       m.id === 'm_a08' || m.id === 'm_res03' ? 'Tourney' : m.level,
   }));
@@ -2233,7 +2260,10 @@ class DemoStore {
           ...teams,
           {
             id: 'team_austin_2nds',
-            name: 'Austin RFC 2nds',
+            name: 'Austin Rugby Football Club 2nds',
+            abbreviation: 'AUS 2',
+            gender: 'men',
+            address: 'Westlake Fields, Austin, TX',
             contactEmails: ['austin-admin@example.com', 'assigner@example.com'],
             contactPhones: ['+15551110002'],
           },
