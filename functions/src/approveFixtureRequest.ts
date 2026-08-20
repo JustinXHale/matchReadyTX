@@ -2,7 +2,12 @@ import { google } from 'googleapis';
 import { FieldValue, type Firestore } from 'firebase-admin/firestore';
 import { HttpsError } from 'firebase-functions/v2/https';
 import { logger } from 'firebase-functions';
-import { emptyCrew, sanitizeMatchId } from './sheetParse';
+import {
+  competitionForGender,
+  emptyCrew,
+  normalizeGender,
+  sanitizeMatchId,
+} from './sheetParse';
 
 type FixtureSide = 'home' | 'away';
 
@@ -185,18 +190,22 @@ async function upsertLocationsRow(
   venueName: string,
   venueAddress: string,
   gender: string,
+  competition?: string,
 ): Promise<void> {
+  const resolvedComp =
+    competition?.trim() ||
+    competitionForGender(normalizeGender(gender));
   const values = await readTab(sheets, spreadsheetId, 'Locations');
   if (!values.length) {
     // Create header + first row
     await sheets.spreadsheets.values.update({
       spreadsheetId,
-      range: 'Locations!A1:D2',
+      range: 'Locations!A1:E2',
       valueInputOption: 'USER_ENTERED',
       requestBody: {
         values: [
-          ['abbreviation', 'gender', 'venue_name', 'address'],
-          [venueName, gender, venueName, venueAddress],
+          ['abbreviation', 'competition', 'gender', 'venue_name', 'address'],
+          [venueName, resolvedComp, gender, venueName, venueAddress],
         ],
       },
     });
@@ -205,36 +214,65 @@ async function upsertLocationsRow(
 
   const headers = values[0] ?? [];
   const abbrIdx = headerIndex(headers, ['abbreviation', 'location']);
+  const competitionIdx = headerIndex(headers, [
+    'competition',
+    'conference',
+    'league',
+    'comp',
+  ]);
   const genderIdx = headerIndex(headers, ['gender']);
-  const nameIdx = headerIndex(headers, ['venue_name', 'name']);
+  // Do not write to Name — on the club directory that column is the university.
+  const venueNameIdx = headerIndex(headers, ['venue_name', 'subvenue']);
   const addrIdx = headerIndex(headers, ['address']);
+  const fullAddrIdx = headerIndex(headers, ['full_address', 'address/link']);
   if (abbrIdx < 0) {
     logger.warn('Locations tab missing abbreviation column — skip upsert');
     return;
   }
 
   const normAbbr = venueName.trim().toLowerCase();
+  const wantComp = resolvedComp.trim().toLowerCase();
+  const wantGender = normalizeGender(gender);
   let existingRow = -1;
   for (let i = 1; i < values.length; i++) {
     const abbr = String(values[i]?.[abbrIdx] ?? '')
       .trim()
       .toLowerCase();
-    if (abbr === normAbbr) {
-      existingRow = i;
-      break;
+    if (abbr !== normAbbr) continue;
+    if (competitionIdx >= 0) {
+      const rowComp = String(values[i]?.[competitionIdx] ?? '')
+        .trim()
+        .toLowerCase();
+      if (rowComp === wantComp) {
+        existingRow = i;
+        break;
+      }
+      continue;
     }
+    if (genderIdx >= 0) {
+      const rowGender = String(values[i]?.[genderIdx] ?? '').trim();
+      if (rowGender && normalizeGender(rowGender) === wantGender) {
+        existingRow = i;
+        break;
+      }
+      continue;
+    }
+    existingRow = i;
+    break;
   }
 
-  const width = Math.max(headers.length, 4);
+  const width = Math.max(headers.length, 5);
   const line = Array.from({ length: width }, () => '');
   if (existingRow >= 0) {
     const prev = values[existingRow] ?? [];
     for (let i = 0; i < width; i++) line[i] = String(prev[i] ?? '');
   }
   line[abbrIdx] = venueName;
+  if (competitionIdx >= 0) line[competitionIdx] = resolvedComp;
   if (genderIdx >= 0) line[genderIdx] = gender;
-  if (nameIdx >= 0) line[nameIdx] = venueName;
+  if (venueNameIdx >= 0) line[venueNameIdx] = venueName;
   if (addrIdx >= 0) line[addrIdx] = venueAddress;
+  if (fullAddrIdx >= 0) line[fullAddrIdx] = venueAddress;
 
   if (existingRow >= 0) {
     const rowNum = existingRow + 1;
@@ -341,6 +379,7 @@ export async function runApproveFixtureRequest(opts: {
         req.venueName,
         req.venueAddress,
         gender,
+        req.competition ?? undefined,
       );
       await appendScheduleRow(sheets, sheetId, {
         matchId: sheetRowKey,

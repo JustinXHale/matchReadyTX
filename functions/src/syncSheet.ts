@@ -14,6 +14,7 @@ import {
 } from './crewDefaults';
 import {
   competitionForGender,
+  genderFromCompetitionName,
   lookupLocation,
   normalizeGender,
   parseContactRows,
@@ -120,9 +121,7 @@ type TeamShape = {
 
 function genderForRow(row: { competition?: string; gender?: string }): 'men' | 'women' {
   if (row.gender?.trim()) return normalizeGender(row.gender);
-  const comp = row.competition ?? '';
-  if (/\bwomen\b|\bfemale\b/i.test(comp)) return 'women';
-  return 'men';
+  return genderFromCompetitionName(row.competition) ?? 'men';
 }
 
 function normNameKey(name: string): string {
@@ -133,7 +132,7 @@ function resolvedCompetition(row: {
   competition?: string;
   gender?: string;
 }): string {
-  return row.competition?.trim() || competitionForGender(normalizeGender(row.gender));
+  return row.competition?.trim() || competitionForGender(genderForRow(row));
 }
 
 function buildTeamIdResolver(rows: ReturnType<typeof parseScheduleRows>) {
@@ -290,9 +289,18 @@ export async function runSheetSync(opts: {
       locations,
       team.abbreviation || team.name,
       team.gender ?? 'men',
+      team.competition,
     );
     if (loc?.teamName) team.name = loc.teamName;
     if (loc?.address) team.address = loc.address;
+    if (loc?.competition) team.competition = loc.competition;
+    if (!team.gender && loc) {
+      const fromLoc =
+        loc.gender?.trim()
+          ? normalizeGender(loc.gender)
+          : genderFromCompetitionName(loc.competition);
+      if (fromLoc) team.gender = fromLoc;
+    }
     if (!team.abbreviation && loc?.abbreviation) {
       team.abbreviation = loc.abbreviation;
     }
@@ -350,15 +358,14 @@ export async function runSheetSync(opts: {
     const snap = await ref.get();
     const existing = snap.data();
 
-    const gender = normalizeGender(row.gender);
-    const loc = lookupLocation(locations, row.location, gender);
+    const gender = genderForRow(row);
+    const competition = resolvedCompetition(row);
+    const loc = lookupLocation(locations, row.location, gender, competition);
     const venueName = loc?.venue_name || row.location || 'TBD';
     const venueAddress = loc?.address || row.location || '';
     const kickoffAt = rowToKickoffIso(row);
     const homeTeamId = resolveTeamId(row.home_team, row);
     const awayTeamId = resolveTeamId(row.away_team, row);
-    const competition =
-      row.competition || competitionForGender(gender);
     const level = row.level || 'Tier 1';
     const sheetCancelled =
       (row.status ?? '').toUpperCase() === 'CANCELLED' ||
@@ -489,6 +496,26 @@ export async function runSheetSync(opts: {
   });
   await flushBatch();
 
+  const remainingMatches = await db.collection(`orgs/${orgId}/matches`).get();
+  const keepTeamIds = new Set(teamsById.keys());
+  for (const docSnap of remainingMatches.docs) {
+    const data = docSnap.data();
+    const home = String(data.homeTeamId ?? '').trim();
+    const away = String(data.awayTeamId ?? '').trim();
+    if (home) keepTeamIds.add(home);
+    if (away) keepTeamIds.add(away);
+  }
+  const existingTeams = await db.collection(`orgs/${orgId}/teams`).get();
+  let teamsRemoved = 0;
+  for (const docSnap of existingTeams.docs) {
+    if (keepTeamIds.has(docSnap.id)) continue;
+    batch.delete(docSnap.ref);
+    batchOps += 1;
+    teamsRemoved += 1;
+    if (batchOps >= 400) await flushBatch();
+  }
+  await flushBatch();
+
   logger.info('Sheet sync complete', {
     orgId,
     sheetId,
@@ -497,6 +524,7 @@ export async function runSheetSync(opts: {
     cancelled,
     removed,
     teams: teamsById.size,
+    teamsRemoved,
   });
 
   return {

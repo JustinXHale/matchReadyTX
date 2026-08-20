@@ -108,7 +108,7 @@ Proposal write-back finds the row by `match_id` / `sheetRowKey` and updates date
 Optional tabs:
 
 - **Contacts** — `team_name`, `email`, `phone` → team contact emails. Tab aliases: `Contacts`, `contacts`, `teamContacts`
-- **Locations** — `abbreviation` (+ `Name` / full team name, `gender`, `address` or `Full Address`, `city`, `state`, `ZIP`). Joined on Schedule `location` for venue, and on team abbreviation for the Teams page. Tab aliases: `Locations`, `locations`
+- **Locations** — `abbreviation` (+ `Name` / full team name, `Competition` / conference, optional `gender`, `address` or `Full Address`, `city`, `state`, `ZIP`). Joined on Schedule `location` + match competition (or gender) so split clubs keep distinct fields (e.g. UNT men vs women). Tab aliases: `Locations`, `locations`. Hidden Gender is fine — the API still reads the column, and gender can be inferred from Competition (`Lonestar Women` → women).
 
 Timezone for kickoff: America/Chicago (−06:00) for v1.
 

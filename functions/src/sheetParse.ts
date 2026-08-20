@@ -24,6 +24,8 @@ export type ContactRow = {
 export type LocationRow = {
   abbreviation: string;
   gender?: string;
+  /** Conference from the Competition column (e.g. Lonestar Men). */
+  competition?: string;
   /** Full club name from the Name column (e.g. University of North Texas). */
   teamName?: string;
   venue_name?: string;
@@ -90,7 +92,13 @@ export function parseScheduleRows(values: string[][]): ScheduleRow[] {
       'visitor',
       'visiting_team',
     ]),
-    competition: alias(['competition', 'comp', 'league', 'conf']),
+    competition: alias([
+      'competition',
+      'conference',
+      'comp',
+      'league',
+      'conf',
+    ]),
     level: alias(['level', 'tier', 'division', 'match_level', 'game_level']),
     gender: alias(['gender', 'side', 'sex']),
     notes: alias(['notes', 'note', 'comments']),
@@ -170,9 +178,17 @@ export function parseLocationRows(values: string[][]): LocationRow[] {
     .map((r) => {
       const fieldOrStreet = (r.address || r.venue_name || r.subvenue || '').trim();
       const mailing = composeAddress(r);
+      const competition = (
+        r.competition ||
+        r.conference ||
+        r.league ||
+        r.comp ||
+        ''
+      ).trim();
       return {
         abbreviation: (r[abbrKey] ?? '').toUpperCase(),
         gender: r.gender || undefined,
+        competition: competition || undefined,
         teamName: (r.name || r.team_name || r.full_name || '').trim() || undefined,
         venue_name: fieldOrStreet || undefined,
         address: mailing || fieldOrStreet || undefined,
@@ -197,6 +213,22 @@ export function normalizeGender(raw?: string): 'men' | 'women' {
 
 export function competitionForGender(gender: 'men' | 'women'): string {
   return gender === 'women' ? 'Lonestar Women' : 'Lonestar Men';
+}
+
+/** Infer men/women from names like "Lonestar Women". */
+export function genderFromCompetitionName(
+  name?: string,
+): 'men' | 'women' | null {
+  const n = (name ?? '').trim();
+  if (!n) return null;
+  if (/\bwomen\b|\bfemale\b/i.test(n)) return 'women';
+  if (/\bmen\b|\bmale\b/i.test(n)) return 'men';
+  return null;
+}
+
+function locationGender(loc: LocationRow): 'men' | 'women' | null {
+  if (loc.gender?.trim()) return normalizeGender(loc.gender);
+  return genderFromCompetitionName(loc.competition);
 }
 
 /** Normalize a Sheets date cell to YYYY-MM-DD. */
@@ -335,17 +367,28 @@ export function lookupLocation(
   locations: LocationRow[],
   abbreviation: string,
   gender: 'men' | 'women',
+  competition?: string,
 ): LocationRow | undefined {
   const abbr = abbreviation.trim().toUpperCase();
   if (!abbr) return undefined;
-  const gendered = locations.find(
-    (l) =>
-      l.abbreviation === abbr &&
-      l.gender &&
-      normalizeGender(l.gender) === gender,
-  );
-  if (gendered) return gendered;
-  const ungendered = locations.find((l) => l.abbreviation === abbr && !l.gender);
-  if (ungendered) return ungendered;
-  return locations.find((l) => l.abbreviation === abbr);
+  const sameAbbr = locations.filter((l) => l.abbreviation === abbr);
+  if (!sameAbbr.length) return undefined;
+
+  const wantComp = (competition ?? '').trim().toLowerCase();
+  if (wantComp) {
+    const byComp = sameAbbr.find(
+      (l) => (l.competition ?? '').trim().toLowerCase() === wantComp,
+    );
+    if (byComp) return byComp;
+  }
+
+  const byGender = sameAbbr.find((l) => locationGender(l) === gender);
+  if (byGender) return byGender;
+
+  const unspecified = sameAbbr.find((l) => !l.gender && !l.competition);
+  if (unspecified) return unspecified;
+
+  // Multiple gendered/conference rows: do not pick the first (UNT men vs women).
+  if (sameAbbr.length === 1) return sameAbbr[0];
+  return undefined;
 }

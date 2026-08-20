@@ -107,10 +107,13 @@ export function scheduleTeamEntries(
     };
   });
 
-  // Hide stale legacy "unknown conference" variants when split conference teams exist.
+  // Hide leftover pre-split docs (e.g. "BAYLOR" / 0 matches) when the
+  // same club now exists as conference-split rows (full name + abbreviation).
   const grouped = new Map<string, ScheduleTeamEntry[]>();
   for (const entry of entries) {
-    const key = entry.team.name.trim().toLowerCase();
+    const abbr = entry.team.abbreviation?.trim().toLowerCase();
+    const nameKey = entry.team.name.trim().toLowerCase();
+    const key = abbr || nameKey;
     const list = grouped.get(key) ?? [];
     list.push(entry);
     grouped.set(key, list);

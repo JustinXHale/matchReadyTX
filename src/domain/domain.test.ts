@@ -69,6 +69,7 @@ import {
 } from '@/domain/members';
 import { defaultRoleView, lensesForUser } from '@/app/AppContext';
 import { standingsByDivision } from '@/domain/standings';
+import { scheduleTeamEntries } from '@/domain/teams';
 
 function baseMatch(): Match {
   return {
@@ -1398,5 +1399,51 @@ describe('coachFeedback', () => {
     ).toBeCloseTo(4, 5);
     expect(coachFeedbackAverage({})).toBeNull();
     expect(coachFeedbackAverageLabel(3.6)).toBe(4);
+  });
+});
+
+describe('scheduleTeamEntries', () => {
+  it('hides leftover abbreviation-only teams when conference-split clubs exist', () => {
+    const matches: Match[] = [
+      {
+        ...baseMatch(),
+        id: 'm1',
+        status: 'team_confirmed',
+        homeTeamId: 'baylor-lonestar-men',
+        homeTeamName: 'BAYLOR',
+        awayTeamId: 'asu-lonestar-men',
+        awayTeamName: 'ASU',
+        competition: 'Lonestar Men',
+      },
+    ];
+    const teams: Team[] = [
+      { id: 'baylor', name: 'BAYLOR', contactEmails: [] },
+      {
+        id: 'baylor-lonestar-men',
+        name: 'BAYLOR University',
+        abbreviation: 'BAYLOR',
+        competition: 'Lonestar Men',
+        contactEmails: [],
+      },
+      {
+        id: 'asu-lonestar-men',
+        name: 'Angelo State University',
+        abbreviation: 'ASU',
+        competition: 'Lonestar Men',
+        contactEmails: [],
+      },
+    ];
+    const ids = scheduleTeamEntries(matches, teams).map((e) => e.team.id);
+    expect(ids).not.toContain('baylor');
+    expect(ids).toContain('baylor-lonestar-men');
+    expect(ids).toContain('asu-lonestar-men');
+  });
+
+  it('keeps a contacts-only club that has no conference-split sibling', () => {
+    const teams: Team[] = [
+      { id: 'new-club', name: 'New Club RFC', contactEmails: ['a@x.com'] },
+    ];
+    const ids = scheduleTeamEntries([], teams).map((e) => e.team.id);
+    expect(ids).toContain('new-club');
   });
 });

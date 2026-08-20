@@ -186,7 +186,7 @@ mail/{mailId}   // outbound queue — Admin SDK only; see docs/EMAIL.md
 
 **Schedule columns:** `match_id`, `date`, `kickoff_time`, `location`, `home_team`, `away_team`, `competition?`, `level?`, `gender?`, `notes?`, `title?`, `status?`  
 **Contacts:** `team_name`, `email`, `phone`  
-**Locations:** `abbreviation`, `name?` (full team name), `gender?`, address fields  
+**Locations:** `abbreviation`, `name?` (full team name), `competition?` (conference), `gender?` (optional if competition encodes men/women), address fields  
 **Never on Sheet:** fees, mileage, flight, housing, official names for pay.
 
 ### Sync & write-back
