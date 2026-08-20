@@ -78,6 +78,40 @@ export function pendingRaiseHandRequests(
   return requests.filter((r) => r.status === 'pending');
 }
 
+export function gameRequestHasMatch(
+  request: GameRequest,
+  matches: Match[],
+): boolean {
+  return matches.some((m) => m.id === request.matchId);
+}
+
+export function proposalHasMatch(
+  proposal: ChangeProposal,
+  matches: Match[],
+): boolean {
+  return matches.some((m) => m.id === proposal.matchId);
+}
+
+/** Pending raise-hand rows whose match is still on the schedule. */
+export function actionableRaiseHandRequests(
+  requests: GameRequest[],
+  matches: Match[],
+): GameRequest[] {
+  return pendingRaiseHandRequests(requests).filter((r) =>
+    gameRequestHasMatch(r, matches),
+  );
+}
+
+/** Proposals awaiting ack whose match is still on the schedule. */
+export function actionableProposalsAwaitingAck(
+  proposals: ChangeProposal[],
+  matches: Match[],
+): ChangeProposal[] {
+  return proposalsAwaitingAck(proposals).filter((p) =>
+    proposalHasMatch(p, matches),
+  );
+}
+
 export function pendingFixtureRequests(
   requests: FixtureRequest[],
 ): FixtureRequest[] {
@@ -110,10 +144,16 @@ export function countSchedulerQueues(state: AppState): SchedulerQueueCounts {
   const teamLinkRequests = pendingTeamLinkRequests(
     state.teamLinkRequests,
   ).length;
-  const raiseHand = pendingRaiseHandRequests(state.requests).length;
+  const raiseHand = actionableRaiseHandRequests(
+    state.requests,
+    state.matches,
+  ).length;
   const needsOfficials = matchesNeedingOfficials(state.matches).length;
   const needsReassignment = matchesNeedingReassignment(state.matches).length;
-  const proposals = proposalsAwaitingAck(state.proposals).length;
+  const proposals = actionableProposalsAwaitingAck(
+    state.proposals,
+    state.matches,
+  ).length;
   const t72 = matchesT72Due(state.matches).length;
   const notifications = state.notifications.length;
   const workActionable =

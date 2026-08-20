@@ -92,8 +92,25 @@ export function ProposalQueueList({
         const m = matches.find((x) => x.id === p.matchId);
         if (!m) {
           return (
-            <li key={p.id}>
-              <p className="rs-match-card__meta">Proposal — match unavailable</p>
+            <li key={p.id} className="rs-request-item">
+              <div className="rs-request-item__main">
+                <strong>
+                  {p.proposedByName ?? 'Team proposal'}
+                </strong>
+                <div className="rs-match-card__meta">
+                  Match no longer on schedule
+                  {p.matchId ? ` (${p.matchId})` : ''}
+                </div>
+              </div>
+              <div className="rs-queue-action">
+                <Button
+                  size="sm"
+                  variant="primary"
+                  onClick={() => onAcknowledge(p.id)}
+                >
+                  Dismiss
+                </Button>
+              </div>
             </li>
           );
         }

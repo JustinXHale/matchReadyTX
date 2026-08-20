@@ -263,6 +263,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     const profile = liveProfile;
     if (!profile) return false;
     flushSync(() => {
+      demoStore.prepareForLiveSync();
       demoStore.upsertAndSignIn(profile);
       setState(demoStore.getState());
       setDataModeState('live');

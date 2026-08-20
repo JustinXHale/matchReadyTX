@@ -1814,11 +1814,73 @@ function seedDemoAvailability(): AvailabilityRange[] {
   ];
 }
 
+/** Queue/demo schedule data must not appear in live Firebase sessions. */
+function emptyLiveQueueState(): Pick<
+  AppState,
+  | 'teams'
+  | 'matches'
+  | 'proposals'
+  | 'requests'
+  | 'fixtureRequests'
+  | 'teamLinkRequests'
+  | 'coachFeedback'
+  | 'availability'
+  | 'notifications'
+  | 'officialAlerts'
+  | 'matchReports'
+  | 'cardReports'
+  | 'coachingReports'
+> {
+  return {
+    teams: [],
+    matches: [],
+    proposals: [],
+    requests: [],
+    fixtureRequests: [],
+    teamLinkRequests: [],
+    coachFeedback: [],
+    availability: [],
+    notifications: [],
+    officialAlerts: [],
+    matchReports: [],
+    cardReports: [],
+    coachingReports: [],
+  };
+}
+
 function createInitialState(): AppState {
   const seeded = seedAssignerQueueDemos(seedMatches());
+  const live = isLiveDataMode();
+  const queueState = live
+    ? emptyLiveQueueState()
+    : {
+        teams: seedTeams(),
+        matches: seeded.matches,
+        proposals: seeded.proposals,
+        requests: seedGameRequests(seeded.matches),
+        fixtureRequests: seedFixtureRequests(),
+        teamLinkRequests: [],
+        coachFeedback: seedCoachFeedback(seeded.matches),
+        availability: seedDemoAvailability(),
+        notifications: [
+          {
+            id: 'n_seed_1',
+            at: new Date().toISOString(),
+            channel: 'email' as const,
+            to: 'assigner@demo.local',
+            subject: 'Raise-hand approved (demo)',
+            body: 'Sample notification so Scheduler → Queues → Notifications is not empty.',
+            event: 'demo_seed',
+          },
+        ],
+        officialAlerts: seedOfficialAlerts(),
+        matchReports: seedMatchReports(seeded.matches),
+        cardReports: seedCardReports(seeded.matches),
+        coachingReports: seedCoachingReports(),
+      };
   return {
     org: {
-      id: 'demo-org',
+      id: live ? defaultOrgId() : 'demo-org',
       name: 'Demo Rugby Society',
       timezone: 'America/Chicago',
       mileageRatePerMile: 0.67,
@@ -1826,33 +1888,11 @@ function createInitialState(): AppState {
       defaultFees: defaultFees(),
       matchLevels: [...DEFAULT_MATCH_LEVELS],
       competitions: [...DEFAULT_COMPETITIONS],
-      sheetId: 'demo-sheet',
-      sheetSyncedAt: new Date().toISOString(),
+      sheetId: live ? undefined : 'demo-sheet',
+      sheetSyncedAt: live ? undefined : new Date().toISOString(),
     },
     users: seedUsers(),
-    teams: seedTeams(),
-    matches: seeded.matches,
-    proposals: seeded.proposals,
-    requests: seedGameRequests(seeded.matches),
-    fixtureRequests: seedFixtureRequests(),
-    teamLinkRequests: [],
-    coachFeedback: seedCoachFeedback(seeded.matches),
-    availability: seedDemoAvailability(),
-    notifications: [
-      {
-        id: 'n_seed_1',
-        at: new Date().toISOString(),
-        channel: 'email',
-        to: 'assigner@demo.local',
-        subject: 'Raise-hand approved (demo)',
-        body: 'Sample notification so Scheduler → Queues → Notifications is not empty.',
-        event: 'demo_seed',
-      },
-    ],
-    officialAlerts: seedOfficialAlerts(),
-    matchReports: seedMatchReports(seeded.matches),
-    cardReports: seedCardReports(seeded.matches),
-    coachingReports: seedCoachingReports(),
+    ...queueState,
     currentUserId: null,
   };
 }
@@ -2098,6 +2138,15 @@ class DemoStore {
     });
   }
 
+  /** Drop demo queue rows before subscribing to Firestore (live mode). */
+  prepareForLiveSync(): void {
+    this.set((s) => ({
+      ...s,
+      ...emptyLiveQueueState(),
+      org: { ...s.org, id: defaultOrgId() },
+    }));
+  }
+
   /**
    * Replace org schedule cache with Firestore live data (real Sheet sync).
    * Clears demo fixtures when a signed-in Firebase user is connected.
@@ -2134,6 +2183,7 @@ class DemoStore {
       cardReports: [],
       coachingReports: [],
       officialAlerts: [],
+      notifications: [],
     }));
   }
 

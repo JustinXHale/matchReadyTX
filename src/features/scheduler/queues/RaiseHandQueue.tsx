@@ -166,13 +166,19 @@ export function RaiseHandQueue({
   return (
     <>
       <ul className="rs-list">
-        {requests.map((r) => (
+        {requests.map((r) => {
+          const matchMissing = !state.matches.some((m) => m.id === r.matchId);
+          return (
           <RaiseHandItem
             key={r.id}
             request={r}
             user={state.users.find((u) => u.uid === r.userId)}
             onApprove={() => onApprove(r.id, r.preferredSlot ?? 'mo')}
             onDecline={() => {
+              if (matchMissing) {
+                onDecline(r.id, 'Match removed from schedule');
+                return;
+              }
               setDeclineReason('');
               setDeclineTarget(r);
             }}
@@ -181,7 +187,8 @@ export function RaiseHandQueue({
               setProfileMatchId(r.matchId);
             }}
           />
-        ))}
+          );
+        })}
       </ul>
 
       <Modal
@@ -385,10 +392,23 @@ function RaiseHandItem({
 
   if (!match) {
     return (
-      <li>
-        <p className="rs-match-card__meta">
-          {name} — match unavailable
-        </p>
+      <li className="rs-request-item">
+        <div className="rs-request-item__main">
+          <strong>{name}</strong>
+          <div className="rs-match-card__meta">
+            {slotLabel} — match no longer on schedule
+            {request.matchId ? ` (${request.matchId})` : ''}
+          </div>
+        </div>
+        <div className="rs-queue-decision__actions">
+          <Button
+            size="sm"
+            variant="danger"
+            onClick={onDecline}
+          >
+            Dismiss
+          </Button>
+        </div>
       </li>
     );
   }
