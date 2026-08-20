@@ -689,10 +689,13 @@ export function subscribeLiveOrg(
     ),
   );
 
-  // Collection-group queries must filter by orgId so rules can authorize them.
+  // Collection-group queries must use a composite (orgId + status).
+  // Single-field collection-group indexes live on the Single field tab and
+  // take longer; Firebase rejected deploying them as composite indexes.
   const proposalsQuery = query(
     collectionGroup(database, 'proposals'),
     where('orgId', '==', orgId),
+    where('status', 'in', ['pending', 'approved']),
   );
 
   unsubs.push(
@@ -720,6 +723,7 @@ export function subscribeLiveOrg(
       ? query(
           collectionGroup(database, 'gameRequests'),
           where('orgId', '==', orgId),
+          where('status', '==', 'pending'),
         )
       : query(
           collectionGroup(database, 'gameRequests'),
