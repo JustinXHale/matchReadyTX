@@ -220,6 +220,11 @@ export function MemberDetailPage() {
       }
     : undefined;
 
+  const teamPickerOptions = useMemo(
+    () => conferenceTeamOptions(state.matches, state.teams),
+    [state.matches, state.teams],
+  );
+
   if (!user) {
     return (
       <div className="rs-stack">
@@ -489,12 +494,6 @@ export function MemberDetailPage() {
     setEditSaved(false);
     setEditError(null);
   };
-
-  const teamPickerOptions = useMemo(
-    () =>
-      conferenceTeamOptions(state.matches, state.teams),
-    [state.matches, state.teams],
-  );
 
   return (
     <div className="rs-stack">
