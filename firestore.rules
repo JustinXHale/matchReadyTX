@@ -322,7 +322,7 @@ service cloud.firestore {
             || (signedIn() && resource.data.userId == request.auth.uid);
           allow delete: if signedIn()
             && resource.data.userId == request.auth.uid
-            && resource.data.status == 'pending';
+            && resource.data.status in ['pending', 'declined'];
         }
       }
       match /fixtureRequests/{requestId} {

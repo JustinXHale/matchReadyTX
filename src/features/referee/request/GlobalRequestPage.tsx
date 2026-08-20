@@ -8,7 +8,6 @@ import {
   matchMatchesDivisionFilters,
 } from '@/domain/divisionFilters';
 import { GlobalDivisionFilters } from '@/features/global/GlobalDivisionFilters';
-import { RequestSubNav } from '@/features/referee/request/RequestSubNav';
 import { MatchListRow } from '@/ui/MatchListRow';
 import { canOfficialRequestMatch, openRequestSlots } from '@/domain/requests';
 import {
@@ -20,8 +19,8 @@ import {
 import { backState, type BackNav } from '@/nav/backNav';
 
 const GLOBAL_REQUEST_BACK: BackNav = {
-  to: '/referee/request/global',
-  label: 'Global',
+  to: '/referee/appointments/open',
+  label: 'Open',
 };
 
 type RoleFilter = 'mo' | 'ar' | 'cmo' | 'no4';
@@ -218,8 +217,6 @@ export function GlobalRequestPage() {
 
   return (
     <div className="rs-stack">
-      <RequestSubNav />
-
       <GlobalDivisionFilters
         options={filterOptions}
         genderFilter={genderFilter}

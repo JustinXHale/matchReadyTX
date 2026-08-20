@@ -12,11 +12,13 @@ import {
 import { useMemo, useState } from 'react';
 import { flushSync } from 'react-dom';
 import { useApp } from '@/app/AppContext';
-import { RequestSubNav } from '@/features/referee/request/RequestSubNav';
 import { MatchListRow } from '@/ui/MatchListRow';
 import type { GameRequest, Match } from '@/domain/types';
 import { REQUESTABLE_SLOT_SHORT } from '@/domain/types';
-import { isPendingRequestActive } from '@/domain/requests';
+import {
+  isDeclinedRequestVisible,
+  isPendingRequestActive,
+} from '@/domain/requests';
 import type { BackNav } from '@/nav/backNav';
 import { isFirebaseConfigured } from '@/services/firebase';
 import {
@@ -25,8 +27,8 @@ import {
 } from '@/services/orgData';
 
 const PENDING_BACK: BackNav = {
-  to: '/referee/request/pending',
-  label: 'Pending',
+  to: '/referee/appointments/requested',
+  label: 'Requested',
 };
 
 function daysPending(iso: string): number {
@@ -53,26 +55,33 @@ function RequestStatusTrailing({
   request: GameRequest;
   onRemove: () => void;
 }) {
+  const declined = request.status === 'declined';
   const pendingDays = daysPending(request.createdAt);
 
   return (
     <button
       type="button"
       className="rs-raise-hand-col rs-request-remove-hit"
-      aria-label="Remove request"
+      aria-label={declined ? 'Dismiss declined request' : 'Remove request'}
       onClick={(e) => {
         e.preventDefault();
         e.stopPropagation();
         onRemove();
       }}
     >
-      <span className="rs-pill rs-pill--warn">Pending {pendingDays}d</span>
+      {declined ? (
+        <span className="rs-pill rs-pill--urgent">Declined</span>
+      ) : (
+        <span className="rs-pill rs-pill--warn">Pending {pendingDays}d</span>
+      )}
       {request.preferredSlot && (
         <span className="rs-pill rs-pill--ink">
           {REQUESTABLE_SLOT_SHORT[request.preferredSlot]}
         </span>
       )}
-      <span className="rs-request-remove-hit__label">Remove</span>
+      <span className="rs-request-remove-hit__label">
+        {declined ? 'Dismiss' : 'Remove'}
+      </span>
     </button>
   );
 }
@@ -87,18 +96,31 @@ export function PendingRequestsPage() {
   const rows = useMemo(() => {
     if (!currentUser) return [] as { request: GameRequest; match: Match }[];
     return state.requests
-      .filter((r) => r.userId === currentUser.uid && r.status === 'pending')
+      .filter(
+        (r) =>
+          r.userId === currentUser.uid &&
+          (r.status === 'pending' || r.status === 'declined'),
+      )
       .map((request) => {
         const match = state.matches.find((m) => m.id === request.matchId);
         return match ? { request, match } : null;
       })
       .filter((x): x is { request: GameRequest; match: Match } => x != null)
-      .filter(({ request, match }) => isPendingRequestActive(match, request))
-      .sort(
-        (a, b) =>
+      .filter(
+        ({ request, match }) =>
+          isPendingRequestActive(match, request) ||
+          isDeclinedRequestVisible(request),
+      )
+      .sort((a, b) => {
+        const declinedDelta =
+          Number(b.request.status === 'declined') -
+          Number(a.request.status === 'declined');
+        if (declinedDelta !== 0) return declinedDelta;
+        return (
           new Date(a.match.kickoffAt).getTime() -
-          new Date(b.match.kickoffAt).getTime(),
-      );
+          new Date(b.match.kickoffAt).getTime()
+        );
+      });
   }, [currentUser, state.requests, state.matches]);
 
   const byMonth = useMemo(() => {
@@ -153,12 +175,12 @@ export function PendingRequestsPage() {
 
   return (
     <div className="rs-stack">
-      <RequestSubNav />
-
       {rows.length === 0 ? (
         <EmptyState titleText="Nothing pending" headingLevel="h3">
           <EmptyStateBody>
-            When you raise your hand on Global, waiting requests show up here.
+            When you raise your hand on Open, waiting requests show up here.
+            If an assigner declines one, it stays here with their reason until
+            you dismiss it.
           </EmptyStateBody>
         </EmptyState>
       ) : (
@@ -175,7 +197,17 @@ export function PendingRequestsPage() {
                     to={`/matches/${match.id}`}
                     showTime
                     split="action"
+                    urgent={request.status === 'declined'}
                     back={PENDING_BACK}
+                    meta={
+                      request.status === 'declined' ? (
+                        <span className="rs-list-row__hint">
+                          {request.declineReason?.trim()
+                            ? `Declined: ${request.declineReason.trim()}`
+                            : 'Declined by the assigner.'}
+                        </span>
+                      ) : undefined
+                    }
                     trailing={
                       <RequestStatusTrailing
                         request={request}
@@ -199,11 +231,23 @@ export function PendingRequestsPage() {
       >
         <ModalHeader>
           <Title headingLevel="h2" id="remove-request-title" size="lg">
-            Remove request?
+            {pendingRemoval?.request.status === 'declined'
+              ? 'Dismiss decision?'
+              : 'Remove request?'}
           </Title>
         </ModalHeader>
         <ModalBody>
-          {pendingRemoval && (
+          {pendingRemoval && pendingRemoval.request.status === 'declined' ? (
+            <p id="remove-request-desc" className="rs-modal-lede">
+              Dismiss this declined request for{' '}
+              <strong>
+                {pendingRemoval.match.homeTeamName} vs{' '}
+                {pendingRemoval.match.awayTeamName}
+              </strong>
+              ? You can raise your hand again from Global if the game is still
+              open.
+            </p>
+          ) : pendingRemoval ? (
             <p id="remove-request-desc" className="rs-modal-lede">
               Remove your request for{' '}
               <strong>
@@ -213,7 +257,7 @@ export function PendingRequestsPage() {
               ? You can raise your hand again later from Global if the game is
               still open.
             </p>
-          )}
+          ) : null}
         </ModalBody>
         <ModalFooter>
           <Button
@@ -221,10 +265,14 @@ export function PendingRequestsPage() {
             variant="link"
             onClick={() => setPendingRemoval(null)}
           >
-            Keep request
+            {pendingRemoval?.request.status === 'declined'
+              ? 'Keep'
+              : 'Keep request'}
           </Button>
           <Button type="button" variant="danger" onClick={confirmRemove}>
-            Remove request
+            {pendingRemoval?.request.status === 'declined'
+              ? 'Dismiss'
+              : 'Remove request'}
           </Button>
         </ModalFooter>
       </Modal>

@@ -102,6 +102,27 @@ export function isPendingRequestActive(
   return true;
 }
 
+/** Declined raise-hand stays on Pending until the official dismisses it. */
+export function isDeclinedRequestVisible(request: GameRequest): boolean {
+  return request.status === 'declined';
+}
+
+/** Raise-hand rows the official still needs to see (pending + declined). */
+export function countOfficialRequestInbox(
+  requests: GameRequest[],
+  matches: Match[],
+  userId: string,
+): number {
+  return requests.filter((r) => {
+    if (r.userId !== userId) return false;
+    const match = matches.find((m) => m.id === r.matchId);
+    if (!match) return false;
+    return (
+      isPendingRequestActive(match, r) || isDeclinedRequestVisible(r)
+    );
+  }).length;
+}
+
 export function canOfficialRequestMatch(
   match: Match,
   userId: string,

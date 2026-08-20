@@ -71,6 +71,13 @@ const RefereeLayout = lazy(() =>
     default: m.RefereeLayout,
   })),
 );
+const RefereeAppointmentsLayout = lazy(() =>
+  import('@/features/referee/appointments/RefereeAppointmentsLayout').then(
+    (m) => ({
+      default: m.RefereeAppointmentsLayout,
+    }),
+  ),
+);
 const AppointmentsPage = lazy(() =>
   import('@/features/referee/appointments/AppointmentsPage').then((m) => ({
     default: m.AppointmentsPage,
@@ -415,14 +422,28 @@ function FeatureRoutes() {
           element={<AppNavigate to="/referee/appointments" replace />}
         />
         <Route path="availability" element={<AvailabilityPage />} />
-        <Route path="appointments" element={<AppointmentsPage />} />
+        <Route path="appointments" element={<RefereeAppointmentsLayout />}>
+          <Route index element={<AppointmentsPage />} />
+          <Route path="requested" element={<PendingRequestsPage />} />
+          <Route path="open" element={<GlobalRequestPage />} />
+        </Route>
         <Route path="request">
           <Route
             index
-            element={<AppNavigate to="/referee/request/pending" replace />}
+            element={
+              <AppNavigate to="/referee/appointments/requested" replace />
+            }
           />
-          <Route path="pending" element={<PendingRequestsPage />} />
-          <Route path="global" element={<GlobalRequestPage />} />
+          <Route
+            path="pending"
+            element={
+              <AppNavigate to="/referee/appointments/requested" replace />
+            }
+          />
+          <Route
+            path="global"
+            element={<AppNavigate to="/referee/appointments/open" replace />}
+          />
         </Route>
         <Route path="reports">
           <Route

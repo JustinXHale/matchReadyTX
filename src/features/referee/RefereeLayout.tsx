@@ -13,7 +13,6 @@ export function RefereeLayout() {
   const { currentUser, state } = useApp();
   const availabilityHref = useAppHref('/referee/availability');
   const appointmentsHref = useAppHref('/referee/appointments');
-  const requestHref = useAppHref('/referee/request');
   const reportsHref = useAppHref('/referee/reports');
 
   const appointmentsPending = useMemo(() => {
@@ -68,12 +67,6 @@ export function RefereeLayout() {
               {formatDueBadge(appointmentsPending)}
             </span>
           )}
-        </NavLink>
-        <NavLink
-          to={requestHref}
-          className={({ isActive }) => (isActive ? 'active' : '')}
-        >
-          Request
         </NavLink>
         <NavLink
           to={reportsHref}

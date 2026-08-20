@@ -3859,12 +3859,12 @@ class DemoStore {
     this.set((s) => ({ ...s, fixtureRequests }));
   }
 
-  /** Official withdraws their own pending request (removed from Pending). */
+  /** Official withdraws a pending request, or dismisses a declined one. */
   withdrawRequest(requestId: string, userId: string): void {
     const req = this.state.requests.find((r) => r.id === requestId);
     if (!req) return;
     if (req.userId !== userId) return;
-    if (req.status !== 'pending') return;
+    if (req.status !== 'pending' && req.status !== 'declined') return;
     this.set((s) => ({
       ...s,
       requests: s.requests.filter((r) => r.id !== requestId),

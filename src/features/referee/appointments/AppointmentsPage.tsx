@@ -13,7 +13,7 @@ import type { BackNav } from '@/nav/backNav';
 
 const APPOINTMENTS_BACK: BackNav = {
   to: '/referee/appointments',
-  label: 'Appointments',
+  label: 'Assigned',
 };
 
 function monthKey(iso: string): string {
