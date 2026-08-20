@@ -2122,8 +2122,10 @@ class DemoStore {
       } as OrgSettings,
       matches: snap.matches,
       teams: snap.teams.length > 0 ? snap.teams : s.teams,
-      proposals: snap.proposals ?? [],
-      requests: snap.gameRequests ?? [],
+      proposals:
+        snap.proposals !== undefined ? snap.proposals : s.proposals,
+      requests:
+        snap.gameRequests !== undefined ? snap.gameRequests : s.requests,
       fixtureRequests: snap.fixtureRequests ?? [],
       teamLinkRequests: snap.teamLinkRequests ?? [],
       // Cleared until subscribeCoachFeedback fills (role-scoped).

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useParams, useSearchParams, useLocation } from 'react-router-dom';
 import {
   Button,
@@ -17,6 +17,7 @@ import {
 } from '@patternfly/react-core';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faPen } from '@fortawesome/free-solid-svg-icons';
+import { canSeeMatchFees } from '@/domain/visibility';
 import { ROLE_HOME, useApp } from '@/app/AppContext';
 import { statusLabel } from '@/domain/matchTransitions';
 import {
@@ -218,6 +219,7 @@ export function MatchDetailPage() {
     store,
     isAssignerView,
     isOfficialView,
+    hasAssignerRole,
     roleView,
     dataMode,
   } = useApp();
@@ -264,6 +266,23 @@ export function MatchDetailPage() {
   const [requestSlot, setRequestSlot] = useState<RequestableSlot | ''>('');
   const [requestNote, setRequestNote] = useState('');
   const requestSectionRef = useRef<HTMLElement | null>(null);
+
+  const persistCrewMatchIfLive = useCallback(
+    (matchId: string) => {
+      if (dataMode !== 'live' || !isFirebaseConfigured) return;
+      const next = store.getState().matches.find((m) => m.id === matchId);
+      if (!next) return;
+      void saveMatchCrewAssignment(defaultOrgId(), next).catch((err) => {
+        console.error('Failed to save crew update', err);
+        window.alert(
+          err instanceof Error
+            ? `Updated locally, but save failed: ${err.message}`
+            : 'Updated locally, but save failed.',
+        );
+      });
+    },
+    [dataMode, store],
+  );
 
   const officials = useMemo(
     () =>
@@ -376,6 +395,10 @@ export function MatchDetailPage() {
   }
 
   const isAssigner = isAssignerView;
+  const showMatchEconomics = canSeeMatchFees({
+    hasAssignerRole,
+    isAssignerView,
+  });
   const isHomeAdmin =
     currentUser.roles.includes('teamAdmin') &&
     currentUser.teamIds.includes(match.homeTeamId);
@@ -475,7 +498,7 @@ export function MatchDetailPage() {
     Boolean(mySlot);
 
   const feeParts =
-    isAssigner ? matchFeeBreakdown(match, state.org) : [];
+    showMatchEconomics ? matchFeeBreakdown(match, state.org) : [];
   const showFees = feeParts.length > 0;
   const matchRoles = rolesNeededForMatch(match);
   const canAlertCoverage =
@@ -853,14 +876,16 @@ export function MatchDetailPage() {
         myAssignment?.id,
       );
     }
+    persistCrewMatchIfLive(match.id);
     setShowDecline(false);
     setReason('');
     navigate(-1);
   };
 
   const acceptAppointment = () => {
-    if (!mySlot) return;
+    if (!mySlot || !match) return;
     store.confirmCrewSlot(match.id, mySlot, myAssignment?.id);
+    persistCrewMatchIfLive(match.id);
   };
 
   const openProposeModal = () => {
@@ -947,7 +972,10 @@ export function MatchDetailPage() {
     if (needsT72Official && mySlot) {
       return {
         label: 'Yes — still attending',
-        onClick: () => store.answerT72Official(match.id, mySlot, 'yes'),
+        onClick: () => {
+          store.answerT72Official(match.id, mySlot, 'yes');
+          persistCrewMatchIfLive(match.id);
+        },
       };
     }
     return null;
@@ -1547,7 +1575,7 @@ export function MatchDetailPage() {
               )}
             </div>
           </div>
-          {isAssigner && (
+          {showMatchEconomics && (
             <>
               {showFees && (
                 <div className="rs-detail-meta__row rs-detail-meta__row--fees">

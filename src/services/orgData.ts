@@ -252,8 +252,8 @@ export type LiveOrgSnapshot = {
   teams: Team[];
   fixtureRequests: FixtureRequest[];
   teamLinkRequests: TeamLinkRequest[];
-  proposals: ChangeProposal[];
-  gameRequests: GameRequest[];
+  proposals?: ChangeProposal[];
+  gameRequests?: GameRequest[];
 };
 
 function parseCoachFeedbackScales(
@@ -593,6 +593,8 @@ export function subscribeLiveOrg(
   let teamLinkRequests: TeamLinkRequest[] = [];
   let proposals: ChangeProposal[] = [];
   let gameRequests: GameRequest[] = [];
+  let proposalsHydrated = false;
+  let gameRequestsHydrated = false;
 
   const emit = () =>
     onData({
@@ -601,8 +603,8 @@ export function subscribeLiveOrg(
       teams,
       fixtureRequests,
       teamLinkRequests,
-      proposals,
-      gameRequests,
+      ...(proposalsHydrated ? { proposals } : {}),
+      ...(gameRequestsHydrated ? { gameRequests } : {}),
     });
 
   const unsubs: Unsubscribe[] = [];
@@ -685,6 +687,7 @@ export function subscribeLiveOrg(
             const matchId = parts[3] ?? '';
             return proposalFromFirestore(d.id, matchId, d.data() as Record<string, unknown>);
           });
+        proposalsHydrated = true;
         emit();
       },
       (err) => onError?.(err),
@@ -706,6 +709,7 @@ export function subscribeLiveOrg(
               d.data() as Record<string, unknown>,
             );
           });
+        gameRequestsHydrated = true;
         emit();
       },
       (err) => onError?.(err),

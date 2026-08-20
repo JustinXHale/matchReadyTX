@@ -1,7 +1,7 @@
 import { Button } from '@patternfly/react-core';
 import { useLayoutEffect, useState } from 'react';
 import { Navigate, useNavigate, useSearchParams } from 'react-router-dom';
-import { defaultRoleView, ROLE_HOME, useApp } from '@/app/AppContext';
+import { resolveRoleView, ROLE_HOME, useApp } from '@/app/AppContext';
 import { signInWithApple, signInWithGoogle } from '@/services/auth';
 import { isFirebaseConfigured } from '@/services/firebase';
 import { safeNextPath } from '@/services/appLinks';
@@ -39,7 +39,6 @@ export function LoginPage() {
     hasFirebaseSession,
     dataMode,
     isDemoMode: showcaseEnabled,
-    setRoleView,
     authBootstrapError,
   } = useApp();
   const navigate = useNavigate();
@@ -57,18 +56,11 @@ export function LoginPage() {
   }, [hasFirebaseSession, liveProfile, dataMode, enterLive]);
 
   useLayoutEffect(() => {
-    if (hasFirebaseSession && liveProfile && dataMode === 'live') {
-      setRoleView(defaultRoleView(liveProfile));
-      setBusyProvider(null);
-    }
-  }, [hasFirebaseSession, liveProfile, dataMode, setRoleView]);
-
-  useLayoutEffect(() => {
     if (authBootstrapError) setBusyProvider(null);
   }, [authBootstrapError]);
 
   if (hasFirebaseSession && liveProfile && dataMode === 'live') {
-    const view = defaultRoleView(liveProfile);
+    const view = resolveRoleView(liveProfile);
     const dest = liveProfile.profileComplete
       ? (nextPath ?? ROLE_HOME[view])
       : '/onboarding';

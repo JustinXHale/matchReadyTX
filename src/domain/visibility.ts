@@ -93,3 +93,11 @@ export function applyMatchScope(
   }
   return matchesForUser(matches, user, asRole);
 }
+
+/** Match fee + flight/housing controls — assigner role in Scheduler lens only. */
+export function canSeeMatchFees(opts: {
+  hasAssignerRole: boolean;
+  isAssignerView: boolean;
+}): boolean {
+  return opts.hasAssignerRole && opts.isAssignerView;
+}

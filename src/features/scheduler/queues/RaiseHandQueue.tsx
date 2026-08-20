@@ -31,7 +31,10 @@ import { backState } from '@/nav/backNav';
 import { MatchListRow } from '@/ui/MatchListRow';
 import { UserAvatar } from '@/ui/UserAvatar';
 
-const QUEUES_BACK = { to: '/scheduler/queues', label: 'Queues' };
+const QUEUES_BACK = {
+  to: '/scheduler/queues/requests/raise-hand',
+  label: 'Raise-hand',
+} as const;
 
 function recentMatchesForOfficial(
   matches: Match[],

@@ -79,6 +79,6 @@ export function SchedulerLayout() {
 }
 
 export function SchedulerIndexRedirect() {
-  const queuesHref = useAppHref('/scheduler/queues');
-  return <Navigate to={queuesHref} replace />;
+  const coverageHref = useAppHref('/scheduler/queues/coverage');
+  return <Navigate to={coverageHref} replace />;
 }

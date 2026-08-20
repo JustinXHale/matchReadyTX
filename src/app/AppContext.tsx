@@ -112,6 +112,8 @@ interface AppContextValue {
   isOfficialView: boolean;
   /** Fan browse lens (Global schedule). */
   isFanView: boolean;
+  /** Firebase Auth first callback finished (avoid login bounce on refresh). */
+  authReady: boolean;
 }
 
 const AppContext = createContext<AppContextValue | null>(null);
@@ -127,10 +129,32 @@ function migrateLegacyRoleView(v: string | null): RoleView | null {
 
 function readStoredRoleView(): RoleView | null {
   try {
-    return migrateLegacyRoleView(sessionStorage.getItem(ROLE_VIEW_KEY));
+    const stored =
+      localStorage.getItem(ROLE_VIEW_KEY) ??
+      sessionStorage.getItem(ROLE_VIEW_KEY);
+    return migrateLegacyRoleView(stored);
   } catch {
     return null;
   }
+}
+
+function persistRoleView(view: RoleView): void {
+  try {
+    localStorage.setItem(ROLE_VIEW_KEY, view);
+    sessionStorage.setItem(ROLE_VIEW_KEY, view);
+  } catch {
+    /* ignore */
+  }
+}
+
+/** Prefer stored lens when allowed; otherwise domain default. */
+export function resolveRoleView(user: UserProfile | null): RoleView {
+  if (!user) return 'referee';
+  const allowed = lensesForUser(user);
+  if (allowed.length === 0) return defaultRoleView(user);
+  const stored = readStoredRoleView();
+  if (stored && allowed.includes(stored)) return stored;
+  return defaultRoleView(user);
 }
 
 function readStoredDataMode(): DataMode {
@@ -200,6 +224,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     return readStoredDataMode();
   });
   const [liveProfile, setLiveProfile] = useState<UserProfile | null>(null);
+  const [authReady, setAuthReady] = useState(() => !isFirebaseConfigured);
   const [authBootstrapError, setAuthBootstrapError] = useState<string | null>(
     null,
   );
@@ -263,21 +288,21 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
     const unsub = subscribeAuth(async (fbUser) => {
       if (cancelled) return;
-      if (!fbUser) {
-        setLiveProfile(null);
-        // Leave demo showcase alone; only clear a live Firebase session in the store.
-        if (dataModeRef.current === 'live') {
-          const uid = demoStore.getState().currentUserId;
-          if (uid && !uid.startsWith('u_')) {
-            flushSync(() => {
-              demoStore.signOut();
-              setState(demoStore.getState());
-            });
-          }
-        }
-        return;
-      }
       try {
+        if (!fbUser) {
+          setLiveProfile(null);
+          // Leave demo showcase alone; only clear a live Firebase session in the store.
+          if (dataModeRef.current === 'live') {
+            const uid = demoStore.getState().currentUserId;
+            if (uid && !uid.startsWith('u_')) {
+              flushSync(() => {
+                demoStore.signOut();
+                setState(demoStore.getState());
+              });
+            }
+          }
+          return;
+        }
         const profile = await ensureFirebaseUser(fbUser);
         if (cancelled) return;
         setAuthBootstrapError(null);
@@ -303,6 +328,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
             setState(demoStore.getState());
           });
         }
+      } finally {
+        if (!cancelled) setAuthReady(true);
       }
     });
     return () => {
@@ -490,29 +517,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   const setRoleView = useCallback((view: RoleView) => {
     setRoleViewState(view);
-    try {
-      sessionStorage.setItem(ROLE_VIEW_KEY, view);
-    } catch {
-      /* ignore */
-    }
+    persistRoleView(view);
   }, []);
 
   useEffect(() => {
     if (!currentUser) return;
-    const allowed = lensesForUser(currentUser);
-    if (allowed.length === 0) return;
-    const stored = readStoredRoleView();
-    const next =
-      stored && allowed.includes(stored)
-        ? stored
-        : defaultRoleView(currentUser);
-    const safe = allowed.includes(next) ? next : allowed[0]!;
+    const safe = resolveRoleView(currentUser);
     setRoleViewState(safe);
-    try {
-      sessionStorage.setItem(ROLE_VIEW_KEY, safe);
-    } catch {
-      /* ignore */
-    }
+    persistRoleView(safe);
   }, [
     currentUser?.uid,
     currentUser?.roles.join(','),
@@ -559,6 +571,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       isAssignerView,
       isOfficialView,
       isFanView,
+      authReady,
     }),
     [
       state,
@@ -589,6 +602,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       isAssignerView,
       isOfficialView,
       isFanView,
+      authReady,
     ],
   );
 

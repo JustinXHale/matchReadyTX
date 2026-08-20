@@ -171,17 +171,55 @@ const SchedulerQueuesLayout = lazy(() =>
     default: m.SchedulerQueuesLayout,
   })),
 );
-const SchedulerQueuesWorkPage = lazy(() =>
-  import('@/features/scheduler/queues/SchedulerQueuesWorkPage').then((m) => ({
-    default: m.SchedulerQueuesWorkPage,
+const SchedulerQueuesWorkLayout = lazy(() =>
+  import('@/features/scheduler/queues/SchedulerQueuesWorkLayout').then((m) => ({
+    default: m.SchedulerQueuesWorkLayout,
   })),
 );
-const SchedulerQueuesRequestsPage = lazy(() =>
-  import('@/features/scheduler/queues/SchedulerQueuesRequestsPage').then(
+const SchedulerQueuesCoveragePage = lazy(() =>
+  import('@/features/scheduler/queues/SchedulerQueuesCoveragePage').then((m) => ({
+    default: m.SchedulerQueuesCoveragePage,
+  })),
+);
+const SchedulerQueuesChangesPage = lazy(() =>
+  import('@/features/scheduler/queues/SchedulerQueuesChangesPage').then((m) => ({
+    default: m.SchedulerQueuesChangesPage,
+  })),
+);
+const SchedulerQueuesNotificationsPage = lazy(() =>
+  import('@/features/scheduler/queues/SchedulerQueuesNotificationsPage').then(
     (m) => ({
-      default: m.SchedulerQueuesRequestsPage,
+      default: m.SchedulerQueuesNotificationsPage,
     }),
   ),
+);
+const SchedulerQueuesRequestsLayout = lazy(() =>
+  import('@/features/scheduler/queues/SchedulerQueuesRequestsLayout').then(
+    (m) => ({
+      default: m.SchedulerQueuesRequestsLayout,
+    }),
+  ),
+);
+const SchedulerQueuesFixtureRequestsPage = lazy(() =>
+  import('@/features/scheduler/queues/SchedulerQueuesFixtureRequestsPage').then(
+    (m) => ({
+      default: m.SchedulerQueuesFixtureRequestsPage,
+    }),
+  ),
+);
+const SchedulerQueuesTeamLinkRequestsPage = lazy(() =>
+  import(
+    '@/features/scheduler/queues/SchedulerQueuesTeamLinkRequestsPage'
+  ).then((m) => ({
+    default: m.SchedulerQueuesTeamLinkRequestsPage,
+  })),
+);
+const SchedulerQueuesRaiseHandRequestsPage = lazy(() =>
+  import(
+    '@/features/scheduler/queues/SchedulerQueuesRaiseHandRequestsPage'
+  ).then((m) => ({
+    default: m.SchedulerQueuesRaiseHandRequestsPage,
+  })),
 );
 const SchedulerSchedulePage = lazy(() =>
   import('@/features/scheduler/schedule/SchedulerSchedulePage').then((m) => ({
@@ -446,8 +484,41 @@ function FeatureRoutes() {
       <Route path="scheduler" element={<SchedulerLayout />}>
         <Route index element={<SchedulerIndexRedirect />} />
         <Route path="queues" element={<SchedulerQueuesLayout />}>
-          <Route index element={<SchedulerQueuesWorkPage />} />
-          <Route path="requests" element={<SchedulerQueuesRequestsPage />} />
+          <Route
+            index
+            element={<AppNavigate to="/scheduler/queues/coverage" replace />}
+          />
+          <Route element={<SchedulerQueuesWorkLayout />}>
+            <Route path="coverage" element={<SchedulerQueuesCoveragePage />} />
+            <Route path="changes" element={<SchedulerQueuesChangesPage />} />
+            <Route
+              path="notifications"
+              element={<SchedulerQueuesNotificationsPage />}
+            />
+          </Route>
+          <Route path="requests" element={<SchedulerQueuesRequestsLayout />}>
+            <Route
+              index
+              element={
+                <AppNavigate
+                  to="/scheduler/queues/requests/fixtures"
+                  replace
+                />
+              }
+            />
+            <Route
+              path="fixtures"
+              element={<SchedulerQueuesFixtureRequestsPage />}
+            />
+            <Route
+              path="team-links"
+              element={<SchedulerQueuesTeamLinkRequestsPage />}
+            />
+            <Route
+              path="raise-hand"
+              element={<SchedulerQueuesRaiseHandRequestsPage />}
+            />
+          </Route>
           <Route path="crew" element={<SchedulerCrewDefaultsPage />} />
         </Route>
         <Route path="schedule" element={<SchedulerSchedulePage />} />
@@ -469,7 +540,7 @@ function FeatureRoutes() {
       />
       <Route
         path="requests"
-        element={<AppNavigate to="/scheduler/queues/requests" replace />}
+        element={<AppNavigate to="/scheduler/queues/requests/fixtures" replace />}
       />
       <Route path="matches" element={<RoleHomeRedirect />} />
       <Route path="settings" element={<AppNavigate to="/profile" replace />} />

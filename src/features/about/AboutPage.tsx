@@ -209,9 +209,10 @@ export function AboutPage() {
           <article className="rs-about-feature">
             <h4 className="rs-about-feature__title">Match and travel information</h4>
             <p>
-              Match fees, flights, housing, and other provided benefits can show
-              for planning. MatchReadyTX does not collect or distribute
-              payments.
+              Schedulers can view match fees and flight/housing flags when
+              assigning. Referees, team admins, and fans see kickoff, venue, and
+              crew visibility rules only — not pay rates. MatchReadyTX does not
+              collect or distribute payments.
             </p>
           </article>
         </div>

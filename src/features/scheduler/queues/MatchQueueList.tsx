@@ -3,8 +3,9 @@ import { Button } from '@patternfly/react-core';
 import { statusLabel } from '@/domain/matchTransitions';
 import type { ChangeProposal, Match } from '@/domain/types';
 import { MatchListRow } from '@/ui/MatchListRow';
+import { WORK_QUEUES_BACK } from '@/features/scheduler/queues/workQueuePagesShared';
 
-const QUEUES_BACK = { to: '/scheduler/queues', label: 'Queues' };
+const QUEUES_BACK = WORK_QUEUES_BACK;
 
 export function MatchQueueList({
   matches,

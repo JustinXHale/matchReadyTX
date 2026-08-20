@@ -99,6 +99,8 @@ export type SchedulerQueueCounts = {
   proposals: number;
   t72: number;
   notifications: number;
+  /** Coverage + changes work queues (excludes inbound requests). */
+  workActionable: number;
   /** Sum of actionable queues (excludes notifications). */
   totalActionable: number;
 };
@@ -114,6 +116,8 @@ export function countSchedulerQueues(state: AppState): SchedulerQueueCounts {
   const proposals = proposalsAwaitingAck(state.proposals).length;
   const t72 = matchesT72Due(state.matches).length;
   const notifications = state.notifications.length;
+  const workActionable =
+    needsOfficials + needsReassignment + proposals + t72;
   return {
     fixtureRequests,
     teamLinkRequests,
@@ -123,13 +127,8 @@ export function countSchedulerQueues(state: AppState): SchedulerQueueCounts {
     proposals,
     t72,
     notifications,
+    workActionable,
     totalActionable:
-      fixtureRequests +
-      teamLinkRequests +
-      raiseHand +
-      needsOfficials +
-      needsReassignment +
-      proposals +
-      t72,
+      fixtureRequests + teamLinkRequests + raiseHand + workActionable,
   };
 }

@@ -1,17 +1,46 @@
 import { useMemo } from 'react';
-import { NavLink } from 'react-router-dom';
+import { NavLink, useLocation } from 'react-router-dom';
 import { useApp, useAppHref } from '@/app/AppContext';
 import { countSchedulerQueues } from '@/features/scheduler/queues/selectors';
 import { formatDueBadge } from '@/features/referee/reports/dueCounts';
 
+function useWorkQueuesActive(baseHref: string) {
+  const { pathname } = useLocation();
+  return useMemo(() => {
+    if (pathname === baseHref || pathname === `${baseHref}/`) return true;
+    return (
+      pathname.startsWith(`${baseHref}/coverage`) ||
+      pathname.startsWith(`${baseHref}/changes`) ||
+      pathname.startsWith(`${baseHref}/notifications`)
+    );
+  }, [pathname, baseHref]);
+}
+
+function useRequestsQueuesActive(requestsBaseHref: string) {
+  const { pathname } = useLocation();
+  return useMemo(() => {
+    if (
+      pathname === requestsBaseHref ||
+      pathname === `${requestsBaseHref}/`
+    ) {
+      return true;
+    }
+    return pathname.startsWith(`${requestsBaseHref}/`);
+  }, [pathname, requestsBaseHref]);
+}
+
 export function QueuesSubNav() {
   const { state } = useApp();
-  const workHref = useAppHref('/scheduler/queues');
-  const requestsHref = useAppHref('/scheduler/queues/requests');
+  const workHref = useAppHref('/scheduler/queues/coverage');
+  const queuesBaseHref = useAppHref('/scheduler/queues');
+  const requestsHref = useAppHref('/scheduler/queues/requests/fixtures');
+  const requestsBaseHref = useAppHref('/scheduler/queues/requests');
   const crewHref = useAppHref('/scheduler/queues/crew');
+  const workActive = useWorkQueuesActive(queuesBaseHref);
+  const requestsActive = useRequestsQueuesActive(requestsBaseHref);
 
-  const queueTotal = useMemo(
-    () => countSchedulerQueues(state).totalActionable,
+  const workTotal = useMemo(
+    () => countSchedulerQueues(state).workActionable,
     [state],
   );
   const requestTotal = useMemo(() => {
@@ -23,28 +52,23 @@ export function QueuesSubNav() {
     <nav className="rs-sub-tabs" aria-label="Queues">
       <NavLink
         to={workHref}
-        end
-        className={({ isActive }) =>
-          `rs-nav-with-badge${isActive ? ' active' : ''}`
-        }
+        className={`rs-nav-with-badge${workActive ? ' active' : ''}`}
         aria-label={
-          queueTotal > 0
-            ? `Work queues, ${queueTotal} needing action`
+          workTotal > 0
+            ? `Work queues, ${workTotal} needing action`
             : 'Work queues'
         }
       >
         Work queues
-        {queueTotal > 0 && (
+        {workTotal > 0 && (
           <span className="rs-nav-badge rs-nav-badge--inline" aria-hidden>
-            {formatDueBadge(queueTotal)}
+            {formatDueBadge(workTotal)}
           </span>
         )}
       </NavLink>
       <NavLink
         to={requestsHref}
-        className={({ isActive }) =>
-          `rs-nav-with-badge${isActive ? ' active' : ''}`
-        }
+        className={`rs-nav-with-badge${requestsActive ? ' active' : ''}`}
         aria-label={
           requestTotal > 0
             ? `Requests, ${requestTotal} needing review`
