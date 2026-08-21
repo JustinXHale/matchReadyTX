@@ -217,7 +217,8 @@ See also [`SHEET_SYNC.md`](./SHEET_SYNC.md).
 | `notify` / mail queue | Email outbound |
 | `t72Sweep` | Hourly scheduled |
 | `geocodeAddress` | Callable — stub until Maps mileage walkthrough |
-| `csvImport` / `approveFixtureRequest` | Assigner tooling |
+| `approveFixtureRequest` | Assigner tooling |
+| `matchSelfService` | Callable — official confirm/decline + T-72 (Admin SDK crew write) |
 | `deleteOrgMemberAccount` | Assigner |
 
 ---

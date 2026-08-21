@@ -6,7 +6,6 @@ import { releasedMatches } from '@/domain/visibility';
 import { genderLabel, type Match } from '@/domain/types';
 import { MatchListRow } from '@/ui/MatchListRow';
 import { MatchCrewTrailing } from '@/ui/MatchCrewTrailing';
-import { appointmentMySlot } from '@/features/referee/appointments/crewLines';
 import { formatTeamAddress, teamHomeMapsUrl } from '@/domain/teams';
 import { readBackNav, type BackNav } from '@/nav/backNav';
 import { MapsAddressLink } from '@/ui/MapsAddressLink';
@@ -151,11 +150,7 @@ export function GlobalTeamDetailPage() {
               {group.label}
             </Title>
             <ul className="rs-list">
-              {group.matches.map((m) => {
-                const mySlot = currentUser
-                  ? appointmentMySlot(m, currentUser.uid)
-                  : null;
-                return (
+              {group.matches.map((m) => (
                   <li key={m.id}>
                     <MatchListRow
                       match={m}
@@ -166,14 +161,13 @@ export function GlobalTeamDetailPage() {
                       trailing={
                         <MatchCrewTrailing
                           match={m}
-                          highlightSlot={mySlot}
+                          highlightUserId={currentUser?.uid}
                           back={matchBack}
                         />
                       }
                     />
                   </li>
-                );
-              })}
+                ))}
             </ul>
           </section>
         ))

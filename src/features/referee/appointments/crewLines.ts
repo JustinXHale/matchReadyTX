@@ -1,6 +1,8 @@
 import {
   assignmentForUser,
+  crewBlocks,
   crewPeople,
+  rolesNeededForMatch,
   type CrewAssignment,
   type CrewSlot,
   type Match,
@@ -98,6 +100,88 @@ export function crewValueForKey(
     return names.length > 0 ? names.join(', ') : 'None';
   }
   return crewRoleLineLabel(match.crew[key]);
+}
+
+export type CrewColumnLine = {
+  id: string;
+  slotLabel: string;
+  value: string;
+  isMine: boolean;
+};
+
+/**
+ * Event-card crew column: named people each get a line; remaining capacity
+ * collapses to `(n) MO Open` so 3 MO spots are not shown as a single MO.
+ */
+export function crewColumnLines(
+  match: Match,
+  opts?: { highlightUserId?: string; redactNames?: boolean },
+): CrewColumnLine[] {
+  const highlightUserId = opts?.highlightUserId;
+  const redactNames = Boolean(opts?.redactNames);
+  const needed = new Set(rolesNeededForMatch(match));
+  const lines: CrewColumnLine[] = [];
+
+  const pushOpen = (id: string, label: string, count: number) => {
+    if (count <= 0) return;
+    lines.push({
+      id,
+      slotLabel: count > 1 ? `(${count}) ${label}` : label,
+      value: 'Open',
+      isMine: false,
+    });
+  };
+
+  for (const key of APPOINTMENT_CREW_ORDER) {
+    if (key === 'cmo') {
+      if (!needed.has('cmo')) continue;
+      const list = match.cmo ?? [];
+      const named = list.filter((c) => Boolean(c.userId));
+      const openN = list.filter((c) => !c.userId).length;
+      for (const c of named) {
+        const isMine = Boolean(highlightUserId && c.userId === highlightUserId);
+        lines.push({
+          id: `cmo-${c.id ?? c.userId ?? 'named'}`,
+          slotLabel: 'CMO',
+          value: redactNames
+            ? 'Assigned'
+            : (c.userName?.trim() || 'Assigned'),
+          isMine,
+        });
+      }
+      if (openN > 0) pushOpen('cmo-open', 'CMO', openN);
+      else if (named.length === 0) pushOpen('cmo-open', 'CMO', 1);
+      continue;
+    }
+
+    if (!needed.has(key)) continue;
+    const label = crewKeyShortLabel(key);
+    const blocks = crewBlocks(match.crew[key]);
+    const people = blocks.filter((a) => Boolean(a.userId));
+    const openN = blocks.filter(
+      (a) => !a.userId && a.status === 'empty',
+    ).length;
+
+    for (const a of people) {
+      const isMine = Boolean(highlightUserId && a.userId === highlightUserId);
+      const raw = crewSlotLineLabel(a);
+      const value = redactNames
+        ? a.status === 'confirmed'
+          ? 'Confirmed'
+          : 'Pending'
+        : raw;
+      lines.push({
+        id: a.id,
+        slotLabel: label,
+        value,
+        isMine,
+      });
+    }
+    if (openN > 0) pushOpen(`${key}-open`, label, openN);
+    else if (people.length === 0) pushOpen(`${key}-open`, label, 1);
+  }
+
+  return lines;
 }
 
 /** Display name(s) for Match Official on this match. */

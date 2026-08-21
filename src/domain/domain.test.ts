@@ -27,7 +27,7 @@ import {
 } from '@/domain/teamLinkRequests';
 import { confirmTeam, releaseMatch } from '@/domain/matchTransitions';
 import { assignOfficial, confirmOfficialSlot, markUnavailableAndRelease } from '@/domain/crew';
-import { emptyCrew, crewBlocks, crewPeople, emptyCrewBlocks, isCrewVisibleToTeams, type Match, type OrgSettings, type Team, type UserProfile } from '@/domain/types';
+import { emptyCrew, crewBlocks, crewPeople, emptyCrewBlocks, emptyAssignment, isCrewVisibleToTeams, type Match, type OrgSettings, type Team, type UserProfile } from '@/domain/types';
 import {
   matchFromFixtureRequest,
   newAppMatchId,
@@ -71,6 +71,7 @@ import {
 import { defaultRoleView, lensesForUser } from '@/app/AppContext';
 import { standingsByDivision } from '@/domain/standings';
 import { scheduleTeamEntries } from '@/domain/teams';
+import { crewColumnLines } from '@/features/referee/appointments/crewLines';
 
 function baseMatch(): Match {
   return {
@@ -1460,5 +1461,39 @@ describe('scheduleTeamEntries', () => {
     ];
     const ids = scheduleTeamEntries([], teams).map((e) => e.team.id);
     expect(ids).toContain('new-club');
+  });
+});
+
+describe('crewColumnLines', () => {
+  it('collapses three empty MO blocks to (3) MO Open', () => {
+    const m = baseMatch();
+    m.crew = {
+      ...emptyCrew(),
+      mo: [emptyAssignment('mo'), emptyAssignment('mo'), emptyAssignment('mo')],
+    };
+    const lines = crewColumnLines(m);
+    const mo = lines.filter((l) => l.slotLabel.includes('MO'));
+    expect(mo).toHaveLength(1);
+    expect(mo[0]?.slotLabel).toBe('(3) MO');
+    expect(mo[0]?.value).toBe('Open');
+  });
+
+  it('shows a filled MO name and remaining open spots', () => {
+    const m = baseMatch();
+    const filled = {
+      ...emptyAssignment('mo'),
+      userId: 'u1',
+      userName: 'Jane Ref',
+      status: 'confirmed' as const,
+    };
+    m.crew = {
+      ...emptyCrew(),
+      mo: [filled, emptyAssignment('mo'), emptyAssignment('mo')],
+    };
+    const lines = crewColumnLines(m);
+    expect(lines.some((l) => l.value === 'Jane Ref')).toBe(true);
+    expect(lines.some((l) => l.slotLabel === '(2) MO' && l.value === 'Open')).toBe(
+      true,
+    );
   });
 });

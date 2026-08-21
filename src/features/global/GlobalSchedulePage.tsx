@@ -8,7 +8,6 @@ import { isTeamMatch, releasedMatches } from '@/domain/visibility';
 import { MatchListRow } from '@/ui/MatchListRow';
 import { MatchCrewTrailing } from '@/ui/MatchCrewTrailing';
 import type { Match, MatchGender } from '@/domain/types';
-import { appointmentMySlot } from '@/features/referee/appointments/crewLines';
 import { GlobalDivisionFilters } from '@/features/global/GlobalDivisionFilters';
 import { GlobalScheduleSubNav } from '@/features/global/GlobalScheduleSubNav';
 import type { BackNav } from '@/nav/backNav';
@@ -240,11 +239,7 @@ export function GlobalSchedulePage() {
               {group.label}
             </Title>
             <ul className="rs-list">
-              {group.matches.map((m) => {
-                const mySlot = currentUser
-                  ? appointmentMySlot(m, currentUser.uid)
-                  : null;
-                return (
+              {group.matches.map((m) => (
                   <li key={m.id}>
                     <MatchListRow
                       match={m}
@@ -255,14 +250,13 @@ export function GlobalSchedulePage() {
                       trailing={
                         <MatchCrewTrailing
                           match={m}
-                          highlightSlot={mySlot}
+                          highlightUserId={currentUser?.uid}
                           back={scheduleBack}
                         />
                       }
                     />
                   </li>
-                );
-              })}
+                ))}
             </ul>
           </section>
         ))

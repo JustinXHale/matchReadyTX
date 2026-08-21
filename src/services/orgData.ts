@@ -1351,6 +1351,37 @@ export async function callReviewTeamLinkRequest(input: {
   return result.data as { ok: true };
 }
 
+export type MatchSelfServiceAction =
+  | 'confirm'
+  | 'decline'
+  | 't72_official_yes'
+  | 't72_official_no'
+  | 't72_team_yes'
+  | 't72_team_no';
+
+/** Official confirm/decline and T-72 — Cloud Function (Admin SDK crew write). */
+export async function callMatchSelfService(input: {
+  orgId?: string;
+  matchId: string;
+  action: MatchSelfServiceAction;
+  slot?: string;
+  assignmentId?: string;
+  side?: 'home' | 'away';
+  reason?: string;
+}): Promise<{ ok: true; status: string }> {
+  const fn = httpsCallable(requireFunctions(), 'matchSelfService');
+  const result = await fn({
+    orgId: input.orgId ?? DEFAULT_ORG,
+    matchId: input.matchId,
+    action: input.action,
+    ...(input.slot ? { slot: input.slot } : {}),
+    ...(input.assignmentId ? { assignmentId: input.assignmentId } : {}),
+    ...(input.side ? { side: input.side } : {}),
+    ...(input.reason ? { reason: input.reason } : {}),
+  });
+  return result.data as { ok: true; status: string };
+}
+
 /** Create or update Team Admin referee feedback (author only). */
 export async function saveCoachFeedbackInFirestore(
   orgId: string,

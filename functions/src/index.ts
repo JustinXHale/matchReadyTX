@@ -19,6 +19,11 @@ import {
   runSubmitTeamLinkRequests,
 } from './teamLinkRequests';
 import {
+  MATCH_SELF_SERVICE_ACTIONS,
+  runMatchSelfService,
+  type MatchSelfServiceAction,
+} from './matchSelfService';
+import {
   enqueueMail,
   processMailDocument,
   type MailDoc,
@@ -391,6 +396,80 @@ export const approveFixtureRequest = onCall(
     });
   },
 );
+
+/**
+ * Official confirm/decline and T-72 answers. Writes crew via Admin SDK
+ * because match-doc rules only let assigners patch `crew`.
+ * Auth + org membership + own assignment (or Team Admin side) is the gate;
+ * Firebase callable quotas / App Check cover abuse.
+ * Body: { orgId?, matchId, action, slot?, assignmentId?, side?, reason? }
+ */
+export const matchSelfService = onCall(async (request) => {
+  if (!request.auth?.uid) {
+    throw new HttpsError('unauthenticated', 'Sign in required');
+  }
+  const data = request.data;
+  if (!data || typeof data !== 'object' || Array.isArray(data)) {
+    throw new HttpsError('invalid-argument', 'Invalid payload.');
+  }
+  const allowed = new Set([
+    'orgId',
+    'matchId',
+    'action',
+    'slot',
+    'assignmentId',
+    'side',
+    'reason',
+  ]);
+  for (const key of Object.keys(data as Record<string, unknown>)) {
+    if (!allowed.has(key)) {
+      throw new HttpsError('invalid-argument', `Unknown field: ${key}`);
+    }
+  }
+  const orgId =
+    String((data as { orgId?: string }).orgId ?? '').trim() ||
+    process.env.DEFAULT_ORG_ID ||
+    'lonestar';
+  const matchId = String((data as { matchId?: string }).matchId ?? '').trim();
+  const action = String(
+    (data as { action?: string }).action ?? '',
+  ).trim() as MatchSelfServiceAction;
+  if (!matchId || matchId.length > 80) {
+    throw new HttpsError('invalid-argument', 'matchId required.');
+  }
+  if (
+    !(MATCH_SELF_SERVICE_ACTIONS as readonly string[]).includes(action)
+  ) {
+    throw new HttpsError('invalid-argument', 'Invalid action.');
+  }
+  const slot = String((data as { slot?: string }).slot ?? '').trim();
+  const assignmentId = String(
+    (data as { assignmentId?: string }).assignmentId ?? '',
+  ).trim();
+  const side = String((data as { side?: string }).side ?? '').trim();
+  const reason = String((data as { reason?: string }).reason ?? '').trim();
+  if (slot && slot.length > 8) {
+    throw new HttpsError('invalid-argument', 'Invalid slot.');
+  }
+  if (assignmentId.length > 80) {
+    throw new HttpsError('invalid-argument', 'Invalid assignmentId.');
+  }
+  if (reason.length > 500) {
+    throw new HttpsError('invalid-argument', 'Reason is too long.');
+  }
+
+  return runMatchSelfService({
+    db,
+    orgId,
+    uid: request.auth.uid,
+    matchId,
+    action,
+    slot: slot || undefined,
+    assignmentId: assignmentId || undefined,
+    side: side || undefined,
+    reason: reason || undefined,
+  });
+});
 
 /**
  * Onboarding / profile: request Team Admin access for one or more teams.

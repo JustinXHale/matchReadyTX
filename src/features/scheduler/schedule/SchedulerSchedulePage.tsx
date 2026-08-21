@@ -19,10 +19,9 @@ import {
   type MatchStatus,
 } from '@/domain/types';
 import { GlobalDivisionFilters } from '@/features/global/GlobalDivisionFilters';
-import { appointmentMySlot } from '@/features/referee/appointments/crewLines';
+import { MatchCrewTrailing } from '@/ui/MatchCrewTrailing';
 import type { BackNav } from '@/nav/backNav';
 import { IconDateInput } from '@/ui/IconDateInput';
-import { MatchCrewTrailing } from '@/ui/MatchCrewTrailing';
 import { MatchListRow } from '@/ui/MatchListRow';
 
 const SCHEDULER_SCHEDULE_BACK: BackNav = {
@@ -218,11 +217,7 @@ export function SchedulerSchedulePage() {
               {group.label}
             </Title>
             <ul className="rs-list">
-              {group.matches.map((m) => {
-                const mySlot = currentUser
-                  ? appointmentMySlot(m, currentUser.uid)
-                  : null;
-                return (
+              {group.matches.map((m) => (
                   <li key={m.id}>
                     <MatchListRow
                       match={m}
@@ -236,14 +231,13 @@ export function SchedulerSchedulePage() {
                       trailing={
                         <MatchCrewTrailing
                           match={m}
-                          highlightSlot={mySlot}
+                          highlightUserId={currentUser?.uid}
                           back={SCHEDULER_SCHEDULE_BACK}
                         />
                       }
                     />
                   </li>
-                );
-              })}
+                ))}
             </ul>
           </section>
         ))

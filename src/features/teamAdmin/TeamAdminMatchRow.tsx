@@ -1,17 +1,11 @@
-import { Link } from 'react-router-dom';
 import { MatchListRow } from '@/ui/MatchListRow';
 import { MatchCrewTrailing } from '@/ui/MatchCrewTrailing';
 import {
   isCrewVisibleToTeams,
-  REQUESTABLE_SLOT_SHORT,
-  rolesNeededForMatch,
   teamAdminListStatus,
-  teamFacingCmoFill,
-  teamFacingCrewRoleFill,
   type Match,
-  type RequestableSlot,
 } from '@/domain/types';
-import { backState, type BackNav } from '@/nav/backNav';
+import type { BackNav } from '@/nav/backNav';
 
 /** Which side of the match belongs to this club team. */
 export function myMatchSide(
@@ -30,59 +24,10 @@ export function sideConfirmedForTeam(match: Match, teamId: string): boolean {
   return false;
 }
 
-function redactedFill(match: Match, slot: RequestableSlot): string {
-  if (slot === 'cmo') return teamFacingCmoFill(match).fill;
-  return teamFacingCrewRoleFill(match.crew[slot]).fill;
-}
-
-function redactedStatus(match: Match, slot: RequestableSlot): string {
-  if (slot === 'cmo') return teamFacingCmoFill(match).status;
-  return teamFacingCrewRoleFill(match.crew[slot]).status;
-}
-
 function pillClassForTone(tone: 'urgent' | 'warn' | 'none'): string {
   if (tone === 'urgent') return 'rs-pill rs-pill--urgent';
   if (tone === 'warn') return 'rs-pill rs-pill--warn';
   return 'rs-pill';
-}
-
-/** Crew column for teams before MO unlock — roles + fill, no names. */
-function TeamAdminCrewPendingTrailing({
-  match,
-  back,
-}: {
-  match: Match;
-  back: BackNav;
-}) {
-  const roles = rolesNeededForMatch(match);
-  return (
-    <Link
-      to={`/matches/${match.id}`}
-      state={backState(back)}
-      className="rs-appt-crew rs-appt-crew-hit"
-      aria-label="Open match crew status"
-      onClick={(e) => e.stopPropagation()}
-    >
-      {roles.map((slot) => {
-        const fill = redactedFill(match, slot);
-        const status = redactedStatus(match, slot);
-        const label = REQUESTABLE_SLOT_SHORT[slot];
-        const detail =
-          fill === 'Open'
-            ? 'Open'
-            : fill === 'Confirmed'
-              ? 'Confirmed'
-              : status === 'Awaiting confirmation'
-                ? 'Pending'
-                : fill;
-        return (
-          <p key={slot} className="rs-appt-crew__line">
-            <span className="rs-appt-crew__slot">{label}</span> {detail}
-          </p>
-        );
-      })}
-    </Link>
-  );
 }
 
 export function TeamAdminMatchRow({
@@ -138,10 +83,12 @@ export function TeamAdminMatchRow({
               )}
             </span>
           </div>
-        ) : crewVisible ? (
-          <MatchCrewTrailing match={match} back={back} />
         ) : (
-          <TeamAdminCrewPendingTrailing match={match} back={back} />
+          <MatchCrewTrailing
+            match={match}
+            back={back}
+            redactNames={!crewVisible}
+          />
         )
       }
     />

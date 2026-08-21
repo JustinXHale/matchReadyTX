@@ -50,7 +50,7 @@ function AppointmentRow({
         mySlot ? (
           <MatchCrewTrailing
             match={match}
-            highlightSlot={mySlot}
+            highlightUserId={userId}
             back={APPOINTMENTS_BACK}
           />
         ) : null

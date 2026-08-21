@@ -67,7 +67,7 @@ import {
 import { openGroupMailto, uniqueEmails } from '@/services/mailto';
 import { mapsDirectionsUrl } from '@/services/maps';
 import { persistCrewAssignmentAndEmail, persistCrewUnassignmentAndEmail, resendCrewAssignmentEmail } from '@/services/liveAssignment';
-import { defaultOrgId, createGameRequestInFirestore, saveMatchCrewAssignment } from '@/services/orgData';
+import { defaultOrgId, createGameRequestInFirestore, saveMatchCrewAssignment, callMatchSelfService } from '@/services/orgData';
 import { isFirebaseConfigured } from '@/services/firebase';
 import { backState, readBackNav } from '@/nav/backNav';
 import {
@@ -266,13 +266,14 @@ export function MatchDetailPage() {
   const [requestNote, setRequestNote] = useState('');
   const requestSectionRef = useRef<HTMLElement | null>(null);
 
-  const persistCrewMatchIfLive = useCallback(
-    (matchId: string) => {
+  const persistSelfServiceIfLive = useCallback(
+    (input: Parameters<typeof callMatchSelfService>[0]) => {
       if (dataMode !== 'live' || !isFirebaseConfigured) return;
-      const next = store.getState().matches.find((m) => m.id === matchId);
-      if (!next) return;
-      void saveMatchCrewAssignment(defaultOrgId(), next).catch((err) => {
-        console.error('Failed to save crew update', err);
+      void callMatchSelfService({
+        orgId: defaultOrgId(),
+        ...input,
+      }).catch((err) => {
+        console.error('Failed to save match response', err);
         window.alert(
           err instanceof Error
             ? `Updated locally, but save failed: ${err.message}`
@@ -280,7 +281,7 @@ export function MatchDetailPage() {
         );
       });
     },
-    [dataMode, store],
+    [dataMode],
   );
 
   const officials = useMemo(
@@ -865,7 +866,13 @@ export function MatchDetailPage() {
         myAssignment?.id,
       );
     }
-    persistCrewMatchIfLive(match.id);
+    persistSelfServiceIfLive({
+      matchId: match.id,
+      action: declineMode === 't72' ? 't72_official_no' : 'decline',
+      slot: mySlot,
+      assignmentId: myAssignment?.id,
+      reason: reason.trim() || undefined,
+    });
     setShowDecline(false);
     setReason('');
     navigate(-1);
@@ -874,7 +881,12 @@ export function MatchDetailPage() {
   const acceptAppointment = () => {
     if (!mySlot || !match) return;
     store.confirmCrewSlot(match.id, mySlot, myAssignment?.id);
-    persistCrewMatchIfLive(match.id);
+    persistSelfServiceIfLive({
+      matchId: match.id,
+      action: 'confirm',
+      slot: mySlot,
+      assignmentId: myAssignment?.id,
+    });
   };
 
   const openProposeModal = () => {
@@ -954,8 +966,15 @@ export function MatchDetailPage() {
     if (needsT72Team) {
       return {
         label: 'Yes — still on',
-        onClick: () =>
-          store.answerT72Team(match.id, isHomeAdmin ? 'home' : 'away', 'yes'),
+        onClick: () => {
+          const side = isHomeAdmin ? 'home' : 'away';
+          store.answerT72Team(match.id, side, 'yes');
+          persistSelfServiceIfLive({
+            matchId: match.id,
+            action: 't72_team_yes',
+            side,
+          });
+        },
       };
     }
     if (needsT72Official && mySlot) {
@@ -963,7 +982,12 @@ export function MatchDetailPage() {
         label: 'Yes — still attending',
         onClick: () => {
           store.answerT72Official(match.id, mySlot, 'yes');
-          persistCrewMatchIfLive(match.id);
+          persistSelfServiceIfLive({
+            matchId: match.id,
+            action: 't72_official_yes',
+            slot: mySlot,
+            assignmentId: myAssignment?.id,
+          });
         },
       };
     }
@@ -2140,9 +2164,15 @@ export function MatchDetailPage() {
           <Button
             variant="link"
             isDanger
-            onClick={() =>
-              store.answerT72Team(match.id, isHomeAdmin ? 'home' : 'away', 'no')
-            }
+            onClick={() => {
+              const side = isHomeAdmin ? 'home' : 'away';
+              store.answerT72Team(match.id, side, 'no');
+              persistSelfServiceIfLive({
+                matchId: match.id,
+                action: 't72_team_no',
+                side,
+              });
+            }}
           >
             No — match not on
           </Button>
