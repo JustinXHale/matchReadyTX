@@ -63,7 +63,7 @@ export function SchedulerFeedbackDetailPage() {
   const { state, hasAssignerRole } = useApp();
   const navigate = useNavigate();
   const listHref = useAppHref('/scheduler/feedback');
-  const memberBase = useAppHref('/members');
+  const memberBase = useAppHref('/about/members');
 
   const feedback = state.coachFeedback.find((f) => f.id === feedbackId);
   const match = feedback

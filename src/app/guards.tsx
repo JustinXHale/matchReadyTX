@@ -38,3 +38,13 @@ export function RequireProfileIncomplete() {
   }
   return <Outlet />;
 }
+
+/** Member directory is for working roles — not the Fan lens. */
+export function RequireMembersAccess() {
+  const { isFanView, dataMode } = useApp();
+  if (isFanView) {
+    const about = dataMode === 'demo' ? withDemoPrefix('/about') : '/about';
+    return <Navigate to={about} replace />;
+  }
+  return <Outlet />;
+}

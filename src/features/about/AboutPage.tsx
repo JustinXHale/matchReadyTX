@@ -252,7 +252,7 @@ export function AboutPage() {
             <p>
               Browse the schedule, standings, and teams. Official names stay
               hidden until a Match Official has confirmed — same rule as for
-              club contacts.
+              club contacts. The member directory is not shown to fans.
             </p>
           </article>
         </div>

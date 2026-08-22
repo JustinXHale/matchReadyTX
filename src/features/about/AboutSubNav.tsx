@@ -1,24 +1,27 @@
 import { NavLink } from 'react-router-dom';
-import { useAppHref } from '@/app/AppContext';
+import { useApp, useAppHref } from '@/app/AppContext';
 
-export function MembersSubNav() {
+export function AboutSubNav() {
+  const { isFanView } = useApp();
+  const aboutHref = useAppHref('/about');
   const membersHref = useAppHref('/about/members');
-  const teamsHref = useAppHref('/about/members/teams');
+
+  if (isFanView) return null;
 
   return (
-    <nav className="rs-sub-tabs" aria-label="Members">
+    <nav className="rs-sub-tabs" aria-label="About">
       <NavLink
-        to={membersHref}
+        to={aboutHref}
         end
         className={({ isActive }) => (isActive ? 'active' : '')}
       >
-        Members
+        About
       </NavLink>
       <NavLink
-        to={teamsHref}
+        to={membersHref}
         className={({ isActive }) => (isActive ? 'active' : '')}
       >
-        Teams
+        Members
       </NavLink>
     </nav>
   );

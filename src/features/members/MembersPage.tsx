@@ -44,8 +44,8 @@ function MemberRow({
   const name = memberListName(user);
   return (
     <Link
-      to={`/members/${user.uid}`}
-      state={backState({ to: '/members', label: 'Members' })}
+      to={`/about/members/${user.uid}`}
+      state={backState({ to: '/about/members', label: 'Members' })}
       className="rs-member-row"
     >
       <UserAvatar user={user} size="md" />

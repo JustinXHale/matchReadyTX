@@ -53,7 +53,7 @@ import {
 import { RefereeLevelChart } from '@/ui/RefereeLevelChart';
 import { UserAvatar } from '@/ui/UserAvatar';
 
-const FALLBACK_BACK: BackNav = { to: '/members', label: 'Members' };
+const FALLBACK_BACK: BackNav = { to: '/about/members', label: 'Members' };
 
 function formatRange(isoStart: string, isoEnd: string): string {
   const start = new Date(isoStart);
@@ -214,7 +214,7 @@ export function MemberDetailPage() {
 
   const matchBack: BackNav | undefined = user
     ? {
-        to: `/members/${user.uid}`,
+        to: `/about/members/${user.uid}`,
         label: listName,
         state: location.state,
       }
@@ -478,7 +478,7 @@ export function MemberDetailPage() {
         }
         store.removeUserLocally(user.uid);
         setRemoveOpen(false);
-        navigate('/members', { replace: true });
+        navigate('/about/members', { replace: true });
       } catch (err) {
         setRemoveError(
           err instanceof Error ? err.message : 'Could not delete member.',

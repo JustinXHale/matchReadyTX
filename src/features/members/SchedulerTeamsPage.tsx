@@ -19,7 +19,7 @@ import { GlobalDivisionFilters } from '@/features/global/GlobalDivisionFilters';
  */
 export function SchedulerTeamsPage() {
   const { state } = useApp();
-  const teamsBaseHref = useAppHref('/members/teams');
+  const teamsBaseHref = useAppHref('/about/members/teams');
   const [competitionFilter, setCompetitionFilter] = useState<string | null>(
     null,
   );

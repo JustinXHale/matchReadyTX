@@ -6,6 +6,7 @@ import {
   Route,
   Routes,
   useLocation,
+  useParams,
 } from 'react-router-dom';
 import {
   AppProvider,
@@ -13,7 +14,7 @@ import {
   useApp,
 } from '@/app/AppContext';
 import { MobileShell } from '@/app/MobileShell';
-import { RequireAuth, RequireProfileIncomplete } from '@/app/guards';
+import { RequireAuth, RequireProfileIncomplete, RequireMembersAccess } from '@/app/guards';
 import {
   isDemoPath,
   stripDemoPrefix,
@@ -30,6 +31,11 @@ const OnboardingPage = lazy(() =>
 );
 const AboutPage = lazy(() =>
   import('@/features/about/AboutPage').then((m) => ({ default: m.AboutPage })),
+);
+const AboutLayout = lazy(() =>
+  import('@/features/about/AboutLayout').then((m) => ({
+    default: m.AboutLayout,
+  })),
 );
 const GlobalLayout = lazy(() =>
   import('@/features/global/GlobalLayout').then((m) => ({
@@ -292,6 +298,13 @@ function AppNavigate({
   return <Navigate to={target} replace={replace} />;
 }
 
+/** Old `/members` URLs now live under About. */
+function LegacyMembersRedirect() {
+  const { '*': rest } = useParams();
+  const suffix = rest ? `/${rest}` : '';
+  return <AppNavigate to={`/about/members${suffix}`} replace />;
+}
+
 /** Send `/` (and unknown paths) to the home for the active role lens. */
 function RoleHomeRedirect() {
   const { currentUser, roleView, dataMode, hasFirebaseSession } = useApp();
@@ -415,7 +428,17 @@ function RootRedirect() {
 function FeatureRoutes() {
   return (
     <>
-      <Route path="about" element={<AboutPage />} />
+      <Route path="about" element={<AboutLayout />}>
+        <Route index element={<AboutPage />} />
+        <Route element={<RequireMembersAccess />}>
+          <Route path="members" element={<MembersLayout />}>
+            <Route index element={<MembersPage />} />
+            <Route path="teams" element={<SchedulerTeamsPage />} />
+            <Route path="teams/:teamId" element={<SchedulerTeamDetailPage />} />
+            <Route path=":userId" element={<MemberDetailPage />} />
+          </Route>
+        </Route>
+      </Route>
       <Route path="referee" element={<RefereeLayout />}>
         <Route
           index
@@ -484,12 +507,10 @@ function FeatureRoutes() {
           <Route path=":teamId" element={<GlobalTeamDetailPage />} />
         </Route>
       </Route>
-      <Route path="members" element={<MembersLayout />}>
-        <Route index element={<MembersPage />} />
-        <Route path="teams" element={<SchedulerTeamsPage />} />
-        <Route path="teams/:teamId" element={<SchedulerTeamDetailPage />} />
-        <Route path=":userId" element={<MemberDetailPage />} />
-      </Route>
+      <Route
+        path="members/*"
+        element={<LegacyMembersRedirect />}
+      />
       <Route
         path="availability"
         element={<AppNavigate to="/referee/availability" replace />}

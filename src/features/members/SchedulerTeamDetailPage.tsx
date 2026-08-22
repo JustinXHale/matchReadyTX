@@ -17,15 +17,15 @@ import { UserAvatar } from '@/ui/UserAvatar';
 import { MatchListRow } from '@/ui/MatchListRow';
 import { MapsAddressLink } from '@/ui/MapsAddressLink';
 
-const FALLBACK_BACK: BackNav = { to: '/members/teams', label: 'Teams' };
+const FALLBACK_BACK: BackNav = { to: '/about/members/teams', label: 'Teams' };
 
 export function SchedulerTeamDetailPage() {
   const { teamId } = useParams();
   const navigate = useNavigate();
   const location = useLocation();
   const { state } = useApp();
-  const membersHref = useAppHref('/members');
-  const teamsBaseHref = useAppHref('/members/teams');
+  const membersHref = useAppHref('/about/members');
+  const teamsBaseHref = useAppHref('/about/members/teams');
   const back = readBackNav(location.state) ?? FALLBACK_BACK;
   const goBack = () =>
     navigate(back.to, back.state !== undefined ? { state: back.state } : undefined);

@@ -12,7 +12,7 @@ function formatAvg(avg: number): string {
 export function SchedulerFeedbackPage() {
   const { state, hasAssignerRole } = useApp();
   const detailBase = useAppHref('/scheduler/feedback');
-  const memberBase = useAppHref('/members');
+  const memberBase = useAppHref('/about/members');
 
   const rows = useMemo(() => {
     return [...state.coachFeedback]

@@ -65,7 +65,10 @@ function navForRole(roleView: RoleView, demo: boolean): NavItem[] {
         aria-hidden
       />
     ),
-    isActive: active('/about'),
+    isActive: (p) => {
+      const s = stripDemoPrefix(p);
+      return s.startsWith('/about');
+    },
   };
   const global: NavItem = {
     to: prefix('/global'),
@@ -78,14 +81,6 @@ function navForRole(roleView: RoleView, demo: boolean): NavItem[] {
       />
     ),
     isActive: active('/global'),
-  };
-  const members: NavItem = {
-    to: prefix('/members'),
-    label: 'Members',
-    icon: (
-      <FontAwesomeIcon icon={faUsers} className={navIconClass} aria-hidden />
-    ),
-    isActive: active('/members'),
   };
   const profile: NavItem = {
     to: prefix('/profile'),
@@ -111,7 +106,6 @@ function navForRole(roleView: RoleView, demo: boolean): NavItem[] {
         ),
         isActive: active('/scheduler'),
       },
-      members,
       global,
       profile,
     ];
@@ -135,14 +129,13 @@ function navForRole(roleView: RoleView, demo: boolean): NavItem[] {
           return s.startsWith('/team-admin') || s.startsWith('/coach');
         },
       },
-      members,
       global,
       profile,
     ];
   }
 
   if (roleView === 'fan') {
-    return [about, global, members, profile];
+    return [about, global, profile];
   }
 
   return [
@@ -153,7 +146,6 @@ function navForRole(roleView: RoleView, demo: boolean): NavItem[] {
       icon: <WhistleIcon className={navIconClass} size={18} />,
       isActive: active('/referee'),
     },
-    members,
     global,
     profile,
   ];
