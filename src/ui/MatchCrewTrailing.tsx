@@ -3,7 +3,7 @@ import type { Match } from '@/domain/types';
 import { crewColumnLines } from '@/features/referee/appointments/crewLines';
 import { backState, type BackNav } from '@/nav/backNav';
 
-/** Referee assignment column — used on Appointments and Global Schedule. */
+/** Referee assignment column — used on Appointments and League Schedule. */
 export function MatchCrewTrailing({
   match,
   highlightUserId,

@@ -32,7 +32,7 @@ function parsePane(raw: string | undefined): SchedulePane | null {
   return null;
 }
 
-/** Society-wide schedule browse (bottom Global tab — not Request → Global). */
+/** Society-wide schedule browse (bottom League tab — not Appointments → Available matches). */
 export function GlobalSchedulePage() {
   const { pane: paneParam } = useParams<{ pane?: string }>();
   const pane = parsePane(paneParam);

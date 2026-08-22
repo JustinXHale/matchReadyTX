@@ -69,7 +69,7 @@ function navForRole(roleView: RoleView, demo: boolean): NavItem[] {
   };
   const global: NavItem = {
     to: prefix('/global'),
-    label: 'Global',
+    label: 'League',
     icon: (
       <FontAwesomeIcon
         icon={faEarthAmericas}

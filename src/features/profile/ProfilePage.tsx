@@ -662,7 +662,7 @@ export function ProfilePage() {
             <FormHelperText>
               <HelperText>
                 <HelperTextItem>
-                  Used to filter Global schedule when you pick a listed club.
+                  Used to filter League schedule when you pick a listed club.
                 </HelperTextItem>
               </HelperText>
             </FormHelperText>

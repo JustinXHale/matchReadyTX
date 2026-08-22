@@ -10,7 +10,7 @@ export function GlobalSubNav() {
   const teamsHref = useAppHref('/global/teams');
 
   return (
-    <nav className="rs-sub-tabs" aria-label="Global">
+    <nav className="rs-sub-tabs" aria-label="League">
       <NavLink
         to={upcomingHref}
         className={() => (scheduleActive ? 'active' : '')}

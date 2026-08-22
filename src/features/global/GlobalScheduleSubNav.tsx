@@ -1,7 +1,7 @@
 import { NavLink } from 'react-router-dom';
 import { useAppHref } from '@/app/AppContext';
 
-/** Upcoming | Completed under Global → Schedule. */
+/** Upcoming | Completed under League → Schedule. */
 export function GlobalScheduleSubNav() {
   const upcomingHref = useAppHref('/global/schedule/upcoming');
   const completedHref = useAppHref('/global/schedule/completed');

@@ -110,7 +110,7 @@ interface AppContextValue {
   isAssignerView: boolean;
   /** Alias: referee/cmo lens (legacy official tools). */
   isOfficialView: boolean;
-  /** Fan browse lens (Global schedule). */
+  /** Fan browse lens (League schedule). */
   isFanView: boolean;
   /** Firebase Auth first callback finished (avoid login bounce on refresh). */
   authReady: boolean;
