@@ -30,6 +30,12 @@ import {
   matchFeeBreakdown,
 } from '@/domain/economics';
 import {
+  downloadMatchIcs,
+  matchHasCalendarTime,
+} from '@/domain/matchIcs';
+import { mapsDirectionsUrl } from '@/services/maps';
+import { matchAppUrl } from '@/services/appLinks';
+import {
   CREW_SLOT_LABELS,
   CREW_SLOTS,
   REQUESTABLE_SLOT_LABELS,
@@ -66,7 +72,6 @@ import {
   pendingRequestForUser,
 } from '@/domain/requests';
 import { openGroupMailto, uniqueEmails } from '@/services/mailto';
-import { mapsDirectionsUrl } from '@/services/maps';
 import { persistCrewAssignmentAndEmail, persistCrewUnassignmentAndEmail, resendCrewAssignmentEmail } from '@/services/liveAssignment';
 import { defaultOrgId, createGameRequestInFirestore, saveMatchCrewAssignment, callMatchSelfService } from '@/services/orgData';
 import { isFirebaseConfigured } from '@/services/firebase';
@@ -1612,6 +1617,22 @@ export function MatchDetailPage() {
               )}
             </div>
           </div>
+          {isOfficialView && matchHasCalendarTime(match) && (
+            <div className="rs-detail-meta__row">
+              <span className="rs-detail-meta__label">Calendar</span>
+              <div className="rs-detail-meta__value">
+                <button
+                  type="button"
+                  className="rs-detail-meta__maps"
+                  onClick={() =>
+                    downloadMatchIcs(match, matchAppUrl(match.id))
+                  }
+                >
+                  Add to calendar
+                </button>
+              </div>
+            </div>
+          )}
           {showMatchEconomics && (
             <>
               {showFees && (

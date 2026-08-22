@@ -60,6 +60,12 @@ import {
 import { matchesForUser, applyMatchScope } from '@/domain/visibility';
 import { compareKickoffAsc, matchOnCalendarDate, sortByKickoffAsc, uniqueMatchCalendarDates } from '@/domain/divisionFilters';
 import {
+  generateMatchIcs,
+  matchHasCalendarTime,
+  matchIcsFilename,
+  matchIcsSummary,
+} from '@/domain/matchIcs';
+import {
   fanFavoriteLabel,
   formatMemberCityState,
   formatMemberJoinedAt,
@@ -256,6 +262,33 @@ describe('crew visibility gate', () => {
       earlier.kickoffAt,
       later.kickoffAt,
     ]);
+  });
+});
+
+describe('match ICS', () => {
+  it('builds a one-event calendar with UTC times and location', () => {
+    const match = baseMatch();
+    match.kickoffAt = '2027-08-01T19:00:00.000Z';
+    match.venueName = 'House Park';
+    match.venueAddress = '1300 Lamar Blvd, Austin, TX';
+    const ics = generateMatchIcs(match, {
+      url: 'https://matchreadytx.web.app/matches/m1',
+      now: '2026-08-21T12:00:00.000Z',
+    });
+    expect(ics).toContain('BEGIN:VCALENDAR');
+    expect(ics).toContain('BEGIN:VEVENT');
+    expect(ics).toContain('DTSTART:20270801T190000Z');
+    expect(ics).toContain('DTEND:20270801T210000Z');
+    expect(ics).toContain('SUMMARY:Home vs Away');
+    expect(ics).toContain('LOCATION:House Park\\, 1300 Lamar Blvd\\, Austin\\, TX');
+    expect(ics).toContain('URL:https://matchreadytx.web.app/matches/m1');
+    expect(ics).toContain('UID:m1@matchreadytx');
+    expect(matchIcsSummary({ ...match, title: ' Conference final ' })).toBe(
+      'Conference final',
+    );
+    expect(matchIcsFilename(match)).toBe('home-vs-away.ics');
+    expect(matchHasCalendarTime(match)).toBe(true);
+    expect(matchHasCalendarTime({ kickoffAt: 'nope' })).toBe(false);
   });
 });
 
