@@ -265,6 +265,16 @@ body {
   margin-top: 4px;
 }
 
+.rs-signin__build {
+  margin: auto 0 0;
+  padding-top: var(--pf-t--global--spacer--md);
+  text-align: center;
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--rs-color-muted);
+  letter-spacing: 0.02em;
+}
+
 .rs-pwa-install__icon {
   flex-shrink: 0;
   width: 40px;
