@@ -23,7 +23,7 @@ import { backState } from '@/nav/backNav';
 import {
   cardReportPath,
   MATCH_REPORTS_BACK,
-  pendingReportForUserOnMatch,
+  pendingCrewReportForUserOnMatch,
   reportHrefForSubmitted,
 } from '@/features/referee/reports/reportLinks';
 import { PerformanceReportForm } from '@/features/referee/reports/PerformanceReportForm';
@@ -39,7 +39,7 @@ export function MatchReportFlowPage() {
   const match = state.matches.find((m) => m.id === matchId);
   const report = useMemo(() => {
     if (!currentUser || !matchId) return undefined;
-    return pendingReportForUserOnMatch(
+    return pendingCrewReportForUserOnMatch(
       state.matchReports,
       matchId,
       currentUser.uid,

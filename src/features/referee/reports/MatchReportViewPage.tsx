@@ -300,6 +300,11 @@ export function CmoReportViewPage() {
             </Field>
           ))}
           <Field label="Overall comment">{p.overallComment}</Field>
+          <Field label="Assessed rating">
+            {p.assessedRating != null
+              ? `${p.assessedRating} (1 highest, 10 lowest)`
+              : null}
+          </Field>
         </>
       ) : (
         <p className="rs-match-card__meta">Report on file (no payload detail).</p>

@@ -173,10 +173,30 @@ export const CMO_SCALE_LABELS: Record<CmoScaleKey, string> = {
   bigDecisions: 'Big Decisions',
 };
 
+/** CMO assessed rating: 1 highest, 10 lowest. */
+export const CMO_ASSESSED_RATING_MIN = 1;
+export const CMO_ASSESSED_RATING_MAX = 10;
+
+export function parseAssessedRating(raw: string): number | undefined {
+  const trimmed = raw.trim();
+  if (!trimmed) return undefined;
+  const n = Number(trimmed);
+  if (
+    !Number.isInteger(n) ||
+    n < CMO_ASSESSED_RATING_MIN ||
+    n > CMO_ASSESSED_RATING_MAX
+  ) {
+    return undefined;
+  }
+  return n;
+}
+
 export interface CmoReportPayload {
   scales: Partial<Record<CmoScaleKey, number>>;
   comments: Partial<Record<CmoScaleKey, string>>;
   overallComment?: string;
+  /** CMO’s assessed rating of the Match Official (1 highest, 10 lowest). */
+  assessedRating?: number;
 }
 
 export interface MatchReport {
@@ -361,6 +381,42 @@ export function pendingReportsForUser(
       r.officialId === userId &&
       r.status === 'pending' &&
       now >= new Date(r.dueAt).getTime(),
+  );
+}
+
+/** Pending rows for one official on one match (MO/AR and CMO can both exist). */
+export function pendingReportsForOfficialOnMatch(
+  reports: MatchReport[],
+  matchId: string,
+  userId: string,
+): MatchReport[] {
+  return reports.filter(
+    (r) =>
+      r.matchId === matchId &&
+      r.officialId === userId &&
+      r.status === 'pending',
+  );
+}
+
+export function pendingReportForOfficial(
+  reports: MatchReport[],
+  matchId: string,
+  userId: string,
+  slot?: ReportAssigneeSlot,
+): MatchReport | undefined {
+  return pendingReportsForOfficialOnMatch(reports, matchId, userId).find(
+    (r) => slot === undefined || r.slot === slot,
+  );
+}
+
+/** MO / AR1 / AR2 pending — never the CMO form on the same match. */
+export function pendingCrewReportForOfficial(
+  reports: MatchReport[],
+  matchId: string,
+  userId: string,
+): MatchReport | undefined {
+  return pendingReportsForOfficialOnMatch(reports, matchId, userId).find(
+    (r) => r.slot !== 'cmo',
   );
 }
 

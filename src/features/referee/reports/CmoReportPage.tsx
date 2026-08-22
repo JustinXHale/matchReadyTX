@@ -7,11 +7,15 @@ import {
   FormSelect,
   FormSelectOption,
   TextArea,
+  TextInput,
   Title,
 } from '@patternfly/react-core';
 import { useApp } from '@/app/AppContext';
 import {
+  CMO_ASSESSED_RATING_MAX,
+  CMO_ASSESSED_RATING_MIN,
   CMO_SCALE_LABELS,
+  parseAssessedRating,
   type CmoReportPayload,
   type CmoScaleKey,
 } from '@/domain/reports';
@@ -20,6 +24,7 @@ import {
   pendingReportForUserOnMatch,
   cmoReportViewPath,
 } from '@/features/referee/reports/reportLinks';
+import { RefereeLevelChart } from '@/ui/RefereeLevelChart';
 
 const SCALE_KEYS = Object.keys(CMO_SCALE_LABELS) as CmoScaleKey[];
 
@@ -31,12 +36,12 @@ export function CmoReportPage() {
   const match = state.matches.find((m) => m.id === matchId);
   const report = useMemo(() => {
     if (!currentUser || !matchId) return undefined;
-    const r = pendingReportForUserOnMatch(
+    return pendingReportForUserOnMatch(
       state.matchReports,
       matchId,
       currentUser.uid,
+      'cmo',
     );
-    return r?.slot === 'cmo' ? r : undefined;
   }, [currentUser, matchId, state.matchReports]);
 
   const [scales, setScales] = useState<Partial<Record<CmoScaleKey, number>>>(
@@ -46,6 +51,7 @@ export function CmoReportPage() {
     Partial<Record<CmoScaleKey, string>>
   >({});
   const [overallComment, setOverallComment] = useState('');
+  const [assessedRating, setAssessedRating] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState(false);
 
@@ -137,10 +143,18 @@ export function CmoReportPage() {
       setError('Rate every scale from 1–5.');
       return;
     }
+    const rating = parseAssessedRating(assessedRating);
+    if (rating == null) {
+      setError(
+        `Enter an assessed rating from ${CMO_ASSESSED_RATING_MIN}–${CMO_ASSESSED_RATING_MAX} (${CMO_ASSESSED_RATING_MIN} highest, ${CMO_ASSESSED_RATING_MAX} lowest).`,
+      );
+      return;
+    }
     const payload: CmoReportPayload = {
       scales,
       comments,
       overallComment: overallComment.trim() || undefined,
+      assessedRating: rating,
     };
     store.submitCmoReport(report.id, payload);
     setDone(true);
@@ -224,6 +238,34 @@ export function CmoReportPage() {
             onChange={(_e, v) => setOverallComment(v)}
             rows={3}
           />
+        </FormGroup>
+
+        <FormGroup
+          label="What is your assessed rating?"
+          isRequired
+          fieldId="cmo-assessed-rating"
+        >
+          <RefereeLevelChart
+            className="rs-profile-level-chart"
+            caption="Match this official to a column (1 highest, 10 lowest). Tap the chart to enlarge."
+          />
+          <TextInput
+            id="cmo-assessed-rating"
+            type="number"
+            inputMode="numeric"
+            min={CMO_ASSESSED_RATING_MIN}
+            max={CMO_ASSESSED_RATING_MAX}
+            step={1}
+            value={assessedRating}
+            onChange={(_e, v) => setAssessedRating(v)}
+            placeholder={`e.g. 8 (${CMO_ASSESSED_RATING_MIN} highest, ${CMO_ASSESSED_RATING_MAX} lowest)`}
+            aria-label="Assessed rating"
+          />
+          <p className="rs-match-card__meta">
+            Whole number {CMO_ASSESSED_RATING_MIN}–{CMO_ASSESSED_RATING_MAX}.{' '}
+            {CMO_ASSESSED_RATING_MIN} is the highest grade;{' '}
+            {CMO_ASSESSED_RATING_MAX} is the lowest.
+          </p>
         </FormGroup>
 
         {error && (

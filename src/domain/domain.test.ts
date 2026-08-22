@@ -1461,6 +1461,65 @@ describe('coachFeedback', () => {
   });
 });
 
+describe('pending match reports', () => {
+  function pending(
+    slot: 'mo' | 'cmo',
+    id: string,
+  ): import('@/domain/reports').MatchReport {
+    return {
+      id,
+      matchId: 'm_res07',
+      officialId: 'u_assigner',
+      slot,
+      status: 'pending',
+      dueAt: new Date(Date.now() - 1000).toISOString(),
+      kickoffAt: new Date(Date.now() - 3 * 60 * 60 * 1000).toISOString(),
+    };
+  }
+
+  it('selects the CMO row when the same official also has an MO pending', async () => {
+    const {
+      pendingCrewReportForOfficial,
+      pendingReportForOfficial,
+    } = await import('@/domain/reports');
+    const reports = [pending('mo', 'mr_mo'), pending('cmo', 'mr_cmo')];
+    expect(
+      pendingReportForOfficial(reports, 'm_res07', 'u_assigner')?.id,
+    ).toBe('mr_mo');
+    expect(
+      pendingReportForOfficial(reports, 'm_res07', 'u_assigner', 'cmo')?.id,
+    ).toBe('mr_cmo');
+    expect(
+      pendingCrewReportForOfficial(reports, 'm_res07', 'u_assigner')?.id,
+    ).toBe('mr_mo');
+  });
+
+  it('still finds the crew report when the CMO pending is listed first', async () => {
+    const { pendingCrewReportForOfficial, pendingReportForOfficial } =
+      await import('@/domain/reports');
+    const reports = [pending('cmo', 'mr_cmo'), pending('mo', 'mr_mo')];
+    expect(
+      pendingReportForOfficial(reports, 'm_res07', 'u_assigner', 'cmo')?.id,
+    ).toBe('mr_cmo');
+    expect(
+      pendingCrewReportForOfficial(reports, 'm_res07', 'u_assigner')?.id,
+    ).toBe('mr_mo');
+  });
+});
+
+describe('parseAssessedRating', () => {
+  it('accepts whole numbers 1–10 (10 lowest) and rejects out of range', async () => {
+    const { parseAssessedRating } = await import('@/domain/reports');
+    expect(parseAssessedRating('1')).toBe(1);
+    expect(parseAssessedRating('10')).toBe(10);
+    expect(parseAssessedRating(' 8 ')).toBe(8);
+    expect(parseAssessedRating('')).toBeUndefined();
+    expect(parseAssessedRating('0')).toBeUndefined();
+    expect(parseAssessedRating('11')).toBeUndefined();
+    expect(parseAssessedRating('8.5')).toBeUndefined();
+  });
+});
+
 describe('scheduleTeamEntries', () => {
   it('hides leftover abbreviation-only teams when conference-split clubs exist', () => {
     const matches: Match[] = [

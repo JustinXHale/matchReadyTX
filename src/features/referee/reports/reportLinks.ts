@@ -2,6 +2,9 @@ import type { MatchReport } from '@/domain/reports';
 import {
   kickoffHasPassed,
   needsCardReportNudge,
+  pendingCrewReportForOfficial,
+  pendingReportForOfficial,
+  pendingReportsForOfficialOnMatch,
   slotForUserOnMatch,
   type CardReport,
   type ReportAssigneeSlot,
@@ -66,13 +69,17 @@ export function pendingReportForUserOnMatch(
   reports: MatchReport[],
   matchId: string,
   userId: string,
+  slot?: ReportAssigneeSlot,
 ): MatchReport | undefined {
-  return reports.find(
-    (r) =>
-      r.matchId === matchId &&
-      r.officialId === userId &&
-      r.status === 'pending',
-  );
+  return pendingReportForOfficial(reports, matchId, userId, slot);
+}
+
+export function pendingCrewReportForUserOnMatch(
+  reports: MatchReport[],
+  matchId: string,
+  userId: string,
+): MatchReport | undefined {
+  return pendingCrewReportForOfficial(reports, matchId, userId);
 }
 
 export function submittedMatchReportsForMatch(
@@ -164,7 +171,16 @@ export function matchDetailReportActions(
   cardLink?: { label: string; to: string; nudge: boolean };
 } {
   const slot = slotForUserOnMatch(match, userId);
-  const pending = pendingReportForUserOnMatch(matchReports, match.id, userId);
+  const pendings = pendingReportsForOfficialOnMatch(
+    matchReports,
+    match.id,
+    userId,
+  );
+  const duePendings = pendings.filter(
+    (r) => now >= new Date(r.dueAt).getTime(),
+  );
+  const crewPending = duePendings.find((r) => r.slot !== 'cmo');
+  const cmoPending = duePendings.find((r) => r.slot === 'cmo');
   const moSubmitted = matchReports.find(
     (r) =>
       r.matchId === match.id &&
@@ -174,23 +190,22 @@ export function matchDetailReportActions(
   );
 
   let primary: { label: string; to: string } | undefined;
-  if (pending && now >= new Date(pending.dueAt).getTime()) {
-    if (pending.slot === 'cmo') {
-      primary = {
-        label: 'Complete CMO report',
-        to: cmoReportPath(match.id),
-      };
-    } else if (pending.slot === 'mo') {
-      primary = {
-        label: 'Complete match report',
-        to: matchReportPath(match.id),
-      };
-    } else {
-      primary = {
-        label: 'Complete AR report',
-        to: matchReportPath(match.id),
-      };
-    }
+  if (crewPending) {
+    primary =
+      crewPending.slot === 'mo'
+        ? {
+            label: 'Complete match report',
+            to: matchReportPath(match.id),
+          }
+        : {
+            label: 'Complete AR report',
+            to: matchReportPath(match.id),
+          };
+  } else if (cmoPending) {
+    primary = {
+      label: 'Complete CMO report',
+      to: cmoReportPath(match.id),
+    };
   }
 
   let cardLink: { label: string; to: string; nudge: boolean } | undefined;
@@ -215,24 +230,26 @@ export function matchDetailHeaderReportLinks(
   now = Date.now(),
 ): { label: string; to: string }[] {
   const links: { label: string; to: string }[] = [];
-  const pending = pendingReportForUserOnMatch(matchReports, match.id, userId);
+  const pendings = pendingReportsForOfficialOnMatch(
+    matchReports,
+    match.id,
+    userId,
+  ).filter((r) => now >= new Date(r.dueAt).getTime());
+  const crewPending = pendings.find((r) => r.slot !== 'cmo');
+  const cmoPending = pendings.find((r) => r.slot === 'cmo');
   const moSubmitted = submittedMoReportForMatch(matchReports, match.id);
   const cmoSubmitted = submittedCmoReportForMatch(matchReports, match.id);
   const cardSubmitted = submittedCardReportForMatch(cardReports, match.id);
   const isMo = crewPeople(match.crew.mo).some((a) => a.userId === userId);
 
-  if (pending && now >= new Date(pending.dueAt).getTime()) {
-    if (pending.slot === 'cmo') {
-      links.push({ label: 'Complete coaching report', to: cmoReportPath(match.id) });
-    } else {
-      links.push({
-        label:
-          pending.slot === 'mo'
-            ? 'Complete match report'
-            : 'Complete AR report',
-        to: matchReportPath(match.id),
-      });
-    }
+  if (crewPending) {
+    links.push({
+      label:
+        crewPending.slot === 'mo'
+          ? 'Complete match report'
+          : 'Complete AR report',
+      to: matchReportPath(match.id),
+    });
   } else if (moSubmitted) {
     links.push({
       label: 'Match report',
@@ -243,7 +260,12 @@ export function matchDetailHeaderReportLinks(
     });
   }
 
-  if (cmoSubmitted) {
+  if (cmoPending) {
+    links.push({
+      label: 'Complete coaching report',
+      to: cmoReportPath(match.id),
+    });
+  } else if (cmoSubmitted) {
     links.push({
       label: 'Coaching report',
       to: cmoReportViewPath(match.id),

@@ -1639,6 +1639,7 @@ function seedMatchReports(matches: Match[]): MatchReport[] {
         },
         overallComment:
           'Strong control game. Continue scanning early at the breakdown.',
+        assessedRating: 8,
       },
     });
   }
@@ -1685,6 +1686,7 @@ function seedMatchReports(matches: Match[]): MatchReport[] {
         },
         overallComment:
           'Solid outing as MO. Keep scanning early at the breakdown.',
+        assessedRating: 7,
       },
     });
   }
