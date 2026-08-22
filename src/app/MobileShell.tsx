@@ -21,7 +21,7 @@ import {
 } from '@fortawesome/free-solid-svg-icons';
 import { ROLE_HOME, ROLE_VIEW_LABELS, useApp, type RoleView } from '@/app/AppContext';
 import { appBuildLabel } from '@/app/appBuild';
-import { stripDemoPrefix, withDemoPrefix } from '@/app/demoPaths';
+import { stripDemoPrefix, withDemoPrefix, isDemoPath } from '@/app/demoPaths';
 import { WhistleIcon } from '@/ui/WhistleIcon';
 import { UpdatePrompt } from '@/pwa/UpdatePrompt';
 import './shell.css';
@@ -169,6 +169,7 @@ export function MobileShell() {
   const tz = state.org.timezone || undefined;
   const bottomNav = navForRole(roleView, isDemoShowcase);
   const showChrome = Boolean(currentUser) && location.pathname !== '/login';
+  const inDemoTree = isDemoPath(location.pathname);
 
   useEffect(() => {
     const tick = () => setNow(new Date());
@@ -204,7 +205,7 @@ export function MobileShell() {
                       decoding="async"
                     />
                     <span className="rs-brand">MatchReadyTX</span>
-                    {isDemoShowcase && (
+                    {inDemoTree && (
                       <span
                         className="rs-demo-badge"
                         title="Seed showcase — not your live org"
@@ -221,7 +222,7 @@ export function MobileShell() {
               </MastheadBrand>
             </MastheadMain>
             <MastheadContent className="rs-masthead__content">
-              {isDemoShowcase && hasFirebaseSession && (
+              {inDemoTree && hasFirebaseSession && (
                 <Button
                   variant="link"
                   className="rs-demo-live"
@@ -234,7 +235,7 @@ export function MobileShell() {
                   Back to live
                 </Button>
               )}
-              {isDemoShowcase && !hasFirebaseSession && (
+              {inDemoTree && !hasFirebaseSession && (
                 <Button
                   variant="link"
                   className="rs-demo-signin"
@@ -268,7 +269,7 @@ export function MobileShell() {
       }
     >
       <PageSection className="rs-page-body" isFilled>
-        {isDemoShowcase && (
+        {inDemoTree && (
           <div className="rs-demo-mode-banner" role="status">
             <strong>Demo showcase</strong>
             <span>Sample schedule and members — not your live org.</span>

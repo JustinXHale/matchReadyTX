@@ -38,6 +38,8 @@ export function LoginPage() {
     liveProfile,
     hasFirebaseSession,
     dataMode,
+    setDataMode,
+    store,
     isDemoMode: showcaseEnabled,
     authBootstrapError,
   } = useApp();
@@ -54,6 +56,14 @@ export function LoginPage() {
       enterLive();
     }
   }, [hasFirebaseSession, liveProfile, dataMode, enterLive]);
+
+  /** Public sign-in is never the showcase — drop leftover Try demo session. */
+  useLayoutEffect(() => {
+    if (hasFirebaseSession) return;
+    if (dataMode !== 'demo') return;
+    setDataMode('live');
+    store.signOut();
+  }, [hasFirebaseSession, dataMode, setDataMode, store]);
 
   useLayoutEffect(() => {
     if (authBootstrapError) setBusyProvider(null);
