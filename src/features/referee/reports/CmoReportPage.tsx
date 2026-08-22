@@ -4,8 +4,6 @@ import {
   Button,
   Form,
   FormGroup,
-  FormSelect,
-  FormSelectOption,
   TextArea,
   TextInput,
   Title,
@@ -16,15 +14,18 @@ import {
   CMO_ASSESSED_RATING_MIN,
   CMO_SCALE_LABELS,
   parseAssessedRating,
+  validateCmoScales,
   type CmoReportPayload,
   type CmoScaleKey,
 } from '@/domain/reports';
+import type { FivePointChoice } from '@/domain/fivePointScale';
 import { moDisplayNames } from '@/features/referee/appointments/crewLines';
 import {
   pendingReportForUserOnMatch,
   cmoReportViewPath,
 } from '@/features/referee/reports/reportLinks';
 import { RefereeLevelChart } from '@/ui/RefereeLevelChart';
+import { ScaleRatingCards } from '@/ui/ScaleRatingCards';
 
 const SCALE_KEYS = Object.keys(CMO_SCALE_LABELS) as CmoScaleKey[];
 
@@ -44,9 +45,9 @@ export function CmoReportPage() {
     );
   }, [currentUser, matchId, state.matchReports]);
 
-  const [scales, setScales] = useState<Partial<Record<CmoScaleKey, number>>>(
-    {},
-  );
+  const [scales, setScales] = useState<
+    Partial<Record<CmoScaleKey, FivePointChoice>>
+  >({});
   const [comments, setComments] = useState<
     Partial<Record<CmoScaleKey, string>>
   >({});
@@ -138,9 +139,8 @@ export function CmoReportPage() {
     : null;
 
   const submit = () => {
-    const missing = SCALE_KEYS.filter((k) => scales[k] == null);
-    if (missing.length > 0) {
-      setError('Rate every scale from 1–5.');
+    if (!validateCmoScales(scales, SCALE_KEYS)) {
+      setError('Rate every scale from 1–5, or N/A.');
       return;
     }
     const rating = parseAssessedRating(assessedRating);
@@ -187,49 +187,47 @@ export function CmoReportPage() {
           submit();
         }}
       >
-        {SCALE_KEYS.map((key) => (
-          <div key={key}>
-            <FormGroup
-              label={CMO_SCALE_LABELS[key]}
-              isRequired
-              fieldId={`cmo-scale-${key}`}
-            >
-              <FormSelect
-                id={`cmo-scale-${key}`}
-                value={scales[key] != null ? String(scales[key]) : ''}
-                onChange={(_e, v) =>
-                  setScales((s) => ({
-                    ...s,
-                    [key]: v === '' ? undefined : Number(v),
-                  }))
-                }
-                aria-label={CMO_SCALE_LABELS[key]}
+        <section className="rs-detail-card rs-coach-fb-ratings">
+          <p className="rs-match-card__meta rs-coach-fb-scale-legend">
+            1 Poor · 2 Below Average · 3 Average · 4 Above Average · 5 Excellent
+            · N/A not applicable.
+          </p>
+
+          {SCALE_KEYS.map((key) => (
+            <div key={key} className="rs-coach-fb-criterion">
+              <FormGroup
+                label={CMO_SCALE_LABELS[key]}
+                isRequired
+                fieldId={`cmo-scale-${key}-1`}
               >
-                <FormSelectOption value="" label="Select 1–5" />
-                {[1, 2, 3, 4, 5].map((n) => (
-                  <FormSelectOption
-                    key={n}
-                    value={String(n)}
-                    label={String(n)}
-                  />
-                ))}
-              </FormSelect>
-            </FormGroup>
-            <FormGroup
-              label={`${CMO_SCALE_LABELS[key]} comment`}
-              fieldId={`cmo-c-${key}`}
-            >
-              <TextArea
-                id={`cmo-c-${key}`}
-                value={comments[key] ?? ''}
-                onChange={(_e, v) =>
-                  setComments((c) => ({ ...c, [key]: v }))
-                }
-                rows={2}
-              />
-            </FormGroup>
-          </div>
-        ))}
+                <ScaleRatingCards
+                  name={`cmo-scale-${key}`}
+                  value={scales[key]}
+                  onChange={(v) =>
+                    setScales((s) => ({
+                      ...s,
+                      [key]: v,
+                    }))
+                  }
+                  ariaLabel={CMO_SCALE_LABELS[key]}
+                />
+              </FormGroup>
+              <FormGroup
+                label={`${CMO_SCALE_LABELS[key]} comment`}
+                fieldId={`cmo-c-${key}`}
+              >
+                <TextArea
+                  id={`cmo-c-${key}`}
+                  value={comments[key] ?? ''}
+                  onChange={(_e, v) =>
+                    setComments((c) => ({ ...c, [key]: v }))
+                  }
+                  rows={2}
+                />
+              </FormGroup>
+            </div>
+          ))}
+        </section>
 
         <FormGroup label="Overall comment" fieldId="cmo-overall">
           <TextArea

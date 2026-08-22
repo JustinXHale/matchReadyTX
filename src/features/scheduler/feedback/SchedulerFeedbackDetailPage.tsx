@@ -6,14 +6,13 @@ import {
   COACH_FEEDBACK_CRITERION_HINTS,
   COACH_FEEDBACK_CRITERION_LABELS,
   COACH_FEEDBACK_SCALE_KEYS,
-  COACH_FEEDBACK_SCALE_LABELS,
   COACH_FEEDBACK_SCALE_LEGEND,
-  COACH_FEEDBACK_SCALE_VALUES,
   coachFeedbackAverage,
   type CoachFeedback,
   type CoachFeedbackCommentKey,
 } from '@/domain/coachFeedback';
 import { MatchListRow } from '@/ui/MatchListRow';
+import { ScaleRatingCards } from '@/ui/ScaleRatingCards';
 
 function commentText(
   feedback: CoachFeedback,
@@ -215,29 +214,12 @@ export function SchedulerFeedbackDetailPage() {
                     {COACH_FEEDBACK_CRITERION_HINTS[key]}
                   </p>
                 </div>
-                <div
-                  className="rs-coach-fb-radios"
-                  role="group"
-                  aria-label={COACH_FEEDBACK_CRITERION_LABELS[key]}
-                >
-                  {COACH_FEEDBACK_SCALE_VALUES.map((v) => {
-                    const isSelected = selected === v;
-                    return (
-                      <div
-                        key={v}
-                        className={`rs-coach-fb-radio${isSelected ? ' rs-coach-fb-radio--selected' : ''}`}
-                        aria-current={isSelected ? 'true' : undefined}
-                      >
-                        <span className="rs-coach-fb-radio__n" aria-hidden>
-                          {v}
-                        </span>
-                        <span className="rs-coach-fb-radio__label">
-                          {COACH_FEEDBACK_SCALE_LABELS[v]}
-                        </span>
-                      </div>
-                    );
-                  })}
-                </div>
+                <ScaleRatingCards
+                  name={`scf-scale-${key}`}
+                  value={selected}
+                  ariaLabel={COACH_FEEDBACK_CRITERION_LABELS[key]}
+                  readOnly
+                />
               </div>
             );
           })}

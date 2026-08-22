@@ -2244,6 +2244,11 @@ a.rs-coach-feedback-trailing__mo:focus-visible {
   color: var(--rs-color-ink);
 }
 
+.rs-coach-fb-radio--na {
+  flex: 1.2 1 4.25rem;
+  max-width: 6.25rem;
+}
+
 .rs-coach-fb-toggle {
   display: flex;
   flex-wrap: wrap;
@@ -2276,6 +2281,20 @@ a.rs-coach-feedback-trailing__mo:focus-visible {
 
 .rs-coach-fb-video-hint {
   margin: 0 0 6px;
+}
+
+.rs-coach-fb-subject__person {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.rs-coach-fb-subject__name {
+  margin: 0;
+  font-size: 1.25rem;
+  font-weight: 700;
+  line-height: 1.25;
+  color: var(--rs-color-ink);
 }
 
 .rs-list-row__side {
@@ -4759,6 +4778,12 @@ button.rs-detail-people__confirm:focus-visible {
 .rs-btn--gold.pf-v6-c-button:focus-visible {
   background-color: color-mix(in srgb, var(--rs-color-warn) 88%, black) !important;
   border-color: color-mix(in srgb, var(--rs-color-warn) 88%, black) !important;
+  color: var(--rs-color-on-primary) !important;
+}
+
+.rs-btn--gold.pf-v6-c-button.pf-m-secondary {
+  background-color: var(--rs-color-warn) !important;
+  border-color: var(--rs-color-warn) !important;
   color: var(--rs-color-on-primary) !important;
 }
 

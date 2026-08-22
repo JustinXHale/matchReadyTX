@@ -1439,6 +1439,25 @@ describe('coachFeedback', () => {
       }),
     ).toBe(true);
     expect(validateCoachFeedbackScales({ overall: 3 })).toBe(false);
+    expect(
+      validateCoachFeedbackScales({
+        breakdown: 'na',
+        scrum: 3,
+        lineout: 'na',
+        safety: 4,
+        communication: 3,
+        professionalism: 5,
+        overall: 3,
+      }),
+    ).toBe(true);
+    expect(normalizeScaleValue('na')).toBe('na');
+    expect(normalizeScaleValue('N/A')).toBe('na');
+    expect(
+      scalesNeedComments({
+        breakdown: 'na',
+        overall: 3,
+      }),
+    ).toBe(false);
   });
 
   it('averages rated criteria', async () => {
@@ -1457,6 +1476,19 @@ describe('coachFeedback', () => {
       }),
     ).toBeCloseTo(4, 5);
     expect(coachFeedbackAverage({})).toBeNull();
+    expect(
+      coachFeedbackAverage({
+        breakdown: 'na',
+        scrum: 'na',
+      }),
+    ).toBeNull();
+    expect(
+      coachFeedbackAverage({
+        breakdown: 4,
+        scrum: 'na',
+        lineout: 2,
+      }),
+    ).toBe(3);
     expect(coachFeedbackAverageLabel(3.6)).toBe(4);
   });
 });
@@ -1517,6 +1549,18 @@ describe('parseAssessedRating', () => {
     expect(parseAssessedRating('0')).toBeUndefined();
     expect(parseAssessedRating('11')).toBeUndefined();
     expect(parseAssessedRating('8.5')).toBeUndefined();
+  });
+
+  it('treats N/A as a complete CMO scale rating', async () => {
+    const { validateCmoScales, CMO_SCALE_LABELS } = await import(
+      '@/domain/reports'
+    );
+    const keys = Object.keys(CMO_SCALE_LABELS) as Array<
+      keyof typeof CMO_SCALE_LABELS
+    >;
+    const allNa = Object.fromEntries(keys.map((k) => [k, 'na' as const]));
+    expect(validateCmoScales(allNa, keys)).toBe(true);
+    expect(validateCmoScales({ scrum: 4 }, keys)).toBe(false);
   });
 });
 

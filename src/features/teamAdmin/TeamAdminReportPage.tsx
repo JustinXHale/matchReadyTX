@@ -34,6 +34,7 @@ function statusLabel(existing: CoachFeedback | undefined): string {
   if (existing.status === 'declined') return 'Declined';
   if (existing.status === 'draft') return 'Draft';
   const overall = existing.scales.overall;
+  if (overall === 'na') return 'Submitted · N/A';
   if (overall != null) {
     return `Submitted · ${COACH_FEEDBACK_SCALE_LABELS[overall]}`;
   }

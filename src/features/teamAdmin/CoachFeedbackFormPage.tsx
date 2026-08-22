@@ -14,9 +14,7 @@ import {
   COACH_FEEDBACK_CRITERION_HINTS,
   COACH_FEEDBACK_CRITERION_LABELS,
   COACH_FEEDBACK_SCALE_KEYS,
-  COACH_FEEDBACK_SCALE_LABELS,
   COACH_FEEDBACK_SCALE_LEGEND,
-  COACH_FEEDBACK_SCALE_VALUES,
   appendCoachFeedbackEdit,
   coachFeedbackDocId,
   existingCoachFeedback,
@@ -38,6 +36,8 @@ import {
   saveCoachFeedbackInFirestore,
 } from '@/services/orgData';
 import { MatchListRow } from '@/ui/MatchListRow';
+import { ScaleRatingCards } from '@/ui/ScaleRatingCards';
+import { UserAvatar } from '@/ui/UserAvatar';
 
 const COMMENT_BLOCKS: {
   key: CoachFeedbackCommentKey;
@@ -273,6 +273,7 @@ export function CoachFeedbackFormPage() {
   }
 
   const { reportingTeamId, reportingTeamName, mo } = context;
+  const officialProfile = state.users.find((u) => u.uid === mo.userId);
 
   const buildFeedback = (
     status: CoachFeedbackStatus,
@@ -378,7 +379,7 @@ export function CoachFeedbackFormPage() {
       return;
     }
     if (!validateCoachFeedbackScales(scales)) {
-      setError('Rate every criterion (1–5).');
+      setError('Rate every criterion (1–5 or N/A).');
       return;
     }
 
@@ -414,22 +415,48 @@ export function CoachFeedbackFormPage() {
       <Title headingLevel="h1" size="lg">
         {title}
       </Title>
-      <p className="rs-match-card__meta">
-        Match Official: {mo.userName} · Reporting as {reportingTeamName}
-      </p>
+
+      <section className="rs-detail-card rs-coach-fb-subject" aria-labelledby="cf-mo">
+        <h2 id="cf-mo" className="rs-detail-section__label">
+          Match Official being rated
+        </h2>
+        <div className="rs-coach-fb-subject__person">
+          <UserAvatar
+            user={
+              officialProfile ?? {
+                displayName: mo.userName,
+                firstName: '',
+                lastName: '',
+              }
+            }
+            size="md"
+          />
+          <div>
+            <p className="rs-coach-fb-subject__name">{mo.userName}</p>
+            <p className="rs-match-card__meta">
+              Feedback from {reportingTeamName}
+            </p>
+          </div>
+        </div>
+      </section>
 
       <MatchListRow match={match} />
 
       <div className="rs-form-stack">
+        <h2 className="rs-detail-section__label">Your details</h2>
+        <p className="rs-match-card__meta">
+          Gray fields are from your signed-in profile (not the Match Official).
+          The Scheduler uses these to follow up with you.
+        </p>
         <div className="rs-form-row rs-form-row--2">
-          <FormGroup label="Name" fieldId="cf-name">
+          <FormGroup label="Your name" fieldId="cf-name">
             <TextInput
               id="cf-name"
               value={currentUser.displayName}
               isDisabled
             />
           </FormGroup>
-          <FormGroup label="Role" fieldId="cf-role" isRequired>
+          <FormGroup label="Your club role" fieldId="cf-role" isRequired>
             <TextInput
               id="cf-role"
               value={clubRole}
@@ -439,14 +466,14 @@ export function CoachFeedbackFormPage() {
           </FormGroup>
         </div>
         <div className="rs-form-row rs-form-row--2">
-          <FormGroup label="Phone" fieldId="cf-phone">
+          <FormGroup label="Your phone" fieldId="cf-phone">
             <TextInput
               id="cf-phone"
               value={phone}
               onChange={(_e, v) => setPhone(v)}
             />
           </FormGroup>
-          <FormGroup label="Email" fieldId="cf-email">
+          <FormGroup label="Your email" fieldId="cf-email">
             <TextInput
               id="cf-email"
               value={currentUser.email}
@@ -491,43 +518,17 @@ export function CoachFeedbackFormPage() {
                   {COACH_FEEDBACK_CRITERION_HINTS[key]}
                 </p>
               </div>
-              <div
-                className="rs-coach-fb-radios"
-                role="radiogroup"
-                aria-label={COACH_FEEDBACK_CRITERION_LABELS[key]}
-              >
-                {COACH_FEEDBACK_SCALE_VALUES.map((v) => {
-                  const selected = scales[key] === v;
-                  const inputId = `cf-scale-${key}-${v}`;
-                  return (
-                    <label
-                      key={v}
-                      htmlFor={inputId}
-                      className={`rs-coach-fb-radio${selected ? ' rs-coach-fb-radio--selected' : ''}`}
-                    >
-                      <input
-                        id={inputId}
-                        type="radio"
-                        name={`cf-scale-${key}`}
-                        value={v}
-                        checked={selected}
-                        onChange={() =>
-                          setScales((prev) => ({
-                            ...prev,
-                            [key]: v,
-                          }))
-                        }
-                      />
-                      <span className="rs-coach-fb-radio__n" aria-hidden>
-                        {v}
-                      </span>
-                      <span className="rs-coach-fb-radio__label">
-                        {COACH_FEEDBACK_SCALE_LABELS[v]}
-                      </span>
-                    </label>
-                  );
-                })}
-              </div>
+              <ScaleRatingCards
+                name={`cf-scale-${key}`}
+                value={scales[key]}
+                onChange={(v) =>
+                  setScales((prev) => ({
+                    ...prev,
+                    [key]: v,
+                  }))
+                }
+                ariaLabel={COACH_FEEDBACK_CRITERION_LABELS[key]}
+              />
             </div>
           ))}
         </section>

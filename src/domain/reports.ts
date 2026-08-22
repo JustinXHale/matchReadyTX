@@ -6,6 +6,11 @@ import {
   type Match,
   type UserProfile,
 } from '@/domain/types';
+import {
+  isFivePointValue,
+  SCALE_NA,
+  type FivePointChoice,
+} from '@/domain/fivePointScale';
 
 /** Minutes after kickoff when MO/AR/CMO report notices open. */
 export const REPORT_DUE_AFTER_MS = 90 * 60 * 1000;
@@ -45,6 +50,8 @@ export interface CardIncident {
   teamName: string;
   minute?: string;
   reason: string;
+  /** Scheduler-only notes for this card. */
+  additionalInfoPrivate?: string;
 }
 
 export type MatchFormat = '7s' | '10s' | '15s';
@@ -192,11 +199,21 @@ export function parseAssessedRating(raw: string): number | undefined {
 }
 
 export interface CmoReportPayload {
-  scales: Partial<Record<CmoScaleKey, number>>;
+  scales: Partial<Record<CmoScaleKey, FivePointChoice>>;
   comments: Partial<Record<CmoScaleKey, string>>;
   overallComment?: string;
   /** CMO’s assessed rating of the Match Official (1 highest, 10 lowest). */
   assessedRating?: number;
+}
+
+export function validateCmoScales(
+  scales: Partial<Record<CmoScaleKey, FivePointChoice>>,
+  keys: CmoScaleKey[],
+): boolean {
+  return keys.every((k) => {
+    const v = scales[k];
+    return v === SCALE_NA || isFivePointValue(v);
+  });
 }
 
 export interface MatchReport {

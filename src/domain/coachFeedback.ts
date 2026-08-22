@@ -10,23 +10,30 @@ import {
   type Match,
   type UserProfile,
 } from '@/domain/types';
+import {
+  FIVE_POINT_LABELS,
+  FIVE_POINT_VALUES,
+  SCALE_NA,
+  SCALE_NA_LABEL,
+  isFivePointValue,
+  parseFivePointChoice,
+  type FivePointChoice,
+  type FivePointValue,
+} from '@/domain/fivePointScale';
 
-/** 1 = Poor … 5 = Excellent */
-export type CoachFeedbackScaleValue = 1 | 2 | 3 | 4 | 5;
+/** 1 = Poor … 5 = Excellent, or N/A. */
+export type CoachFeedbackScaleValue = FivePointChoice;
 
-export const COACH_FEEDBACK_SCALE_VALUES: CoachFeedbackScaleValue[] = [
-  1, 2, 3, 4, 5,
+export const COACH_FEEDBACK_SCALE_VALUES: FivePointValue[] = [
+  ...FIVE_POINT_VALUES,
 ];
 
 export const COACH_FEEDBACK_SCALE_LABELS: Record<
   CoachFeedbackScaleValue,
   string
 > = {
-  1: 'Poor',
-  2: 'Below Average',
-  3: 'Average',
-  4: 'Above Average',
-  5: 'Excellent',
+  ...FIVE_POINT_LABELS,
+  [SCALE_NA]: SCALE_NA_LABEL,
 };
 
 /** Short labels for compact radio UIs. */
@@ -39,6 +46,7 @@ export const COACH_FEEDBACK_SCALE_SHORT: Record<
   3: '3',
   4: '4',
   5: '5',
+  [SCALE_NA]: 'N/A',
 };
 
 export type CoachFeedbackScaleKey =
@@ -94,7 +102,7 @@ export const COACH_FEEDBACK_CRITERION_HINTS: Record<
 };
 
 export const COACH_FEEDBACK_SCALE_LEGEND =
-  '1 Poor · 2 Below Average · 3 Average · 4 Above Average · 5 Excellent — rate how the Match Official performed at this level.';
+  '1 Poor · 2 Below Average · 3 Average · 4 Above Average · 5 Excellent · N/A not applicable — rate how the Match Official performed at this level, or N/A if it does not apply.';
 
 export type CoachFeedbackCommentKey =
   | 'commentsOnScores'
@@ -290,32 +298,27 @@ export function validateCoachFeedbackScales(
 ): scales is Record<CoachFeedbackScaleKey, CoachFeedbackScaleValue> {
   return COACH_FEEDBACK_SCALE_KEYS.every((k) => {
     const v = scales[k];
-    return (
-      typeof v === 'number' &&
-      COACH_FEEDBACK_SCALE_VALUES.includes(v as CoachFeedbackScaleValue)
-    );
+    return v === SCALE_NA || isFivePointValue(v);
   });
 }
 
-/** Mean of rated criteria (1–5). Null when nothing rated. */
+/** Mean of numeric ratings (1–5). N/A is skipped. Null when nothing rated. */
 export function coachFeedbackAverage(
   scales: Partial<Record<CoachFeedbackScaleKey, CoachFeedbackScaleValue>>,
 ): number | null {
   const values = COACH_FEEDBACK_SCALE_KEYS.map((k) => scales[k]).filter(
-    (v): v is CoachFeedbackScaleValue => typeof v === 'number',
+    (v): v is FivePointValue => isFivePointValue(v),
   );
   if (values.length === 0) return null;
   return values.reduce((sum, v) => sum + v, 0) / values.length;
 }
 
 /** Nearest scale label for a numeric average. */
-export function coachFeedbackAverageLabel(
-  avg: number,
-): CoachFeedbackScaleValue {
-  const rounded = Math.round(avg) as CoachFeedbackScaleValue;
+export function coachFeedbackAverageLabel(avg: number): FivePointValue {
+  const rounded = Math.round(avg);
   if (rounded < 1) return 1;
   if (rounded > 5) return 5;
-  return rounded;
+  return rounded as FivePointValue;
 }
 
 export function appendCoachFeedbackEdit(
@@ -325,22 +328,14 @@ export function appendCoachFeedbackEdit(
   return [...(existing ?? []), edit];
 }
 
-/** Map legacy string scale values from early drafts to 1–5. */
+/** Map stored / legacy scale values to 1–5 or N/A. */
 export function normalizeScaleValue(
   raw: unknown,
 ): CoachFeedbackScaleValue | null {
-  if (typeof raw === 'number' && COACH_FEEDBACK_SCALE_VALUES.includes(raw as CoachFeedbackScaleValue)) {
-    return raw as CoachFeedbackScaleValue;
-  }
+  const parsed = parseFivePointChoice(raw);
+  if (parsed != null) return parsed;
   if (typeof raw === 'string') {
-    const asNum = Number(raw);
-    if (
-      Number.isInteger(asNum) &&
-      COACH_FEEDBACK_SCALE_VALUES.includes(asNum as CoachFeedbackScaleValue)
-    ) {
-      return asNum as CoachFeedbackScaleValue;
-    }
-    const legacy: Record<string, CoachFeedbackScaleValue> = {
+    const legacy: Record<string, FivePointValue> = {
       poor: 1,
       below_average: 2,
       average: 3,

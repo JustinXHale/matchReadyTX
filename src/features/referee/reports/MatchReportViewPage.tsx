@@ -7,6 +7,7 @@ import {
   COMPETITION_UNION_LABELS,
   type CmoScaleKey,
 } from '@/domain/reports';
+import { formatFivePointChoice } from '@/domain/fivePointScale';
 import { crewPeople, REQUESTABLE_SLOT_SHORT } from '@/domain/types';
 import { moDisplayNames } from '@/features/referee/appointments/crewLines';
 import {
@@ -293,7 +294,7 @@ export function CmoReportViewPage() {
             <Field key={key} label={CMO_SCALE_LABELS[key]}>
               {p.scales[key] != null ? (
                 <>
-                  {p.scales[key]}/5
+                  {formatFivePointChoice(p.scales[key])}
                   {p.comments[key] ? ` — ${p.comments[key]}` : ''}
                 </>
               ) : null}
@@ -347,13 +348,20 @@ export function CardReportViewBody({
           <Field label="Team">{c.teamName}</Field>
           <Field label="Minute">{c.minute}</Field>
           <Field label="Reason">{c.reason}</Field>
+          {isAssignerView && (
+            <Field label="Additional information (Scheduler only)">
+              {c.additionalInfoPrivate}
+            </Field>
+          )}
         </div>
       ))}
-      {isAssignerView && (
-        <Field label="Additional information (Scheduler only)">
-          {report.additionalInfoPrivate || '—'}
-        </Field>
-      )}
+      {isAssignerView &&
+        report.additionalInfoPrivate &&
+        !report.cards.some((c) => c.additionalInfoPrivate) && (
+          <Field label="Additional information (Scheduler only)">
+            {report.additionalInfoPrivate}
+          </Field>
+        )}
     </div>
   );
 }

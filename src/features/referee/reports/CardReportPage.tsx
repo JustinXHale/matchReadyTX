@@ -83,7 +83,6 @@ export function CardReportPage() {
       ? [emptyCard(match.homeTeamId, match.homeTeamName)]
       : [],
   );
-  const [additionalInfoPrivate, setAdditionalInfoPrivate] = useState('');
   const [error, setError] = useState<string | null>(null);
 
   if (!currentUser) return null;
@@ -247,6 +246,17 @@ export function CardReportPage() {
       setError('Add at least one card with player name and reason.');
       return;
     }
+    const cleaned = valid.map((c) => ({
+      ...c,
+      playerName: c.playerName.trim(),
+      reason: c.reason.trim(),
+      minute: c.minute?.trim() || undefined,
+      additionalInfoPrivate: c.additionalInfoPrivate?.trim() || undefined,
+    }));
+    const joinedPrivate = cleaned
+      .map((c) => c.additionalInfoPrivate)
+      .filter((t): t is string => Boolean(t))
+      .join('\n\n');
     store.submitCardReport({
       matchId: match.id,
       officialId: currentUser.uid,
@@ -255,13 +265,8 @@ export function CardReportPage() {
       officialEmail: officialEmail.trim(),
       officialPhone: officialPhone.trim(),
       matchDate,
-      cards: valid.map((c) => ({
-        ...c,
-        playerName: c.playerName.trim(),
-        reason: c.reason.trim(),
-        minute: c.minute?.trim() || undefined,
-      })),
-      additionalInfoPrivate: additionalInfoPrivate.trim() || undefined,
+      cards: cleaned,
+      additionalInfoPrivate: joinedPrivate || undefined,
     });
     setStep('done');
   };
@@ -359,7 +364,7 @@ export function CardReportPage() {
         {step === 'cards' && (
           <>
             {cards.map((card, index) => (
-              <div key={card.id}>
+              <div key={card.id} className="rs-team-score-card">
                 <strong>
                   Card {index + 1}
                   {cards.length > 1 && (
@@ -439,10 +444,26 @@ export function CardReportPage() {
                     rows={3}
                   />
                 </FormGroup>
+                <FormGroup
+                  label="Additional information (Scheduler only)"
+                  fieldId={`${card.id}-extra`}
+                >
+                  <TextArea
+                    id={`${card.id}-extra`}
+                    value={card.additionalInfoPrivate ?? ''}
+                    onChange={(_e, v) =>
+                      updateCard(card.id, { additionalInfoPrivate: v })
+                    }
+                    rows={3}
+                    placeholder="Anything else the Scheduler should know about this card — not shown publicly"
+                  />
+                </FormGroup>
               </div>
             ))}
             <Button
               variant="secondary"
+              className="rs-btn--gold"
+              isBlock
               onClick={() =>
                 setCards((list) => [
                   ...list,
@@ -452,18 +473,6 @@ export function CardReportPage() {
             >
               Add another card
             </Button>
-            <FormGroup
-              label="Additional information (Scheduler only)"
-              fieldId="cr-private"
-            >
-              <TextArea
-                id="cr-private"
-                value={additionalInfoPrivate}
-                onChange={(_e, v) => setAdditionalInfoPrivate(v)}
-                rows={3}
-                placeholder="Anything else the Scheduler should know — not shown publicly"
-              />
-            </FormGroup>
             <Button type="submit" variant="primary" isBlock>
               Submit card report
             </Button>

@@ -12,10 +12,12 @@ import {
 } from '@patternfly/react-core';
 import { useApp } from '@/app/AppContext';
 import {
+  crewForAttendance,
   isQuickReportLocked,
   matchHasAssignedCmo,
   totalCardsFromMoPayload,
   type ArReportPayload,
+  type CrewAttendanceEntry,
   type MoReportPayload,
   type ReportFormKind,
 } from '@/domain/reports';
@@ -27,6 +29,10 @@ import {
   reportHrefForSubmitted,
 } from '@/features/referee/reports/reportLinks';
 import { PerformanceReportForm } from '@/features/referee/reports/PerformanceReportForm';
+import {
+  CrewAttendanceFields,
+  formatCrewAttendanceNote,
+} from '@/features/referee/reports/CrewAttendanceFields';
 import { MatchListRow } from '@/ui/MatchListRow';
 
 type Step = 'chooser' | 'form' | 'done';
@@ -88,6 +94,11 @@ export function MatchReportFlowPage() {
   const [awayYellow, setAwayYellow] = useState('0');
   const [awayRed, setAwayRed] = useState('0');
   const [lightFeedback, setLightFeedback] = useState('');
+  const [crewAttendance, setCrewAttendance] = useState<CrewAttendanceEntry[]>(
+    () => (match ? crewForAttendance(match) : []),
+  );
+  const [crewAbsenceNote, setCrewAbsenceNote] = useState('');
+  const [crewIssuesNote, setCrewIssuesNote] = useState('');
   const [stillComfortable, setStillComfortable] = useState<
     ArReportPayload['stillComfortable']
   >('');
@@ -240,6 +251,11 @@ export function MatchReportFlowPage() {
       setError('Card counts must be zero or greater.');
       return;
     }
+    const someoneAbsent = crewAttendance.some((c) => !c.attended);
+    if (someoneAbsent && !crewAbsenceNote.trim()) {
+      setError('Note who did not attend (and anything we should know).');
+      return;
+    }
 
     submitMoPayload(
       {
@@ -252,6 +268,12 @@ export function MatchReportFlowPage() {
         yellowCards: hy + ay,
         redCards: hr + ar,
         lightFeedback: lightFeedback.trim() || undefined,
+        crewAttendance,
+        crewAbsenceNote: someoneAbsent
+          ? crewAbsenceNote.trim() || undefined
+          : undefined,
+        crewIssuesNote: crewIssuesNote.trim() || undefined,
+        refereeTeamNote: formatCrewAttendanceNote(crewAttendance) || undefined,
         cmoDidNotAttend: hasCmo && formKind === 'mo_quick' ? true : undefined,
       },
       'mo_quick',
@@ -484,6 +506,15 @@ export function MatchReportFlowPage() {
                 </FormGroup>
               </div>
             </div>
+            <CrewAttendanceFields
+              crewAttendance={crewAttendance}
+              onAttendanceChange={setCrewAttendance}
+              crewAbsenceNote={crewAbsenceNote}
+              onAbsenceNoteChange={setCrewAbsenceNote}
+              crewIssuesNote={crewIssuesNote}
+              onIssuesNoteChange={setCrewIssuesNote}
+              idPrefix="quick-attend"
+            />
             <FormGroup label="Light feedback" fieldId="mo-light">
               <TextArea
                 id="mo-light"

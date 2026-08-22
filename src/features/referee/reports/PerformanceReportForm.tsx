@@ -18,11 +18,11 @@ import {
   type MoReportPayload,
 } from '@/domain/reports';
 import {
-  REQUESTABLE_SLOT_SHORT,
   genderLabel,
   type Match,
   type UserProfile,
 } from '@/domain/types';
+import { CrewAttendanceFields, formatCrewAttendanceNote } from '@/features/referee/reports/CrewAttendanceFields';
 import { IconDateInput } from '@/ui/IconDateInput';
 
 const SECTION_COUNT = 4;
@@ -272,14 +272,6 @@ export function PerformanceReportForm({
     const hr = Number(homeRed);
     const ay = Number(awayYellow);
     const ar = Number(awayRed);
-    const attendanceSummary = crewAttendance
-      .map(
-        (c) =>
-          `${REQUESTABLE_SLOT_SHORT[c.slot]}: ${c.userName}${
-            c.attended ? '' : ' (absent)'
-          }`,
-      )
-      .join(' · ');
     const payload: MoReportPayload = {
       homePoints: Number(homePoints),
       awayPoints: Number(awayPoints),
@@ -300,7 +292,7 @@ export function PerformanceReportForm({
         ? crewAbsenceNote.trim() || undefined
         : undefined,
       crewIssuesNote: crewIssuesNote.trim() || undefined,
-      refereeTeamNote: attendanceSummary || undefined,
+      refereeTeamNote: formatCrewAttendanceNote(crewAttendance) || undefined,
       gameTemperature: gameTemperature as number,
       controlAndFlow: controlAndFlow as number,
       todayIPerformed: todayIPerformed.trim(),
@@ -420,70 +412,14 @@ export function PerformanceReportForm({
               onRed={setAwayRed}
             />
 
-            <div className="rs-team-score-card">
-              <div className="rs-team-score-card__head">
-                <strong>Referee team attendance</strong>
-              </div>
-              <p className="rs-scale-field__criteria">
-                Assumed present by default. Uncheck anyone who did not attend.
-              </p>
-              {crewAttendance.length === 0 ? (
-                <p className="rs-match-card__meta">
-                  No other crew listed on this match.
-                </p>
-              ) : (
-                <ul className="rs-crew-attend">
-                  {crewAttendance.map((c) => (
-                    <li key={`${c.slot}-${c.userId}`}>
-                      <Checkbox
-                        id={`attend-${c.slot}-${c.userId}`}
-                        label={`${REQUESTABLE_SLOT_SHORT[c.slot]} · ${c.userName}`}
-                        isChecked={c.attended}
-                        onChange={(_e, checked) =>
-                          setCrewAttendance((list) =>
-                            list.map((row) =>
-                              row.slot === c.slot && row.userId === c.userId
-                                ? { ...row, attended: checked }
-                                : row,
-                            ),
-                          )
-                        }
-                      />
-                    </li>
-                  ))}
-                </ul>
-              )}
-              {someoneAbsent && (
-                <FormGroup
-                  label="Who did not attend / what happened?"
-                  isRequired
-                  fieldId="crew-absent"
-                >
-                  <TextArea
-                    id="crew-absent"
-                    value={crewAbsenceNote}
-                    onChange={(_e, v) => setCrewAbsenceNote(v)}
-                    rows={2}
-                    placeholder="e.g. AR2 no-show; covered by #4"
-                  />
-                </FormGroup>
-              )}
-              <FormGroup
-                label="Any issues with someone on the referee team?"
-                fieldId="crew-issues"
-              >
-                <p className="rs-scale-field__criteria">
-                  Optional — performance, communication, punctuality, or other
-                  concerns.
-                </p>
-                <TextArea
-                  id="crew-issues"
-                  value={crewIssuesNote}
-                  onChange={(_e, v) => setCrewIssuesNote(v)}
-                  rows={2}
-                />
-              </FormGroup>
-            </div>
+            <CrewAttendanceFields
+              crewAttendance={crewAttendance}
+              onAttendanceChange={setCrewAttendance}
+              crewAbsenceNote={crewAbsenceNote}
+              onAbsenceNoteChange={setCrewAbsenceNote}
+              crewIssuesNote={crewIssuesNote}
+              onIssuesNoteChange={setCrewIssuesNote}
+            />
           </>
         )}
 
