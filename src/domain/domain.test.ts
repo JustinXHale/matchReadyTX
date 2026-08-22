@@ -58,7 +58,7 @@ import {
   zonedLocalToUtcIso,
 } from '@/domain/availability';
 import { matchesForUser, applyMatchScope } from '@/domain/visibility';
-import { matchOnCalendarDate, uniqueMatchCalendarDates } from '@/domain/divisionFilters';
+import { compareKickoffAsc, matchOnCalendarDate, sortByKickoffAsc, uniqueMatchCalendarDates } from '@/domain/divisionFilters';
 import {
   fanFavoriteLabel,
   formatMemberCityState,
@@ -245,6 +245,16 @@ describe('crew visibility gate', () => {
     expect(uniqueMatchCalendarDates([match])).toEqual([`${yyyy}-${mm}-${dd}`]);
     expect(uniqueMatchCalendarDates([match, match])).toEqual([
       `${yyyy}-${mm}-${dd}`,
+    ]);
+  });
+
+  it('sorts matches by kickoff ascending', () => {
+    const later = { kickoffAt: '2026-10-31T18:00:00.000Z' };
+    const earlier = { kickoffAt: '2026-10-02T18:00:00.000Z' };
+    expect(compareKickoffAsc(earlier, later)).toBeLessThan(0);
+    expect(sortByKickoffAsc([later, earlier]).map((m) => m.kickoffAt)).toEqual([
+      earlier.kickoffAt,
+      later.kickoffAt,
     ]);
   });
 });

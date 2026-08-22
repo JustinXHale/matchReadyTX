@@ -88,6 +88,14 @@ export function GlobalDivisionFilters({
     ];
   }, [availableDates, availableSet]);
 
+  const competitionSelectSizer = useMemo(() => {
+    let longest = 'All competitions';
+    for (const comp of options.competitions) {
+      if (comp.length > longest.length) longest = comp;
+    }
+    return longest;
+  }, [options.competitions]);
+
   if (!showCompetitionSelect && !showLevels && !showGenders && !showDate) {
     return null;
   }
@@ -109,24 +117,29 @@ export function GlobalDivisionFilters({
           }`}
         >
           {showCompetitionSelect && (
-            <label className="rs-filter-field">
+            <label className="rs-filter-field rs-filter-field--competition">
               <span className="rs-filter-field__label">Competition</span>
-              <select
-                className="rs-filter-select"
-                value={competitionFilter ?? ''}
-                onChange={(e) => setCompetition(e.target.value || null)}
-              >
-                <option value="">All competitions</option>
-                {options.competitions.map((comp) => (
-                  <option key={comp} value={comp}>
-                    {comp}
-                  </option>
-                ))}
-              </select>
+              <span className="rs-filter-select-wrap">
+                <select
+                  className="rs-filter-select"
+                  value={competitionFilter ?? ''}
+                  onChange={(e) => setCompetition(e.target.value || null)}
+                >
+                  <option value="">All competitions</option>
+                  {options.competitions.map((comp) => (
+                    <option key={comp} value={comp}>
+                      {comp}
+                    </option>
+                  ))}
+                </select>
+                <span className="rs-filter-select-sizer" aria-hidden>
+                  {competitionSelectSizer}
+                </span>
+              </span>
             </label>
           )}
           {showDate && onDateChange && (
-            <label className="rs-filter-field">
+            <label className="rs-filter-field rs-filter-field--date">
               <span className="rs-filter-field__label">Date</span>
               {availableDates != null ? (
                 <DatePicker

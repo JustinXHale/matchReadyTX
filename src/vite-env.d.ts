@@ -12,6 +12,7 @@ interface ImportMetaEnv {
   readonly VITE_DEFAULT_ORG_ID?: string;
   readonly VITE_RECAPTCHA_ENTERPRISE_SITE_KEY?: string;
   readonly VITE_APP_CHECK_DEBUG?: string;
+  readonly VITE_APP_BUILD?: string;
 }
 
 interface ImportMeta {

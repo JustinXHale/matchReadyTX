@@ -20,28 +20,51 @@ export function SchedulerQueuesCoveragePage() {
     setLevelFilter,
     competitionFilter,
     setCompetitionFilter,
+    dateFilter,
+    setDateFilter,
     filterOptions,
-    divisionActive,
+    filtersActive,
     filterMatch,
+    availableDatesFromMatches,
   } = useWorkDivisionFilters(state);
 
+  const officialsPool = useMemo(
+    () => matchesNeedingOfficials(state.matches),
+    [state.matches],
+  );
+  const reassignPool = useMemo(
+    () => matchesNeedingReassignment(state.matches),
+    [state.matches],
+  );
+  const t72Pool = useMemo(() => matchesT72Due(state.matches), [state.matches]);
+
+  const availableDates = useMemo(
+    () =>
+      availableDatesFromMatches([
+        ...officialsPool,
+        ...reassignPool,
+        ...t72Pool,
+      ]),
+    [availableDatesFromMatches, officialsPool, reassignPool, t72Pool],
+  );
+
   const needsOfficials = useMemo(
-    () => filterMatch(matchesNeedingOfficials(state.matches), (m) => m),
-    [state.matches, filterMatch],
+    () => filterMatch(officialsPool, (m) => m),
+    [officialsPool, filterMatch],
   );
   const needsReassignment = useMemo(
-    () => filterMatch(matchesNeedingReassignment(state.matches), (m) => m),
-    [state.matches, filterMatch],
+    () => filterMatch(reassignPool, (m) => m),
+    [reassignPool, filterMatch],
   );
   const t72 = useMemo(
-    () => filterMatch(matchesT72Due(state.matches), (m) => m),
-    [state.matches, filterMatch],
+    () => filterMatch(t72Pool, (m) => m),
+    [t72Pool, filterMatch],
   );
 
   const filteredTotal =
     needsOfficials.length + needsReassignment.length + t72.length;
 
-  if (!divisionActive && filteredTotal === 0) {
+  if (!filtersActive && filteredTotal === 0) {
     return (
       <EmptyState titleText="Coverage is clear" headingLevel="h3">
         <EmptyStateBody>
@@ -67,12 +90,16 @@ export function SchedulerQueuesCoveragePage() {
         onGenderChange={setGenderFilter}
         onLevelChange={setLevelFilter}
         onCompetitionChange={setCompetitionFilter}
+        showDate
+        dateFilter={dateFilter}
+        onDateChange={setDateFilter}
+        availableDates={availableDates}
         ariaLabel="Filter coverage queues by division"
       />
-      {divisionActive && filteredTotal === 0 && (
+      {filtersActive && filteredTotal === 0 && (
         <p className="rs-match-card__meta">
-          No coverage items for this division. Clear Men/Women or level chips to
-          see everything.
+          No coverage items for these filters. Clear competition, date, or chips
+          to see everything.
         </p>
       )}
 

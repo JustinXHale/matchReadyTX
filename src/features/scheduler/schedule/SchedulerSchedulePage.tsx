@@ -4,12 +4,16 @@ import {
   Button,
   EmptyState,
   EmptyStateBody,
-  FormGroup,
   Title,
 } from '@patternfly/react-core';
 import { useApp } from '@/app/AppContext';
 import { statusLabel } from '@/domain/matchTransitions';
-import { divisionFilterOptionsFromMatches } from '@/domain/divisionFilters';
+import {
+  compareKickoffAsc,
+  divisionFilterOptionsFromMatches,
+  matchOnCalendarDate,
+  uniqueMatchCalendarDates,
+} from '@/domain/divisionFilters';
 import {
   crewPeople,
   rolesNeededForMatch,
@@ -21,7 +25,6 @@ import {
 import { GlobalDivisionFilters } from '@/features/global/GlobalDivisionFilters';
 import { MatchCrewTrailing } from '@/ui/MatchCrewTrailing';
 import type { BackNav } from '@/nav/backNav';
-import { IconDateInput } from '@/ui/IconDateInput';
 import { MatchListRow } from '@/ui/MatchListRow';
 
 const SCHEDULER_SCHEDULE_BACK: BackNav = {
@@ -65,22 +68,6 @@ function hasOpenCrewSlot(m: Match): boolean {
   });
 }
 
-function inDateRange(kickoffAt: string, from: string, to: string): boolean {
-  const t = new Date(kickoffAt).getTime();
-  if (from) {
-    const start = new Date(from).getTime();
-    if (!Number.isNaN(start) && t < start) return false;
-  }
-  if (to) {
-    const end = new Date(to);
-    if (!Number.isNaN(end.getTime())) {
-      end.setHours(23, 59, 59, 999);
-      if (t > end.getTime()) return false;
-    }
-  }
-  return true;
-}
-
 /** Assigner schedule browse — all org matches, not only released. */
 export function SchedulerSchedulePage() {
   const { currentUser, state } = useApp();
@@ -92,12 +79,34 @@ export function SchedulerSchedulePage() {
   const [statusFilter, setStatusFilter] = useState<
     MatchStatus | 'open_slots' | 'all'
   >('all');
-  const [dateFrom, setDateFrom] = useState('');
-  const [dateTo, setDateTo] = useState('');
+  const [dateFilter, setDateFilter] = useState<string | null>(null);
 
   const filterOptions = useMemo(
     () => divisionFilterOptionsFromMatches(state.matches, competitionFilter),
     [state.matches, competitionFilter],
+  );
+
+  const availableDates = useMemo(
+    () =>
+      uniqueMatchCalendarDates(
+        state.matches.filter((m) => {
+          if (genderFilter && m.gender !== genderFilter) return false;
+          if (levelFilter && m.level !== levelFilter) return false;
+          if (competitionFilter && m.competition !== competitionFilter) {
+            return false;
+          }
+          if (statusFilter === 'open_slots') return hasOpenCrewSlot(m);
+          if (statusFilter !== 'all' && m.status !== statusFilter) return false;
+          return true;
+        }),
+      ),
+    [
+      state.matches,
+      genderFilter,
+      levelFilter,
+      competitionFilter,
+      statusFilter,
+    ],
   );
 
   const list = useMemo(() => {
@@ -108,23 +117,19 @@ export function SchedulerSchedulePage() {
         if (competitionFilter && m.competition !== competitionFilter) {
           return false;
         }
-        if (!inDateRange(m.kickoffAt, dateFrom, dateTo)) return false;
+        if (!matchOnCalendarDate(m, dateFilter)) return false;
         if (statusFilter === 'open_slots') return hasOpenCrewSlot(m);
         if (statusFilter !== 'all' && m.status !== statusFilter) return false;
         return true;
       })
-      .sort(
-        (a, b) =>
-          new Date(a.kickoffAt).getTime() - new Date(b.kickoffAt).getTime(),
-      );
+      .sort(compareKickoffAsc);
   }, [
     state.matches,
     genderFilter,
     levelFilter,
     competitionFilter,
     statusFilter,
-    dateFrom,
-    dateTo,
+    dateFilter,
   ]);
 
   const byMonth = useMemo(() => {
@@ -144,8 +149,8 @@ export function SchedulerSchedulePage() {
         Schedule
       </Title>
       <p className="rs-match-card__meta">
-        Society matches — filter by competition, level, or gender. Tap a game to
-        assign crew or edit.
+        Society matches — filter by competition, date, level, or gender. Tap a
+        game to assign crew or edit.
       </p>
       <Link to="/scheduler/upload">
         <Button variant="secondary" isBlock>
@@ -153,24 +158,20 @@ export function SchedulerSchedulePage() {
         </Button>
       </Link>
 
-      <div className="rs-date-range" role="group" aria-label="Date range">
-        <FormGroup label="From" fieldId="sched-from">
-          <IconDateInput
-            id="sched-from"
-            type="date"
-            value={dateFrom}
-            onChange={(_, v) => setDateFrom(v)}
-          />
-        </FormGroup>
-        <FormGroup label="To" fieldId="sched-to">
-          <IconDateInput
-            id="sched-to"
-            type="date"
-            value={dateTo}
-            onChange={(_, v) => setDateTo(v)}
-          />
-        </FormGroup>
-      </div>
+      <GlobalDivisionFilters
+        options={filterOptions}
+        genderFilter={genderFilter}
+        levelFilter={levelFilter}
+        competitionFilter={competitionFilter}
+        onGenderChange={setGenderFilter}
+        onLevelChange={setLevelFilter}
+        onCompetitionChange={setCompetitionFilter}
+        showDate
+        dateFilter={dateFilter}
+        onDateChange={setDateFilter}
+        availableDates={availableDates}
+        ariaLabel="Filter schedule by division"
+      />
 
       <div className="rs-filter-chips" role="group" aria-label="Status filter">
         {STATUS_FILTERS.map((f) => (
@@ -186,17 +187,6 @@ export function SchedulerSchedulePage() {
           </button>
         ))}
       </div>
-
-      <GlobalDivisionFilters
-        options={filterOptions}
-        genderFilter={genderFilter}
-        levelFilter={levelFilter}
-        competitionFilter={competitionFilter}
-        onGenderChange={setGenderFilter}
-        onLevelChange={setLevelFilter}
-        onCompetitionChange={setCompetitionFilter}
-        ariaLabel="Filter schedule by division"
-      />
 
       {state.matches.length === 0 ? (
         <EmptyState titleText="No matches" headingLevel="h3">
@@ -218,26 +208,26 @@ export function SchedulerSchedulePage() {
             </Title>
             <ul className="rs-list">
               {group.matches.map((m) => (
-                  <li key={m.id}>
-                    <MatchListRow
-                      match={m}
-                      to={`/matches/${m.id}`}
-                      showTime
-                      split="action"
-                      back={SCHEDULER_SCHEDULE_BACK}
-                      meta={
-                        <span className="rs-pill">{statusLabel(m.status)}</span>
-                      }
-                      trailing={
-                        <MatchCrewTrailing
-                          match={m}
-                          highlightUserId={currentUser?.uid}
-                          back={SCHEDULER_SCHEDULE_BACK}
-                        />
-                      }
-                    />
-                  </li>
-                ))}
+                <li key={m.id}>
+                  <MatchListRow
+                    match={m}
+                    to={`/matches/${m.id}`}
+                    showTime
+                    split="action"
+                    back={SCHEDULER_SCHEDULE_BACK}
+                    meta={
+                      <span className="rs-pill">{statusLabel(m.status)}</span>
+                    }
+                    trailing={
+                      <MatchCrewTrailing
+                        match={m}
+                        highlightUserId={currentUser?.uid}
+                        back={SCHEDULER_SCHEDULE_BACK}
+                      />
+                    }
+                  />
+                </li>
+              ))}
             </ul>
           </section>
         ))

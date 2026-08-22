@@ -2,9 +2,11 @@ import { useCallback, useMemo, useState } from 'react';
 import {
   divisionFilterOptionsFromMatches,
   divisionFiltersActive,
+  matchMatchesDivisionFilters,
+  matchOnCalendarDate,
+  uniqueMatchCalendarDates,
 } from '@/domain/divisionFilters';
-import type { MatchGender } from '@/domain/types';
-import { matchMatchesDivisionFilters } from '@/features/scheduler/queues/selectors';
+import type { Match, MatchGender } from '@/domain/types';
 import type { AppState } from '@/services/demoStore';
 
 export const WORK_QUEUES_BACK = {
@@ -18,6 +20,7 @@ export function useWorkDivisionFilters(state: AppState) {
   const [competitionFilter, setCompetitionFilter] = useState<string | null>(
     null,
   );
+  const [dateFilter, setDateFilter] = useState<string | null>(null);
 
   const filterOptions = useMemo(
     () => divisionFilterOptionsFromMatches(state.matches, competitionFilter),
@@ -29,29 +32,39 @@ export function useWorkDivisionFilters(state: AppState) {
     level: levelFilter,
     competition: competitionFilter,
   });
+  const filtersActive = divisionActive || dateFilter != null;
+
+  const matchPassesDivision = useCallback(
+    (m: Match) =>
+      matchMatchesDivisionFilters(
+        m,
+        genderFilter,
+        levelFilter,
+        competitionFilter,
+      ),
+    [genderFilter, levelFilter, competitionFilter],
+  );
 
   const filterMatch = useCallback(
     <T,>(
       list: T[],
-      matchFor: (
-        item: T,
-      ) => Parameters<typeof matchMatchesDivisionFilters>[0] | undefined,
+      matchFor: (item: T) => Match | undefined,
     ) => {
-      if (!divisionActive) return list;
+      if (!filtersActive) return list;
       return list.filter((item) => {
         const m = matchFor(item);
-        return (
-          m != null &&
-          matchMatchesDivisionFilters(
-            m,
-            genderFilter,
-            levelFilter,
-            competitionFilter,
-          )
-        );
+        if (m == null) return false;
+        if (!matchPassesDivision(m)) return false;
+        return matchOnCalendarDate(m, dateFilter);
       });
     },
-    [divisionActive, genderFilter, levelFilter, competitionFilter],
+    [filtersActive, matchPassesDivision, dateFilter],
+  );
+
+  const availableDatesFromMatches = useCallback(
+    (matches: Match[]) =>
+      uniqueMatchCalendarDates(matches.filter(matchPassesDivision)),
+    [matchPassesDivision],
   );
 
   return {
@@ -61,8 +74,12 @@ export function useWorkDivisionFilters(state: AppState) {
     setLevelFilter,
     competitionFilter,
     setCompetitionFilter,
+    dateFilter,
+    setDateFilter,
     filterOptions,
     divisionActive,
+    filtersActive,
     filterMatch,
+    availableDatesFromMatches,
   };
 }

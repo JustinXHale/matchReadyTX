@@ -17,7 +17,12 @@ import {
 import { matchesForUser } from '@/domain/visibility';
 import type { MatchGender, Team } from '@/domain/types';
 import { GlobalDivisionFilters } from '@/features/global/GlobalDivisionFilters';
-import { divisionFilterOptionsFromMatches } from '@/domain/divisionFilters';
+import {
+  compareKickoffAsc,
+  divisionFilterOptionsFromMatches,
+  matchOnCalendarDate,
+  uniqueMatchCalendarDates,
+} from '@/domain/divisionFilters';
 import { isFirebaseConfigured } from '@/services/firebase';
 import { defaultOrgId, saveCoachFeedbackInFirestore } from '@/services/orgData';
 import { MatchListRow } from '@/ui/MatchListRow';
@@ -46,6 +51,7 @@ export function TeamAdminReportPage() {
   const [competitionFilter, setCompetitionFilter] = useState<string | null>(
     null,
   );
+  const [dateFilter, setDateFilter] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
 
   const myTeams = useMemo((): Team[] => {
@@ -70,11 +76,7 @@ export function TeamAdminReportPage() {
         const mo = matchOfficialForFeedback(match);
         return { match, reportingTeamId, existing, mo };
       })
-      .sort(
-        (a, b) =>
-          new Date(b.match.kickoffAt).getTime() -
-          new Date(a.match.kickoffAt).getTime(),
-      );
+      .sort((a, b) => compareKickoffAsc(a.match, b.match));
   }, [currentUser, state.matches, state.coachFeedback]);
 
   const filterOptions = useMemo(
@@ -86,6 +88,24 @@ export function TeamAdminReportPage() {
     [rows, competitionFilter],
   );
 
+  const availableDates = useMemo(
+    () =>
+      uniqueMatchCalendarDates(
+        rows
+          .filter(({ match, reportingTeamId }) => {
+            if (teamFilter && reportingTeamId !== teamFilter) return false;
+            if (genderFilter && match.gender !== genderFilter) return false;
+            if (levelFilter && match.level !== levelFilter) return false;
+            if (competitionFilter && match.competition !== competitionFilter) {
+              return false;
+            }
+            return true;
+          })
+          .map((r) => r.match),
+      ),
+    [rows, teamFilter, genderFilter, levelFilter, competitionFilter],
+  );
+
   const filtered = useMemo(() => {
     return rows.filter(({ match, reportingTeamId, existing }) => {
       if (teamFilter && reportingTeamId !== teamFilter) return false;
@@ -94,6 +114,7 @@ export function TeamAdminReportPage() {
       if (competitionFilter && match.competition !== competitionFilter) {
         return false;
       }
+      if (!matchOnCalendarDate(match, dateFilter)) return false;
       if (statusFilter === 'needs') {
         return coachFeedbackNeedsAttention(existing);
       }
@@ -115,6 +136,7 @@ export function TeamAdminReportPage() {
     genderFilter,
     levelFilter,
     competitionFilter,
+    dateFilter,
   ]);
 
   const hasFilters =
@@ -122,7 +144,8 @@ export function TeamAdminReportPage() {
     statusFilter !== 'all' ||
     genderFilter != null ||
     levelFilter != null ||
-    competitionFilter != null;
+    competitionFilter != null ||
+    dateFilter != null;
 
   const onDecline = async (matchId: string, reportingTeamId: string) => {
     if (!currentUser) return;
@@ -278,6 +301,10 @@ export function TeamAdminReportPage() {
         onGenderChange={setGenderFilter}
         onLevelChange={setLevelFilter}
         onCompetitionChange={setCompetitionFilter}
+        showDate
+        dateFilter={dateFilter}
+        onDateChange={setDateFilter}
+        availableDates={availableDates}
         ariaLabel="Filter by division"
       />
 

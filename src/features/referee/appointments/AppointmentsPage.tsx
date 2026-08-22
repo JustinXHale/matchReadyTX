@@ -1,14 +1,21 @@
 import { Title, EmptyState, EmptyStateBody } from '@patternfly/react-core';
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { useApp } from '@/app/AppContext';
+import {
+  compareKickoffAsc,
+  divisionFilterOptionsFromMatches,
+  matchOnCalendarDate,
+  uniqueMatchCalendarDates,
+} from '@/domain/divisionFilters';
 import { applyMatchScope } from '@/domain/visibility';
 import { MatchListRow } from '@/ui/MatchListRow';
 import { MatchCrewTrailing } from '@/ui/MatchCrewTrailing';
-import type { Match } from '@/domain/types';
+import type { Match, MatchGender } from '@/domain/types';
 import {
   appointmentMySlot,
   isAppointmentPendingAccept,
 } from '@/features/referee/appointments/crewLines';
+import { GlobalDivisionFilters } from '@/features/global/GlobalDivisionFilters';
 import type { BackNav } from '@/nav/backNav';
 
 const APPOINTMENTS_BACK: BackNav = {
@@ -61,13 +68,52 @@ function AppointmentRow({
 
 export function AppointmentsPage() {
   const { currentUser, state } = useApp();
+  const [genderFilter, setGenderFilter] = useState<MatchGender | null>(null);
+  const [levelFilter, setLevelFilter] = useState<string | null>(null);
+  const [competitionFilter, setCompetitionFilter] = useState<string | null>(
+    null,
+  );
+  const [dateFilter, setDateFilter] = useState<string | null>(null);
 
-  const list = useMemo(() => {
-    if (!currentUser) return [];
-    return [...applyMatchScope(state.matches, currentUser, 'mine', 'official')].sort(
-      (a, b) => new Date(a.kickoffAt).getTime() - new Date(b.kickoffAt).getTime(),
-    );
+  const pool = useMemo(() => {
+    if (!currentUser) return [] as Match[];
+    return [
+      ...applyMatchScope(state.matches, currentUser, 'mine', 'official'),
+    ].sort(compareKickoffAsc);
   }, [currentUser, state.matches]);
+
+  const filterOptions = useMemo(
+    () => divisionFilterOptionsFromMatches(pool, competitionFilter),
+    [pool, competitionFilter],
+  );
+
+  const availableDates = useMemo(
+    () =>
+      uniqueMatchCalendarDates(
+        pool.filter((m) => {
+          if (genderFilter && m.gender !== genderFilter) return false;
+          if (levelFilter && m.level !== levelFilter) return false;
+          if (competitionFilter && m.competition !== competitionFilter) {
+            return false;
+          }
+          return true;
+        }),
+      ),
+    [pool, genderFilter, levelFilter, competitionFilter],
+  );
+
+  const list = useMemo(
+    () =>
+      pool.filter((m) => {
+        if (genderFilter && m.gender !== genderFilter) return false;
+        if (levelFilter && m.level !== levelFilter) return false;
+        if (competitionFilter && m.competition !== competitionFilter) {
+          return false;
+        }
+        return matchOnCalendarDate(m, dateFilter);
+      }),
+    [pool, genderFilter, levelFilter, competitionFilter, dateFilter],
+  );
 
   const pendingAccept = useMemo(() => {
     if (!currentUser) return [] as Match[];
@@ -95,14 +141,47 @@ export function AppointmentsPage() {
 
   if (!currentUser) return null;
 
-  const empty = list.length === 0;
+  const hasFilters =
+    genderFilter != null ||
+    levelFilter != null ||
+    competitionFilter != null ||
+    dateFilter != null;
 
-  return (
-    <div className="rs-stack">
-      {empty ? (
+  if (pool.length === 0) {
+    return (
+      <div className="rs-stack">
         <EmptyState titleText="No appointments" headingLevel="h3">
           <EmptyStateBody>
             Games you are assigned to will show up here.
+          </EmptyStateBody>
+        </EmptyState>
+      </div>
+    );
+  }
+
+  return (
+    <div className="rs-stack">
+      <GlobalDivisionFilters
+        options={filterOptions}
+        genderFilter={genderFilter}
+        levelFilter={levelFilter}
+        competitionFilter={competitionFilter}
+        onGenderChange={setGenderFilter}
+        onLevelChange={setLevelFilter}
+        onCompetitionChange={setCompetitionFilter}
+        showDate
+        dateFilter={dateFilter}
+        onDateChange={setDateFilter}
+        availableDates={availableDates}
+        ariaLabel="Filter assigned matches"
+      />
+
+      {list.length === 0 ? (
+        <EmptyState titleText="No matching games" headingLevel="h3">
+          <EmptyStateBody>
+            {hasFilters
+              ? 'No games match these filters. Clear competition, date, or chips to widen.'
+              : 'Games you are assigned to will show up here.'}
           </EmptyStateBody>
         </EmptyState>
       ) : (

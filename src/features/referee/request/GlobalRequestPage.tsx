@@ -22,7 +22,7 @@ import { backState, type BackNav } from '@/nav/backNav';
 
 const GLOBAL_REQUEST_BACK: BackNav = {
   to: '/referee/appointments/open',
-  label: 'Open',
+  label: 'Available matches',
 };
 
 type RoleFilter = 'mo' | 'ar' | 'cmo' | 'no4';
@@ -290,7 +290,7 @@ export function GlobalRequestPage() {
       )}
 
       {!hasBase ? (
-        <EmptyState titleText="No open games" headingLevel="h3">
+        <EmptyState titleText="No available matches" headingLevel="h3">
           <EmptyStateBody>
             There are no requestable games with open positions right now.
           </EmptyStateBody>
@@ -298,7 +298,7 @@ export function GlobalRequestPage() {
       ) : !hasAny ? (
         <EmptyState titleText="No matching games" headingLevel="h3">
           <EmptyStateBody>
-            No open games match this filter. Tap a chip again to clear.
+            No available matches match this filter. Tap a chip again to clear.
           </EmptyStateBody>
         </EmptyState>
       ) : (

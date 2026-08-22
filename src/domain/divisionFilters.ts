@@ -71,12 +71,30 @@ export function matchLocalCalendarDate(iso: string): string {
   return `${y}-${m}-${day}`;
 }
 
+export function isoOnCalendarDate(
+  iso: string,
+  yyyyMmDd: string | null,
+): boolean {
+  if (!yyyyMmDd) return true;
+  return matchLocalCalendarDate(iso) === yyyyMmDd;
+}
+
 export function matchOnCalendarDate(
   match: Match,
   yyyyMmDd: string | null,
 ): boolean {
-  if (!yyyyMmDd) return true;
-  return matchLocalCalendarDate(match.kickoffAt) === yyyyMmDd;
+  return isoOnCalendarDate(match.kickoffAt, yyyyMmDd);
+}
+
+export function compareKickoffAsc(
+  a: { kickoffAt: string },
+  b: { kickoffAt: string },
+): number {
+  return new Date(a.kickoffAt).getTime() - new Date(b.kickoffAt).getTime();
+}
+
+export function sortByKickoffAsc<T extends { kickoffAt: string }>(list: T[]): T[] {
+  return [...list].sort(compareKickoffAsc);
 }
 
 /** Local YYYY-MM-DD from a Date (calendar cells are local midnight). */
@@ -88,14 +106,19 @@ export function calendarDateKey(date: Date): string {
   return `${y}-${m}-${d}`;
 }
 
-/** Distinct local calendar days that have a kickoff in `matches`. */
-export function uniqueMatchCalendarDates(matches: Match[]): string[] {
+/** Distinct local calendar days from ISO kickoff timestamps. */
+export function uniqueIsoCalendarDates(isos: string[]): string[] {
   const dates = new Set<string>();
-  for (const m of matches) {
-    const key = matchLocalCalendarDate(m.kickoffAt);
+  for (const iso of isos) {
+    const key = matchLocalCalendarDate(iso);
     if (key) dates.add(key);
   }
   return [...dates].sort();
+}
+
+/** Distinct local calendar days that have a kickoff in `matches`. */
+export function uniqueMatchCalendarDates(matches: Match[]): string[] {
+  return uniqueIsoCalendarDates(matches.map((m) => m.kickoffAt));
 }
 
 export function divisionFilterOptionsFromFixtureRequests(

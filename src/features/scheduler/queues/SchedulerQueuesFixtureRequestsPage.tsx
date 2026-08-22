@@ -1,11 +1,10 @@
 import { useMemo } from 'react';
 import { EmptyState, EmptyStateBody } from '@patternfly/react-core';
 import { useApp } from '@/app/AppContext';
+import { compareKickoffAsc } from '@/domain/divisionFilters';
 import { GlobalDivisionFilters } from '@/features/global/GlobalDivisionFilters';
 import { FixtureRequestQueue } from '@/features/scheduler/queues/FixtureRequestQueue';
-import {
-  pendingFixtureRequests,
-} from '@/features/scheduler/queues/selectors';
+import { pendingFixtureRequests } from '@/features/scheduler/queues/selectors';
 import {
   useRequestDivisionFilters,
   useSchedulerRequestActions,
@@ -20,19 +19,25 @@ export function SchedulerQueuesFixtureRequestsPage() {
     setLevelFilter,
     competitionFilter,
     setCompetitionFilter,
+    dateFilter,
+    setDateFilter,
     filterOptions,
-    divisionActive,
+    filtersActive,
     filterFixture,
+    availableDatesForFixtures,
   } = useRequestDivisionFilters(state);
   const { fixtureBusyId, onApproveFixture, onDeclineFixture } =
     useSchedulerRequestActions();
 
   const fixtureReqs = useMemo(
-    () => filterFixture(pendingFixtureRequests(state.fixtureRequests)),
+    () =>
+      [...filterFixture(pendingFixtureRequests(state.fixtureRequests))].sort(
+        compareKickoffAsc,
+      ),
     [state.fixtureRequests, filterFixture],
   );
 
-  if (!divisionActive && fixtureReqs.length === 0) {
+  if (!filtersActive && fixtureReqs.length === 0) {
     return (
       <EmptyState titleText="No fixture requests" headingLevel="h3">
         <EmptyStateBody>
@@ -55,12 +60,16 @@ export function SchedulerQueuesFixtureRequestsPage() {
         onGenderChange={setGenderFilter}
         onLevelChange={setLevelFilter}
         onCompetitionChange={setCompetitionFilter}
+        showDate
+        dateFilter={dateFilter}
+        onDateChange={setDateFilter}
+        availableDates={availableDatesForFixtures}
         ariaLabel="Filter fixture requests by division"
       />
-      {divisionActive && fixtureReqs.length === 0 && (
+      {filtersActive && fixtureReqs.length === 0 && (
         <p className="rs-match-card__meta">
-          No fixture requests for this division. Clear Men/Women or level chips
-          to see everything.
+          No fixture requests for these filters. Clear competition, date, or
+          chips to see everything.
         </p>
       )}
       <FixtureRequestQueue

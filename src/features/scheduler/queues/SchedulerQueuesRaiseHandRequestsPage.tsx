@@ -1,6 +1,7 @@
 import { useMemo } from 'react';
 import { EmptyState, EmptyStateBody } from '@patternfly/react-core';
 import { useApp } from '@/app/AppContext';
+import { compareKickoffAsc } from '@/domain/divisionFilters';
 import { GlobalDivisionFilters } from '@/features/global/GlobalDivisionFilters';
 import { RaiseHandQueue } from '@/features/scheduler/queues/RaiseHandQueue';
 import { pendingRaiseHandRequests } from '@/features/scheduler/queues/selectors';
@@ -18,19 +19,29 @@ export function SchedulerQueuesRaiseHandRequestsPage() {
     setLevelFilter,
     competitionFilter,
     setCompetitionFilter,
+    dateFilter,
+    setDateFilter,
     filterOptions,
-    divisionActive,
+    filtersActive,
     filterRaiseHand,
+    availableDatesForRaiseHand,
   } = useRequestDivisionFilters(state);
   const { onApproveRaiseHand, onDeclineRaiseHand } =
     useSchedulerRequestActions();
 
-  const raiseHand = useMemo(
-    () => filterRaiseHand(pendingRaiseHandRequests(state.requests)),
-    [state.requests, filterRaiseHand],
-  );
+  const raiseHand = useMemo(() => {
+    const filtered = filterRaiseHand(pendingRaiseHandRequests(state.requests));
+    return [...filtered].sort((a, b) => {
+      const ma = state.matches.find((m) => m.id === a.matchId);
+      const mb = state.matches.find((m) => m.id === b.matchId);
+      if (!ma && !mb) return 0;
+      if (!ma) return 1;
+      if (!mb) return -1;
+      return compareKickoffAsc(ma, mb);
+    });
+  }, [state.requests, state.matches, filterRaiseHand]);
 
-  if (!divisionActive && raiseHand.length === 0) {
+  if (!filtersActive && raiseHand.length === 0) {
     return (
       <EmptyState titleText="No raise-hand requests" headingLevel="h3">
         <EmptyStateBody>
@@ -53,11 +64,15 @@ export function SchedulerQueuesRaiseHandRequestsPage() {
         onGenderChange={setGenderFilter}
         onLevelChange={setLevelFilter}
         onCompetitionChange={setCompetitionFilter}
+        showDate
+        dateFilter={dateFilter}
+        onDateChange={setDateFilter}
+        availableDates={availableDatesForRaiseHand}
         ariaLabel="Filter raise-hand requests by division"
       />
-      {divisionActive && raiseHand.length === 0 && (
+      {filtersActive && raiseHand.length === 0 && (
         <p className="rs-match-card__meta">
-          No raise-hand requests for this division. Clear Men/Women or level
+          No raise-hand requests for these filters. Clear competition, date, or
           chips to see everything.
         </p>
       )}

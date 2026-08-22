@@ -12,8 +12,15 @@ import {
 import { useMemo, useState } from 'react';
 import { flushSync } from 'react-dom';
 import { useApp } from '@/app/AppContext';
+import {
+  compareKickoffAsc,
+  divisionFilterOptionsFromMatches,
+  matchOnCalendarDate,
+  uniqueMatchCalendarDates,
+} from '@/domain/divisionFilters';
+import { GlobalDivisionFilters } from '@/features/global/GlobalDivisionFilters';
 import { MatchListRow } from '@/ui/MatchListRow';
-import type { GameRequest, Match } from '@/domain/types';
+import type { GameRequest, Match, MatchGender } from '@/domain/types';
 import { REQUESTABLE_SLOT_SHORT } from '@/domain/types';
 import {
   isDeclinedRequestVisible,
@@ -92,8 +99,14 @@ export function PendingRequestsPage() {
     request: GameRequest;
     match: Match;
   } | null>(null);
+  const [genderFilter, setGenderFilter] = useState<MatchGender | null>(null);
+  const [levelFilter, setLevelFilter] = useState<string | null>(null);
+  const [competitionFilter, setCompetitionFilter] = useState<string | null>(
+    null,
+  );
+  const [dateFilter, setDateFilter] = useState<string | null>(null);
 
-  const rows = useMemo(() => {
+  const pool = useMemo(() => {
     if (!currentUser) return [] as { request: GameRequest; match: Match }[];
     return state.requests
       .filter(
@@ -116,12 +129,48 @@ export function PendingRequestsPage() {
           Number(b.request.status === 'declined') -
           Number(a.request.status === 'declined');
         if (declinedDelta !== 0) return declinedDelta;
-        return (
-          new Date(a.match.kickoffAt).getTime() -
-          new Date(b.match.kickoffAt).getTime()
-        );
+        return compareKickoffAsc(a.match, b.match);
       });
   }, [currentUser, state.requests, state.matches]);
+
+  const filterOptions = useMemo(
+    () =>
+      divisionFilterOptionsFromMatches(
+        pool.map((r) => r.match),
+        competitionFilter,
+      ),
+    [pool, competitionFilter],
+  );
+
+  const availableDates = useMemo(
+    () =>
+      uniqueMatchCalendarDates(
+        pool
+          .filter(({ match }) => {
+            if (genderFilter && match.gender !== genderFilter) return false;
+            if (levelFilter && match.level !== levelFilter) return false;
+            if (competitionFilter && match.competition !== competitionFilter) {
+              return false;
+            }
+            return true;
+          })
+          .map((r) => r.match),
+      ),
+    [pool, genderFilter, levelFilter, competitionFilter],
+  );
+
+  const rows = useMemo(
+    () =>
+      pool.filter(({ match }) => {
+        if (genderFilter && match.gender !== genderFilter) return false;
+        if (levelFilter && match.level !== levelFilter) return false;
+        if (competitionFilter && match.competition !== competitionFilter) {
+          return false;
+        }
+        return matchOnCalendarDate(match, dateFilter);
+      }),
+    [pool, genderFilter, levelFilter, competitionFilter, dateFilter],
+  );
 
   const byMonth = useMemo(() => {
     const groups: {
@@ -175,51 +224,76 @@ export function PendingRequestsPage() {
 
   return (
     <div className="rs-stack">
-      {rows.length === 0 ? (
+      {pool.length === 0 ? (
         <EmptyState titleText="Nothing pending" headingLevel="h3">
           <EmptyStateBody>
-            When you raise your hand on Open, waiting requests show up here.
-            If an assigner declines one, it stays here with their reason until
-            you dismiss it.
+            When you raise your hand on Available matches, waiting requests show
+            up here. If an assigner declines one, it stays here with their
+            reason until you dismiss it.
           </EmptyStateBody>
         </EmptyState>
       ) : (
-        byMonth.map((group) => (
-          <section key={group.key} className="rs-month-section">
-            <Title headingLevel="h3" size="md" className="rs-month-heading">
-              {group.label}
-            </Title>
-            <ul className="rs-list">
-              {group.items.map(({ request, match }) => (
-                <li key={request.id}>
-                  <MatchListRow
-                    match={match}
-                    to={`/matches/${match.id}`}
-                    showTime
-                    split="action"
-                    urgent={request.status === 'declined'}
-                    back={PENDING_BACK}
-                    meta={
-                      request.status === 'declined' ? (
-                        <span className="rs-list-row__hint">
-                          {request.declineReason?.trim()
-                            ? `Declined: ${request.declineReason.trim()}`
-                            : 'Declined by the assigner.'}
-                        </span>
-                      ) : undefined
-                    }
-                    trailing={
-                      <RequestStatusTrailing
-                        request={request}
-                        onRemove={() => setPendingRemoval({ request, match })}
+        <>
+          <GlobalDivisionFilters
+            options={filterOptions}
+            genderFilter={genderFilter}
+            levelFilter={levelFilter}
+            competitionFilter={competitionFilter}
+            onGenderChange={setGenderFilter}
+            onLevelChange={setLevelFilter}
+            onCompetitionChange={setCompetitionFilter}
+            showDate
+            dateFilter={dateFilter}
+            onDateChange={setDateFilter}
+            availableDates={availableDates}
+            ariaLabel="Filter requested matches"
+          />
+          {rows.length === 0 ? (
+            <p className="rs-match-card__meta">
+              No games match these filters. Clear competition, date, or chips to
+              widen.
+            </p>
+          ) : (
+            byMonth.map((group) => (
+              <section key={group.key} className="rs-month-section">
+                <Title headingLevel="h3" size="md" className="rs-month-heading">
+                  {group.label}
+                </Title>
+                <ul className="rs-list">
+                  {group.items.map(({ request, match }) => (
+                    <li key={request.id}>
+                      <MatchListRow
+                        match={match}
+                        to={`/matches/${match.id}`}
+                        showTime
+                        split="action"
+                        urgent={request.status === 'declined'}
+                        back={PENDING_BACK}
+                        meta={
+                          request.status === 'declined' ? (
+                            <span className="rs-list-row__hint">
+                              {request.declineReason?.trim()
+                                ? `Declined: ${request.declineReason.trim()}`
+                                : 'Declined by the assigner.'}
+                            </span>
+                          ) : undefined
+                        }
+                        trailing={
+                          <RequestStatusTrailing
+                            request={request}
+                            onRemove={() =>
+                              setPendingRemoval({ request, match })
+                            }
+                          />
+                        }
                       />
-                    }
-                  />
-                </li>
-              ))}
-            </ul>
-          </section>
-        ))
+                    </li>
+                  ))}
+                </ul>
+              </section>
+            ))
+          )}
+        </>
       )}
 
       <Modal
@@ -244,8 +318,8 @@ export function PendingRequestsPage() {
                 {pendingRemoval.match.homeTeamName} vs{' '}
                 {pendingRemoval.match.awayTeamName}
               </strong>
-              ? You can raise your hand again from Global if the game is still
-              open.
+              ? You can raise your hand again from Available matches if the game
+              is still open.
             </p>
           ) : pendingRemoval ? (
             <p id="remove-request-desc" className="rs-modal-lede">
@@ -254,8 +328,8 @@ export function PendingRequestsPage() {
                 {pendingRemoval.match.homeTeamName} vs{' '}
                 {pendingRemoval.match.awayTeamName}
               </strong>
-              ? You can raise your hand again later from Global if the game is
-              still open.
+              ? You can raise your hand again later from Available matches if
+              the game is still open.
             </p>
           ) : null}
         </ModalBody>

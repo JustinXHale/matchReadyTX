@@ -20,6 +20,7 @@ import {
   faUsers,
 } from '@fortawesome/free-solid-svg-icons';
 import { ROLE_HOME, ROLE_VIEW_LABELS, useApp, type RoleView } from '@/app/AppContext';
+import { appBuildLabel } from '@/app/appBuild';
 import { stripDemoPrefix, withDemoPrefix } from '@/app/demoPaths';
 import { WhistleIcon } from '@/ui/WhistleIcon';
 import { UpdatePrompt } from '@/pwa/UpdatePrompt';
@@ -223,6 +224,7 @@ export function MobileShell() {
                   <time className="rs-brand-date" dateTime={todayIso}>
                     {clockLabel}
                   </time>
+                  <span className="rs-brand-build">{appBuildLabel()}</span>
                 </span>
               </MastheadBrand>
             </MastheadMain>

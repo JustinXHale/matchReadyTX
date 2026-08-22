@@ -9,6 +9,7 @@ import {
 import {
   fixtureMatchesDivisionFilters,
   matchMatchesDivisionFilters,
+  sortByKickoffAsc,
 } from '@/domain/divisionFilters';
 import type { AppState } from '@/services/demoStore';
 
@@ -36,7 +37,7 @@ export function proposalMatchesDivisionFilters(
 
 /** Released matches still missing Match Official (not already in reassignment). */
 export function matchesNeedingOfficials(matches: Match[]): Match[] {
-  return matches.filter((m) => {
+  return sortByKickoffAsc(matches.filter((m) => {
     if (
       m.status === 'draft' ||
       m.status === 'cancelled' ||
@@ -47,17 +48,21 @@ export function matchesNeedingOfficials(matches: Match[]): Match[] {
     }
     if (!m.releasedAt) return false;
     return crewPeople(m.crew.mo).length === 0;
-  });
+  }));
 }
 
 export function matchesNeedingReassignment(matches: Match[]): Match[] {
-  return matches.filter((m) => m.status === 'needs_reassignment');
+  return sortByKickoffAsc(
+    matches.filter((m) => m.status === 'needs_reassignment'),
+  );
 }
 
 export function matchesT72Due(matches: Match[]): Match[] {
-  return matches.filter(
-    (m) =>
-      m.status === 't72_team_pending' || m.status === 't72_officials_pending',
+  return sortByKickoffAsc(
+    matches.filter(
+      (m) =>
+        m.status === 't72_team_pending' || m.status === 't72_officials_pending',
+    ),
   );
 }
 

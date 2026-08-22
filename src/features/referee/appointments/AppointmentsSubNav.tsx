@@ -4,7 +4,7 @@ import { useApp, useAppHref } from '@/app/AppContext';
 import { countOfficialRequestInbox } from '@/domain/requests';
 import { formatDueBadge } from '@/features/referee/reports/dueCounts';
 
-/** Assigned | Requested | Open under Appointments. */
+/** Assigned | Requested | Available matches under Appointments. */
 export function AppointmentsSubNav() {
   const { currentUser, state } = useApp();
   const assignedHref = useAppHref('/referee/appointments');
@@ -48,7 +48,7 @@ export function AppointmentsSubNav() {
         )}
       </NavLink>
       <NavLink to={openHref} className={({ isActive }) => (isActive ? 'active' : '')}>
-        Open
+        Available matches
       </NavLink>
     </nav>
   );

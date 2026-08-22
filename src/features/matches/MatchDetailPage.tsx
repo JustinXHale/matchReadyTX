@@ -14,6 +14,7 @@ import {
   ModalHeader,
   ModalVariant,
   Radio,
+  Alert,
 } from '@patternfly/react-core';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faPen } from '@fortawesome/free-solid-svg-icons';
@@ -264,7 +265,9 @@ export function MatchDetailPage() {
   const [coverageAlertSent, setCoverageAlertSent] = useState(false);
   const [requestSlot, setRequestSlot] = useState<RequestableSlot | ''>('');
   const [requestNote, setRequestNote] = useState('');
+  const [requestToast, setRequestToast] = useState(false);
   const requestSectionRef = useRef<HTMLElement | null>(null);
+  const titleRowRef = useRef<HTMLDivElement | null>(null);
 
   const persistSelfServiceIfLive = useCallback(
     (input: Parameters<typeof callMatchSelfService>[0]) => {
@@ -378,6 +381,12 @@ export function MatchDetailPage() {
     }, 50);
     return () => window.clearTimeout(t);
   }, [canRequestPreview, highlightRequest, match?.id]);
+
+  useEffect(() => {
+    if (!requestToast) return;
+    const id = window.setTimeout(() => setRequestToast(false), 4000);
+    return () => window.clearTimeout(id);
+  }, [requestToast]);
 
   if (!currentUser || !match) {
     return (
@@ -1048,6 +1057,13 @@ export function MatchDetailPage() {
 
     setRequestSlot('');
     setRequestNote('');
+    setRequestToast(true);
+    window.requestAnimationFrame(() => {
+      titleRowRef.current?.scrollIntoView({
+        behavior: 'smooth',
+        block: 'start',
+      });
+    });
   };
 
   return (
@@ -1060,7 +1076,7 @@ export function MatchDetailPage() {
         ← {backLabel}
       </button>
 
-      <div className="rs-detail__title-row">
+      <div className="rs-detail__title-row" ref={titleRowRef}>
         <Title headingLevel="h2" className="rs-detail__title">
           <span className="rs-detail__home">
             <span className="rs-detail__ha">(H)</span> {match.homeTeamName}
@@ -2829,6 +2845,16 @@ export function MatchDetailPage() {
           </Button>
         </ModalFooter>
       </Modal>
+      {requestToast && (
+        <div className="rs-update-toast" role="status">
+          <Alert
+            variant="success"
+            isInline
+            isPlain
+            title="Match successfully requested"
+          />
+        </div>
+      )}
     </div>
   );
 }

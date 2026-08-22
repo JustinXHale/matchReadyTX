@@ -1,5 +1,5 @@
 import { Title, EmptyState, EmptyStateBody } from '@patternfly/react-core';
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Navigate, useParams } from 'react-router-dom';
 import { useApp, useAppHref } from '@/app/AppContext';
 import { isKickoffUpcoming } from '@/domain/requests';
@@ -51,11 +51,6 @@ export function GlobalSchedulePage() {
   const fanFavorites = currentUser?.fanTeamIds;
   const showMyTeamsChip =
     isFanView && Boolean(fanFavorites && fanFavorites.length > 0);
-
-  useEffect(() => {
-    // Upcoming: soonest first. Completed: most recent first.
-    setSortDir(pane === 'completed' ? 'desc' : 'asc');
-  }, [pane]);
 
   const paneMatches = useMemo(() => {
     if (!pane) return [] as Match[];

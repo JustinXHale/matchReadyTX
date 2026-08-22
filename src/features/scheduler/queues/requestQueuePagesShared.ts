@@ -3,13 +3,18 @@ import {
   divisionFilterOptionsFromFixtureRequests,
   divisionFilterOptionsFromMatches,
   divisionFiltersActive,
-  mergeDivisionFilterOptions,
-} from '@/domain/divisionFilters';
-import type { MatchGender, RequestableSlot } from '@/domain/types';
-import {
   fixtureMatchesDivisionFilters,
+  isoOnCalendarDate,
   matchMatchesDivisionFilters,
+  matchOnCalendarDate,
+  mergeDivisionFilterOptions,
+  uniqueIsoCalendarDates,
+  uniqueMatchCalendarDates,
+} from '@/domain/divisionFilters';
+import type { Match, MatchGender, RequestableSlot } from '@/domain/types';
+import {
   pendingFixtureRequests,
+  pendingRaiseHandRequests,
 } from '@/features/scheduler/queues/selectors';
 import {
   approveRaiseHandRequest,
@@ -36,6 +41,7 @@ export function useRequestDivisionFilters(state: AppState) {
   const [competitionFilter, setCompetitionFilter] = useState<string | null>(
     null,
   );
+  const [dateFilter, setDateFilter] = useState<string | null>(null);
 
   const filterOptions = useMemo(
     () =>
@@ -53,46 +59,95 @@ export function useRequestDivisionFilters(state: AppState) {
     level: levelFilter,
     competition: competitionFilter,
   });
+  const filtersActive = divisionActive || dateFilter != null;
 
   const filterFixture = useCallback(
     <T extends Parameters<typeof fixtureMatchesDivisionFilters>[0]>(list: T[]) => {
-      if (!divisionActive) return list;
-      return list.filter((r) =>
-        fixtureMatchesDivisionFilters(
-          r,
-          genderFilter,
-          levelFilter,
-          competitionFilter,
-        ),
-      );
+      if (!filtersActive) return list;
+      return list.filter((r) => {
+        if (
+          !fixtureMatchesDivisionFilters(
+            r,
+            genderFilter,
+            levelFilter,
+            competitionFilter,
+          )
+        ) {
+          return false;
+        }
+        return isoOnCalendarDate(r.kickoffAt, dateFilter);
+      });
     },
-    [divisionActive, genderFilter, levelFilter, competitionFilter],
+    [
+      filtersActive,
+      genderFilter,
+      levelFilter,
+      competitionFilter,
+      dateFilter,
+    ],
   );
 
   const filterRaiseHand = useCallback(
     <T extends { matchId: string }>(list: T[]) => {
-      if (!divisionActive) return list;
+      if (!filtersActive) return list;
       return list.filter((r) => {
         const match = state.matches.find((m) => m.id === r.matchId);
-        return (
-          match != null &&
-          matchMatchesDivisionFilters(
+        if (match == null) return false;
+        if (
+          !matchMatchesDivisionFilters(
             match,
             genderFilter,
             levelFilter,
             competitionFilter,
           )
-        );
+        ) {
+          return false;
+        }
+        return matchOnCalendarDate(match, dateFilter);
       });
     },
     [
       state.matches,
-      divisionActive,
+      filtersActive,
       genderFilter,
       levelFilter,
       competitionFilter,
+      dateFilter,
     ],
   );
+
+  const availableDatesForFixtures = useMemo(() => {
+    const pending = pendingFixtureRequests(state.fixtureRequests).filter((r) =>
+      fixtureMatchesDivisionFilters(
+        r,
+        genderFilter,
+        levelFilter,
+        competitionFilter,
+      ),
+    );
+    return uniqueIsoCalendarDates(pending.map((r) => r.kickoffAt));
+  }, [state.fixtureRequests, genderFilter, levelFilter, competitionFilter]);
+
+  const availableDatesForRaiseHand = useMemo(() => {
+    const matches = pendingRaiseHandRequests(state.requests)
+      .map((r) => state.matches.find((m) => m.id === r.matchId))
+      .filter((m): m is Match => m != null)
+      .filter((m) =>
+        matchMatchesDivisionFilters(
+          m,
+          genderFilter,
+          levelFilter,
+          competitionFilter,
+        ),
+      );
+    return uniqueMatchCalendarDates(matches);
+  }, [
+    state.requests,
+    state.matches,
+    genderFilter,
+    levelFilter,
+    competitionFilter,
+  ]);
 
   return {
     genderFilter,
@@ -101,10 +156,15 @@ export function useRequestDivisionFilters(state: AppState) {
     setLevelFilter,
     competitionFilter,
     setCompetitionFilter,
+    dateFilter,
+    setDateFilter,
     filterOptions,
     divisionActive,
+    filtersActive,
     filterFixture,
     filterRaiseHand,
+    availableDatesForFixtures,
+    availableDatesForRaiseHand,
   };
 }
 
