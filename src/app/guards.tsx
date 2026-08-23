@@ -39,6 +39,16 @@ export function RequireProfileIncomplete() {
   return <Outlet />;
 }
 
+/** Insights tab — Scheduler (assigner) or delegated reportAnalytics role. */
+export function RequireInsightsAccess() {
+  const { hasInsightsAccess, dataMode } = useApp();
+  if (!hasInsightsAccess) {
+    const home = dataMode === 'demo' ? withDemoPrefix('/about') : '/about';
+    return <Navigate to={home} replace />;
+  }
+  return <Outlet />;
+}
+
 /** Member directory is for working roles — not the Fan lens. */
 export function RequireMembersAccess() {
   const { isFanView, dataMode } = useApp();

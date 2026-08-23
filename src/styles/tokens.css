@@ -1,58 +1,102 @@
 /**
- * MatchReadyTX design tokens — T03 monochrome system adapted for web/PWA.
- * Source of truth docs: docs/THEME.md and .design/theme.md
- * Prefer these variables over raw hex in components.
+ * MatchReadyTX design tokens — PatternFly-aligned monochrome + high contrast.
+ *
+ * Architecture (see docs/THEME.md):
+ * 1. Palette — literal values ONLY in this file
+ * 2. Semantic --rs-color-* — product tokens (reference palette or PF globals)
+ * 3. PatternFly --pf-t--global-* overrides — brand + surfaces for PF components
+ *
+ * Color scheme: `pf-v6-theme-dark` on <html> (light default).
+ * High contrast: `pf-v6-theme-high-contrast` on <html> (MatchReadyTX default).
  */
 
-:root,
-.rs-theme {
-  /* Brand pair */
-  --rs-color-primary: #000000;
-  --rs-color-secondary: #ffffff;
-  --rs-color-primary-muted: #1f2937;
+/* ---- Palette (hex literals — do not use outside this file) ---- */
+:root.rs-theme {
+  --rs-palette-black: #000000;
+  --rs-palette-white: #ffffff;
+  --rs-palette-gray-50: #f9fafb;
+  --rs-palette-gray-100: #f3f4f6;
+  --rs-palette-gray-200: #e5e7eb;
+  --rs-palette-gray-400: #9ca3af;
+  --rs-palette-gray-500: #6b7280;
+  --rs-palette-gray-600: #4b5563;
+  --rs-palette-gray-700: #374151;
+  --rs-palette-gray-800: #1f2937;
+  --rs-palette-gray-900: #111827;
+  --rs-palette-gray-950: #141414;
+  --rs-palette-gray-border: #333333;
+  --rs-palette-gray-muted: #a3a3a3;
+  --rs-palette-gray-muted-light: #d4d4d4;
+  --rs-palette-gray-ended: #737373;
+  --rs-palette-red-urgent: #dc2626;
+  --rs-palette-green-ok: #16a34a;
+  --rs-palette-yellow-warn: #ca8a04;
+  --rs-palette-yellow-warn-vivid: #fbbf24;
+  /* Google sign-in (official control colors) */
+  --rs-palette-google-text: #1f1f1f;
+  --rs-palette-google-border: #747775;
+  --rs-palette-google-bg: #ffffff;
+  --rs-palette-google-bg-hover: #f8f9fa;
+  --rs-palette-google-spinner-track: #dadce0;
+  --rs-palette-overlay-scrim: #111827;
 
-  /* Neutrals (charcoal ladder — not brand “secondary”) */
-  --rs-color-charcoal: #374151;
-  --rs-color-charcoal-light: #4b5563;
-  --rs-color-charcoal-dark: #1f2937;
-  --rs-color-muted: #4b5563;
-  --rs-color-ended: #6b7280;
+  /* ---- Semantic colors (light scheme) ---- */
+  --rs-color-primary: var(--rs-palette-black);
+  --rs-color-secondary: var(--rs-palette-white);
+  --rs-color-primary-muted: var(--rs-palette-gray-800);
+  --rs-color-charcoal: var(--rs-palette-gray-700);
+  --rs-color-charcoal-light: var(--rs-palette-gray-600);
+  --rs-color-charcoal-dark: var(--rs-palette-gray-800);
+  --rs-color-muted: var(--rs-palette-gray-600);
+  --rs-color-ended: var(--rs-palette-gray-500);
+  --rs-color-bg: var(--rs-palette-gray-50);
+  --rs-color-surface: var(--rs-palette-white);
+  --rs-color-surface-muted: var(--rs-palette-gray-100);
+  --rs-color-border: var(--rs-palette-gray-200);
+  --rs-color-ink: var(--rs-palette-black);
+  --rs-color-on-primary: var(--rs-palette-white);
+  --rs-color-urgent: var(--rs-palette-red-urgent);
+  --rs-color-on-urgent: var(--rs-palette-white);
+  --rs-color-urgent-ink: var(--rs-color-urgent);
+  --rs-color-urgent-meta: var(--rs-palette-black); /* meta on solid urgent rows */
+  --rs-color-urgent-chip-bg: var(--rs-palette-black);
+  --rs-color-urgent-chip-text: var(--rs-palette-white);
+  --rs-color-ok: var(--rs-palette-green-ok);
+  --rs-color-warn: var(--rs-palette-yellow-warn);
+  --rs-color-warn-surface: var(--rs-palette-yellow-warn);
+  --rs-color-warn-accent: var(--rs-palette-yellow-warn);
+  --rs-color-on-warn: var(--rs-palette-black);
+  --rs-color-on-warn-surface: var(--rs-palette-black);
+  --rs-color-tint-contrast: var(--rs-palette-black);
+  --rs-color-signin-google-text: var(--rs-palette-google-text);
+  --rs-color-signin-google-border: var(--rs-palette-google-border);
+  --rs-color-signin-google-bg: var(--rs-palette-google-bg);
+  --rs-color-signin-google-bg-hover: var(--rs-palette-google-bg-hover);
+  --rs-color-signin-google-spinner-track: var(--rs-palette-google-spinner-track);
+  --rs-color-signin-apple-bg: var(--rs-palette-black);
+  --rs-color-signin-apple-bg-hover: var(--rs-palette-gray-900);
+  --rs-color-signin-apple-text: var(--rs-palette-white);
+  --rs-color-overlay-scrim: var(--rs-palette-overlay-scrim);
+  --rs-color-focus-ring: var(--rs-color-primary);
 
-  /* Surfaces */
-  --rs-color-bg: #f9fafb;
-  --rs-color-surface: #ffffff;
-  --rs-color-surface-muted: #f3f4f6;
-  --rs-color-border: #e5e7eb;
-
-  /* Semantic status — do not repurpose for chrome */
-  --rs-color-urgent: #dc2626; /* LIVE / needs action / destructive accent */
-  --rs-color-ok: #16a34a; /* confirmed / success */
-  --rs-color-warn: #ca8a04; /* assigned, awaiting confirm */
-  --rs-color-ink: #000000;
-  --rs-color-on-primary: #ffffff;
-
-  /* Radius / elevation (T03: soft, flat) */
   --rs-radius-card: 12px;
   --rs-radius-chip: 8px;
   --rs-radius-pill: 999px;
   --rs-radius-dialog: 16px;
   --rs-shadow: none;
 
-  /* Spacing — prefer PatternFly spacers; avoid raw px in layout CSS */
-  --rs-space-xs: var(--pf-t--global--spacer--xs); /* 0.25rem / 4px — micro (chips, icon gaps) */
-  --rs-space-sm: var(--pf-t--global--spacer--sm); /* 0.5rem / 8px — controls, action rows */
-  --rs-space-md: var(--pf-t--global--spacer--md); /* 1rem / 16px — fields, card body, sections */
-  --rs-space-lg: var(--pf-t--global--spacer--lg); /* 1.5rem / 24px — major section breaks */
-  --rs-space-xl: var(--pf-t--global--spacer--xl); /* 2rem / 32px */
+  --rs-space-xs: var(--pf-t--global--spacer--xs);
+  --rs-space-sm: var(--pf-t--global--spacer--sm);
+  --rs-space-md: var(--pf-t--global--spacer--md);
+  --rs-space-lg: var(--pf-t--global--spacer--lg);
+  --rs-space-xl: var(--pf-t--global--spacer--xl);
 
-  /* Layout */
-  --rs-page-pad: 0.75rem; /* T03 mobile density (between PF sm/md) */
+  --rs-page-pad: 0.75rem;
   --rs-gap-grid: var(--rs-space-sm);
   --rs-bottom-nav-height: 4rem;
   --rs-bottom-clearance: 6.25rem;
-  --rs-tap-min: var(--pf-t--global--spacer--2xl); /* 3rem / 48px */
+  --rs-tap-min: var(--pf-t--global--spacer--2xl);
 
-  /* Type */
   --rs-font-family: 'Roboto', system-ui, -apple-system, 'Segoe UI', sans-serif;
   --rs-font-title: 600 18px/1.3 var(--rs-font-family);
   --rs-font-card-title: 700 14px/1.25 var(--rs-font-family);
@@ -62,7 +106,7 @@
   --rs-font-nav: 600 12px/1.2 var(--rs-font-family);
   --rs-font-body: 400 15px/1.45 var(--rs-font-family);
 
-  /* PatternFly brand overrides → monochrome */
+  /* PatternFly global overrides → monochrome brand */
   --pf-t--global--color--brand--default: var(--rs-color-primary);
   --pf-t--global--color--brand--hover: var(--rs-color-primary-muted);
   --pf-t--global--color--brand--clicked: var(--rs-color-primary-muted);
@@ -73,4 +117,51 @@
   --pf-t--global--border--color--default: var(--rs-color-border);
   --pf-t--global--text--color--regular: var(--rs-color-ink);
   --pf-t--global--text--color--subtle: var(--rs-color-muted);
+}
+
+/* Dark color scheme */
+.pf-v6-theme-dark.rs-theme {
+  --rs-color-primary: var(--rs-palette-white);
+  --rs-color-secondary: var(--rs-palette-black);
+  --rs-color-primary-muted: var(--rs-palette-gray-200);
+  --rs-color-charcoal: var(--rs-palette-gray-muted);
+  --rs-color-charcoal-light: var(--rs-palette-gray-muted-light);
+  --rs-color-charcoal-dark: var(--rs-palette-gray-ended);
+  --rs-color-muted: var(--rs-palette-gray-muted);
+  --rs-color-ended: var(--rs-palette-gray-ended);
+  --rs-color-bg: var(--rs-palette-black);
+  --rs-color-surface: var(--rs-palette-black);
+  --rs-color-surface-muted: var(--rs-palette-gray-950);
+  --rs-color-border: var(--rs-palette-gray-border);
+  --rs-color-ink: var(--rs-palette-white);
+  --rs-color-on-primary: var(--rs-palette-black);
+  --rs-color-tint-contrast: var(--rs-palette-white);
+  --rs-color-warn: var(--rs-palette-yellow-warn-vivid);
+  --rs-color-warn-surface: var(
+    --pf-t--global--background--color--highlight--default
+  );
+  --rs-color-warn-accent: var(
+    --pf-t--global--icon--color--status--warning--default
+  );
+  --rs-color-on-warn: var(--rs-palette-black);
+  --rs-color-on-warn-surface: var(--rs-color-ink);
+  --rs-color-urgent-ink: var(--rs-color-ink);
+  --rs-color-overlay-scrim: var(--rs-palette-black);
+  --rs-color-focus-ring: var(--rs-color-primary);
+
+  --pf-t--global--color--brand--default: var(--rs-color-primary);
+  --pf-t--global--color--brand--hover: var(--rs-color-primary-muted);
+  --pf-t--global--color--brand--clicked: var(--rs-color-primary-muted);
+  --pf-t--global--text--color--link--default: var(--rs-color-primary);
+  --pf-t--global--text--color--link--hover: var(--rs-color-primary-muted);
+  --pf-t--global--background--color--primary--default: var(--rs-color-surface);
+  --pf-t--global--background--color--secondary--default: var(--rs-color-bg);
+  --pf-t--global--border--color--default: var(--rs-color-border);
+  --pf-t--global--text--color--regular: var(--rs-color-ink);
+  --pf-t--global--text--color--subtle: var(--rs-color-muted);
+}
+
+/* High contrast — borders over subtle fills (PatternFly handbook) */
+.pf-v6-theme-high-contrast.rs-theme {
+  --rs-shadow: none;
 }

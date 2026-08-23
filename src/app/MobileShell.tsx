@@ -15,6 +15,7 @@ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import {
   faCircleInfo,
   faClipboardList,
+  faChartLine,
   faEarthAmericas,
   faUser,
   faUsers,
@@ -23,6 +24,8 @@ import { ROLE_HOME, ROLE_VIEW_LABELS, useApp, type RoleView } from '@/app/AppCon
 import { appBuildLabel } from '@/app/appBuild';
 import { stripDemoPrefix, withDemoPrefix, isDemoPath } from '@/app/demoPaths';
 import { WhistleIcon } from '@/ui/WhistleIcon';
+import { ThemeToggle } from '@/ui/ThemeToggle';
+import { BrandLogo } from '@/ui/BrandLogo';
 import { UpdatePrompt } from '@/pwa/UpdatePrompt';
 import './shell.css';
 
@@ -50,7 +53,11 @@ function formatHeaderClock(now: Date, timeZone?: string): string {
   return `${date} · ${time}`;
 }
 
-function navForRole(roleView: RoleView, demo: boolean): NavItem[] {
+function navForRole(
+  roleView: RoleView,
+  demo: boolean,
+  hasInsightsAccess: boolean,
+): NavItem[] {
   const prefix = (path: string) => (demo ? withDemoPrefix(path) : path);
   const active = (base: string) => (p: string) =>
     stripDemoPrefix(p).startsWith(base);
@@ -82,6 +89,18 @@ function navForRole(roleView: RoleView, demo: boolean): NavItem[] {
     ),
     isActive: active('/global'),
   };
+  const insights: NavItem = {
+    to: prefix('/insights'),
+    label: 'Insights',
+    icon: (
+      <FontAwesomeIcon
+        icon={faChartLine}
+        className={navIconClass}
+        aria-hidden
+      />
+    ),
+    isActive: (p) => stripDemoPrefix(p).startsWith('/insights'),
+  };
   const profile: NavItem = {
     to: prefix('/profile'),
     label: 'Profile',
@@ -91,8 +110,21 @@ function navForRole(roleView: RoleView, demo: boolean): NavItem[] {
     isActive: active('/profile'),
   };
 
-  if (roleView === 'scheduler') {
+  const withInsights = (items: NavItem[]): NavItem[] => {
+    if (!hasInsightsAccess) return items;
+    const leagueIdx = items.findIndex((i) =>
+      stripDemoPrefix(i.to).startsWith('/global'),
+    );
+    if (leagueIdx < 0) return [...items, insights];
     return [
+      ...items.slice(0, leagueIdx + 1),
+      insights,
+      ...items.slice(leagueIdx + 1),
+    ];
+  };
+
+  if (roleView === 'scheduler') {
+    return withInsights([
       about,
       {
         to: prefix('/scheduler'),
@@ -108,11 +140,11 @@ function navForRole(roleView: RoleView, demo: boolean): NavItem[] {
       },
       global,
       profile,
-    ];
+    ]);
   }
 
   if (roleView === 'teamAdmin') {
-    return [
+    return withInsights([
       about,
       {
         to: prefix('/team-admin'),
@@ -131,14 +163,14 @@ function navForRole(roleView: RoleView, demo: boolean): NavItem[] {
       },
       global,
       profile,
-    ];
+    ]);
   }
 
   if (roleView === 'fan') {
-    return [about, global, profile];
+    return withInsights([about, global, profile]);
   }
 
-  return [
+  return withInsights([
     about,
     {
       to: prefix('/referee'),
@@ -148,7 +180,7 @@ function navForRole(roleView: RoleView, demo: boolean): NavItem[] {
     },
     global,
     profile,
-  ];
+  ]);
 }
 
 export function MobileShell() {
@@ -161,13 +193,18 @@ export function MobileShell() {
     availableLenses,
     roleView,
     setRoleView,
+    hasInsightsAccess,
     state,
   } = useApp();
   const navigate = useNavigate();
   const location = useLocation();
   const [now, setNow] = useState(() => new Date());
   const tz = state.org.timezone || undefined;
-  const bottomNav = navForRole(roleView, isDemoShowcase);
+  const bottomNav = navForRole(
+    roleView,
+    isDemoShowcase,
+    hasInsightsAccess,
+  );
   const showChrome = Boolean(currentUser) && location.pathname !== '/login';
   const inDemoTree = isDemoPath(location.pathname);
 
@@ -196,15 +233,9 @@ export function MobileShell() {
               <MastheadBrand className="rs-masthead__brand">
                 <span className="rs-brand-block">
                   <span className="rs-brand-row">
-                    <img
-                      className="rs-brand-logo"
-                      src="/matchReadyLogo.png"
-                      alt=""
-                      width={32}
-                      height={32}
-                      decoding="async"
-                    />
+                    <BrandLogo width={32} height={32} />
                     <span className="rs-brand">MatchReadyTX</span>
+                    <ThemeToggle />
                     {inDemoTree && (
                       <span
                         className="rs-demo-badge"

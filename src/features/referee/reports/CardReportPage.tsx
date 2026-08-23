@@ -24,6 +24,7 @@ import {
 } from '@/domain/reports';
 import { assignmentForUser } from '@/domain/types';
 import { CardReportViewBody } from '@/features/referee/reports/MatchReportViewPage';
+import { persistSubmittedCardReport } from '@/services/reportsLive';
 import { IconDateInput } from '@/ui/IconDateInput';
 
 type WizardStep = 'identity' | 'cards' | 'done';
@@ -42,7 +43,7 @@ function emptyCard(homeId: string, homeName: string): CardIncident {
 
 export function CardReportPage() {
   const { matchId = '' } = useParams();
-  const { currentUser, state, store } = useApp();
+  const { currentUser, state, store, dataMode } = useApp();
   const navigate = useNavigate();
 
   const match = state.matches.find((m) => m.id === matchId);
@@ -238,7 +239,7 @@ export function CardReportPage() {
     setStep('cards');
   };
 
-  const submit = () => {
+  const submit = async () => {
     const valid = cards.filter(
       (c) => c.playerName.trim() && c.reason.trim() && c.color,
     );
@@ -257,18 +258,30 @@ export function CardReportPage() {
       .map((c) => c.additionalInfoPrivate)
       .filter((t): t is string => Boolean(t))
       .join('\n\n');
-    store.submitCardReport({
-      matchId: match.id,
-      officialId: currentUser.uid,
-      competitionUnion,
-      officialName: officialName.trim(),
-      officialEmail: officialEmail.trim(),
-      officialPhone: officialPhone.trim(),
-      matchDate,
-      cards: cleaned,
-      additionalInfoPrivate: joinedPrivate || undefined,
-    });
-    setStep('done');
+    setError(null);
+    try {
+      const input = {
+        matchId: match.id,
+        officialId: currentUser.uid,
+        competitionUnion,
+        officialName: officialName.trim(),
+        officialEmail: officialEmail.trim(),
+        officialPhone: officialPhone.trim(),
+        matchDate,
+        cards: cleaned,
+        additionalInfoPrivate: joinedPrivate || undefined,
+      };
+      if (dataMode === 'live') {
+        await persistSubmittedCardReport(input);
+      } else {
+        store.submitCardReport(input);
+      }
+      setStep('done');
+    } catch (err) {
+      setError(
+        err instanceof Error ? err.message : 'Could not save card report.',
+      );
+    }
   };
 
   return (

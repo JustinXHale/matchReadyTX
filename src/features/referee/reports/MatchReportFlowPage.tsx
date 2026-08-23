@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import {
   Button,
@@ -33,13 +33,17 @@ import {
   CrewAttendanceFields,
   formatCrewAttendanceNote,
 } from '@/features/referee/reports/CrewAttendanceFields';
+import {
+  persistSubmittedMatchReport,
+  ensureMatchReportReady,
+} from '@/services/reportsLive';
 import { MatchListRow } from '@/ui/MatchListRow';
 
 type Step = 'chooser' | 'form' | 'done';
 
 export function MatchReportFlowPage() {
   const { matchId = '' } = useParams();
-  const { currentUser, state, store } = useApp();
+  const { currentUser, state, store, dataMode } = useApp();
   const navigate = useNavigate();
 
   const match = state.matches.find((m) => m.id === matchId);
@@ -98,6 +102,14 @@ export function MatchReportFlowPage() {
     () => (match ? crewForAttendance(match) : []),
   );
   const [crewAbsenceNote, setCrewAbsenceNote] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+
+  useEffect(() => {
+    if (dataMode !== 'live' || !currentUser || !matchId) return;
+    void ensureMatchReportReady(matchId, currentUser.uid).catch((err) =>
+      console.error('ensureMatchReportReady failed', err),
+    );
+  }, [dataMode, currentUser?.uid, matchId]);
   const [crewIssuesNote, setCrewIssuesNote] = useState('');
   const [stillComfortable, setStillComfortable] = useState<
     ArReportPayload['stillComfortable']
@@ -195,89 +207,122 @@ export function MatchReportFlowPage() {
     setError(null);
   };
 
-  const submitMoPayload = (payload: MoReportPayload, kind: ReportFormKind) => {
+  const submitMoPayload = async (
+    payload: MoReportPayload,
+    kind: ReportFormKind,
+  ) => {
     if (!report) return;
-    store.submitMatchReport(report.id, kind, payload);
-    const { yellow, red } = totalCardsFromMoPayload(payload);
-    const total = yellow + red;
-    setDoneCards(total);
-    if (total > 0) {
-      navigate(cardReportPath(match.id), {
-        state: backState(MATCH_REPORTS_BACK),
-        replace: true,
-      });
-      return;
-    }
-    setStep('done');
-  };
-
-  const submit = () => {
-    if (!formKind || !report) return;
-    setError(null);
-
-    if (formKind === 'ar_basic') {
-      if (!stillComfortable) {
-        setError(
-          'Please answer whether you still feel comfortable at this level.',
-        );
+    setSubmitting(true);
+    try {
+      if (dataMode === 'live') {
+        await persistSubmittedMatchReport(report.id, kind, payload);
+      } else {
+        store.submitMatchReport(report.id, kind, payload);
+      }
+      const { yellow, red } = totalCardsFromMoPayload(payload);
+      const total = yellow + red;
+      setDoneCards(total);
+      if (total > 0) {
+        navigate(cardReportPath(match.id), {
+          state: backState(MATCH_REPORTS_BACK),
+          replace: true,
+        });
         return;
       }
-      store.submitMatchReport(report.id, 'ar_basic', {
-        stillComfortable,
-        keyIncidents: arIncidents.trim() || undefined,
-        note: arNote.trim() || undefined,
-      });
       setStep('done');
-      setDoneCards(0);
-      return;
+    } catch (err) {
+      setError(
+        err instanceof Error ? err.message : 'Could not save match report.',
+      );
+    } finally {
+      setSubmitting(false);
     }
+  };
 
-    if (formKind === 'mo_quick' && quickLocked) {
-      setError('Confirm that the CMO did not attend to use Quick Report.');
-      return;
-    }
+  const submit = async () => {
+    if (!formKind || !report) return;
+    setError(null);
+    setSubmitting(true);
 
-    const home = Number(homePoints);
-    const away = Number(awayPoints);
-    const hy = Number(homeYellow);
-    const hr = Number(homeRed);
-    const ay = Number(awayYellow);
-    const ar = Number(awayRed);
-    if (!Number.isFinite(home) || !Number.isFinite(away)) {
-      setError('Enter home and away points.');
-      return;
-    }
-    if ([hy, hr, ay, ar].some((n) => !Number.isFinite(n) || n < 0)) {
-      setError('Card counts must be zero or greater.');
-      return;
-    }
-    const someoneAbsent = crewAttendance.some((c) => !c.attended);
-    if (someoneAbsent && !crewAbsenceNote.trim()) {
-      setError('Note who did not attend (and anything we should know).');
-      return;
-    }
+    try {
+      if (formKind === 'ar_basic') {
+        if (!stillComfortable) {
+          setError(
+            'Please answer whether you still feel comfortable at this level.',
+          );
+          return;
+        }
+        if (dataMode === 'live') {
+          await persistSubmittedMatchReport(report.id, 'ar_basic', {
+            stillComfortable,
+            keyIncidents: arIncidents.trim() || undefined,
+            note: arNote.trim() || undefined,
+          });
+        } else {
+          store.submitMatchReport(report.id, 'ar_basic', {
+            stillComfortable,
+            keyIncidents: arIncidents.trim() || undefined,
+            note: arNote.trim() || undefined,
+          });
+        }
+        setStep('done');
+        setDoneCards(0);
+        return;
+      }
 
-    submitMoPayload(
-      {
-        homePoints: home,
-        awayPoints: away,
-        homeYellowCards: hy,
-        homeRedCards: hr,
-        awayYellowCards: ay,
-        awayRedCards: ar,
-        yellowCards: hy + ay,
-        redCards: hr + ar,
-        lightFeedback: lightFeedback.trim() || undefined,
-        crewAttendance,
-        crewAbsenceNote: someoneAbsent
-          ? crewAbsenceNote.trim() || undefined
-          : undefined,
-        crewIssuesNote: crewIssuesNote.trim() || undefined,
-        refereeTeamNote: formatCrewAttendanceNote(crewAttendance) || undefined,
-        cmoDidNotAttend: hasCmo && formKind === 'mo_quick' ? true : undefined,
-      },
-      'mo_quick',
-    );
+      if (formKind === 'mo_quick' && quickLocked) {
+        setError('Confirm that the CMO did not attend to use Quick Report.');
+        return;
+      }
+
+      const home = Number(homePoints);
+      const away = Number(awayPoints);
+      const hy = Number(homeYellow);
+      const hr = Number(homeRed);
+      const ay = Number(awayYellow);
+      const ar = Number(awayRed);
+      if (!Number.isFinite(home) || !Number.isFinite(away)) {
+        setError('Enter home and away points.');
+        return;
+      }
+      if ([hy, hr, ay, ar].some((n) => !Number.isFinite(n) || n < 0)) {
+        setError('Card counts must be zero or greater.');
+        return;
+      }
+      const someoneAbsent = crewAttendance.some((c) => !c.attended);
+      if (someoneAbsent && !crewAbsenceNote.trim()) {
+        setError('Note who did not attend (and anything we should know).');
+        return;
+      }
+
+      await submitMoPayload(
+        {
+          homePoints: home,
+          awayPoints: away,
+          homeYellowCards: hy,
+          homeRedCards: hr,
+          awayYellowCards: ay,
+          awayRedCards: ar,
+          yellowCards: hy + ay,
+          redCards: hr + ar,
+          lightFeedback: lightFeedback.trim() || undefined,
+          crewAttendance,
+          crewAbsenceNote: someoneAbsent
+            ? crewAbsenceNote.trim() || undefined
+            : undefined,
+          crewIssuesNote: crewIssuesNote.trim() || undefined,
+          refereeTeamNote: formatCrewAttendanceNote(crewAttendance) || undefined,
+          cmoDidNotAttend: hasCmo && formKind === 'mo_quick' ? true : undefined,
+        },
+        'mo_quick',
+      );
+    } catch (err) {
+      setError(
+        err instanceof Error ? err.message : 'Could not save match report.',
+      );
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   if (step === 'done') {
@@ -572,7 +617,7 @@ export function MatchReportFlowPage() {
           </p>
         )}
 
-        <Button type="submit" variant="primary" isBlock>
+        <Button type="submit" variant="primary" isBlock isLoading={submitting}>
           Submit report
         </Button>
       </Form>

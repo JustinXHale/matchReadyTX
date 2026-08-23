@@ -17,7 +17,9 @@ import { ensureFirebaseUser, loadFirebaseProfile } from '@/services/userProfile'
 import {
   defaultOrgId,
   subscribeCoachFeedback,
+  subscribeCardReports,
   subscribeLiveOrg,
+  subscribeMatchReports,
 } from '@/services/orgData';
 import { subscribeOrgRoster } from '@/services/orgMembers';
 import {
@@ -91,6 +93,9 @@ interface AppContextValue {
   signOut: () => void;
   store: typeof demoStore;
   hasAssignerRole: boolean;
+  hasReportAnalyticsRole: boolean;
+  /** Insights tab + routes — Scheduler (assigner) or delegated reportAnalytics. */
+  hasInsightsAccess: boolean;
   hasOfficialRole: boolean;
   hasTeamAdminRole: boolean;
   /** True when the user has 2+ lenses — masthead switcher is shown. */
@@ -411,13 +416,15 @@ export function AppProvider({ children }: { children: ReactNode }) {
     const me = state.users.find((u) => u.uid === uid);
     if (!me) return;
     const isAssigner = me.roles.includes('assigner');
+    const isGlobal =
+      isAssigner || me.roles.includes('reportAnalytics');
     const canRead =
-      isAssigner || me.roles.includes('teamAdmin');
+      isGlobal || me.roles.includes('teamAdmin');
     if (!canRead) return;
 
     const unsub = subscribeCoachFeedback(
       defaultOrgId(),
-      { isAssigner, teamIds: me.teamIds },
+      { isGlobal, teamIds: me.teamIds },
       (feedback) => {
         if (dataModeRef.current !== 'live') return;
         demoStore.applyLiveCoachFeedback(feedback);
@@ -433,6 +440,53 @@ export function AppProvider({ children }: { children: ReactNode }) {
     state.users
       .find((u) => u.uid === state.currentUserId)
       ?.teamIds.join(','),
+  ]);
+
+  /** Match + card reports — officials see own; assigner / insights see all. */
+  useEffect(() => {
+    if (!isFirebaseConfigured) return;
+    if (dataMode !== 'live') return;
+    const uid = state.currentUserId;
+    if (!uid || uid.startsWith('u_')) return;
+    const me = state.users.find((u) => u.uid === uid);
+    if (!me) return;
+    const isGlobal =
+      me.roles.includes('assigner') || me.roles.includes('reportAnalytics');
+    const canRead =
+      isGlobal ||
+      hasRefereeLensRole(me.roles) ||
+      me.roles.includes('cmo');
+    if (!canRead) return;
+
+    const orgId = defaultOrgId();
+    const unsubMatch = subscribeMatchReports(
+      orgId,
+      { isGlobal, uid },
+      (reports) => {
+        if (dataModeRef.current !== 'live') return;
+        demoStore.applyLiveMatchReports(reports);
+        setState(demoStore.getState());
+      },
+      (err) => console.error('Match reports subscription failed', err),
+    );
+    const unsubCard = subscribeCardReports(
+      orgId,
+      { isGlobal, uid },
+      (reports) => {
+        if (dataModeRef.current !== 'live') return;
+        demoStore.applyLiveCardReports(reports);
+        setState(demoStore.getState());
+      },
+      (err) => console.error('Card reports subscription failed', err),
+    );
+    return () => {
+      unsubMatch();
+      unsubCard();
+    };
+  }, [
+    dataMode,
+    state.currentUserId,
+    state.users.find((u) => u.uid === state.currentUserId)?.roles.join(','),
   ]);
 
   /**
@@ -513,6 +567,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const isDemoShowcase = dataMode === 'demo';
 
   const hasAssignerRole = Boolean(currentUser?.roles.includes('assigner'));
+  const hasReportAnalyticsRole = Boolean(
+    currentUser?.roles.includes('reportAnalytics'),
+  );
+  const hasInsightsAccess = hasAssignerRole || hasReportAnalyticsRole;
   const hasOfficialRole = Boolean(
     currentUser && hasRefereeLensRole(currentUser.roles),
   );
@@ -566,6 +624,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
       signOut,
       store: demoStore,
       hasAssignerRole,
+      hasReportAnalyticsRole,
+      hasInsightsAccess,
       hasOfficialRole,
       hasTeamAdminRole,
       canSwitchRoleView,
@@ -597,6 +657,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
       signInAs,
       signOut,
       hasAssignerRole,
+      hasReportAnalyticsRole,
+      hasInsightsAccess,
       hasOfficialRole,
       hasTeamAdminRole,
       canSwitchRoleView,

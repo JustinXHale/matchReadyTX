@@ -15,6 +15,7 @@ export default defineConfig({
       includeAssets: [
         'icon.svg',
         'matchReadyLogo.png',
+        'matchReadyLogoWHITE.png',
         'pwa-192.png',
         'pwa-512.png',
         'pwa-512-maskable.png',

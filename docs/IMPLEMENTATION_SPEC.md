@@ -50,7 +50,7 @@ orgs/{orgId}/members/{uid}
   joinedAt?
 
 orgs/{orgId}/teams/{teamId}
-  name, contactEmails[], contactPhones[]
+  name, contactEmails[], contactPhones[], contactPeople[] { name?, email, phone? }
 
 orgs/{orgId}/matches/{matchId}
   sheetRowKey, status, kickoffAt, venueName, venueAddress,
@@ -97,6 +97,21 @@ orgs/{orgId}/coachFeedback/{feedbackId}   // id = matchId_reportingTeamId
   // One doc per match × reporting side (home and away each may submit).
   // Officials never read. Scheduler inbox shows submitted only.
 
+orgs/{orgId}/matchReports/{reportId}   // id = matchReportDocId(matchId, officialId, slot)
+  matchId, officialId, slot: mo|ar1|ar2|cmo, formKind?,
+  status: pending|submitted, dueAt, kickoffAt, submittedAt?,
+  subjectOfficialId? (CMO reports — MO user assessed),
+  moPayload? | arPayload? | cmoPayload? (maps),
+  orgId, createdAt, updatedAt
+  // MO/AR post-match forms + CMO coaching reports (slot cmo).
+  // Pending rows lazy-created when filer opens flow; not bulk-synced.
+
+orgs/{orgId}/cardReports/{reportId}   // id = cardReportDocId(matchId, officialId)
+  matchId, officialId, cards[], competitionUnion,
+  official contact fields, additionalInfoPrivate?,
+  status: pending|submitted, submittedAt?, orgId, createdAt, updatedAt
+  // MO card incidents — created on submit (no pending doc).
+
 users/{uid}
   firstName, lastName, displayName (derived), email, phone,
   smsOptIn (dormant; always false — no SMS product),
@@ -104,7 +119,7 @@ users/{uid}
   homeAddress (composed), homeLat?, homeLng?,
   birthday?, refereeLevel?, assessedLevel?, refereeingSince?,
   jerseySize?, shortsSize?, photoUrl?,
-  profileComplete, roles: assigner|teamAdmin|official|cmo|fan,
+  profileComplete, roles: assigner|teamAdmin|official|cmo|fan|reportAnalytics,
   fanTeamIds?: string[],
   fanTeamOther?: string
 
@@ -133,7 +148,10 @@ mail/{mailId}   // outbound queue — Admin SDK only; see docs/EMAIL.md
 - Team admins: read matches for their teams; write confirmations/proposals for those matches; **cannot** read crew `userId`/PII until match status ≥ `mo_confirmed` (or field `crewVisibleToTeams`).
 - Officials: read own assignments + open requestable matches (facts + economics); write own confirm/availability/requests.
 - Assigner: full org read/write for scheduling.
-- **Coach feedback** (`coachFeedback`): assigner reads all; Team Admins read/update when `reportingTeamId` is in their `teamIds` (club-owned, one doc per match×side). **Officials never read**. Create/update binds match facts via `get(matches/…)` (home/away, kickoff, crew-visible status) and requires doc id `matchId_reportingTeamId`.
+- **Coach feedback** (`coachFeedback`): assigner and `reportAnalytics` read all; Team Admins read/update when `reportingTeamId` is in their `teamIds` (club-owned, one doc per match×side). **Officials never read**. Create/update binds match facts via `get(matches/…)` (home/away, kickoff, crew-visible status) and requires doc id `matchId_reportingTeamId`.
+- **Match reports** (`matchReports`): filer (`officialId`) read/write own; assigner and `reportAnalytics` read all; MO may read CMO reports where `subjectOfficialId == auth.uid`. Pending create + submit with shape validation; assigner delete.
+- **Card reports** (`cardReports`): filer MO read/write own after kickoff; assigner and `reportAnalytics` read all; assigner delete.
+- **`reportAnalytics` role:** Scheduler grants on member profile only (not self-assignable, not in onboarding). Enables Insights bottom-nav tab and global read of coach feedback + reports.
 
 ---
 
@@ -163,10 +181,14 @@ mail/{mailId}   // outbound queue — Admin SDK only; see docs/EMAIL.md
 | `/scheduler/schedule` | All-org match browse |
 | `/scheduler/feedback` | Coach feedback inbox (assigner-only) |
 | `/scheduler/feedback/:id` | Feedback detail |
+| `/insights` | Insights overview (reportAnalytics) — pyramid + global stats |
+| `/insights/coach-feedback` | All submitted coach feedback |
+| `/insights/coach-feedback/:id` | Feedback detail (read-only) |
+| `/insights/cmo-reports` | Submitted CMO coaching reports |
 | `/scheduler/org` | Sheet link/sync, CSV, release, fees |
 | `/matches/:id` | Canonical match detail |
 
-**Bottom nav (by lens):** About · (Referee/CMO \| Team Admin \| Scheduler home) · Members · Global · Profile  
+**Bottom nav (by lens):** About · (Referee/CMO \| Team Admin \| Scheduler home) · Members · Global · **Insights** (when `reportAnalytics`) · Profile  
 
 **Referee/CMO top tabs:** Availability · Appointments · Request · Reports.  
 

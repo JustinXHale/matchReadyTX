@@ -14,6 +14,7 @@ import {
 } from './crewDefaults';
 import {
   competitionForGender,
+  contactMatchKeys,
   genderFromCompetitionName,
   lookupLocation,
   normalizeGender,
@@ -23,6 +24,8 @@ import {
   rowToKickoffIso,
   sanitizeMatchId,
   slugTeamId,
+  type ContactRow,
+  type LocationRow,
 } from './sheetParse';
 
 export type SyncSheetResult = {
@@ -117,7 +120,78 @@ type TeamShape = {
   address?: string;
   contactEmails: Set<string>;
   contactPhones: Set<string>;
+  contactPeople: Map<string, { name?: string; phone?: string }>;
 };
+
+function attachContact(team: TeamShape, c: ContactRow) {
+  team.contactEmails.add(c.email);
+  if (c.phone) team.contactPhones.add(c.phone);
+  const prev = team.contactPeople.get(c.email);
+  team.contactPeople.set(c.email, {
+    name: c.name?.trim() || prev?.name,
+    phone: c.phone || prev?.phone,
+  });
+}
+
+function addContactIndexKey(
+  index: Map<string, string[]>,
+  raw: string | undefined,
+  id: string,
+) {
+  for (const key of contactMatchKeys(raw ?? '')) {
+    const list = index.get(key) ?? [];
+    if (!list.includes(id)) list.push(id);
+    index.set(key, list);
+  }
+}
+
+function buildContactTeamIndex(
+  teamsById: Map<string, TeamShape>,
+  locations: LocationRow[],
+): Map<string, string[]> {
+  const index = new Map<string, string[]>();
+  for (const team of teamsById.values()) {
+    addContactIndexKey(index, team.name, team.id);
+    addContactIndexKey(index, team.abbreviation, team.id);
+  }
+  for (const loc of locations) {
+    const locAbbr = (loc.abbreviation ?? '').trim().toUpperCase();
+    const locComp = (loc.competition ?? '').trim().toLowerCase();
+    for (const team of teamsById.values()) {
+      const teamAbbr = (team.abbreviation ?? '').trim().toUpperCase();
+      const teamComp = (team.competition ?? '').trim().toLowerCase();
+      const abbrMatch = Boolean(locAbbr && teamAbbr && locAbbr === teamAbbr);
+      const sameComp =
+        !locComp || !teamComp || locComp === teamComp;
+      if (abbrMatch && sameComp) {
+        addContactIndexKey(index, loc.teamName, team.id);
+        addContactIndexKey(index, loc.abbreviation, team.id);
+      }
+    }
+  }
+  return index;
+}
+
+function teamIdsForContact(
+  index: Map<string, string[]>,
+  teamsById: Map<string, TeamShape>,
+  contact: ContactRow,
+): string[] {
+  const ids = new Set<string>();
+  for (const key of contactMatchKeys(contact.team_name)) {
+    for (const id of index.get(key) ?? []) ids.add(id);
+  }
+  let list = [...ids];
+  const conf = (contact.conference ?? '').trim().toLowerCase();
+  if (list.length > 1 && conf) {
+    const narrowed = list.filter((id) => {
+      const t = teamsById.get(id);
+      return (t?.competition ?? '').trim().toLowerCase() === conf;
+    });
+    if (narrowed.length) list = narrowed;
+  }
+  return list;
+}
 
 function genderForRow(row: { competition?: string; gender?: string }): 'men' | 'women' {
   if (row.gender?.trim()) return normalizeGender(row.gender);
@@ -237,6 +311,7 @@ export async function runSheetSync(opts: {
       gender: extra?.gender,
       contactEmails: new Set<string>(),
       contactPhones: new Set<string>(),
+      contactPeople: new Map(),
     };
     teamsById.set(id, next);
     return next;
@@ -252,38 +327,6 @@ export async function runSheetSync(opts: {
       });
     }
   }
-  const teamIdsByName = new Map<string, string[]>();
-  for (const team of teamsById.values()) {
-    const key = normNameKey(team.name);
-    const ids = teamIdsByName.get(key) ?? [];
-    ids.push(team.id);
-    teamIdsByName.set(key, ids);
-  }
-  for (const c of contacts) {
-    const key = normNameKey(c.team_name);
-    const ids = teamIdsByName.get(key) ?? [];
-    if (ids.length === 1) {
-      const team = teamsById.get(ids[0]!);
-      if (team) {
-        team.contactEmails.add(c.email);
-        if (c.phone) team.contactPhones.add(c.phone);
-      }
-      continue;
-    }
-    if (ids.length === 0) {
-      const id = slugTeamId(c.team_name);
-      const team = getOrCreateTeam(id, c.team_name);
-      team.contactEmails.add(c.email);
-      if (c.phone) team.contactPhones.add(c.phone);
-      continue;
-    }
-    logger.warn('Skipped ambiguous contact team link', {
-      orgId,
-      teamName: c.team_name,
-      candidateIds: ids,
-    });
-  }
-
   for (const team of teamsById.values()) {
     const loc = lookupLocation(
       locations,
@@ -304,6 +347,31 @@ export async function runSheetSync(opts: {
     if (!team.abbreviation && loc?.abbreviation) {
       team.abbreviation = loc.abbreviation;
     }
+  }
+
+  const contactIndex = buildContactTeamIndex(teamsById, locations);
+  for (const c of contacts) {
+    const ids = teamIdsForContact(contactIndex, teamsById, c);
+    if (ids.length === 1) {
+      const team = teamsById.get(ids[0]!);
+      if (team) attachContact(team, c);
+      continue;
+    }
+    if (ids.length === 0) {
+      const id = slugTeamId(
+        c.conference ? `${c.team_name} ${c.conference}` : c.team_name,
+      );
+      const team = getOrCreateTeam(id, c.team_name, c.conference);
+      attachContact(team, c);
+      addContactIndexKey(contactIndex, c.team_name, team.id);
+      continue;
+    }
+    logger.warn('Skipped ambiguous contact team link', {
+      orgId,
+      teamName: c.team_name,
+      conference: c.conference,
+      candidateIds: ids,
+    });
   }
 
   let batch = db.batch();
@@ -327,6 +395,11 @@ export async function runSheetSync(opts: {
   for (const team of teamsById.values()) {
     const emails = [...team.contactEmails];
     const phones = [...team.contactPhones];
+    const people = [...team.contactPeople.entries()].map(([email, p]) => ({
+      email,
+      ...(p.name ? { name: p.name } : {}),
+      ...(p.phone ? { phone: p.phone } : {}),
+    }));
     setDoc(db.doc(`orgs/${orgId}/teams/${team.id}`), {
       id: team.id,
       name: team.name,
@@ -336,6 +409,7 @@ export async function runSheetSync(opts: {
       ...(team.address ? { address: team.address } : {}),
       contactEmails: emails,
       ...(phones.length ? { contactPhones: phones } : {}),
+      contactPeople: people,
       updatedAt: FieldValue.serverTimestamp(),
     });
     if (batchOps >= 400) await flushBatch();

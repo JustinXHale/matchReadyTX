@@ -1,54 +1,95 @@
 # MatchReadyTX — Visual Theme
 
-**Purpose:** Single reference for color, surfaces, and layout so the PWA stays visually consistent with the **T03 (to3-app)** monochrome system.
+**Purpose:** Single reference for color, surfaces, and layout so the PWA stays visually consistent with the **T03 (to3-app)** monochrome system, implemented through **PatternFly v6 theming** (color scheme + high contrast).
 
 **Source of truth (code):**
-- Tokens: [`src/styles/tokens.css`](../src/styles/tokens.css)
-- Shell / layout: [`src/app/shell.css`](../src/app/shell.css)
-- Mirror: [`.design/theme.md`](../.design/theme.md)
 
-**Last updated:** 2026-07-25  
-**Inspiration:** `/Users/jxhale/Documents/github-repos/to3-app` (Flutter) — adapted for Vite + PatternFly.
+| File | Role |
+|------|------|
+| [`src/styles/tokens.css`](../src/styles/tokens.css) | Palette hex literals, `--rs-color-*` semantics, `--pf-t--global-*` overrides |
+| [`src/styles/theme-high-contrast.css`](../src/styles/theme-high-contrast.css) | Custom `rs-*` chrome aligned with PF high contrast |
+| [`src/app/theme.ts`](../src/app/theme.ts) | Applies `pf-v6-theme-dark` + `pf-v6-theme-high-contrast` on `<html>` |
+| [`src/app/shell.css`](../src/app/shell.css) | Layout and components — **no raw hex** |
+| Mirror: [`.design/theme.md`](../.design/theme.md) |
 
----
+**Last updated:** 2026-08-22  
+**Inspiration:** T03 / to3-app monochrome — adapted for Vite + PatternFly.
 
-## Palette: Monochrome (Black & White)
+**PatternFly references:**
 
-High contrast, low distraction — works in daylight and on phone OLED. Greys carry hierarchy; **one red** is reserved for urgency.
-
-| Role | CSS token | Hex | Usage |
-|------|-----------|-----|--------|
-| Primary (brand) | `--rs-color-primary` | `#000000` | Primary buttons, selected nav, ink, selected filter chips |
-| Secondary (brand) | `--rs-color-secondary` | `#FFFFFF` | Text/icons on primary fills; card surfaces |
-| Primary muted | `--rs-color-primary-muted` | `#1F2937` | Hover depth, dark borders |
-| Charcoal | `--rs-color-charcoal` | `#374151` | Secondary badges, “upcoming / confirmed” status |
-| Muted text | `--rs-color-muted` | `#6B7280` | Meta, unselected nav |
-| Ended / quiet | `--rs-color-ended` | `#9CA3AF` | Cancelled, inactive |
-
-**Do not** use PatternFly default blue as brand. PF brand tokens are remapped in `tokens.css`.
+- [Theming overview](https://www.patternfly.org/foundations-and-styles/theming/#dark-mode)
+- [Dark theme handbook](https://www.patternfly.org/foundations-and-styles/theming/dark-theme-handbook/)
+- [High contrast handbook](https://www.patternfly.org/foundations-and-styles/theming/high-contrast-handbook/)
 
 ---
 
-## Surfaces
+## Theming model
 
-| Token | Hex | Usage |
-|-------|-----|--------|
-| `--rs-color-bg` | `#F9FAFB` | App canvas |
-| `--rs-color-surface` | `#FFFFFF` | Cards, masthead, bottom nav |
-| `--rs-color-surface-muted` | `#F3F4F6` | Table headers, inset strips |
-| `--rs-color-border` | `#E5E7EB` | Hairlines, card borders |
+MatchReadyTX uses PatternFly’s layered model:
 
-Cards: **12px** radius, **no elevation**, 1px border.
+| Layer | Class / mechanism | MatchReadyTX |
+|-------|-------------------|--------------|
+| **Color scheme** | `pf-v6-theme-dark` on `<html>` | Light (default) or dark — sun/moon toggle, `localStorage` key `rs-theme` |
+| **High contrast** | `pf-v6-theme-high-contrast` on `<html>` | **Always on** — monochrome product targets WCAG AAA-style clarity (7:1 text, 4.5:1 UI) |
+| **Brand** | `--pf-t--global--*` overrides in `tokens.css` | Black/white brand, not PatternFly blue |
+
+`initTheme()` and `persistTheme()` live in [`src/app/theme.ts`](../src/app/theme.ts). `watchSystemContrastPreferences()` re-applies when OS `forced-colors` or `prefers-contrast: more` changes.
 
 ---
 
-## Status (semantic — do not repurpose)
+## Token layers (no hex in components)
 
-| Token | Hex | Usage |
-|-------|-----|--------|
-| `--rs-color-urgent` | `#DC2626` | Needs action, T-72, LIVE-style urgency, destructive |
-| Charcoal pills | — | Default / confirmed / draft hierarchy |
-| Ended grey | `#9CA3AF` | Cancelled / postponed |
+1. **`--rs-palette-*`** — literal colors **only in `tokens.css`**
+2. **`--rs-color-*`** — semantic tokens used in `shell.css` and features
+3. **`--pf-t--global--*`** — PatternFly globals remapped for monochrome; PF components consume these automatically
+
+**Rule:** Do not use `#…` or color names in `shell.css` or feature CSS. Add a palette + semantic pair in `tokens.css` instead.
+
+---
+
+## Palette (light scheme reference)
+
+High contrast, low distraction. Greys carry hierarchy; red is reserved for urgency.
+
+| Role | Semantic token | Palette (light) |
+|------|----------------|-----------------|
+| Primary (brand) | `--rs-color-primary` | `--rs-palette-black` |
+| On primary | `--rs-color-on-primary` | `--rs-palette-white` |
+| Canvas | `--rs-color-bg` | `--rs-palette-gray-50` |
+| Surface | `--rs-color-surface` | `--rs-palette-white` |
+| Border | `--rs-color-border` | `--rs-palette-gray-200` |
+| Ink (body text) | `--rs-color-ink` | `--rs-palette-black` |
+| Muted meta | `--rs-color-muted` | `--rs-palette-gray-600` |
+| Urgent | `--rs-color-urgent` | `--rs-palette-red-urgent` |
+| On urgent (solid red) | `--rs-color-on-urgent` | `--rs-palette-white` |
+| Urgent label ink | `--rs-color-urgent-ink` | red in light, white in dark |
+
+Dark scheme inverts via `.pf-v6-theme-dark.rs-theme` in `tokens.css` (black canvas, white ink).
+
+---
+
+## High contrast (custom chrome)
+
+PatternFly components pick up high contrast when `pf-v6-theme-high-contrast` is on `<html>`. Custom `rs-*` surfaces get explicit borders in `theme-high-contrast.css` (cards, list rows, FAB, filter chips, urgent left accents) using:
+
+- `--pf-t--global--border--color--default`
+- `--pf-t--global--border--width--regular` / `--strong` / `--extra-strong`
+- Plain-action hover border widths where applicable
+
+Shadows are disabled (`--rs-shadow: none`); borders replace elevation.
+
+---
+
+## Status semantics
+
+| Token | Usage |
+|-------|--------|
+| `--rs-color-urgent` | Needs action, due counts, destructive accent |
+| `--rs-color-on-urgent` | Text on solid red (badges, dark pills) |
+| `--rs-color-urgent-ink` | Urgency labels on tinted/dark surfaces (not red-on-black) |
+| `--rs-color-ok` / `--rs-color-warn` | Success / assigned (tinted with `--rs-color-surface`) |
+
+Status tints use `color-mix(..., var(--rs-color-surface))` so light and dark schemes stay correct.
 
 ---
 
@@ -56,62 +97,25 @@ Cards: **12px** radius, **no elevation**, 1px border.
 
 | Pattern | Spec |
 |---------|------|
-| Page pad | `--rs-page-pad` = `0.75rem` (12px) — T03 density between PF sm/md |
-| Section stack | `--rs-space-md` (`--pf-t--global--spacer--md`, 16px) via `.rs-stack` |
-| Card padding / field gaps | `--rs-space-md` via `.rs-detail-card`, `.rs-form-stack`, Form `GridGap` |
-| Control / action row gaps | `--rs-space-sm` (`--pf-t--global--spacer--sm`, 8px) |
-| Micro (chips, calendar cells) | `--rs-space-xs` (`--pf-t--global--spacer--xs`, 4px) |
+| Page pad | `--rs-page-pad` = `0.75rem` |
+| Section stack | `--rs-space-md` via `.rs-stack` |
 | Bottom clearance | `--rs-bottom-clearance` above fixed nav |
-| Tap targets | Prefer ≥ `--rs-tap-min` (PF 2xl / 48px) |
-| Filters | Full-width search + **horizontal chip scroller**; selected chip = black fill / white label |
-| List vs grid | Cards (compact tiles) or schedule table; list-row density for table |
+| Tap targets | ≥ `--rs-tap-min` (48px) |
 
-**Spacing rule:** Use `--rs-space-*` / PatternFly `--pf-t--global--spacer--*` for layout gaps. Do not hard-code `8px` / `12px` / `16px` in new CSS. FormGroups outside a PatternFly `Form` belong in `.rs-form-stack` or `.rs-detail-card` so fields never sit flush against buttons.
+Use `--rs-space-*` / `--pf-t--global--spacer--*` — not raw px in layout CSS.
 
 ---
 
-## Implementation rules
+## Images & dark scheme
 
-1. Prefer `--rs-color-*` / `--rs-space-*` / layout tokens — avoid raw hex or raw px spacing outside `tokens.css`.
-2. PatternFly components are allowed for structure; **skin** them with tokens (already overridden for brand). Prefer PF spacer tokens (`--pf-t--global--spacer--*`) for gaps.
-3. Body text on white = pure black (`--rs-color-ink`).
-4. Primary actions = black fill / white label; secondary = outlined black.
-5. Test contrast on light surfaces (dark mode optional later).
+- **Logo:** `BrandLogo` swaps `matchReadyLogo.png` / `matchReadyLogoWHITE.png` (PatternFly image handbook pattern).
+- **Referee level chart:** single PNG + brightness tweak in dark scheme; consider dual asset later.
 
 ---
 
 ## Component conventions
 
-### Status / level chips
-Use `.rs-label-row` + `.rs-pill` (not PatternFly `Label`, not full-width).
-Variants: `.rs-pill--ink` (selected/primary), `.rs-pill--urgent` (needs action), `.rs-pill--quiet` (ended).
-
-### Primary button
-Black background, white text (PF `primary` remapped).
-
-### Filter chips
-`.rs-filter-chip` / `.rs-filter-chip--selected` — pill, horizontal scroll.
-
-### Sign-in
-Full-bleed auth composition (`.rs-signin`): brand hero, Google/Apple, optional **Try demo** → `/demo` when `VITE_DEMO_MODE` is enabled. No masthead on the login page. Showcase uses a Demo badge and optional Demo \| Live control when a Firebase session exists.
-
-### Masthead clock
-Under the brand: org-local **date · time** (`.rs-brand-date`). Quiet muted text; do not compete with the title.
-
-### Due / count badges
-`.rs-nav-badge` — urgent red pill for Appointments pending-accept and Reports due counts on referee tabs. Keep tiny; do not use for decorative counts.
-
-### Match list cards
-`.rs-list-row` — date stack (month + ordinal day), ink gender/level chips, team names with scores (or `–`). Trailing crew / raise-hand columns use `split="action"` or `split="crew"`.
-
-### Dropdowns / filters
-Use PatternFly **`FormSelect` + `FormSelectOption`** (not raw `<select class="pf-v6-c-form-control">`). The `pf-v6-c-form-control` class belongs on the PF wrapper so padding uses **control spacer tokens** (`--pf-t--global--spacer--control--*`). Do not override select padding for “centering.”
-
-### Empty states
-Icon or quiet title + one sentence + optional single CTA (e.g. Release drafts).
-
-### Detail back control
-`.rs-detail__back` — full-width underline control matching Request sub-tabs; label is **← Back to {destination}** when location state provides `backNav`.
+See prior sections in this doc for pills, filter chips, sign-in, masthead, match list rows, etc. Primary actions = `--rs-color-primary` fill + `--rs-color-on-primary` label.
 
 ---
 
@@ -121,7 +125,5 @@ Icon or quiet title + one sentence + optional single CTA (e.g. Release drafts).
 |---------------|--------------------|
 | `AppColors.primary` | `--rs-color-primary` |
 | `AppColors.statusLive` | `--rs-color-urgent` |
-| `Wrap` 2-column grid | `.rs-card-grid` |
-| Horizontal `FilterChip` row | `.rs-filter-chips` |
-| Bottom `NavigationBar` | `.rs-bottom-nav` |
-| Roboto | `--rs-font-family` (Roboto + system fallbacks) |
+| Bottom nav | `.rs-bottom-nav` |
+| Roboto | `--rs-font-family` |

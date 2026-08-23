@@ -10,7 +10,7 @@ import {
   teamHomeMapsUrl,
   teamsFromSchedule,
   teamAdminsForTeam,
-  teamContactEmails,
+  teamContactPeople,
 } from '@/domain/teams';
 import { readBackNav, backState, type BackNav } from '@/nav/backNav';
 import { UserAvatar } from '@/ui/UserAvatar';
@@ -61,7 +61,7 @@ export function SchedulerTeamDetailPage() {
   );
 
   const contacts = useMemo(
-    () => (team ? teamContactEmails(team) : []),
+    () => (team ? teamContactPeople(team) : []),
     [team],
   );
 
@@ -170,13 +170,15 @@ export function SchedulerTeamDetailPage() {
             Contacts sheet
           </h2>
           <p className="rs-detail-note">
-            Emails from the Contacts tab — auto-link when that person signs up
-            and requests the club.
+            People from the Contacts tab (rows without an email are omitted).
+            Auto-link when that person signs up and requests the club.
           </p>
           <ul className="rs-member-teams">
-            {contacts.map((email) => (
-              <li key={email}>
-                <a href={`mailto:${email}`}>{email}</a>
+            {contacts.map((person) => (
+              <li key={person.email}>
+                {person.name ? `${person.name} · ` : null}
+                <a href={`mailto:${person.email}`}>{person.email}</a>
+                {person.phone ? ` · ${person.phone}` : null}
               </li>
             ))}
           </ul>

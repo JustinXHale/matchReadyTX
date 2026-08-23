@@ -43,6 +43,7 @@ import {
   type MatchReport,
   type MoReportPayload,
   type ReportFormKind,
+  cardReportDocId,
   syncPendingMatchReports,
 } from '@/domain/reports';
 import { matchFromFixtureRequest, newAppMatchId } from '@/domain/fixtureRequests';
@@ -162,6 +163,100 @@ function withHome(
   return syncHomeAddressLine(parts);
 }
 
+/** Extra referees so Insights demo shows a realistic roster density. */
+const INSIGHTS_DEMO_REFEREES: Array<{
+  uid: string;
+  firstName: string;
+  lastName: string;
+  assessedLevel: number;
+  refereeLevel: number;
+  city: string;
+}> = [
+  { uid: 'u_ref3', firstName: 'Jordan', lastName: 'Smith', assessedLevel: 6, refereeLevel: 6, city: 'Austin' },
+  { uid: 'u_ref4', firstName: 'Mia', lastName: 'Chen', assessedLevel: 7, refereeLevel: 7, city: 'Dallas' },
+  { uid: 'u_ref5', firstName: 'Devon', lastName: 'Taylor', assessedLevel: 7, refereeLevel: 7, city: 'Houston' },
+  { uid: 'u_ref6', firstName: 'Sara', lastName: 'Patel', assessedLevel: 8, refereeLevel: 8, city: 'Austin' },
+  { uid: 'u_ref7', firstName: 'Marcus', lastName: 'Webb', assessedLevel: 8, refereeLevel: 8, city: 'Dallas' },
+  { uid: 'u_ref8', firstName: 'Elena', lastName: 'Ruiz', assessedLevel: 9, refereeLevel: 9, city: 'Houston' },
+  { uid: 'u_ref9', firstName: 'Tyler', lastName: 'Brooks', assessedLevel: 9, refereeLevel: 9, city: 'Austin' },
+  { uid: 'u_ref10', firstName: 'Naomi', lastName: 'Park', assessedLevel: 10, refereeLevel: 10, city: 'Dallas' },
+  { uid: 'u_ref11', firstName: 'Chris', lastName: 'Nguyen', assessedLevel: 10, refereeLevel: 10, city: 'Houston' },
+];
+
+/** Demo officials who should not receive a seeded CMO coaching report (Insights “needs review”). */
+const INSIGHTS_DEMO_NO_CMO_OFFICIALS = new Set([
+  'u_ref3',
+  'u_ref4',
+  'u_ref6',
+  'u_ref8',
+  'u_ref9',
+  'u_ref10',
+  'u_ref11',
+]);
+
+function insightsDemoUsers(): UserProfile[] {
+  return INSIGHTS_DEMO_REFEREES.map((r, i) => ({
+    uid: r.uid,
+    firstName: r.firstName,
+    lastName: r.lastName,
+    displayName: `${r.firstName} ${r.lastName}`,
+    email: `${r.firstName.toLowerCase()}.${r.lastName.toLowerCase()}@example.com`,
+    phone: `+1555111${String(2000 + i).slice(-4)}`,
+    smsOptIn: false,
+    ...withHome(`${120 + i * 7} Main St`, r.city, 'TX', `${78700 + i}`),
+    roles: ['official'] as UserProfile['roles'],
+    teamIds: [],
+    profileComplete: true,
+    birthday: '1990-06-15',
+    refereeLevel: r.refereeLevel,
+    assessedLevel: r.assessedLevel,
+    refereeingSince: '2019',
+    jerseySize: 'M',
+    shortsSize: 'M',
+  }));
+}
+
+function insightsDemoRoster(): { userId: string; userName: string }[] {
+  const extra = INSIGHTS_DEMO_REFEREES.map((r) => ({
+    userId: r.uid,
+    userName: `${r.firstName} ${r.lastName}`,
+  }));
+  return [
+    { userId: 'u_ref1', userName: 'Riley Official' },
+    { userId: 'u_ref2', userName: 'Casey Official' },
+    { userId: 'u_assigner', userName: 'Alex Assigner' },
+    ...extra,
+  ];
+}
+
+function buildCrewFromRefs(
+  mo: { userId: string; userName: string },
+  ar1: { userId: string; userName: string },
+  ar2: { userId: string; userName: string },
+  confirmedAt: string,
+): Match['crew'] {
+  const slot = (
+    slotName: CrewSlot,
+    person: { userId: string; userName: string },
+  ): CrewAssignment[] => [
+    {
+      id: newAssignmentId(),
+      slot: slotName,
+      userId: person.userId,
+      userName: person.userName,
+      status: 'confirmed',
+      confirmedAt,
+      history: [],
+    },
+  ];
+  return {
+    mo: slot('mo', mo),
+    ar1: slot('ar1', ar1),
+    ar2: slot('ar2', ar2),
+    no4: [],
+  };
+}
+
 function seedUsers(): UserProfile[] {
   return [
     {
@@ -177,7 +272,7 @@ function seedUsers(): UserProfile[] {
       homeLng: -97.7431,
       // One demo persona covers Scheduler, Referee/CMO, and Team Admin lenses
       // with multiple club sides (1sts + 2nds).
-      roles: ['assigner', 'official', 'teamAdmin'],
+      roles: ['assigner', 'official', 'teamAdmin', 'reportAnalytics'],
       teamIds: ['team_austin', 'team_austin_2nds'],
       profileComplete: true,
       birthday: '1988-04-12',
@@ -261,6 +356,7 @@ function seedUsers(): UserProfile[] {
       jerseySize: 'L',
       shortsSize: 'M',
     },
+    ...insightsDemoUsers(),
     incompleteOnboardingDemoUser(),
   ];
 }
@@ -1125,6 +1221,68 @@ function seedMatches(): Match[] {
     };
   });
 
+  const insightsPairs: Array<{
+    homeTeamId: string;
+    homeTeamName: string;
+    awayTeamId: string;
+    awayTeamName: string;
+  }> = [
+    { homeTeamId: 'team_austin', homeTeamName: 'Austin RFC', awayTeamId: 'team_dallas', awayTeamName: 'Dallas RFC' },
+    { homeTeamId: 'team_dallas', homeTeamName: 'Dallas RFC', awayTeamId: 'team_houston', awayTeamName: 'Houston Athletic' },
+    { homeTeamId: 'team_houston', homeTeamName: 'Houston Athletic', awayTeamId: 'team_austin', awayTeamName: 'Austin RFC' },
+    { homeTeamId: 'team_austin', homeTeamName: 'Austin RFC', awayTeamId: 'team_houston', awayTeamName: 'Houston Athletic' },
+    { homeTeamId: 'team_dallas', homeTeamName: 'Dallas RFC', awayTeamId: 'team_austin', awayTeamName: 'Austin RFC' },
+    { homeTeamId: 'team_houston', homeTeamName: 'Houston Athletic', awayTeamId: 'team_dallas', awayTeamName: 'Dallas RFC' },
+  ];
+  const insightsVenues = [
+    { name: 'Westlake Fields', address: 'Austin, TX', lat: austin.lat, lng: austin.lng },
+    { name: 'Dallas Rugby Grounds', address: 'Dallas, TX', lat: dallas.lat, lng: dallas.lng },
+    { name: 'Memorial Park', address: 'Houston, TX', lat: houston.lat, lng: houston.lng },
+  ];
+  const insightsRoster = insightsDemoRoster();
+  const moPool = insightsRoster.filter(
+    (r) => !INSIGHTS_DEMO_NO_CMO_OFFICIALS.has(r.userId),
+  );
+  for (let i = 0; i < 12; i += 1) {
+    const pair = insightsPairs[i % insightsPairs.length];
+    const venue = insightsVenues[i % insightsVenues.length];
+    const mo = moPool[i % moPool.length];
+    const arPool = insightsRoster.filter((r) => r.userId !== mo.userId);
+    const ar1 = arPool[i % arPool.length];
+    const ar2 = arPool[(i + 1) % arPool.length];
+    const daysAgo = 5 + i * 9;
+    const matchNum = 9 + i;
+    results.push({
+      id: `m_res${String(matchNum).padStart(2, '0')}`,
+      sheetRowKey: `sheet-m_res${String(matchNum).padStart(2, '0')}`,
+      status: 'locked_confirmed',
+      kickoffAt: kickAt(-daysAgo, 11 + (i % 3)),
+      venueName: venue.name,
+      venueAddress: venue.address,
+      venueLat: venue.lat,
+      venueLng: venue.lng,
+      homeTeamId: pair.homeTeamId,
+      awayTeamId: pair.awayTeamId,
+      homeTeamName: pair.homeTeamName,
+      awayTeamName: pair.awayTeamName,
+      competition: 'Club',
+      level: (['D1', 'D2', 'D3'] as const)[i % 3],
+      gender: i % 2 === 0 ? 'men' : 'women',
+      flightProvided: false,
+      housingProvided: false,
+      homeConfirmedAt: released,
+      awayConfirmedAt: released,
+      releasedAt: released,
+      homeScore: 12 + (i % 8) * 3,
+      awayScore: 8 + (i % 6) * 2,
+      crew: buildCrewFromRefs(mo, ar1, ar2, released),
+      cmo:
+        i % 4 === 0
+          ? [{ userId: 'u_ref2', userName: 'Casey Official' }]
+          : undefined,
+    });
+  }
+
   const all: Match[] = [
     ...extras,
     ...appointments,
@@ -1447,13 +1605,90 @@ function seedCoachFeedback(matches: Match[]): CoachFeedback[] {
     );
   }
 
-  // Austin away — draft in progress (partial ratings)
+  // Austin away — submitted (spread across prior months for Insights trend demo)
   if (m02) {
     push(
       base(m02, 'team_austin', {
+        status: 'submitted',
+        daysAgo: 42,
+        submitter: austin,
+        scales: {
+          breakdown: 4,
+          scrum: 4,
+          lineout: 3,
+          safety: 4,
+          communication: 4,
+          professionalism: 4,
+          overall: 4,
+        },
+        areasDoneWell: 'Strong playoff control; good use of captains.',
+        areasToImprove: 'Lineout spacing on Houston throws.',
+      }),
+    );
+  }
+
+  const m03 = byId('m_res03');
+  if (m03) {
+    push(
+      base(m03, 'team_dallas', {
+        status: 'submitted',
+        daysAgo: 72,
+        submitter: dallas,
+        scales: {
+          breakdown: 3,
+          scrum: 4,
+          lineout: 4,
+          safety: 4,
+          communication: 3,
+          professionalism: 4,
+          overall: 3,
+        },
+        areasDoneWell: 'Managed a tight draw without losing control.',
+        areasToImprove: 'Earlier communication at breakdown.',
+      }),
+    );
+  }
+
+  if (m04) {
+    push(
+      base(m04, 'team_houston', {
+        status: 'submitted',
+        daysAgo: 105,
+        submitter: {
+          uid: 'u_houston',
+          name: 'Houston Admin',
+          email: 'houston-admin@example.com',
+          phone: '+15551110004',
+          clubRole: 'Coach',
+        },
+        scales: {
+          breakdown: 4,
+          scrum: 3,
+          lineout: 4,
+          safety: 5,
+          communication: 4,
+          professionalism: 5,
+          overall: 4,
+        },
+        areasDoneWell: 'Excellent player safety standards.',
+        areasToImprove: 'Scrum cadence on wet day.',
+      }),
+    );
+  }
+
+  // Austin away — draft in progress (partial ratings) — recent, not in trend totals
+  if (m02) {
+    push(
+      base(m02, 'team_houston', {
         status: 'draft',
         daysAgo: 1,
-        submitter: austin,
+        submitter: {
+          uid: 'u_houston',
+          name: 'Houston Admin',
+          email: 'houston-admin@example.com',
+          phone: '+15551110004',
+          clubRole: 'Coach',
+        },
         scales: {
           breakdown: 3,
           scrum: 3,
@@ -1489,12 +1724,64 @@ function seedCoachFeedback(matches: Match[]): CoachFeedback[] {
   }
 
   // m_res05 Austin away intentionally unseeded → Needs feedback in Team Admin demo
+
+  const houstonAdmin = {
+    uid: 'u_houston',
+    name: 'Houston Admin',
+    email: 'houston@example.com',
+    phone: '+15551110006',
+    clubRole: 'Coach',
+  };
+
+  const extraInsightMatches = matches.filter((m) => {
+    const num = Number(m.id.replace('m_res', ''));
+    return m.id.startsWith('m_res') && !Number.isNaN(num) && num >= 6;
+  });
+
+  const daysSpread = [
+    4, 8, 12, 17, 23, 31, 39, 47, 56, 67, 79, 91, 14, 21, 28, 36,
+  ];
+  const scaleSets: Partial<
+    Record<CoachFeedbackScaleKey, CoachFeedbackScaleValue>
+  >[] = [
+    { breakdown: 4, scrum: 4, lineout: 4, safety: 4, communication: 4, professionalism: 4, overall: 4 },
+    { breakdown: 3, scrum: 4, lineout: 3, safety: 4, communication: 4, professionalism: 3, overall: 3 },
+    { breakdown: 4, scrum: 3, lineout: 4, safety: 5, communication: 4, professionalism: 4, overall: 4 },
+    { breakdown: 5, scrum: 4, lineout: 4, safety: 4, communication: 5, professionalism: 4, overall: 5 },
+    { breakdown: 3, scrum: 3, lineout: 3, safety: 4, communication: 3, professionalism: 4, overall: 3 },
+    { breakdown: 4, scrum: 4, lineout: 4, safety: 4, communication: 4, professionalism: 5, overall: 4 },
+  ];
+
+  for (let i = 0; i < extraInsightMatches.length; i += 1) {
+    const match = extraInsightMatches[i];
+    const reportingTeamId = match.homeTeamId;
+    const docId = coachFeedbackDocId(match.id, reportingTeamId);
+    if (out.some((f) => f.id === docId)) continue;
+    const submitter =
+      reportingTeamId === 'team_austin'
+        ? austin
+        : reportingTeamId === 'team_dallas'
+          ? dallas
+          : houstonAdmin;
+    push(
+      base(match, reportingTeamId, {
+        status: 'submitted',
+        daysAgo: daysSpread[i % daysSpread.length],
+        submitter,
+        scales: scaleSets[i % scaleSets.length],
+        areasDoneWell: 'Consistent communication with players and coaches.',
+        areasToImprove: 'Continue building pace at the breakdown.',
+      }),
+    );
+  }
+
   return out;
 }
 
 function seedMatchReports(matches: Match[]): MatchReport[] {
   const existing: MatchReport[] = [];
-  const nowIso = new Date().toISOString();
+  const daysAgoIso = (days: number) =>
+    new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString();
 
   // Alex (demo user) submitted MO Performance — viewable under Submitted.
   const alexMo = matches.find(
@@ -1515,7 +1802,7 @@ function seedMatchReports(matches: Match[]): MatchReport[] {
         new Date(alexMo.kickoffAt).getTime() + 90 * 60 * 1000,
       ).toISOString(),
       kickoffAt: alexMo.kickoffAt,
-      submittedAt: nowIso,
+      submittedAt: daysAgoIso(5),
       moPayload: {
         refereeName: 'Alex Assigner',
         matchDate: alexMo.kickoffAt.slice(0, 10),
@@ -1587,7 +1874,7 @@ function seedMatchReports(matches: Match[]): MatchReport[] {
         new Date(rileyMo.kickoffAt).getTime() + 90 * 60 * 1000,
       ).toISOString(),
       kickoffAt: rileyMo.kickoffAt,
-      submittedAt: nowIso,
+      submittedAt: daysAgoIso(18),
       moPayload: {
         homePoints: rileyMo.homeScore ?? 19,
         awayPoints: rileyMo.awayScore ?? 12,
@@ -1622,7 +1909,7 @@ function seedMatchReports(matches: Match[]): MatchReport[] {
         new Date(alexCmo.kickoffAt).getTime() + 48 * 60 * 60 * 1000,
       ).toISOString(),
       kickoffAt: alexCmo.kickoffAt,
-      submittedAt: nowIso,
+      submittedAt: daysAgoIso(8),
       cmoPayload: {
         scales: {
           scrum: 4,
@@ -1669,7 +1956,7 @@ function seedMatchReports(matches: Match[]): MatchReport[] {
         new Date(aboutAlex.kickoffAt).getTime() + 48 * 60 * 60 * 1000,
       ).toISOString(),
       kickoffAt: aboutAlex.kickoffAt,
-      submittedAt: nowIso,
+      submittedAt: daysAgoIso(48),
       cmoPayload: {
         scales: {
           scrum: 3,
@@ -1687,6 +1974,55 @@ function seedMatchReports(matches: Match[]): MatchReport[] {
         overallComment:
           'Solid outing as MO. Keep scanning early at the breakdown.',
         assessedRating: 7,
+      },
+    });
+  }
+
+  const cmoMatchIds = new Set(
+    existing.filter((r) => r.slot === 'cmo').map((r) => r.matchId),
+  );
+  const cmoTargets = matches.filter((m) => {
+    const num = Number(m.id.replace('m_res', ''));
+    return m.id.startsWith('m_res') && !Number.isNaN(num) && num >= 6 && !cmoMatchIds.has(m.id);
+  });
+  const cmoDays = [6, 11, 18, 25, 33, 44, 52, 61, 74, 88, 96, 15, 27, 40];
+  for (let i = 0; i < cmoTargets.length; i += 1) {
+    const match = cmoTargets[i];
+    const mo = crewPeople(match.crew.mo).find((a) => a.userId);
+    if (!mo?.userId) continue;
+    if (INSIGHTS_DEMO_NO_CMO_OFFICIALS.has(mo.userId)) continue;
+    const kickoff = match.kickoffAt;
+    existing.push({
+      id: `mr_insights_cmo_${match.id}`,
+      matchId: match.id,
+      officialId: 'u_ref2',
+      slot: 'cmo',
+      subjectOfficialId: mo.userId,
+      formKind: 'cmo',
+      status: 'submitted',
+      dueAt: new Date(
+        new Date(kickoff).getTime() + 90 * 60 * 1000,
+      ).toISOString(),
+      deadlineAt: new Date(
+        new Date(kickoff).getTime() + 48 * 60 * 60 * 1000,
+      ).toISOString(),
+      kickoffAt: kickoff,
+      submittedAt: daysAgoIso(cmoDays[i % cmoDays.length]),
+      cmoPayload: {
+        scales: {
+          scrum: 4,
+          breakdown: i % 2 === 0 ? 3 : 4,
+          gameControl: 4,
+          communication: 4,
+          positioning: i % 2 === 0 ? 3 : 4,
+          lineout: 4,
+          bigDecisions: 4,
+        },
+        comments: {
+          communication: 'Clear with captains throughout the match.',
+        },
+        overallComment: 'Solid outing — continue scanning early at the breakdown.',
+        assessedRating: 6 + (i % 4),
       },
     });
   }
@@ -1947,8 +2283,46 @@ class DemoStore {
         s.matches,
         s.matchReports,
         now,
-        () => id('mr'),
+        (_match, _assignee) => id('mr'),
       ),
+    }));
+  }
+
+  applyLiveMatchReports(matchReports: MatchReport[]): void {
+    this.set((s) => ({
+      ...s,
+      matchReports: syncPendingMatchReports(s.matches, matchReports, Date.now()),
+    }));
+  }
+
+  applyLiveCardReports(cardReports: CardReport[]): void {
+    this.set((s) => ({ ...s, cardReports }));
+  }
+
+  upsertMatchReportLocal(report: MatchReport): void {
+    this.set((s) => {
+      const rest = s.matchReports.filter((r) => r.id !== report.id);
+      return {
+        ...s,
+        matchReports: syncPendingMatchReports(
+          s.matches,
+          [...rest, report],
+          Date.now(),
+        ),
+      };
+    });
+  }
+
+  upsertCardReportLocal(report: CardReport): void {
+    this.set((s) => ({
+      ...s,
+      cardReports: [
+        ...s.cardReports.filter(
+          (c) =>
+            c.matchId !== report.matchId || c.officialId !== report.officialId,
+        ),
+        report,
+      ],
     }));
   }
 
@@ -2008,7 +2382,11 @@ class DemoStore {
     });
   }
 
-  submitCmoReport(reportId: string, payload: CmoReportPayload): void {
+  submitCmoReport(
+    reportId: string,
+    payload: CmoReportPayload,
+    subjectOfficialId?: string,
+  ): void {
     const report = this.state.matchReports.find((r) => r.id === reportId);
     if (!report || report.slot !== 'cmo' || report.status === 'submitted') {
       return;
@@ -2024,6 +2402,7 @@ class DemoStore {
               status: 'submitted' as const,
               submittedAt: nowIso,
               cmoPayload: payload,
+              ...(subjectOfficialId ? { subjectOfficialId } : {}),
             }
           : r,
       ),
@@ -2037,7 +2416,7 @@ class DemoStore {
   ): CardReport {
     const nowIso = new Date().toISOString();
     const report: CardReport = {
-      id: input.id ?? id('card'),
+      id: input.id ?? cardReportDocId(input.matchId, input.officialId),
       matchId: input.matchId,
       officialId: input.officialId,
       status: 'submitted',
@@ -2206,11 +2585,11 @@ class DemoStore {
         snap.gameRequests !== undefined ? snap.gameRequests : s.requests,
       fixtureRequests: snap.fixtureRequests ?? [],
       teamLinkRequests: snap.teamLinkRequests ?? [],
-      // Cleared until subscribeCoachFeedback fills (role-scoped).
-      coachFeedback: [],
-      matchReports: [],
-      cardReports: [],
-      coachingReports: [],
+      // coachFeedback / matchReports / cardReports filled by live subscriptions.
+      coachFeedback: s.coachFeedback,
+      matchReports: s.matchReports,
+      cardReports: s.cardReports,
+      coachingReports: s.coachingReports,
       officialAlerts: [],
       notifications: [],
     }));

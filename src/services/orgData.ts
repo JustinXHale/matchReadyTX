@@ -26,8 +26,23 @@ import {
 import { applyLevelCrewDefaultsIfStock, applyLevelCrewDefaults, matchEligibleForCrewDefaultsReapply } from '@/domain/crewDefaults';
 import { releaseMatch } from '@/domain/matchTransitions';
 import {
+  type CardReport,
+  type CardIncident,
+  type CmoReportPayload,
+  type CompetitionUnion,
+  type MatchReport,
+  type MatchReportStatus,
+  type MoReportPayload,
+  type ArReportPayload,
+  type ReportAssigneeSlot,
+  type ReportFormKind,
+  matchReportDocId,
+  buildPendingReport,
+} from '@/domain/reports';
+import {
   emptyCrew,
   ensureDefaultMoBlock,
+  crewPeople,
   newAssignmentId,
   newCmoId,
   type ChangeProposal,
@@ -39,6 +54,7 @@ import {
   type MatchGender,
   type OrgSettings,
   type Team,
+  type TeamContactPerson,
   type TeamLinkRequest,
 } from '@/domain/types';
 
@@ -190,6 +206,29 @@ export function matchFromFirestore(
   };
 }
 
+function parseTeamContactPeople(raw: unknown): TeamContactPerson[] | undefined {
+  if (!Array.isArray(raw)) return undefined;
+  const people: TeamContactPerson[] = [];
+  for (const item of raw) {
+    if (!item || typeof item !== 'object') continue;
+    const rec = item as Record<string, unknown>;
+    const email = typeof rec.email === 'string' ? rec.email.trim() : '';
+    if (!email) continue;
+    people.push({
+      email,
+      name:
+        typeof rec.name === 'string' && rec.name.trim()
+          ? rec.name.trim()
+          : undefined,
+      phone:
+        typeof rec.phone === 'string' && rec.phone.trim()
+          ? rec.phone.trim()
+          : undefined,
+    });
+  }
+  return people.length ? people : undefined;
+}
+
 export function teamFromFirestore(
   id: string,
   data: Record<string, unknown>,
@@ -216,6 +255,7 @@ export function teamFromFirestore(
     contactPhones: Array.isArray(data.contactPhones)
       ? (data.contactPhones as string[])
       : undefined,
+    contactPeople: parseTeamContactPeople(data.contactPeople),
   };
 }
 
@@ -776,14 +816,14 @@ export function subscribeLiveOrg(
  */
 export function subscribeCoachFeedback(
   orgId: string,
-  opts: { isAssigner: boolean; teamIds: string[] },
+  opts: { isGlobal: boolean; teamIds: string[] },
   onData: (feedback: CoachFeedback[]) => void,
   onError?: (err: Error) => void,
 ): Unsubscribe {
   const database = requireDb();
   const col = collection(database, 'orgs', orgId, 'coachFeedback');
 
-  if (opts.isAssigner) {
+  if (opts.isGlobal) {
     return onSnapshot(
       col,
       (snap) => {
@@ -1428,4 +1468,342 @@ export async function saveCoachFeedbackInFirestore(
     doc(requireDb(), 'orgs', orgId, 'coachFeedback', feedback.id),
     payload,
   );
+}
+
+function parseReportAssigneeSlot(raw: unknown): ReportAssigneeSlot | null {
+  if (raw === 'mo' || raw === 'ar1' || raw === 'ar2' || raw === 'cmo') return raw;
+  return null;
+}
+
+function parseReportFormKind(raw: unknown): ReportFormKind | undefined {
+  if (
+    raw === 'mo_quick' ||
+    raw === 'mo_performance' ||
+    raw === 'ar_basic' ||
+    raw === 'cmo'
+  ) {
+    return raw;
+  }
+  return undefined;
+}
+
+function parseMatchReportStatus(raw: unknown): MatchReportStatus {
+  return raw === 'submitted' ? 'submitted' : 'pending';
+}
+
+function parseCardIncidents(raw: unknown): CardIncident[] {
+  if (!Array.isArray(raw)) return [];
+  const out: CardIncident[] = [];
+  for (const item of raw) {
+    if (!item || typeof item !== 'object') continue;
+    const rec = item as Record<string, unknown>;
+    const color = rec.color === 'yellow' || rec.color === 'red' ? rec.color : null;
+    const playerName = typeof rec.playerName === 'string' ? rec.playerName : '';
+    const teamId = typeof rec.teamId === 'string' ? rec.teamId : '';
+    const teamName = typeof rec.teamName === 'string' ? rec.teamName : '';
+    const reason = typeof rec.reason === 'string' ? rec.reason : '';
+    if (!color || !playerName || !teamId) continue;
+    out.push({
+      id: typeof rec.id === 'string' ? rec.id : `card_${out.length}`,
+      color,
+      playerName,
+      teamId,
+      teamName,
+      reason,
+      minute: typeof rec.minute === 'string' ? rec.minute : undefined,
+      additionalInfoPrivate:
+        typeof rec.additionalInfoPrivate === 'string'
+          ? rec.additionalInfoPrivate
+          : undefined,
+    });
+  }
+  return out;
+}
+
+export function matchReportFromFirestore(
+  id: string,
+  data: Record<string, unknown>,
+): MatchReport | null {
+  const matchId = typeof data.matchId === 'string' ? data.matchId : '';
+  const officialId = typeof data.officialId === 'string' ? data.officialId : '';
+  const slot = parseReportAssigneeSlot(data.slot);
+  if (!matchId || !officialId || !slot) return null;
+  const status = parseMatchReportStatus(data.status);
+  const dueAt = typeof data.dueAt === 'string' ? data.dueAt : '';
+  const kickoffAt = typeof data.kickoffAt === 'string' ? data.kickoffAt : '';
+  if (!dueAt || !kickoffAt) return null;
+  return {
+    id,
+    matchId,
+    officialId,
+    slot,
+    formKind: parseReportFormKind(data.formKind),
+    status,
+    dueAt,
+    deadlineAt:
+      typeof data.deadlineAt === 'string' ? data.deadlineAt : undefined,
+    kickoffAt,
+    submittedAt:
+      typeof data.submittedAt === 'string' ? data.submittedAt : undefined,
+    subjectOfficialId:
+      typeof data.subjectOfficialId === 'string'
+        ? data.subjectOfficialId
+        : undefined,
+    moPayload:
+      data.moPayload && typeof data.moPayload === 'object'
+        ? (data.moPayload as MoReportPayload)
+        : undefined,
+    arPayload:
+      data.arPayload && typeof data.arPayload === 'object'
+        ? (data.arPayload as ArReportPayload)
+        : undefined,
+    cmoPayload:
+      data.cmoPayload && typeof data.cmoPayload === 'object'
+        ? (data.cmoPayload as CmoReportPayload)
+        : undefined,
+  };
+}
+
+export function cardReportFromFirestore(
+  id: string,
+  data: Record<string, unknown>,
+): CardReport | null {
+  const matchId = typeof data.matchId === 'string' ? data.matchId : '';
+  const officialId = typeof data.officialId === 'string' ? data.officialId : '';
+  if (!matchId || !officialId) return null;
+  const unions: CompetitionUnion[] = [
+    'rugby_texas_youth',
+    'ncr_lonestar_college',
+    'texas_rugby_union_club',
+  ];
+  const unionRaw = data.competitionUnion;
+  const competitionUnion =
+    typeof unionRaw === 'string' &&
+    unions.includes(unionRaw as CompetitionUnion)
+      ? (unionRaw as CompetitionUnion)
+      : '';
+  const status =
+    data.status === 'draft' || data.status === 'submitted' ? data.status : 'submitted';
+  const createdAt = typeof data.createdAt === 'string' ? data.createdAt : '';
+  if (!createdAt) return null;
+  return {
+    id,
+    matchId,
+    officialId,
+    status,
+    competitionUnion,
+    officialName: String(data.officialName ?? ''),
+    officialEmail: String(data.officialEmail ?? ''),
+    officialPhone: String(data.officialPhone ?? ''),
+    matchDate: String(data.matchDate ?? ''),
+    cards: parseCardIncidents(data.cards),
+    additionalInfoPrivate:
+      typeof data.additionalInfoPrivate === 'string'
+        ? data.additionalInfoPrivate
+        : undefined,
+    submittedAt:
+      typeof data.submittedAt === 'string' ? data.submittedAt : undefined,
+    createdAt,
+  };
+}
+
+function matchReportToFirestore(
+  orgId: string,
+  report: MatchReport,
+): Record<string, unknown> {
+  return stripUndefined({
+    orgId,
+    id: report.id,
+    matchId: report.matchId,
+    officialId: report.officialId,
+    slot: report.slot,
+    formKind: report.formKind ?? null,
+    status: report.status,
+    dueAt: report.dueAt,
+    deadlineAt: report.deadlineAt ?? null,
+    kickoffAt: report.kickoffAt,
+    submittedAt: report.submittedAt ?? null,
+    subjectOfficialId: report.subjectOfficialId ?? null,
+    moPayload: report.moPayload ?? null,
+    arPayload: report.arPayload ?? null,
+    cmoPayload: report.cmoPayload ?? null,
+    updatedAt: new Date().toISOString(),
+    createdAt: report.submittedAt ?? new Date().toISOString(),
+  });
+}
+
+function cardReportToFirestore(
+  orgId: string,
+  report: CardReport,
+): Record<string, unknown> {
+  return stripUndefined({
+    orgId,
+    id: report.id,
+    matchId: report.matchId,
+    officialId: report.officialId,
+    status: report.status,
+    competitionUnion: report.competitionUnion || null,
+    officialName: report.officialName,
+    officialEmail: report.officialEmail,
+    officialPhone: report.officialPhone,
+    matchDate: report.matchDate,
+    cards: report.cards,
+    additionalInfoPrivate: report.additionalInfoPrivate ?? null,
+    submittedAt: report.submittedAt ?? null,
+    createdAt: report.createdAt,
+    updatedAt: new Date().toISOString(),
+  });
+}
+
+/** Subscribe to match reports (filer + CMO-about-me, or global for assigner/analytics). */
+export function subscribeMatchReports(
+  orgId: string,
+  opts: { isGlobal: boolean; uid: string },
+  onData: (reports: MatchReport[]) => void,
+  onError?: (err: Error) => void,
+): Unsubscribe {
+  const database = requireDb();
+  const col = collection(database, 'orgs', orgId, 'matchReports');
+
+  if (opts.isGlobal) {
+    return onSnapshot(
+      col,
+      (snap) => {
+        const reports = snap.docs
+          .map((d) =>
+            matchReportFromFirestore(d.id, d.data() as Record<string, unknown>),
+          )
+          .filter((r): r is MatchReport => r != null);
+        onData(reports);
+      },
+      (err) => onError?.(err),
+    );
+  }
+
+  let filed: MatchReport[] = [];
+  let received: MatchReport[] = [];
+
+  const emit = () => {
+    const byId = new Map<string, MatchReport>();
+    for (const r of [...filed, ...received]) byId.set(r.id, r);
+    onData([...byId.values()]);
+  };
+
+  const unsubFiled = onSnapshot(
+    query(col, where('officialId', '==', opts.uid)),
+    (snap) => {
+      filed = snap.docs
+        .map((d) =>
+          matchReportFromFirestore(d.id, d.data() as Record<string, unknown>),
+        )
+        .filter((r): r is MatchReport => r != null);
+      emit();
+    },
+    (err) => onError?.(err),
+  );
+
+  const unsubReceived = onSnapshot(
+    query(col, where('subjectOfficialId', '==', opts.uid)),
+    (snap) => {
+      received = snap.docs
+        .map((d) =>
+          matchReportFromFirestore(d.id, d.data() as Record<string, unknown>),
+        )
+        .filter((r): r is MatchReport => r != null);
+      emit();
+    },
+    (err) => onError?.(err),
+  );
+
+  return () => {
+    unsubFiled();
+    unsubReceived();
+  };
+}
+
+export function subscribeCardReports(
+  orgId: string,
+  opts: { isGlobal: boolean; uid: string },
+  onData: (reports: CardReport[]) => void,
+  onError?: (err: Error) => void,
+): Unsubscribe {
+  const database = requireDb();
+  const col = collection(database, 'orgs', orgId, 'cardReports');
+
+  if (opts.isGlobal) {
+    return onSnapshot(
+      col,
+      (snap) => {
+        const reports = snap.docs
+          .map((d) =>
+            cardReportFromFirestore(d.id, d.data() as Record<string, unknown>),
+          )
+          .filter((r): r is CardReport => r != null);
+        onData(reports);
+      },
+      (err) => onError?.(err),
+    );
+  }
+
+  return onSnapshot(
+    query(col, where('officialId', '==', opts.uid)),
+    (snap) => {
+      const reports = snap.docs
+        .map((d) =>
+          cardReportFromFirestore(d.id, d.data() as Record<string, unknown>),
+        )
+        .filter((r): r is CardReport => r != null);
+      onData(reports);
+    },
+    (err) => onError?.(err),
+  );
+}
+
+export async function saveMatchReportInFirestore(
+  orgId: string,
+  report: MatchReport,
+): Promise<void> {
+  await setDoc(
+    doc(requireDb(), 'orgs', orgId, 'matchReports', report.id),
+    matchReportToFirestore(orgId, report),
+  );
+}
+
+export async function saveCardReportInFirestore(
+  orgId: string,
+  report: CardReport,
+): Promise<void> {
+  await setDoc(
+    doc(requireDb(), 'orgs', orgId, 'cardReports', report.id),
+    cardReportToFirestore(orgId, report),
+  );
+}
+
+/** Lazy-create a pending match report doc when the official opens the flow. */
+export async function ensurePendingMatchReportInFirestore(
+  orgId: string,
+  match: Match,
+  assignee: { userId: string; slot: ReportAssigneeSlot },
+): Promise<MatchReport> {
+  const id = matchReportDocId(match.id, assignee.userId, assignee.slot);
+  const ref = doc(requireDb(), 'orgs', orgId, 'matchReports', id);
+  const snap = await getDoc(ref);
+  if (snap.exists()) {
+    const parsed = matchReportFromFirestore(
+      id,
+      snap.data() as Record<string, unknown>,
+    );
+    if (parsed) return parsed;
+  }
+  const pending = buildPendingReport(match, assignee, () => id);
+  await setDoc(ref, matchReportToFirestore(orgId, pending));
+  return pending;
+}
+
+/** MO user id on a match (first MO block with a user). */
+export function moOfficialIdOnMatch(match: Match): string | undefined {
+  for (const a of crewPeople(match.crew.mo)) {
+    if (a.userId) return a.userId;
+  }
+  return undefined;
 }

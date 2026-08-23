@@ -26,6 +26,7 @@ function normEmail(email: string): string {
 function headerIndex(headers: string[], aliases: string[]): number {
   const norm = headers.map((h) =>
     String(h ?? '')
+      .replace(/^\uFEFF/, '')
       .trim()
       .toLowerCase()
       .replace(/\s+/g, '_'),
@@ -52,12 +53,12 @@ async function appendContactsRow(
     // Create header + first row
     await sheets.spreadsheets.values.update({
       spreadsheetId,
-      range: 'Contacts!A1:C2',
+      range: 'Contacts!A1:E2',
       valueInputOption: 'USER_ENTERED',
       requestBody: {
         values: [
-          ['team_name', 'email', 'phone'],
-          [row.teamName, row.email, row.phone ?? ''],
+          ['team_name', 'conference', 'name', 'email', 'phone'],
+          [row.teamName, '', '', row.email, row.phone ?? ''],
         ],
       },
     });
@@ -66,8 +67,10 @@ async function appendContactsRow(
 
   const headers = values[0] ?? [];
   const teamIdx = headerIndex(headers, ['team_name', 'team', 'club']);
-  const emailIdx = headerIndex(headers, ['email', 'e_mail']);
+  const emailIdx = headerIndex(headers, ['email', 'e_mail', 'e-mail']);
   const phoneIdx = headerIndex(headers, ['phone', 'mobile', 'cell']);
+  const nameIdx = headerIndex(headers, ['name', 'contact_name', 'person']);
+  const confIdx = headerIndex(headers, ['conference', 'competition', 'league']);
   if (teamIdx < 0 || emailIdx < 0) {
     throw new HttpsError(
       'failed-precondition',
@@ -87,11 +90,13 @@ async function appendContactsRow(
     }
   }
 
-  const width = Math.max(headers.length, 3);
+  const width = Math.max(headers.length, 5);
   const line = Array.from({ length: width }, () => '');
   line[teamIdx] = row.teamName;
   line[emailIdx] = row.email;
   if (phoneIdx >= 0) line[phoneIdx] = row.phone ?? '';
+  if (nameIdx >= 0) line[nameIdx] = '';
+  if (confIdx >= 0) line[confIdx] = '';
 
   await sheets.spreadsheets.values.append({
     spreadsheetId,
@@ -241,6 +246,15 @@ async function grantTeam(opts: {
   if (!contactEmails.some((c) => normEmail(String(c)) === emailNorm)) {
     contactEmails.push(emailNorm);
   }
+  const contactPeople = Array.isArray(teamSnap.data()?.contactPeople)
+    ? [...(teamSnap.data()!.contactPeople as Array<Record<string, unknown>>)]
+    : [];
+  const hasPerson = contactPeople.some(
+    (p) => normEmail(String(p?.email ?? '')) === emailNorm,
+  );
+  if (!hasPerson) {
+    contactPeople.push({ email: emailNorm });
+  }
 
   await userRef.set(
     { roles, teamIds: userTeamIds, updatedAt: FieldValue.serverTimestamp() },
@@ -255,7 +269,7 @@ async function grantTeam(opts: {
     { merge: true },
   );
   await teamRef.set(
-    { contactEmails, updatedAt: FieldValue.serverTimestamp() },
+    { contactEmails, contactPeople, updatedAt: FieldValue.serverTimestamp() },
     { merge: true },
   );
 

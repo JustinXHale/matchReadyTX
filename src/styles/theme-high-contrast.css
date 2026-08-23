@@ -1,0 +1,67 @@
+/**
+ * Custom chrome aligned with PatternFly high contrast mode.
+ * PF components pick up HC via pf-v6-theme-high-contrast; rs-* rules live here.
+ * Uses PF border tokens — no raw hex.
+ */
+
+.pf-v6-theme-high-contrast .rs-detail-card,
+.pf-v6-theme-high-contrast .rs-match-card,
+.pf-v6-theme-high-contrast .rs-list-row,
+.pf-v6-theme-high-contrast .rs-callout,
+.pf-v6-theme-high-contrast .rs-pwa-install,
+.pf-v6-theme-high-contrast .rs-signin__note,
+.pf-v6-theme-high-contrast .rs-avail-day:not(.rs-avail-day--empty) {
+  border-width: var(--pf-t--global--border--width--regular);
+  border-style: solid;
+  border-color: var(--pf-t--global--border--color--default);
+  box-shadow: none;
+}
+
+.pf-v6-theme-high-contrast .rs-fab {
+  box-shadow: none;
+  border: var(--pf-t--global--border--width--strong) solid
+    var(--pf-t--global--border--color--default);
+}
+
+.pf-v6-theme-high-contrast .rs-theme-toggle,
+.pf-v6-theme-high-contrast .rs-filter-chip,
+.pf-v6-theme-high-contrast .rs-detail__back {
+  border-width: var(--pf-t--global--border--width--regular);
+  border-style: solid;
+  border-color: var(--pf-t--global--border--color--default);
+}
+
+.pf-v6-theme-high-contrast .rs-theme-toggle:hover,
+.pf-v6-theme-high-contrast .rs-theme-toggle:focus-visible,
+.pf-v6-theme-high-contrast .rs-filter-chip:hover,
+.pf-v6-theme-high-contrast .rs-filter-chip:focus-visible,
+.pf-v6-theme-high-contrast .rs-detail__back:hover,
+.pf-v6-theme-high-contrast .rs-detail__back:focus-visible {
+  border-width: var(
+    --pf-t--global--border--width--action--plain--hover,
+    var(--pf-t--global--border--width--regular)
+  );
+}
+
+.pf-v6-theme-high-contrast .rs-theme-toggle:active,
+.pf-v6-theme-high-contrast .rs-filter-chip--selected {
+  border-width: var(
+    --pf-t--global--border--width--action--plain--clicked,
+    var(--pf-t--global--border--width--strong)
+  );
+}
+
+.pf-v6-theme-high-contrast .rs-list-row--urgent {
+  border-color: var(--rs-color-urgent);
+  border-left-width: var(--pf-t--global--border--width--extra-strong, 3px);
+}
+
+.pf-v6-theme-high-contrast .rs-list-row--warn {
+  border-left-width: var(--pf-t--global--border--width--extra-strong, 3px);
+}
+
+.pf-v6-theme-high-contrast .rs-urgent-alert,
+.pf-v6-theme-high-contrast .rs-detail-card--proposal,
+.pf-v6-theme-high-contrast .rs-detail-card--proposal-denied {
+  border-left-width: var(--pf-t--global--border--width--extra-strong, 3px);
+}

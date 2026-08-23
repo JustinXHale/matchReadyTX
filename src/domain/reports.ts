@@ -216,11 +216,29 @@ export function validateCmoScales(
   });
 }
 
+/** Stable Firestore doc id for a match report row. */
+export function matchReportDocId(
+  matchId: string,
+  officialId: string,
+  slot: ReportAssigneeSlot,
+): string {
+  return `${matchId}_${officialId}_${slot}`
+    .replace(/[^a-zA-Z0-9_-]/g, '_')
+    .slice(0, 120);
+}
+
+/** Stable Firestore doc id for a card report (one per MO per match). */
+export function cardReportDocId(matchId: string, officialId: string): string {
+  return `${matchId}_${officialId}`.replace(/[^a-zA-Z0-9_-]/g, '_').slice(0, 120);
+}
+
 export interface MatchReport {
   id: string;
   matchId: string;
   officialId: string;
   slot: ReportAssigneeSlot;
+  /** MO being assessed — set on CMO coaching reports for read rules. */
+  subjectOfficialId?: string;
   /** Set when user chooses / is forced into a form; pending may omit until chooser. */
   formKind?: ReportFormKind;
   status: MatchReportStatus;
@@ -368,8 +386,11 @@ export function syncPendingMatchReports(
   matches: Match[],
   existing: MatchReport[],
   now = Date.now(),
-  idFactory: () => string = () =>
-    `mr_${Math.random().toString(36).slice(2, 10)}`,
+  idFactory: (
+    match: Match,
+    assignee: { userId: string; slot: ReportAssigneeSlot },
+  ) => string = (match, assignee) =>
+    matchReportDocId(match.id, assignee.userId, assignee.slot),
 ): MatchReport[] {
   const byKey = new Map<string, MatchReport>();
   for (const r of existing) {
@@ -381,7 +402,10 @@ export function syncPendingMatchReports(
     for (const a of reportAssignees(match)) {
       const key = `${match.id}:${a.userId}:${a.slot}`;
       if (!byKey.has(key)) {
-        byKey.set(key, buildPendingReport(match, a, idFactory));
+        byKey.set(
+          key,
+          buildPendingReport(match, a, () => idFactory(match, a)),
+        );
       }
     }
   }

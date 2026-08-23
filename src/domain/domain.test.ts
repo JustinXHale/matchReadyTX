@@ -76,7 +76,7 @@ import {
 } from '@/domain/members';
 import { defaultRoleView, lensesForUser } from '@/app/AppContext';
 import { standingsByDivision } from '@/domain/standings';
-import { scheduleTeamEntries } from '@/domain/teams';
+import { scheduleTeamEntries, teamContactPeople } from '@/domain/teams';
 import { crewColumnLines } from '@/features/referee/appointments/crewLines';
 
 function baseMatch(): Match {
@@ -395,6 +395,33 @@ describe('contacts', () => {
       teams,
     );
     expect(users[0]!.teamIds).toContain('team_austin');
+  });
+
+  it('skips paste rows with no email', () => {
+    const rows = parseContactsPaste(
+      'Austin RFC, austin-admin@example.com\nBaylor University, , (253) 686-6170',
+    );
+    expect(rows).toHaveLength(1);
+    expect(rows[0]?.email).toBe('austin-admin@example.com');
+  });
+
+  it('merges named Contacts people with email-only fallbacks', () => {
+    const people = teamContactPeople({
+      id: 't1',
+      name: 'Rice University',
+      contactEmails: ['lms21@rice.edu', 'extra@rice.edu'],
+      contactPeople: [
+        { name: 'Luke Sullivan', email: 'lms21@rice.edu', phone: '914-267-7543' },
+      ],
+    });
+    expect(people).toEqual([
+      {
+        name: 'Luke Sullivan',
+        email: 'lms21@rice.edu',
+        phone: '914-267-7543',
+      },
+      { email: 'extra@rice.edu' },
+    ]);
   });
 });
 

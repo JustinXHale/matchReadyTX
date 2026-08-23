@@ -11,6 +11,8 @@ import {
 } from '@/features/auth/SocialSignInButtons';
 import { appBuildLabel } from '@/app/appBuild';
 import { PwaInstallCard } from '@/ui/PwaInstallCard';
+import { ThemeToggle } from '@/ui/ThemeToggle';
+import { BrandLogo } from '@/ui/BrandLogo';
 
 function authErrorMessage(provider: 'Google' | 'Apple', err: unknown): string {
   const message =
@@ -125,13 +127,11 @@ export function LoginPage() {
   return (
     <div className="rs-signin">
       <header className="rs-signin__hero">
-        <img
+        <BrandLogo
           className="rs-signin__logo"
-          src="/matchReadyLogo.png"
-          alt="MatchReadyTX"
           width={280}
           height={280}
-          decoding="async"
+          alt="MatchReadyTX"
         />
         <p className="rs-signin__lede">
           Sign in securely with your Google or Apple account
@@ -169,7 +169,10 @@ export function LoginPage() {
 
       <PwaInstallCard className="rs-signin__pwa" />
 
-      <p className="rs-signin__build">{appBuildLabel()}</p>
+      <div className="rs-signin__build-row">
+        <p className="rs-signin__build">{appBuildLabel()}</p>
+        <ThemeToggle />
+      </div>
     </div>
   );
 }

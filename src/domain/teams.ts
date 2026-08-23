@@ -1,4 +1,4 @@
-import type { Match, Team, UserProfile } from '@/domain/types';
+import type { Match, Team, TeamContactPerson, UserProfile } from '@/domain/types';
 import { memberListName } from '@/domain/members';
 import { mapsDirectionsUrl } from '@/services/maps';
 
@@ -199,6 +199,29 @@ export function teamAdminsForTeam(
 /** Contact emails on the team record (Contacts sheet — may not be registered yet). */
 export function teamContactEmails(team: Team): string[] {
   return [...new Set(team.contactEmails.map((e) => e.trim()).filter(Boolean))];
+}
+
+/** Named Contacts-tab people (email required). Falls back to email-only rows. */
+export function teamContactPeople(team: Team): TeamContactPerson[] {
+  const seen = new Set<string>();
+  const people: TeamContactPerson[] = [];
+  for (const p of team.contactPeople ?? []) {
+    const email = p.email.trim().toLowerCase();
+    if (!email || seen.has(email)) continue;
+    seen.add(email);
+    people.push({
+      email,
+      name: p.name?.trim() || undefined,
+      phone: p.phone?.trim() || undefined,
+    });
+  }
+  for (const email of teamContactEmails(team)) {
+    const key = email.trim().toLowerCase();
+    if (!key || seen.has(key)) continue;
+    seen.add(key);
+    people.push({ email: key });
+  }
+  return people;
 }
 
 export function teamConferenceLabel(competitions: string[]): string {

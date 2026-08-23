@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import {
   Button,
@@ -26,12 +26,16 @@ import {
 } from '@/features/referee/reports/reportLinks';
 import { RefereeLevelChart } from '@/ui/RefereeLevelChart';
 import { ScaleRatingCards } from '@/ui/ScaleRatingCards';
+import {
+  ensureMatchReportReady,
+  persistSubmittedCmoReport,
+} from '@/services/reportsLive';
 
 const SCALE_KEYS = Object.keys(CMO_SCALE_LABELS) as CmoScaleKey[];
 
 export function CmoReportPage() {
   const { matchId = '' } = useParams();
-  const { currentUser, state, store } = useApp();
+  const { currentUser, state, store, dataMode } = useApp();
   const navigate = useNavigate();
 
   const match = state.matches.find((m) => m.id === matchId);
@@ -55,6 +59,13 @@ export function CmoReportPage() {
   const [assessedRating, setAssessedRating] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState(false);
+
+  useEffect(() => {
+    if (dataMode !== 'live' || !currentUser || !matchId) return;
+    void ensureMatchReportReady(matchId, currentUser.uid).catch((err) =>
+      console.error('ensureMatchReportReady failed', err),
+    );
+  }, [dataMode, currentUser?.uid, matchId]);
 
   if (!currentUser) return null;
 
@@ -138,7 +149,7 @@ export function CmoReportPage() {
     ? new Date(report.deadlineAt).toLocaleString()
     : null;
 
-  const submit = () => {
+  const submit = async () => {
     if (!validateCmoScales(scales, SCALE_KEYS)) {
       setError('Rate every scale from 1–5, or N/A.');
       return;
@@ -156,8 +167,18 @@ export function CmoReportPage() {
       overallComment: overallComment.trim() || undefined,
       assessedRating: rating,
     };
-    store.submitCmoReport(report.id, payload);
-    setDone(true);
+    try {
+      if (dataMode === 'live') {
+        await persistSubmittedCmoReport(report.id, payload, match.id);
+      } else {
+        store.submitCmoReport(report.id, payload);
+      }
+      setDone(true);
+    } catch (err) {
+      setError(
+        err instanceof Error ? err.message : 'Could not save CMO report.',
+      );
+    }
   };
 
   return (

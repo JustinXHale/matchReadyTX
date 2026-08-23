@@ -12,14 +12,18 @@ service cloud.firestore {
         && exists(/databases/$(database)/documents/users/$(request.auth.uid))
         && userDoc().get('profileComplete', false) == true;
     }
+    function isMember(orgId) {
+      return onboardingComplete()
+        && exists(/databases/$(database)/documents/orgs/$(orgId)/members/$(request.auth.uid));
+    }
+    function isReportAnalytics(orgId) {
+      return isMember(orgId)
+        && 'reportAnalytics' in get(/databases/$(database)/documents/orgs/$(orgId)/members/$(request.auth.uid)).data.roles;
+    }
     function isAssigner(orgId) {
       return onboardingComplete()
         && exists(/databases/$(database)/documents/orgs/$(orgId)/members/$(request.auth.uid))
         && 'assigner' in get(/databases/$(database)/documents/orgs/$(orgId)/members/$(request.auth.uid)).data.roles;
-    }
-    function isMember(orgId) {
-      return onboardingComplete()
-        && exists(/databases/$(database)/documents/orgs/$(orgId)/members/$(request.auth.uid));
     }
     function isOrgMember(orgId, uid) {
       return exists(/databases/$(database)/documents/orgs/$(orgId)/members/$(uid));
@@ -59,7 +63,8 @@ service cloud.firestore {
           'photoUrl', 'competitionAccess', 'profileComplete', 'updatedAt'
         ])
         && request.resource.data.roles is list
-        && ('assigner' in resource.data.roles) == ('assigner' in request.resource.data.roles);
+        && ('assigner' in resource.data.roles) == ('assigner' in request.resource.data.roles)
+        && ('reportAnalytics' in resource.data.roles) == ('reportAnalytics' in request.resource.data.roles);
     }
     function requestHasWorkingSocietyRole() {
       return request.resource.data.roles is list
@@ -123,14 +128,27 @@ service cloud.firestore {
         );
     }
 
+    function assessedLevelValueOk(value) {
+      return value == null
+        || (
+          value is int
+          && value >= 1
+          && value <= 10
+        );
+    }
+
     function selfAssessedRequestOk() {
       return !request.resource.data.diff(resource.data).affectedKeys()
           .hasAny(['requestedAssessedLevel'])
-        || request.resource.data.requestedAssessedLevel == null
+        || assessedLevelValueOk(request.resource.data.requestedAssessedLevel);
+    }
+
+    function assignerAssessedLevelOk() {
+      return !request.resource.data.diff(resource.data).affectedKeys()
+          .hasAny(['assessedLevel', 'requestedAssessedLevel'])
         || (
-          request.resource.data.requestedAssessedLevel is int
-          && request.resource.data.requestedAssessedLevel >= 1
-          && request.resource.data.requestedAssessedLevel <= 20
+          assessedLevelValueOk(request.resource.data.get('assessedLevel', null))
+          && assessedLevelValueOk(request.resource.data.get('requestedAssessedLevel', null))
         );
     }
 
@@ -150,7 +168,8 @@ service cloud.firestore {
           && selfAssessedRequestOk())
         || (isAssigner(defaultOrgId())
           && isOrgMember(defaultOrgId(), uid)
-          && assignerMemberPatch())
+          && assignerMemberPatch()
+          && assignerAssessedLevelOk())
       );
       allow delete: if false;
     }
@@ -181,6 +200,7 @@ service cloud.firestore {
             && request.resource.data.roles is list
             && request.resource.data.teamIds is list
             && !('assigner' in request.resource.data.roles)
+            && !('reportAnalytics' in request.resource.data.roles)
           )
         );
         // Assigner manages anyone; members may update own roles / favorites but not grant or revoke assigner.
@@ -192,6 +212,7 @@ service cloud.firestore {
           && request.resource.data.roles is list
           && request.resource.data.teamIds is list
           && ('assigner' in resource.data.roles) == ('assigner' in request.resource.data.roles)
+          && ('reportAnalytics' in resource.data.roles) == ('reportAnalytics' in request.resource.data.roles)
         );
         allow delete: if isAssigner(orgId);
       }
@@ -406,7 +427,7 @@ service cloud.firestore {
           && request.resource.data.scales is map
           && matchAllowsCoachFeedback();
         }
-        allow read: if isAssigner(orgId) || canReadClubFeedback();
+        allow read: if isAssigner(orgId) || isReportAnalytics(orgId) || canReadClubFeedback();
         allow create: if signedIn()
           && isTeamAdminForReportingTeam()
           && coachFeedbackCreateShape();
@@ -422,6 +443,69 @@ service cloud.firestore {
           && request.resource.data.submitterUserId == request.auth.uid
           && request.resource.data.scales is map
           && matchAllowsCoachFeedback();
+        allow delete: if isAssigner(orgId);
+      }
+
+      /**
+       * Post-match MO / AR / CMO reports (Coaching Reports tab uses slot cmo).
+       */
+      match /matchReports/{reportId} {
+        function memberDoc() {
+          return get(/databases/$(database)/documents/orgs/$(orgId)/members/$(request.auth.uid)).data;
+        }
+        function canReadMatchReport() {
+          return isMember(orgId)
+            && (
+              isAssigner(orgId)
+              || isReportAnalytics(orgId)
+              || resource.data.officialId == request.auth.uid
+              || resource.data.get('subjectOfficialId', '') == request.auth.uid
+            );
+        }
+        function matchReportShapeOk() {
+          return request.resource.data.orgId == orgId
+            && request.resource.data.matchId is string
+            && request.resource.data.officialId == request.auth.uid
+            && request.resource.data.slot in ['mo', 'ar1', 'ar2', 'cmo']
+            && request.resource.data.status in ['pending', 'submitted']
+            && request.resource.data.dueAt is string
+            && request.resource.data.kickoffAt is string;
+        }
+        allow read: if canReadMatchReport();
+        allow create: if signedIn()
+          && isMember(orgId)
+          && matchReportShapeOk()
+          && request.resource.data.status == 'pending'
+          && reportId == request.resource.data.id;
+        allow update: if signedIn()
+          && isMember(orgId)
+          && resource.data.officialId == request.auth.uid
+          && request.resource.data.officialId == resource.data.officialId
+          && request.resource.data.matchId == resource.data.matchId
+          && request.resource.data.slot == resource.data.slot
+          && request.resource.data.status in ['pending', 'submitted']
+          && (
+            resource.data.status == 'pending'
+            || resource.data.status == request.resource.data.status
+          );
+        allow delete: if isAssigner(orgId);
+      }
+
+      match /cardReports/{reportId} {
+        allow read: if isMember(orgId)
+          && (
+            isAssigner(orgId)
+            || isReportAnalytics(orgId)
+            || resource.data.officialId == request.auth.uid
+          );
+        allow create, update: if signedIn()
+          && isMember(orgId)
+          && request.resource.data.orgId == orgId
+          && request.resource.data.officialId == request.auth.uid
+          && request.resource.data.matchId is string
+          && request.resource.data.status in ['draft', 'submitted']
+          && request.resource.data.cards is list
+          && reportId == request.resource.data.id;
         allow delete: if isAssigner(orgId);
       }
       /** Team Admin club-link requests — create/review via Admin SDK callables. */

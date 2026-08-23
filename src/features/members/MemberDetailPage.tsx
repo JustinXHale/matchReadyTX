@@ -31,7 +31,13 @@ import {
   syncDisplayName,
   syncHomeAddressLine,
 } from '@/domain/profile';
-import { APPAREL_SIZES, type Role, type UserProfile } from '@/domain/types';
+import {
+  APPAREL_SIZES,
+  ASSESSED_LEVEL_MAX,
+  ASSESSED_LEVEL_MIN,
+  type Role,
+  type UserProfile,
+} from '@/domain/types';
 import {
   conferenceTeamOptions,
   scheduleTeamEntries,
@@ -89,6 +95,7 @@ type EditDraft = {
   roleTeamAdmin: boolean;
   roleCmo: boolean;
   roleAssigner: boolean;
+  roleReportAnalytics: boolean;
   roleFan: boolean;
   refereeLevel: string;
   levelUnknown: boolean;
@@ -114,6 +121,7 @@ function draftFromUser(user: UserProfile): EditDraft {
     roleTeamAdmin: user.roles.includes('teamAdmin'),
     roleCmo: user.roles.includes('cmo'),
     roleAssigner: user.roles.includes('assigner'),
+    roleReportAnalytics: user.roles.includes('reportAnalytics'),
     roleFan: user.roles.includes('fan'),
     refereeLevel: user.refereeLevel != null ? String(user.refereeLevel) : '',
     levelUnknown:
@@ -254,7 +262,8 @@ export function MemberDetailPage() {
     !editDraft!.roleOfficial &&
     !editDraft!.roleTeamAdmin &&
     !editDraft!.roleCmo &&
-    !editDraft!.roleAssigner;
+    !editDraft!.roleAssigner &&
+    !editDraft!.roleReportAnalytics;
 
   const onApproveRequestedLevel = () => {
     const requested = user.requestedAssessedLevel;
@@ -297,8 +306,14 @@ export function MemberDetailPage() {
       next = undefined;
     } else {
       const n = Number(trimmed);
-      if (!Number.isFinite(n) || n < 1 || n > 20) {
-        setAssessedError('Enter a level from 1–20, or leave blank to clear.');
+      if (
+        !Number.isFinite(n) ||
+        n < ASSESSED_LEVEL_MIN ||
+        n > ASSESSED_LEVEL_MAX
+      ) {
+        setAssessedError(
+          `Enter a level from ${ASSESSED_LEVEL_MIN}–${ASSESSED_LEVEL_MAX}, or leave blank to clear.`,
+        );
         return;
       }
       next = n;
@@ -347,6 +362,7 @@ export function MemberDetailPage() {
     if (editDraft.roleTeamAdmin) roles.push('teamAdmin');
     if (editDraft.roleCmo) roles.push('cmo');
     if (editDraft.roleAssigner) roles.push('assigner');
+    if (editDraft.roleReportAnalytics) roles.push('reportAnalytics');
     if (editDraft.roleFan) roles.push('fan');
     if (roles.length === 0) {
       setEditError('Pick at least one role.');
@@ -358,7 +374,8 @@ export function MemberDetailPage() {
       !editDraft.roleOfficial &&
       !editDraft.roleTeamAdmin &&
       !editDraft.roleCmo &&
-      !editDraft.roleAssigner;
+      !editDraft.roleAssigner &&
+      !editDraft.roleReportAnalytics;
 
     if (!fanOnly && !editDraft.phone.trim()) {
       setEditError('Phone is required.');
@@ -611,15 +628,15 @@ export function MemberDetailPage() {
             <TextInput
               id="member-assessed-input"
               type="number"
-              min={1}
-              max={20}
+              min={ASSESSED_LEVEL_MIN}
+              max={ASSESSED_LEVEL_MAX}
               value={assessedDraft}
               onChange={(_, v) => {
                 setAssessedDraft(v);
                 setAssessedSaved(false);
                 setAssessedError(null);
               }}
-              placeholder="1–20, blank to clear"
+              placeholder={`${ASSESSED_LEVEL_MIN}–${ASSESSED_LEVEL_MAX}, blank to clear`}
             />
           </FormGroup>
           <Button variant="secondary" onClick={onSaveAssessedLevel}>
@@ -685,7 +702,8 @@ export function MemberDetailPage() {
                   !editDraft.roleOfficial &&
                   !editDraft.roleTeamAdmin &&
                   !editDraft.roleCmo &&
-                  !editDraft.roleAssigner
+                  !editDraft.roleAssigner &&
+                  !editDraft.roleReportAnalytics
                 ) && (
                   <FormGroup label="Phone" isRequired>
                     <TextInput
@@ -732,6 +750,14 @@ export function MemberDetailPage() {
                     label="Scheduler"
                     isChecked={editDraft.roleAssigner}
                     onChange={(_, v) => patchDraft({ roleAssigner: v })}
+                  />
+                  <Checkbox
+                    id="member-role-insights"
+                    label="Insights access"
+                    isChecked={editDraft.roleReportAnalytics}
+                    onChange={(_, v) =>
+                      patchDraft({ roleReportAnalytics: v })
+                    }
                   />
                 </div>
               </FormGroup>

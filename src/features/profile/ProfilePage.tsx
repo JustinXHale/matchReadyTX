@@ -20,7 +20,7 @@ import {
   readFileAsDataUrl,
   validateProfilePhoto,
 } from '@/domain/profile';
-import { APPAREL_SIZES, type Role } from '@/domain/types';
+import { APPAREL_SIZES, ASSESSED_LEVEL_MAX, ASSESSED_LEVEL_MIN, type Role } from '@/domain/types';
 import { conferenceTeamOptions } from '@/domain/teams';
 import { isFirebaseConfigured } from '@/services/firebase';
 import {
@@ -264,12 +264,18 @@ export function ProfilePage() {
   const submitLevelRequest = async () => {
     const trimmed = requestLevelDraft.trim();
     if (!trimmed) {
-      setRequestLevelNote('Enter a level from 1–20.');
+      setRequestLevelNote(`Enter a level from ${ASSESSED_LEVEL_MIN}–${ASSESSED_LEVEL_MAX}.`);
       return;
     }
     const n = Number(trimmed);
-    if (!Number.isFinite(n) || n < 1 || n > 20) {
-      setRequestLevelNote('Level must be between 1 and 20.');
+    if (
+      !Number.isFinite(n) ||
+      n < ASSESSED_LEVEL_MIN ||
+      n > ASSESSED_LEVEL_MAX
+    ) {
+      setRequestLevelNote(
+        `Level must be between ${ASSESSED_LEVEL_MIN} and ${ASSESSED_LEVEL_MAX}.`,
+      );
       return;
     }
     setRequestLevelBusy(true);
@@ -790,8 +796,8 @@ export function ProfilePage() {
                   <TextInput
                     id="pf-assessed-level"
                     type="number"
-                    min={1}
-                    max={20}
+                    min={ASSESSED_LEVEL_MIN}
+                    max={ASSESSED_LEVEL_MAX}
                     value={requestLevelDraft}
                     placeholder="e.g. 5"
                     onChange={(_, v) => {

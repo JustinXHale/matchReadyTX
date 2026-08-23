@@ -19,6 +19,10 @@ export type ContactRow = {
   team_name: string;
   email: string;
   phone?: string;
+  /** Person / club-contact name from the Name column. */
+  name?: string;
+  /** Conference / competition from Contacts (e.g. Lonestar Men). */
+  conference?: string;
 };
 
 export type LocationRow = {
@@ -35,7 +39,74 @@ export type LocationRow = {
 };
 
 function normHeader(h: string): string {
-  return h.trim().toLowerCase().replace(/\s+/g, '_');
+  return h
+    .replace(/^\uFEFF/, '')
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, '_');
+}
+
+function cleanPhone(raw?: string): string | undefined {
+  const s = (raw ?? '')
+    .replace(/[\u200e\u200f\u202a-\u202e\u2066-\u2069]/g, '')
+    .trim();
+  return s || undefined;
+}
+
+/** Real mailbox only — blank / phone-only Contacts rows are skipped. */
+export function isUsableEmail(raw: string): boolean {
+  const e = raw.trim().toLowerCase();
+  const at = e.indexOf('@');
+  if (at <= 0) return false;
+  const domain = e.slice(at + 1);
+  return domain.includes('.') && !/\s/.test(e);
+}
+
+function softenName(raw: string): string {
+  return raw
+    .trim()
+    .toLowerCase()
+    .replace(/[''`]/g, '')
+    .replace(/\bst\.?\b/g, 'saint')
+    .replace(/[^a-z0-9]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function stripInstitution(soft: string): string {
+  return soft
+    .replace(/^(the\s+)?(university|univ)\s+of\s+/, '')
+    .replace(/\b(university|univ|college)\s*$/, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+/**
+ * Keys used to join Contacts `team_name` to schedule / Locations clubs.
+ * Handles full names vs abbreviations and "Texas State (TXST)".
+ */
+export function contactMatchKeys(raw: string): string[] {
+  const trimmed = raw.trim();
+  if (!trimmed) return [];
+  const keys = new Set<string>();
+  const add = (s: string) => {
+    const soft = softenName(s);
+    if (!soft) return;
+    keys.add(soft);
+    keys.add(soft.replace(/\s+/g, ''));
+    const stripped = stripInstitution(soft);
+    if (stripped && stripped !== soft) {
+      keys.add(stripped);
+      keys.add(stripped.replace(/\s+/g, ''));
+    }
+  };
+  add(trimmed);
+  const paren = trimmed.match(/^(.*)\(([^)]+)\)\s*$/);
+  if (paren) {
+    add(paren[1]!);
+    add(paren[2]!);
+  }
+  return [...keys];
 }
 
 /** Map 2D values (header row + data) to objects keyed by normalized header. */
@@ -146,14 +217,35 @@ export function parseScheduleRows(values: string[][]): ScheduleRow[] {
 export function parseContactRows(values: string[][]): ContactRow[] {
   if (!values.length) return [];
   const headers = values[0]!.map((h) => normHeader(String(h ?? '')));
-  if (!headers.includes('team_name') || !headers.includes('email')) return [];
+  const alias = (names: string[]): string | null => {
+    for (const n of names) {
+      if (headers.includes(n)) return n;
+    }
+    return null;
+  };
+
+  const teamKey = alias(['team_name', 'team', 'club', 'club_name']);
+  const emailKey = alias(['email', 'e_mail', 'e-mail']);
+  if (!teamKey || !emailKey) return [];
+  const phoneKey = alias(['phone', 'mobile', 'cell', 'phone_number']);
+  const personKey = alias(['name', 'contact_name', 'contact', 'person']);
+  const confKey = alias(['conference', 'competition', 'league', 'comp']);
+
   return rowsFromValues(values)
-    .filter((r) => r.team_name && r.email)
-    .map((r) => ({
-      team_name: r.team_name!,
-      email: r.email!.toLowerCase(),
-      phone: r.phone || undefined,
-    }));
+    .map((r) => {
+      const team_name = (r[teamKey] ?? '').trim();
+      const email = (r[emailKey] ?? '').trim().toLowerCase();
+      return {
+        team_name,
+        email,
+        phone: phoneKey ? cleanPhone(r[phoneKey]) : undefined,
+        name: personKey ? (r[personKey] ?? '').trim() || undefined : undefined,
+        conference: confKey
+          ? (r[confKey] ?? '').trim() || undefined
+          : undefined,
+      };
+    })
+    .filter((r) => r.team_name && isUsableEmail(r.email));
 }
 
 export function parseLocationRows(values: string[][]): LocationRow[] {

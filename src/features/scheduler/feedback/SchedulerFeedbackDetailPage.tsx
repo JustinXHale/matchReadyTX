@@ -1,5 +1,5 @@
 import { Button, FormGroup, TextInput, TextArea, Title } from '@patternfly/react-core';
-import { Link, useNavigate, useParams } from 'react-router-dom';
+import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
 import { useApp, useAppHref } from '@/app/AppContext';
 import {
   COACH_FEEDBACK_COMMENT_BLOCKS,
@@ -59,9 +59,17 @@ function ReadOnlyYesNo({
 
 export function SchedulerFeedbackDetailPage() {
   const { feedbackId = '' } = useParams();
-  const { state, hasAssignerRole } = useApp();
+  const location = useLocation();
+  const { state, hasInsightsAccess } = useApp();
   const navigate = useNavigate();
-  const listHref = useAppHref('/scheduler/feedback');
+  const insightsList = useAppHref('/insights/reports/coach-feedback');
+  const schedulerList = useAppHref('/scheduler/feedback');
+  const listHref = location.pathname.includes('/insights')
+    ? insightsList
+    : schedulerList;
+  const backLabel = location.pathname.includes('/insights')
+    ? 'Back to coach feedback'
+    : 'Back to Feedback';
   const memberBase = useAppHref('/about/members');
 
   const feedback = state.coachFeedback.find((f) => f.id === feedbackId);
@@ -69,10 +77,10 @@ export function SchedulerFeedbackDetailPage() {
     ? state.matches.find((m) => m.id === feedback.matchId)
     : undefined;
 
-  if (!hasAssignerRole) {
+  if (!hasInsightsAccess) {
     return (
       <p className="rs-match-card__meta">
-        Scheduler tools require an assigner role.
+        You do not have access to view coach feedback reports.
       </p>
     );
   }
@@ -84,7 +92,7 @@ export function SchedulerFeedbackDetailPage() {
           Feedback not found
         </Title>
         <Button variant="link" onClick={() => navigate(listHref)}>
-          Back to Feedback
+          {backLabel}
         </Button>
       </div>
     );
@@ -118,7 +126,7 @@ export function SchedulerFeedbackDetailPage() {
         className="rs-detail__back"
         onClick={() => navigate(listHref)}
       >
-        ← Feedback
+        ← {backLabel}
       </Button>
       <Title headingLevel="h1" size="lg">
         Coach feedback

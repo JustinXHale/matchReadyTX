@@ -1,6 +1,16 @@
 /** Domain types for MatchReadyTX — see docs/IMPLEMENTATION_SPEC.md */
 
-export type Role = 'assigner' | 'teamAdmin' | 'official' | 'cmo' | 'fan';
+export type Role =
+  | 'assigner'
+  | 'teamAdmin'
+  | 'official'
+  | 'cmo'
+  | 'fan'
+  | 'reportAnalytics';
+
+/** Society assessed grade range (scheduler-set; members may request within same range). */
+export const ASSESSED_LEVEL_MIN = 1;
+export const ASSESSED_LEVEL_MAX = 10;
 
 export type CrewSlot = 'mo' | 'ar1' | 'ar2' | 'no4';
 
@@ -291,11 +301,11 @@ export interface UserProfile {
   /** Society referee grade (e.g. 5). Optional — officials may choose “I don’t know”. */
   refereeLevel?: number;
   /**
-   * CMO/society-assessed grade — true level independent of self-reported refereeLevel.
+   * CMO/society-assessed grade (1–10) — true level independent of self-reported refereeLevel.
    * Only schedulers set this; members may request via requestedAssessedLevel.
    */
   assessedLevel?: number;
-  /** Pending society level request — official asks scheduler to assess at this grade. */
+  /** Pending society level request — official asks scheduler to assess at this grade (1–10). */
   requestedAssessedLevel?: number;
   /**
    * Competitions this user may manage as assigner. Omit/empty = all org competitions.
@@ -349,6 +359,12 @@ export interface OrgSettings {
   sheetSyncError?: string;
 }
 
+export type TeamContactPerson = {
+  name?: string;
+  email: string;
+  phone?: string;
+};
+
 export interface Team {
   id: string;
   name: string;
@@ -361,6 +377,8 @@ export interface Team {
   address?: string;
   contactEmails: string[];
   contactPhones?: string[];
+  /** Named people from Contacts (email required; rows without email are omitted). */
+  contactPeople?: TeamContactPerson[];
 }
 
 export interface NotificationLogEntry {

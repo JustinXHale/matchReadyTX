@@ -14,7 +14,7 @@ import {
   useApp,
 } from '@/app/AppContext';
 import { MobileShell } from '@/app/MobileShell';
-import { RequireAuth, RequireProfileIncomplete, RequireMembersAccess } from '@/app/guards';
+import { RequireAuth, RequireProfileIncomplete, RequireMembersAccess, RequireInsightsAccess } from '@/app/guards';
 import {
   isDemoPath,
   stripDemoPrefix,
@@ -254,6 +254,36 @@ const SchedulerFeedbackDetailPage = lazy(() =>
     (m) => ({ default: m.SchedulerFeedbackDetailPage }),
   ),
 );
+const InsightsLayout = lazy(() =>
+  import('@/features/insights/InsightsLayout').then((m) => ({
+    default: m.InsightsLayout,
+  })),
+);
+const InsightsReportsLayout = lazy(() =>
+  import('@/features/insights/InsightsReportsLayout').then((m) => ({
+    default: m.InsightsReportsLayout,
+  })),
+);
+const InsightsOfficialsPage = lazy(() =>
+  import('@/features/insights/InsightsOfficialsPage').then((m) => ({
+    default: m.InsightsOfficialsPage,
+  })),
+);
+const InsightsOverviewPage = lazy(() =>
+  import('@/features/insights/InsightsOverviewPage').then((m) => ({
+    default: m.InsightsOverviewPage,
+  })),
+);
+const InsightsCoachFeedbackPage = lazy(() =>
+  import('@/features/insights/InsightsCoachFeedbackPage').then((m) => ({
+    default: m.InsightsCoachFeedbackPage,
+  })),
+);
+const InsightsCmoReportsPage = lazy(() =>
+  import('@/features/insights/InsightsCmoReportsPage').then((m) => ({
+    default: m.InsightsCmoReportsPage,
+  })),
+);
 const MatchDetailPage = lazy(() =>
   import('@/features/matches/MatchDetailPage').then((m) => ({
     default: m.MatchDetailPage,
@@ -296,6 +326,16 @@ function AppNavigate({
   const { dataMode } = useApp();
   const target = dataMode === 'demo' ? withDemoPrefix(to) : to;
   return <Navigate to={target} replace={replace} />;
+}
+
+function InsightsGradeRedirect() {
+  const { level = '' } = useParams();
+  return (
+    <AppNavigate
+      to={`/insights/officials?grade=${encodeURIComponent(level)}`}
+      replace
+    />
+  );
 }
 
 /** Old `/members` URLs now live under About. */
@@ -505,6 +545,48 @@ function FeatureRoutes() {
         <Route path="teams">
           <Route index element={<GlobalTeamsPage />} />
           <Route path=":teamId" element={<GlobalTeamDetailPage />} />
+        </Route>
+      </Route>
+      <Route element={<RequireInsightsAccess />}>
+        <Route element={<InsightsLayout />}>
+          <Route path="insights" element={<InsightsOverviewPage />} />
+          <Route path="insights/officials" element={<InsightsOfficialsPage />} />
+          <Route
+            path="insights/grade/:level"
+            element={<InsightsGradeRedirect />}
+          />
+          <Route element={<InsightsReportsLayout />}>
+            <Route
+              path="insights/reports"
+              element={<AppNavigate to="/insights/reports/cmo" replace />}
+            />
+            <Route
+              path="insights/reports/cmo"
+              element={<InsightsCmoReportsPage />}
+            />
+            <Route
+              path="insights/reports/coach-feedback"
+              element={<InsightsCoachFeedbackPage />}
+            />
+            <Route
+              path="insights/reports/coach-feedback/:feedbackId"
+              element={<SchedulerFeedbackDetailPage />}
+            />
+          </Route>
+          <Route
+            path="insights/coach-feedback"
+            element={
+              <AppNavigate to="/insights/reports/coach-feedback" replace />
+            }
+          />
+          <Route
+            path="insights/coach-feedback/:feedbackId"
+            element={<SchedulerFeedbackDetailPage />}
+          />
+          <Route
+            path="insights/cmo-reports"
+            element={<AppNavigate to="/insights/reports/cmo" replace />}
+          />
         </Route>
       </Route>
       <Route

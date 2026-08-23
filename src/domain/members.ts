@@ -292,6 +292,7 @@ export function rolePillsForMember(roles: Role[]): string[] {
   if (roles.includes('cmo')) labels.push('CMO');
   if (roles.includes('teamAdmin')) labels.push('Team Admin');
   if (roles.includes('assigner')) labels.push('Scheduler');
+  if (roles.includes('reportAnalytics')) labels.push('Insights');
   if (roles.includes('fan')) labels.push('Fan');
   return labels;
 }
