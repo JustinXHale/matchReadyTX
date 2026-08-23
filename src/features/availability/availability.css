@@ -124,6 +124,10 @@
   font: inherit;
 }
 
+.rs-avail-day__hit--static {
+  cursor: default;
+}
+
 .rs-avail-day--empty {
   visibility: hidden;
   pointer-events: none;

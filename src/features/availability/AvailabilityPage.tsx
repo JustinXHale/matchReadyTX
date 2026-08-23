@@ -20,7 +20,6 @@ import {
   dayAvailability,
   DEFAULT_AVAIL_END_HM,
   DEFAULT_AVAIL_START_HM,
-  formatDayWindowsLabel,
   setDayState,
   setWeekdayInMonth,
   type TimeWindow,
@@ -32,6 +31,8 @@ import {
   syncUserAvailabilityRanges,
 } from '@/services/availability';
 import { IconDateInput } from '@/ui/IconDateInput';
+import { AvailabilityMonthCalendar } from '@/features/availability/AvailabilityMonthCalendar';
+import { monthTitle } from '@/features/availability/availabilityCalendar';
 
 const WEEKDAY_LABELS = [
   { d: 0, label: 'S', title: 'Sunday' },
@@ -42,44 +43,6 @@ const WEEKDAY_LABELS = [
   { d: 5, label: 'F', title: 'Friday', busy: true },
   { d: 6, label: 'S', title: 'Saturday', busy: true },
 ] as const;
-
-const DOW_HEADERS = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
-
-function monthTitle(year: number, month: number): string {
-  return new Date(Date.UTC(year, month - 1, 1)).toLocaleDateString(undefined, {
-    month: 'long',
-    year: 'numeric',
-    timeZone: 'UTC',
-  });
-}
-
-function todayDayKey(timeZone: string): string {
-  const parts = new Intl.DateTimeFormat('en-US', {
-    timeZone,
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-  }).formatToParts(new Date());
-  const bag: Record<string, string> = {};
-  for (const p of parts) {
-    if (p.type !== 'literal') bag[p.type] = p.value;
-  }
-  return `${bag.year}-${bag.month}-${bag.day}`;
-}
-
-function buildMonthCells(year: number, month: number): (string | null)[] {
-  const firstDow = new Date(Date.UTC(year, month - 1, 1)).getUTCDay();
-  const daysInMonth = new Date(Date.UTC(year, month, 0)).getUTCDate();
-  const cells: (string | null)[] = [];
-  for (let i = 0; i < firstDow; i++) cells.push(null);
-  for (let d = 1; d <= daysInMonth; d++) {
-    cells.push(
-      `${year}-${String(month).padStart(2, '0')}-${String(d).padStart(2, '0')}`,
-    );
-  }
-  while (cells.length % 7 !== 0) cells.push(null);
-  return cells;
-}
 
 function defaultWindow(): TimeWindow {
   return {
@@ -117,19 +80,17 @@ export function AvailabilityPage() {
   const [patEnd, setPatEnd] = useState(DEFAULT_AVAIL_END_HM);
   const [patDays, setPatDays] = useState<number[]>([5, 6]);
 
-  const todayKey = useMemo(() => todayDayKey(timeZone), [timeZone]);
-  const togglePatDay = useCallback((d: number) => {
-    setPatDays((prev) =>
-      prev.includes(d) ? prev.filter((x) => x !== d) : [...prev, d].sort(),
-    );
-  }, []);
-
   const uid = currentUser?.uid ?? '';
   const mineAll = useMemo(
     () => state.availability.filter((r) => r.userId === uid),
     [state.availability, uid],
   );
-  const cells = useMemo(() => buildMonthCells(year, month), [year, month]);
+
+  const togglePatDay = useCallback((d: number) => {
+    setPatDays((prev) =>
+      prev.includes(d) ? prev.filter((x) => x !== d) : [...prev, d].sort(),
+    );
+  }, []);
 
   if (!currentUser) return null;
 
@@ -169,16 +130,7 @@ export function AvailabilityPage() {
 
   const nextId = () => store.nextAvailabilityId();
 
-  const shiftMonth = (delta: number) => {
-    let m = month + delta;
-    let y = year;
-    if (m < 1) {
-      m = 12;
-      y -= 1;
-    } else if (m > 12) {
-      m = 1;
-      y += 1;
-    }
+  const onMonthChange = (y: number, m: number) => {
     setYear(y);
     setMonth(m);
   };
@@ -326,19 +278,6 @@ export function AvailabilityPage() {
         Use Edit on an open day to set one or more time windows.
       </p>
 
-      <div className="rs-avail-legend" aria-label="Legend">
-        <span className="rs-avail-legend__item">
-          <span className="rs-avail-swatch rs-avail-swatch--available" />{' '}
-          Available
-        </span>
-        <span className="rs-avail-legend__item">
-          <span className="rs-avail-swatch rs-avail-swatch--blocked" /> Blocked
-        </span>
-        <span className="rs-avail-legend__item">
-          <span className="rs-avail-swatch rs-avail-swatch--unmarked" /> Closed
-        </span>
-      </div>
-
       <div className="rs-avail-toolbar">
         <Button variant="secondary" onClick={() => setPatternOpen(true)}>
           Set pattern
@@ -348,96 +287,17 @@ export function AvailabilityPage() {
         </Button>
       </div>
 
-      <section
-        className="rs-detail-card rs-avail-cal"
-        aria-label="Month calendar"
-      >
-        <div className="rs-avail-cal__nav">
-          <Button
-            variant="plain"
-            className="rs-avail-cal__nav-btn"
-            aria-label="Previous month"
-            onClick={() => shiftMonth(-1)}
-          >
-            ‹
-          </Button>
-          <h3 className="rs-avail-cal__title">{monthTitle(year, month)}</h3>
-          <Button
-            variant="plain"
-            className="rs-avail-cal__nav-btn"
-            aria-label="Next month"
-            onClick={() => shiftMonth(1)}
-          >
-            ›
-          </Button>
-        </div>
-        <div className="rs-avail-cal__dow" aria-hidden>
-          {DOW_HEADERS.map((h, i) => (
-            <span
-              key={`${h}-${i}`}
-              className={
-                i === 5 || i === 6 ? 'rs-avail-cal__dow--busy' : undefined
-              }
-            >
-              {h}
-            </span>
-          ))}
-        </div>
-        <div
-          className="rs-avail-cal__grid"
-          role="grid"
-          aria-label={monthTitle(year, month)}
-        >
-          {cells.map((dayKey, idx) => {
-            if (!dayKey) {
-              return (
-                <div
-                  key={`e-${idx}`}
-                  className="rs-avail-day rs-avail-day--empty"
-                />
-              );
-            }
-            const day = dayAvailability(mineAll, uid, dayKey, timeZone);
-            const dom = Number(dayKey.slice(-2));
-            const isToday = dayKey === todayKey;
-            const windowLabel = formatDayWindowsLabel(day.windows);
-            return (
-              <div
-                key={dayKey}
-                role="gridcell"
-                className={`rs-avail-day rs-avail-day--${day.state}${
-                  isToday ? ' rs-avail-day--today' : ''
-                }`}
-              >
-                <button
-                  type="button"
-                  className="rs-avail-day__hit"
-                  aria-label={`${dayKey}, ${day.state}${
-                    windowLabel ? `, ${windowLabel}` : ''
-                  }`}
-                  disabled={busy}
-                  onClick={() => onTapDay(dayKey)}
-                  onContextMenu={(e) => openTimeEdit(dayKey, e)}
-                >
-                  <span className="rs-avail-day__num">{dom}</span>
-                  {day.state === 'available' && windowLabel && (
-                    <span className="rs-avail-day__time">{windowLabel}</span>
-                  )}
-                </button>
-                {day.state === 'available' && (
-                  <button
-                    type="button"
-                    className="rs-avail-day__edit"
-                    onClick={(e) => openTimeEdit(dayKey, e)}
-                  >
-                    Edit
-                  </button>
-                )}
-              </div>
-            );
-          })}
-        </div>
-      </section>
+      <AvailabilityMonthCalendar
+        ranges={mineAll}
+        userId={uid}
+        timeZone={timeZone}
+        year={year}
+        month={month}
+        onMonthChange={onMonthChange}
+        busy={busy}
+        onDayTap={onTapDay}
+        onDayTimeEdit={openTimeEdit}
+      />
 
       {error && (
         <p className="rs-match-card__meta" role="alert">

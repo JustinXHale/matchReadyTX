@@ -204,14 +204,17 @@ export function useSchedulerRequestActions() {
     setFixtureBusyId(id);
     try {
       if (dataMode === 'live' && isFirebaseConfigured) {
-        await callApproveFixtureRequest({ requestId: id });
+        store.markFixtureRequestApprovedOptimistic(id, reviewerId);
         refresh();
+        setFixtureBusyId(null);
+        await callApproveFixtureRequest({ requestId: id });
       } else {
         store.approveFixtureRequest(id, reviewerId);
         refresh();
       }
     } catch (err) {
       console.error('Approve fixture failed', err);
+      refresh();
       window.alert(
         err instanceof Error
           ? err.message
@@ -255,19 +258,19 @@ export function useSchedulerRequestActions() {
     if (!reviewerId) return;
     setTeamLinkBusyId(id);
     try {
+      store.reviewTeamLinkRequest(id, reviewerId, decision, reason);
+      refresh();
+      setTeamLinkBusyId(null);
       if (dataMode === 'live' && isFirebaseConfigured) {
         await callReviewTeamLinkRequest({
           requestId: id,
           decision,
           denyReason: reason,
         });
-        refresh();
-      } else {
-        store.reviewTeamLinkRequest(id, reviewerId, decision, reason);
-        refresh();
       }
     } catch (err) {
       console.error('Team link review failed', err);
+      refresh();
       window.alert(
         err instanceof Error
           ? err.message

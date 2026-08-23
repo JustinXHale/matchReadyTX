@@ -1,5 +1,4 @@
 import { useMemo } from 'react';
-import { EmptyState, EmptyStateBody } from '@patternfly/react-core';
 import { useApp } from '@/app/AppContext';
 import { compareKickoffAsc } from '@/domain/divisionFilters';
 import { GlobalDivisionFilters } from '@/features/global/GlobalDivisionFilters';
@@ -41,16 +40,6 @@ export function SchedulerQueuesRaiseHandRequestsPage() {
     });
   }, [state.requests, state.matches, filterRaiseHand]);
 
-  if (!filtersActive && raiseHand.length === 0) {
-    return (
-      <EmptyState titleText="No raise-hand requests" headingLevel="h3">
-        <EmptyStateBody>
-          No referees have raised their hand for an open crew slot.
-        </EmptyStateBody>
-      </EmptyState>
-    );
-  }
-
   return (
     <>
       <p className="rs-match-card__meta">
@@ -70,17 +59,22 @@ export function SchedulerQueuesRaiseHandRequestsPage() {
         availableDates={availableDatesForRaiseHand}
         ariaLabel="Filter raise-hand requests by division"
       />
-      {filtersActive && raiseHand.length === 0 && (
+      {filtersActive && raiseHand.length === 0 ? (
         <p className="rs-match-card__meta">
           No raise-hand requests for these filters. Clear competition, date, or
           chips to see everything.
         </p>
+      ) : raiseHand.length === 0 ? (
+        <p className="rs-match-card__meta">
+          No referees have raised their hand for an open crew slot.
+        </p>
+      ) : (
+        <RaiseHandQueue
+          requests={raiseHand}
+          onApprove={onApproveRaiseHand}
+          onDecline={onDeclineRaiseHand}
+        />
       )}
-      <RaiseHandQueue
-        requests={raiseHand}
-        onApprove={onApproveRaiseHand}
-        onDecline={onDeclineRaiseHand}
-      />
     </>
   );
 }

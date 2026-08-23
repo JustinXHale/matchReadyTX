@@ -71,7 +71,7 @@ export function TeamLinkRequestQueue({
             <div className="rs-actions">
               <Button
                 variant="primary"
-                isDisabled={busyId != null}
+                isDisabled={busyId === r.id}
                 isLoading={busyId === r.id}
                 onClick={() => onApprove(r.id)}
               >
@@ -80,7 +80,7 @@ export function TeamLinkRequestQueue({
               <Button
                 variant="secondary"
                 isDanger
-                isDisabled={busyId != null}
+                isDisabled={busyId === r.id}
                 onClick={() => setDenyId(r.id)}
               >
                 Deny

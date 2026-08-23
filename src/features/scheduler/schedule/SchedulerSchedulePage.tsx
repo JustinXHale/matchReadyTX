@@ -7,6 +7,7 @@ import {
   Title,
 } from '@patternfly/react-core';
 import { useApp } from '@/app/AppContext';
+import { namedOfficialsNeedingAvailability } from '@/domain/crew';
 import { statusLabel } from '@/domain/matchTransitions';
 import {
   compareKickoffAsc,
@@ -68,6 +69,15 @@ function hasOpenCrewSlot(m: Match): boolean {
   });
 }
 
+/** Named officials who have not accepted yet (crew column shows "MO Pending", etc.). */
+function hasCrewAcceptancePending(m: Match): boolean {
+  return namedOfficialsNeedingAvailability(m).length > 0;
+}
+
+function matchesCrewPendingFilter(m: Match): boolean {
+  return m.status === 'crew_pending' || hasCrewAcceptancePending(m);
+}
+
 /** Assigner schedule browse — all org matches, not only released. */
 export function SchedulerSchedulePage() {
   const { currentUser, state } = useApp();
@@ -96,6 +106,7 @@ export function SchedulerSchedulePage() {
             return false;
           }
           if (statusFilter === 'open_slots') return hasOpenCrewSlot(m);
+          if (statusFilter === 'crew_pending') return matchesCrewPendingFilter(m);
           if (statusFilter !== 'all' && m.status !== statusFilter) return false;
           return true;
         }),
@@ -119,6 +130,7 @@ export function SchedulerSchedulePage() {
         }
         if (!matchOnCalendarDate(m, dateFilter)) return false;
         if (statusFilter === 'open_slots') return hasOpenCrewSlot(m);
+        if (statusFilter === 'crew_pending') return matchesCrewPendingFilter(m);
         if (statusFilter !== 'all' && m.status !== statusFilter) return false;
         return true;
       })

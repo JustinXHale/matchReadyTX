@@ -86,6 +86,10 @@ import {
   matchDetailHeaderReportLinks,
   matchDetailReportActions,
 } from '@/features/referee/reports/reportLinks';
+import {
+  MatchAssignerMenu,
+  type AssignerMenuAction,
+} from '@/features/matches/MatchAssignerMenu';
 
 type CrewPickTarget = {
   slot: RequestableSlot;
@@ -269,11 +273,21 @@ export function MatchDetailPage() {
     blockId: string;
   } | null>(null);
   const [coverageAlertSent, setCoverageAlertSent] = useState(false);
+  const [assignerConfirm, setAssignerConfirm] =
+    useState<AssignerMenuAction | null>(null);
+  /** In-progress fee edits — keeps empty/partial input from snapping to org default. */
+  const [feeDrafts, setFeeDrafts] = useState<
+    Partial<Record<RequestableSlot, string>>
+  >({});
   const [requestSlot, setRequestSlot] = useState<RequestableSlot | ''>('');
   const [requestNote, setRequestNote] = useState('');
   const [requestToast, setRequestToast] = useState(false);
   const requestSectionRef = useRef<HTMLElement | null>(null);
   const titleRowRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    setFeeDrafts({});
+  }, [id]);
 
   const persistSelfServiceIfLive = useCallback(
     (input: Parameters<typeof callMatchSelfService>[0]) => {
@@ -808,6 +822,30 @@ export function MatchDetailPage() {
     });
   };
 
+  const feeFieldValue = (
+    slot: RequestableSlot,
+    def: number,
+    override?: number,
+  ): string => {
+    if (feeDrafts[slot] !== undefined) return feeDrafts[slot]!;
+    if (override != null) return String(override);
+    return String(def);
+  };
+
+  const onFeeFieldChange = (slot: RequestableSlot, raw: string) => {
+    setFeeDrafts((prev) => ({ ...prev, [slot]: raw }));
+    setSlotFee(slot, raw);
+  };
+
+  const onFeeFieldBlur = (slot: RequestableSlot) => {
+    setFeeDrafts((prev) => {
+      if (prev[slot] === undefined) return prev;
+      const next = { ...prev };
+      delete next[slot];
+      return next;
+    });
+  };
+
   const canToggleTeamDetails = (side: 'home' | 'away') => {
     if (match.status === 'change_proposed') return false;
     // Scheduler can set either side.
@@ -967,6 +1005,26 @@ export function MatchDetailPage() {
     setDenyProposalId(null);
   };
 
+  const confirmAssignerAction = () => {
+    if (!assignerConfirm) return;
+    switch (assignerConfirm) {
+      case 'alert_coverage':
+        store.sendCoverageAlert(match.id);
+        setCoverageAlertSent(true);
+        break;
+      case 'cancel':
+        store.cancelOrPostpone(match.id, 'cancel');
+        break;
+      case 'postpone':
+        store.cancelOrPostpone(match.id, 'postpone');
+        break;
+      case 'reactivate':
+        store.reactivateMatch(match.id);
+        break;
+    }
+    setAssignerConfirm(null);
+  };
+
   const stickyPrimary = (() => {
     if (needsOfficialConfirm && mySlot) {
       return null; // Accept / Decline split bar below
@@ -1092,56 +1150,37 @@ export function MatchDetailPage() {
             <span className="rs-detail__ha">(A)</span> {match.awayTeamName}
           </span>
         </Title>
-        <div className="rs-detail__title-actions">
-          {headerReportLinks.map((link) => (
-            <Button
-              key={link.to + link.label}
-              variant="secondary"
-              size="sm"
-              onClick={() =>
-                navigate(link.to, {
-                  state: backState({
-                    to: `/matches/${match.id}`,
-                    label: 'Match',
-                  }),
-                })
-              }
-            >
-              {link.label}
-            </Button>
-          ))}
-          {isAssigner && (
-            <>
-              {canAlertCoverage && (
-                <Button
-                  variant="secondary"
-                  size="sm"
-                  onClick={() => {
-                    store.sendCoverageAlert(match.id);
-                    setCoverageAlertSent(true);
-                  }}
-                >
-                  {coverageAlertSent ? 'Resend alert' : 'Alert refs'}
-                </Button>
-              )}
+        {(headerReportLinks.length > 0 || isAssigner) && (
+          <div className="rs-detail__title-actions">
+            {headerReportLinks.map((link) => (
               <Button
+                key={link.to + link.label}
                 variant="secondary"
                 size="sm"
-                isDanger
-                onClick={() => store.cancelOrPostpone(match.id, 'cancel')}
+                onClick={() =>
+                  navigate(link.to, {
+                    state: backState({
+                      to: `/matches/${match.id}`,
+                      label: 'Match',
+                    }),
+                  })
+                }
               >
-                Cancel
+                {link.label}
               </Button>
-              <Button
-                variant="secondary"
-                size="sm"
-                onClick={() => store.cancelOrPostpone(match.id, 'postpone')}
-              >
-                Postpone
-              </Button>
-            </>
-          )}
-        </div>
+            ))}
+            {isAssigner && (
+              <MatchAssignerMenu
+                match={match}
+                canAlertCoverage={canAlertCoverage}
+                coverageAlertLabel={
+                  coverageAlertSent ? 'Resend alert' : 'Alert refs'
+                }
+                onAction={setAssignerConfirm}
+              />
+            )}
+          </div>
+        )}
       </div>
 
       {match.title?.trim() ? (
@@ -1653,14 +1692,13 @@ export function MatchDetailPage() {
                         <label key={slot} className="rs-detail-fee-edit__field">
                           <span>{REQUESTABLE_SLOT_SHORT[slot]}</span>
                           <TextInput
-                            type="number"
-                            min={0}
-                            step={1}
-                            value={
-                              override != null ? String(override) : String(def)
-                            }
+                            type="text"
+                            inputMode="numeric"
+                            pattern="[0-9]*"
+                            value={feeFieldValue(slot, def, override)}
                             aria-label={`${REQUESTABLE_SLOT_LABELS[slot]} fee`}
-                            onChange={(_, v) => setSlotFee(slot, v)}
+                            onChange={(_, v) => onFeeFieldChange(slot, v)}
+                            onBlur={() => onFeeFieldBlur(slot)}
                           />
                         </label>
                       );
@@ -2127,29 +2165,30 @@ export function MatchDetailPage() {
       </section>
 
       {isAssigner && (
-        <section className="rs-detail-card" aria-labelledby="history-heading">
-          <h3 id="history-heading" className="rs-detail-section__label">
-            Assignment history
-          </h3>
-          {assignmentHistory.length === 0 ? (
-            <p className="rs-match-card__meta">
-              No assignment history on this match yet.
-            </p>
-          ) : (
-            <ul className="rs-history-list">
-              {assignmentHistory.map(({ slot, entry }) => (
-                <li key={entry.id}>
-                  <strong>
-                    {CREW_SLOT_LABELS[slot]} · {entry.action.replace(/_/g, ' ')}
-                  </strong>
-                  <div className="rs-match-card__meta">
-                    {entry.userName} · {new Date(entry.at).toLocaleString()}
-                    {entry.reason ? ` · ${entry.reason}` : ''}
-                  </div>
-                </li>
-              ))}
-            </ul>
-          )}
+        <section className="rs-detail-card">
+          <details className="rs-detail-tools rs-match-history-details">
+            <summary id="history-heading">Assignment history</summary>
+            {assignmentHistory.length === 0 ? (
+              <p className="rs-match-card__meta">
+                No assignment history on this match yet.
+              </p>
+            ) : (
+              <ul className="rs-history-list">
+                {assignmentHistory.map(({ slot, entry }) => (
+                  <li key={entry.id}>
+                    <strong>
+                      {CREW_SLOT_LABELS[slot]} ·{' '}
+                      {entry.action.replace(/_/g, ' ')}
+                    </strong>
+                    <div className="rs-match-card__meta">
+                      {entry.userName} · {new Date(entry.at).toLocaleString()}
+                      {entry.reason ? ` · ${entry.reason}` : ''}
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </details>
         </section>
       )}
 
@@ -2867,6 +2906,63 @@ export function MatchDetailPage() {
           </Button>
         </ModalFooter>
       </Modal>
+
+      <Modal
+        variant={ModalVariant.small}
+        isOpen={assignerConfirm != null}
+        onClose={() => setAssignerConfirm(null)}
+        aria-labelledby="assigner-action-title"
+        aria-describedby="assigner-action-desc"
+      >
+        <ModalHeader>
+          <Title headingLevel="h2" id="assigner-action-title" size="lg">
+            {assignerConfirm === 'alert_coverage'
+              ? coverageAlertSent
+                ? 'Resend coverage alert?'
+                : 'Alert officials?'
+              : assignerConfirm === 'cancel'
+                ? 'Cancel this match?'
+                : assignerConfirm === 'postpone'
+                  ? 'Postpone this match?'
+                  : 'Reactivate this match?'}
+          </Title>
+        </ModalHeader>
+        <ModalBody>
+          <p id="assigner-action-desc" className="rs-modal-lede">
+            {assignerConfirm === 'alert_coverage'
+              ? 'Send a coverage alert to officials who may be available for open roles on this match.'
+              : assignerConfirm === 'cancel'
+                ? 'The match will be marked cancelled. You can reactivate it later from the match menu if this was a mistake.'
+                : assignerConfirm === 'postpone'
+                  ? 'The match will be marked postponed. Team confirmations are cleared and assigned officials are held until teams reconfirm.'
+                  : match.status === 'postponed'
+                    ? 'The match returns to the schedule as needs reconfirmation. Teams and officials must confirm again.'
+                    : 'The match returns to the schedule at the appropriate workflow step based on current confirmations and crew.'}
+          </p>
+        </ModalBody>
+        <ModalFooter>
+          <Button variant="link" onClick={() => setAssignerConfirm(null)}>
+            Keep as is
+          </Button>
+          <Button
+            variant={
+              assignerConfirm === 'cancel' ? 'danger' : 'primary'
+            }
+            onClick={confirmAssignerAction}
+          >
+            {assignerConfirm === 'alert_coverage'
+              ? coverageAlertSent
+                ? 'Resend alert'
+                : 'Send alert'
+              : assignerConfirm === 'cancel'
+                ? 'Cancel match'
+                : assignerConfirm === 'postpone'
+                  ? 'Postpone match'
+                  : 'Reactivate match'}
+          </Button>
+        </ModalFooter>
+      </Modal>
+
       {requestToast && (
         <div className="rs-update-toast" role="status">
           <Alert

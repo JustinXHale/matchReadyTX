@@ -32,6 +32,10 @@
   text-align: center;
 }
 
+.rs-signin__hero .rs-brand-logo-wrap--fluid {
+  max-width: 72vw;
+}
+
 .rs-signin__logo {
   object-fit: contain;
   border-radius: 28px;

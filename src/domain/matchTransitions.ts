@@ -1,5 +1,10 @@
 import type { Match, MatchStatus } from './types';
-import { CREW_SLOTS, bothTeamsConfirmed, crewPeople } from './types';
+import {
+  CREW_SLOTS,
+  bothTeamsConfirmed,
+  crewPeople,
+  isCrewVisibleToTeams,
+} from './types';
 
 /** Pure match status transitions */
 
@@ -150,6 +155,60 @@ export function cancelMatch(match: Match, at = new Date().toISOString()): Match 
 export function postponeMatch(match: Match, at = new Date().toISOString()): Match {
   const held = markNeedsReconfirmation(match);
   return { ...held, status: 'postponed', postponedAt: at };
+}
+
+/** Best-effort workflow status from confirmations + crew (e.g. after accidental cancel). */
+export function inferWorkflowStatus(match: Match): MatchStatus {
+  if (!match.releasedAt) return 'draft';
+  if (!bothTeamsConfirmed(match)) return 'pending_team_review';
+
+  const hasNamedCrew = CREW_SLOTS.some((s) =>
+    crewPeople(match.crew[s]).some(
+      (a) =>
+        a.status === 'pending_internal' ||
+        a.status === 'official' ||
+        a.status === 'confirmed' ||
+        a.status === 'held',
+    ),
+  );
+  const moPeople = crewPeople(match.crew.mo);
+  if (moPeople.length === 0) {
+    return hasNamedCrew ? 'needs_reassignment' : 'team_confirmed';
+  }
+
+  const allFilledConfirmed = CREW_SLOTS.every((s) =>
+    crewPeople(match.crew[s]).every((a) => a.status === 'confirmed'),
+  );
+  if (
+    allFilledConfirmed &&
+    isCrewVisibleToTeams({ ...match, status: 'crew_confirmed' })
+  ) {
+    return 'crew_confirmed';
+  }
+  if (moPeople.some((a) => a.status === 'confirmed')) return 'mo_confirmed';
+  if (hasNamedCrew) return 'crew_pending';
+  return 'team_confirmed';
+}
+
+/** Undo cancel/postpone — postponed matches return to needs_reconfirmation. */
+export function reactivateMatch(match: Match): Match {
+  if (match.status !== 'cancelled' && match.status !== 'postponed') {
+    return match;
+  }
+  if (match.status === 'postponed') {
+    return {
+      ...match,
+      status: 'needs_reconfirmation',
+      cancelledAt: undefined,
+      postponedAt: undefined,
+    };
+  }
+  return {
+    ...match,
+    status: inferWorkflowStatus(match),
+    cancelledAt: undefined,
+    postponedAt: undefined,
+  };
 }
 
 export function enterT72(match: Match): Match {

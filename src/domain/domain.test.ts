@@ -25,7 +25,13 @@ import {
   shouldShowPendingFanBrowse,
   shouldShowTeamAdminLens,
 } from '@/domain/teamLinkRequests';
-import { confirmTeam, releaseMatch } from '@/domain/matchTransitions';
+import {
+  cancelMatch,
+  confirmTeam,
+  postponeMatch,
+  reactivateMatch,
+  releaseMatch,
+} from '@/domain/matchTransitions';
 import { assignOfficial, confirmOfficialSlot, markUnavailableAndRelease } from '@/domain/crew';
 import { emptyCrew, crewBlocks, crewPeople, emptyCrewBlocks, emptyAssignment, isCrewVisibleToTeams, type Match, type OrgSettings, type Team, type UserProfile } from '@/domain/types';
 import {
@@ -120,6 +126,26 @@ describe('match transitions', () => {
     expect(m.homeConfirmedAt).toBeTruthy();
     m = confirmTeam(m, 'away');
     expect(m.status).toBe('team_confirmed');
+  });
+
+  it('reactivateMatch restores cancelled match from workflow state', () => {
+    let m = releaseMatch(baseMatch());
+    m = confirmTeam(confirmTeam(m, 'home'), 'away');
+    m = cancelMatch(m);
+    expect(m.status).toBe('cancelled');
+    const back = reactivateMatch(m);
+    expect(back.status).toBe('team_confirmed');
+    expect(back.cancelledAt).toBeUndefined();
+  });
+
+  it('reactivateMatch from postponed returns to needs_reconfirmation', () => {
+    let m = releaseMatch(baseMatch());
+    m = confirmTeam(confirmTeam(m, 'home'), 'away');
+    m = postponeMatch(m);
+    expect(m.status).toBe('postponed');
+    const back = reactivateMatch(m);
+    expect(back.status).toBe('needs_reconfirmation');
+    expect(back.postponedAt).toBeUndefined();
   });
 });
 

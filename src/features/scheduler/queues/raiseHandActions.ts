@@ -26,6 +26,7 @@ export async function approveRaiseHandRequest(opts: {
   if (!before) return;
 
   store.approveRequest(requestId, slot);
+  // assignCrew / approveRequest already notify demoStore subscribers.
 
   if (dataMode !== 'live' || !isFirebaseConfigured) return;
 

@@ -20,7 +20,7 @@ export function BrandLogo({
   return (
     <span
       className={
-        isMastheadSize ? 'rs-brand-logo-wrap' : 'rs-brand-logo-wrap rs-brand-logo-wrap--fluid'
+        isMastheadSize ? 'rs-brand-logo-wrap' : 'rs-brand-logo-wrap--fluid'
       }
       style={
         isMastheadSize

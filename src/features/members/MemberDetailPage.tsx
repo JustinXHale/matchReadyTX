@@ -15,7 +15,6 @@ import {
 } from '@patternfly/react-core';
 import { useApp } from '@/app/AppContext';
 import {
-  availabilityForUser,
   fanFavoriteLabel,
   formatMemberAddress,
   formatMemberJoinedAt,
@@ -58,27 +57,21 @@ import {
 } from '@/ui/ConferenceTeamPicker';
 import { RefereeLevelChart } from '@/ui/RefereeLevelChart';
 import { UserAvatar } from '@/ui/UserAvatar';
+import { AvailabilityMonthCalendar } from '@/features/availability/AvailabilityMonthCalendar';
 
-const FALLBACK_BACK: BackNav = { to: '/about/members', label: 'Members' };
-
-function formatRange(isoStart: string, isoEnd: string): string {
-  const start = new Date(isoStart);
-  const end = new Date(isoEnd);
-  const day = start.toLocaleDateString(undefined, {
-    weekday: 'short',
+function formatBirthdayLabel(birthday: string | undefined): string | null {
+  const raw = birthday?.slice(0, 10) ?? '';
+  if (!raw) return null;
+  const d = new Date(`${raw}T12:00:00`);
+  if (Number.isNaN(d.getTime())) return raw;
+  return d.toLocaleDateString(undefined, {
     month: 'short',
     day: 'numeric',
+    year: 'numeric',
   });
-  const t0 = start.toLocaleTimeString(undefined, {
-    hour: 'numeric',
-    minute: '2-digit',
-  });
-  const t1 = end.toLocaleTimeString(undefined, {
-    hour: 'numeric',
-    minute: '2-digit',
-  });
-  return `${day} · ${t0}–${t1}`;
 }
+
+const FALLBACK_BACK: BackNav = { to: '/about/members', label: 'Members' };
 
 type EditDraft = {
   firstName: string;
@@ -148,6 +141,8 @@ export function MemberDetailPage() {
   const location = useLocation();
   const { state, hasAssignerRole, isAssignerView, store, currentUser } =
     useApp();
+  const timeZone = state.org.timezone || 'America/Chicago';
+  const availNow = new Date();
   const back = readBackNav(location.state) ?? FALLBACK_BACK;
   const goBack = () =>
     navigate(back.to, back.state !== undefined ? { state: back.state } : undefined);
@@ -181,8 +176,9 @@ export function MemberDetailPage() {
     [user, state.matches],
   );
 
-  const availability = useMemo(
-    () => (user ? availabilityForUser(state.availability, user.uid) : []),
+  const userAvailRanges = useMemo(
+    () =>
+      user ? state.availability.filter((r) => r.userId === user.uid) : [],
     [user, state.availability],
   );
 
@@ -197,6 +193,8 @@ export function MemberDetailPage() {
   const [editSaving, setEditSaving] = useState(false);
   const [editSaved, setEditSaved] = useState(false);
   const [editError, setEditError] = useState<string | null>(null);
+  const [availYear, setAvailYear] = useState(availNow.getFullYear());
+  const [availMonth, setAvailMonth] = useState(availNow.getMonth() + 1);
 
   useEffect(() => {
     if (!user) return;
@@ -255,6 +253,14 @@ export function MemberDetailPage() {
   const fanFavorite = isFan ? fanFavoriteLabel(user, state.teams) : null;
   const isSelf = currentUser?.uid === user.uid;
   const canDelete = canManage && !isSelf;
+  const memberFanOnly =
+    isFan &&
+    !user.roles.includes('official') &&
+    !user.roles.includes('teamAdmin') &&
+    !user.roles.includes('cmo') &&
+    !user.roles.includes('assigner') &&
+    !user.roles.includes('reportAnalytics');
+  const birthdayLabel = formatBirthdayLabel(user.birthday);
 
   const editFanOnly =
     Boolean(editDraft) &&
@@ -513,7 +519,11 @@ export function MemberDetailPage() {
   };
 
   return (
-    <div className="rs-stack">
+    <div
+      className={`rs-stack rs-member-page${
+        editing ? ' rs-member-page--editing' : ''
+      }`}
+    >
       <button type="button" className="rs-detail__back" onClick={goBack}>
         ← {backLabel}
       </button>
@@ -554,47 +564,368 @@ export function MemberDetailPage() {
       </section>
 
       <section className="rs-detail-card" aria-labelledby="member-contact">
-        <h2 id="member-contact" className="rs-detail-section__label">
-          Contact
-        </h2>
-        <dl className="rs-member-dl">
-          <div>
-            <dt>Email</dt>
-            <dd>
-              <a href={`mailto:${user.email}`}>{user.email}</a>
-            </dd>
-          </div>
-          {user.phone ? (
-            <div>
-              <dt>Phone</dt>
-              <dd>
-                <a href={`tel:${user.phone}`}>{user.phone}</a>
-              </dd>
-            </div>
-          ) : null}
-          {canSeeAssignerPii && (
-            <div>
-              <dt>Address</dt>
-              <dd>{address ?? '—'}</dd>
-            </div>
+        <div className="rs-detail-card__head">
+          <h2 id="member-contact" className="rs-detail-section__label">
+            Contact
+          </h2>
+          {canManage && !editing && (
+            <Button
+              variant="link"
+              className="rs-detail-card__action"
+              onClick={startEdit}
+            >
+              Edit info
+            </Button>
           )}
-          {isOfficialLens && (
-            <div>
-              <dt>Assessed Level</dt>
-              <dd>
-                {user.assessedLevel != null
-                  ? user.assessedLevel
-                  : 'Not assessed'}
-                {user.assessedLevel == null && user.refereeLevel != null && (
-                  <span className="rs-member-dl__hint">
-                    {' '}
-                    · self-assessed lvl {user.refereeLevel}
-                  </span>
+        </div>
+
+        {!editing ? (
+          <>
+            <dl className="rs-member-dl">
+              <div>
+                <dt>Name</dt>
+                <dd>{listName}</dd>
+              </div>
+              <div>
+                <dt>Email</dt>
+                <dd>
+                  <a href={`mailto:${user.email}`}>{user.email}</a>
+                </dd>
+              </div>
+              {user.phone ? (
+                <div>
+                  <dt>Phone</dt>
+                  <dd>
+                    <a href={`tel:${user.phone}`}>{user.phone}</a>
+                  </dd>
+                </div>
+              ) : null}
+              {canSeeAssignerPii && (
+                <div>
+                  <dt>Address</dt>
+                  <dd>{address ?? '—'}</dd>
+                </div>
+              )}
+              {!memberFanOnly && birthdayLabel && (
+                <div>
+                  <dt>Birthday</dt>
+                  <dd>{birthdayLabel}</dd>
+                </div>
+              )}
+              {isOfficialLens && user.refereeingSince && (
+                <div>
+                  <dt>Started</dt>
+                  <dd>{user.refereeingSince}</dd>
+                </div>
+              )}
+              {isOfficialLens && user.jerseySize && (
+                <div>
+                  <dt>Jersey</dt>
+                  <dd>{user.jerseySize}</dd>
+                </div>
+              )}
+              {isOfficialLens && user.shortsSize && (
+                <div>
+                  <dt>Shorts</dt>
+                  <dd>{user.shortsSize}</dd>
+                </div>
+              )}
+              {isOfficialLens && (
+                <div>
+                  <dt>Assessed Level</dt>
+                  <dd>
+                    {user.assessedLevel != null
+                      ? user.assessedLevel
+                      : 'Not assessed'}
+                    {user.assessedLevel == null && user.refereeLevel != null && (
+                      <span className="rs-member-dl__hint">
+                        {' '}
+                        · self-assessed lvl {user.refereeLevel}
+                      </span>
+                    )}
+                  </dd>
+                </div>
+              )}
+            </dl>
+            {editSaved && (
+              <p className="rs-match-card__meta" role="status">
+                Member info saved.
+              </p>
+            )}
+            {editError && !editing && (
+              <p className="rs-match-card__meta" role="alert">
+                {editError}
+              </p>
+            )}
+          </>
+        ) : editDraft ? (
+          <div className="rs-stack rs-member-edit">
+            <div className="rs-form-row rs-form-row--2">
+              <FormGroup label="First name" isRequired>
+                <TextInput
+                  value={editDraft.firstName}
+                  onChange={(_, v) => patchDraft({ firstName: v })}
+                />
+              </FormGroup>
+              <FormGroup label="Last name" isRequired>
+                <TextInput
+                  value={editDraft.lastName}
+                  onChange={(_, v) => patchDraft({ lastName: v })}
+                />
+              </FormGroup>
+            </div>
+            <div className="rs-form-row rs-form-row--2">
+              <FormGroup label="Email">
+                <TextInput value={user.email} isDisabled readOnly />
+              </FormGroup>
+              {!editFanOnly && (
+                <FormGroup label="Phone" isRequired>
+                  <TextInput
+                    type="tel"
+                    value={editDraft.phone}
+                    onChange={(_, v) => patchDraft({ phone: v })}
+                  />
+                </FormGroup>
+              )}
+            </div>
+            <FormGroup label="Roles" isRequired>
+              <div className="rs-onboarding__roles">
+                <Checkbox
+                  id="member-role-official"
+                  label="Referee"
+                  isChecked={editDraft.roleOfficial}
+                  onChange={(_, v) => patchDraft({ roleOfficial: v })}
+                />
+                <Checkbox
+                  id="member-role-team"
+                  label="Team Admin"
+                  isChecked={editDraft.roleTeamAdmin}
+                  onChange={(_, v) =>
+                    patchDraft({
+                      roleTeamAdmin: v,
+                      teamIds: v ? editDraft.teamIds : [],
+                    })
+                  }
+                />
+                <Checkbox
+                  id="member-role-cmo"
+                  label="CMO"
+                  isChecked={editDraft.roleCmo}
+                  onChange={(_, v) => patchDraft({ roleCmo: v })}
+                />
+                <Checkbox
+                  id="member-role-fan"
+                  label="Fan"
+                  isChecked={editDraft.roleFan}
+                  onChange={(_, v) => patchDraft({ roleFan: v })}
+                />
+                <Checkbox
+                  id="member-role-assigner"
+                  label="Scheduler"
+                  isChecked={editDraft.roleAssigner}
+                  onChange={(_, v) => patchDraft({ roleAssigner: v })}
+                />
+                <Checkbox
+                  id="member-role-insights"
+                  label="Insights access"
+                  isChecked={editDraft.roleReportAnalytics}
+                  onChange={(_, v) =>
+                    patchDraft({ roleReportAnalytics: v })
+                  }
+                />
+              </div>
+            </FormGroup>
+            {editDraft.roleTeamAdmin && (
+              <FormGroup label="Clubs they manage" isRequired>
+                {assignableTeams.length === 0 ? (
+                  <p className="rs-match-card__meta">
+                    Sync the schedule first to list clubs.
+                  </p>
+                ) : (
+                  <div className="rs-stack">
+                    <ConferenceTeamPicker
+                      options={teamPickerOptions}
+                      selectedIds={editDraft.teamIds}
+                      onChange={(teamIds) => patchDraft({ teamIds })}
+                      ariaLabel="Assign clubs by conference"
+                    />
+                    {editDraft.teamIds.length > 0 && (
+                      <div
+                        className="rs-filter-chips"
+                        role="group"
+                        aria-label="Assigned clubs"
+                      >
+                        {editDraft.teamIds.map((id) => {
+                          const entry = assignableTeams.find(
+                            (t) => t.team.id === id,
+                          );
+                          const label = entry
+                            ? `${entry.team.name} (${teamConferenceLabel(entry.competitions)})`
+                            : id;
+                          return (
+                            <button
+                              key={id}
+                              type="button"
+                              className="rs-filter-chip rs-filter-chip--selected"
+                              onClick={() =>
+                                patchDraft({
+                                  teamIds: editDraft.teamIds.filter(
+                                    (tid) => tid !== id,
+                                  ),
+                                })
+                              }
+                              title="Remove club"
+                            >
+                              {label} ×
+                            </button>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
                 )}
-              </dd>
-            </div>
-          )}
-        </dl>
+                <p className="rs-match-card__meta pf-v6-u-mt-sm">
+                  Direct assignment — no link request needed.
+                </p>
+              </FormGroup>
+            )}
+            <FormGroup label="Birthday" isRequired={!editFanOnly}>
+              <TextInput
+                type="date"
+                value={editDraft.birthday}
+                onChange={(_, v) => patchDraft({ birthday: v })}
+              />
+            </FormGroup>
+            {(editDraft.roleOfficial || editDraft.roleCmo) && (
+              <>
+                <div className="rs-form-row rs-form-row--2">
+                  <FormGroup label="Street address" isRequired>
+                    <TextInput
+                      value={editDraft.homeStreet}
+                      onChange={(_, v) => patchDraft({ homeStreet: v })}
+                    />
+                  </FormGroup>
+                  <FormGroup label="Apt / suite / unit">
+                    <TextInput
+                      value={editDraft.homeUnit}
+                      onChange={(_, v) => patchDraft({ homeUnit: v })}
+                    />
+                  </FormGroup>
+                </div>
+                <div className="rs-form-row rs-form-row--3">
+                  <FormGroup label="City" isRequired>
+                    <TextInput
+                      value={editDraft.homeCity}
+                      onChange={(_, v) => patchDraft({ homeCity: v })}
+                    />
+                  </FormGroup>
+                  <FormGroup label="State" isRequired>
+                    <TextInput
+                      value={editDraft.homeRegion}
+                      onChange={(_, v) => patchDraft({ homeRegion: v })}
+                    />
+                  </FormGroup>
+                  <FormGroup label="ZIP" isRequired>
+                    <TextInput
+                      value={editDraft.homePostalCode}
+                      onChange={(_, v) => patchDraft({ homePostalCode: v })}
+                    />
+                  </FormGroup>
+                </div>
+                <FormGroup label="Self-reported referee level">
+                  <TextInput
+                    type="number"
+                    min={1}
+                    max={20}
+                    value={
+                      editDraft.levelUnknown ? '' : editDraft.refereeLevel
+                    }
+                    isDisabled={editDraft.levelUnknown}
+                    onChange={(_, v) =>
+                      patchDraft({ levelUnknown: false, refereeLevel: v })
+                    }
+                  />
+                  <Checkbox
+                    id="member-level-unknown"
+                    className="pf-v6-u-mt-sm"
+                    label="I don’t know"
+                    isChecked={editDraft.levelUnknown}
+                    onChange={(_, v) =>
+                      patchDraft({
+                        levelUnknown: v,
+                        refereeLevel: v ? '' : editDraft.refereeLevel,
+                      })
+                    }
+                  />
+                </FormGroup>
+                <FormGroup label="Year started refereeing" isRequired>
+                  <TextInput
+                    type="number"
+                    inputMode="numeric"
+                    min={1950}
+                    max={new Date().getFullYear()}
+                    value={editDraft.refereeingSince}
+                    onChange={(_, v) =>
+                      patchDraft({
+                        refereeingSince: v.replace(/\D/g, '').slice(0, 4),
+                      })
+                    }
+                    placeholder="e.g. 2018"
+                  />
+                </FormGroup>
+                <FormGroup label="Jersey size" isRequired>
+                  <div
+                    className="rs-onboard__sizes"
+                    role="group"
+                    aria-label="Jersey size"
+                  >
+                    {APPAREL_SIZES.map((s) => (
+                      <button
+                        key={`mj-${s}`}
+                        type="button"
+                        className={`rs-onboard__size${
+                          editDraft.jerseySize === s
+                            ? ' rs-onboard__size--selected'
+                            : ''
+                        }`}
+                        onClick={() => patchDraft({ jerseySize: s })}
+                      >
+                        {s}
+                      </button>
+                    ))}
+                  </div>
+                </FormGroup>
+                <FormGroup label="Shorts size" isRequired>
+                  <div
+                    className="rs-onboard__sizes"
+                    role="group"
+                    aria-label="Shorts size"
+                  >
+                    {APPAREL_SIZES.map((s) => (
+                      <button
+                        key={`ms-${s}`}
+                        type="button"
+                        className={`rs-onboard__size${
+                          editDraft.shortsSize === s
+                            ? ' rs-onboard__size--selected'
+                            : ''
+                        }`}
+                        onClick={() => patchDraft({ shortsSize: s })}
+                      >
+                        {s}
+                      </button>
+                    ))}
+                  </div>
+                </FormGroup>
+              </>
+            )}
+            {editError && (
+              <p className="rs-match-card__meta" role="alert">
+                {editError}
+              </p>
+            )}
+          </div>
+        ) : null}
       </section>
 
       {canManage && isOfficialLens && (
@@ -650,323 +981,6 @@ export function MemberDetailPage() {
           {assessedError && (
             <p className="rs-match-card__meta" role="alert">
               {assessedError}
-            </p>
-          )}
-        </section>
-      )}
-
-      {canManage && (
-        <section className="rs-detail-card" aria-labelledby="member-manage">
-          <h2 id="member-manage" className="rs-detail-section__label">
-            Manage member
-          </h2>
-
-          {!editing ? (
-            <div className="rs-actions">
-              <Button variant="secondary" onClick={startEdit}>
-                Edit member info
-              </Button>
-              <Button
-                variant="danger"
-                isDisabled={!canDelete}
-                onClick={() => {
-                  setRemoveError(null);
-                  setRemoveOpen(true);
-                }}
-              >
-                Delete from MatchReadyTX
-              </Button>
-            </div>
-          ) : editDraft ? (
-            <div className="rs-stack">
-              <div className="rs-form-row rs-form-row--2">
-                <FormGroup label="First name" isRequired>
-                  <TextInput
-                    value={editDraft.firstName}
-                    onChange={(_, v) => patchDraft({ firstName: v })}
-                  />
-                </FormGroup>
-                <FormGroup label="Last name" isRequired>
-                  <TextInput
-                    value={editDraft.lastName}
-                    onChange={(_, v) => patchDraft({ lastName: v })}
-                  />
-                </FormGroup>
-              </div>
-              <div className="rs-form-row rs-form-row--2">
-                <FormGroup label="Email">
-                  <TextInput value={user.email} isDisabled readOnly />
-                </FormGroup>
-                {!(
-                  editDraft.roleFan &&
-                  !editDraft.roleOfficial &&
-                  !editDraft.roleTeamAdmin &&
-                  !editDraft.roleCmo &&
-                  !editDraft.roleAssigner &&
-                  !editDraft.roleReportAnalytics
-                ) && (
-                  <FormGroup label="Phone" isRequired>
-                    <TextInput
-                      type="tel"
-                      value={editDraft.phone}
-                      onChange={(_, v) => patchDraft({ phone: v })}
-                    />
-                  </FormGroup>
-                )}
-              </div>
-              <FormGroup label="Roles" isRequired>
-                <div className="rs-onboarding__roles">
-                  <Checkbox
-                    id="member-role-official"
-                    label="Referee"
-                    isChecked={editDraft.roleOfficial}
-                    onChange={(_, v) => patchDraft({ roleOfficial: v })}
-                  />
-                  <Checkbox
-                    id="member-role-team"
-                    label="Team Admin"
-                    isChecked={editDraft.roleTeamAdmin}
-                    onChange={(_, v) =>
-                      patchDraft({
-                        roleTeamAdmin: v,
-                        teamIds: v ? editDraft.teamIds : [],
-                      })
-                    }
-                  />
-                  <Checkbox
-                    id="member-role-cmo"
-                    label="CMO"
-                    isChecked={editDraft.roleCmo}
-                    onChange={(_, v) => patchDraft({ roleCmo: v })}
-                  />
-                  <Checkbox
-                    id="member-role-fan"
-                    label="Fan"
-                    isChecked={editDraft.roleFan}
-                    onChange={(_, v) => patchDraft({ roleFan: v })}
-                  />
-                  <Checkbox
-                    id="member-role-assigner"
-                    label="Scheduler"
-                    isChecked={editDraft.roleAssigner}
-                    onChange={(_, v) => patchDraft({ roleAssigner: v })}
-                  />
-                  <Checkbox
-                    id="member-role-insights"
-                    label="Insights access"
-                    isChecked={editDraft.roleReportAnalytics}
-                    onChange={(_, v) =>
-                      patchDraft({ roleReportAnalytics: v })
-                    }
-                  />
-                </div>
-              </FormGroup>
-              {editDraft.roleTeamAdmin && (
-                <FormGroup label="Clubs they manage" isRequired>
-                  {assignableTeams.length === 0 ? (
-                    <p className="rs-match-card__meta">
-                      Sync the schedule first to list clubs.
-                    </p>
-                  ) : (
-                    <div className="rs-stack">
-                      <ConferenceTeamPicker
-                        options={teamPickerOptions}
-                        selectedIds={editDraft.teamIds}
-                        onChange={(teamIds) => patchDraft({ teamIds })}
-                        ariaLabel="Assign clubs by conference"
-                      />
-
-                      {editDraft.teamIds.length > 0 && (
-                        <div className="rs-filter-chips" role="group" aria-label="Assigned clubs">
-                          {editDraft.teamIds.map((id) => {
-                            const entry = assignableTeams.find((t) => t.team.id === id);
-                            const label = entry
-                              ? `${entry.team.name} (${teamConferenceLabel(entry.competitions)})`
-                              : id;
-                            return (
-                              <button
-                                key={id}
-                                type="button"
-                                className="rs-filter-chip rs-filter-chip--selected"
-                                onClick={() =>
-                                  patchDraft({
-                                    teamIds: editDraft.teamIds.filter((tid) => tid !== id),
-                                  })
-                                }
-                                title="Remove club"
-                              >
-                                {label} ×
-                              </button>
-                            );
-                          })}
-                        </div>
-                      )}
-                    </div>
-                  )}
-                  <p className="rs-match-card__meta pf-v6-u-mt-sm">
-                    Direct assignment — no link request needed.
-                  </p>
-                </FormGroup>
-              )}
-              <FormGroup label="Birthday" isRequired={!editFanOnly}>
-                <TextInput
-                  type="date"
-                  value={editDraft.birthday}
-                  onChange={(_, v) => patchDraft({ birthday: v })}
-                />
-              </FormGroup>
-
-              {(editDraft.roleOfficial || editDraft.roleCmo) && (
-                <>
-                  <div className="rs-form-row rs-form-row--2">
-                    <FormGroup label="Street address" isRequired>
-                      <TextInput
-                        value={editDraft.homeStreet}
-                        onChange={(_, v) => patchDraft({ homeStreet: v })}
-                      />
-                    </FormGroup>
-                    <FormGroup label="Apt / suite / unit">
-                      <TextInput
-                        value={editDraft.homeUnit}
-                        onChange={(_, v) => patchDraft({ homeUnit: v })}
-                      />
-                    </FormGroup>
-                  </div>
-                  <div className="rs-form-row rs-form-row--3">
-                    <FormGroup label="City" isRequired>
-                      <TextInput
-                        value={editDraft.homeCity}
-                        onChange={(_, v) => patchDraft({ homeCity: v })}
-                      />
-                    </FormGroup>
-                    <FormGroup label="State" isRequired>
-                      <TextInput
-                        value={editDraft.homeRegion}
-                        onChange={(_, v) => patchDraft({ homeRegion: v })}
-                      />
-                    </FormGroup>
-                    <FormGroup label="ZIP" isRequired>
-                      <TextInput
-                        value={editDraft.homePostalCode}
-                        onChange={(_, v) => patchDraft({ homePostalCode: v })}
-                      />
-                    </FormGroup>
-                  </div>
-                  <FormGroup label="Self-reported referee level">
-                    <TextInput
-                      type="number"
-                      min={1}
-                      max={20}
-                      value={editDraft.levelUnknown ? '' : editDraft.refereeLevel}
-                      isDisabled={editDraft.levelUnknown}
-                      onChange={(_, v) =>
-                        patchDraft({ levelUnknown: false, refereeLevel: v })
-                      }
-                    />
-                    <Checkbox
-                      id="member-level-unknown"
-                      className="pf-v6-u-mt-sm"
-                      label="I don’t know"
-                      isChecked={editDraft.levelUnknown}
-                      onChange={(_, v) =>
-                        patchDraft({
-                          levelUnknown: v,
-                          refereeLevel: v ? '' : editDraft.refereeLevel,
-                        })
-                      }
-                    />
-                  </FormGroup>
-                  <FormGroup label="Year started refereeing" isRequired>
-                    <TextInput
-                      type="number"
-                      inputMode="numeric"
-                      min={1950}
-                      max={new Date().getFullYear()}
-                      value={editDraft.refereeingSince}
-                      onChange={(_, v) =>
-                        patchDraft({
-                          refereeingSince: v.replace(/\D/g, '').slice(0, 4),
-                        })
-                      }
-                      placeholder="e.g. 2018"
-                    />
-                  </FormGroup>
-                  <FormGroup label="Jersey size" isRequired>
-                    <div className="rs-onboard__sizes" role="group" aria-label="Jersey size">
-                      {APPAREL_SIZES.map((s) => (
-                        <button
-                          key={`mj-${s}`}
-                          type="button"
-                          className={`rs-onboard__size${
-                            editDraft.jerseySize === s
-                              ? ' rs-onboard__size--selected'
-                              : ''
-                          }`}
-                          onClick={() => patchDraft({ jerseySize: s })}
-                        >
-                          {s}
-                        </button>
-                      ))}
-                    </div>
-                  </FormGroup>
-                  <FormGroup label="Shorts size" isRequired>
-                    <div className="rs-onboard__sizes" role="group" aria-label="Shorts size">
-                      {APPAREL_SIZES.map((s) => (
-                        <button
-                          key={`ms-${s}`}
-                          type="button"
-                          className={`rs-onboard__size${
-                            editDraft.shortsSize === s
-                              ? ' rs-onboard__size--selected'
-                              : ''
-                          }`}
-                          onClick={() => patchDraft({ shortsSize: s })}
-                        >
-                          {s}
-                        </button>
-                      ))}
-                    </div>
-                  </FormGroup>
-                </>
-              )}
-
-              <div className="rs-actions">
-                <Button
-                  variant="primary"
-                  isLoading={editSaving}
-                  isDisabled={editSaving}
-                  onClick={saveEdit}
-                >
-                  Save changes
-                </Button>
-                <Button
-                  variant="link"
-                  isDisabled={editSaving}
-                  onClick={cancelEdit}
-                >
-                  Cancel
-                </Button>
-              </div>
-            </div>
-          ) : null}
-
-          {editSaved && !editing && (
-            <p className="rs-match-card__meta" role="status">
-              Member info saved.
-            </p>
-          )}
-          {editError && (
-            <p className="rs-match-card__meta" role="alert">
-              {editError}
-            </p>
-          )}
-          <p className="rs-detail-note pf-v6-u-mt-sm">
-            Delete removes them from this society, deletes their profile data,
-            and removes their Firebase Auth account so they must sign up again.
-          </p>
-          {isSelf && (
-            <p className="rs-match-card__meta">
-              You can’t delete yourself.
             </p>
           )}
         </section>
@@ -1032,34 +1046,34 @@ export function MemberDetailPage() {
 
       {isOfficialLens && (
         <>
-          <section className="rs-detail-card" aria-labelledby="member-upcoming">
-            <h2 id="member-upcoming" className="rs-detail-section__label">
-              Upcoming schedule
-            </h2>
-            {upcoming.length === 0 ? (
-              <p className="rs-detail-note">No upcoming appointments.</p>
-            ) : (
-              <ul className="rs-list">
-                {upcoming.map((m) => (
-                  <li key={m.id}>
-                    <MatchListRow
-                      match={m}
-                      to={`/matches/${m.id}`}
-                      showTime
-                      back={matchBack}
-                      meta={
-                        <span className="rs-list-row__hint">
-                          {memberSlotLabel(m, user.uid) ?? 'Crew'}
-                        </span>
-                      }
-                    />
-                  </li>
-                ))}
-              </ul>
-            )}
+          <section className="rs-detail-card rs-member-collapse-wrap">
+            <details className="rs-detail-tools rs-member-collapse" open>
+              <summary>Upcoming schedule</summary>
+              {upcoming.length === 0 ? (
+                <p className="rs-detail-note">No upcoming appointments.</p>
+              ) : (
+                <ul className="rs-list">
+                  {upcoming.map((m) => (
+                    <li key={m.id}>
+                      <MatchListRow
+                        match={m}
+                        to={`/matches/${m.id}`}
+                        showTime
+                        back={matchBack}
+                        meta={
+                          <span className="rs-list-row__hint">
+                            {memberSlotLabel(m, user.uid) ?? 'Crew'}
+                          </span>
+                        }
+                      />
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </details>
           </section>
 
-          {canSeeAssignerPii && availability.length > 0 && (
+          {canSeeAssignerPii && (
             <section
               className="rs-detail-card"
               aria-labelledby="member-availability"
@@ -1067,50 +1081,95 @@ export function MemberDetailPage() {
               <h2 id="member-availability" className="rs-detail-section__label">
                 Availability
               </h2>
-              <ul className="rs-member-availability">
-                {availability.map((r) => (
-                  <li key={r.id}>
-                    <span
-                      className={`rs-pill${
-                        r.kind === 'blocked' ? ' rs-pill--urgent' : ' rs-pill--ok'
-                      }`}
-                    >
-                      {r.kind === 'blocked' ? 'Blocked' : 'Available'}
-                    </span>{' '}
-                    {formatRange(r.startAt, r.endAt)}
-                  </li>
-                ))}
-              </ul>
+              <AvailabilityMonthCalendar
+                ranges={userAvailRanges}
+                userId={user.uid}
+                timeZone={timeZone}
+                year={availYear}
+                month={availMonth}
+                onMonthChange={(y, m) => {
+                  setAvailYear(y);
+                  setAvailMonth(m);
+                }}
+                readOnly
+                showLegend
+              />
             </section>
           )}
 
-          <section className="rs-detail-card" aria-labelledby="member-history">
-            <h2 id="member-history" className="rs-detail-section__label">
-              Games worked
-            </h2>
-            {past.length === 0 ? (
-              <p className="rs-detail-note">No completed games on file yet.</p>
-            ) : (
-              <ul className="rs-list">
-                {past.map((m) => (
-                  <li key={m.id}>
-                    <MatchListRow
-                      match={m}
-                      to={`/matches/${m.id}`}
-                      showTime
-                      back={matchBack}
-                      meta={
-                        <span className="rs-list-row__hint">
-                          {memberSlotLabel(m, user.uid) ?? 'Crew'}
-                        </span>
-                      }
-                    />
-                  </li>
-                ))}
-              </ul>
-            )}
+          <section className="rs-detail-card rs-member-collapse-wrap">
+            <details className="rs-detail-tools rs-member-collapse">
+              <summary>Matches officiated</summary>
+              {past.length === 0 ? (
+                <p className="rs-detail-note">No completed games on file yet.</p>
+              ) : (
+                <ul className="rs-list">
+                  {past.map((m) => (
+                    <li key={m.id}>
+                      <MatchListRow
+                        match={m}
+                        to={`/matches/${m.id}`}
+                        showTime
+                        back={matchBack}
+                        meta={
+                          <span className="rs-list-row__hint">
+                            {memberSlotLabel(m, user.uid) ?? 'Crew'}
+                          </span>
+                        }
+                      />
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </details>
           </section>
         </>
+      )}
+
+      {canManage && (
+        <div className="rs-member-delete">
+          {canDelete ? (
+            <button
+              type="button"
+              className="rs-member-delete__link"
+              onClick={() => {
+                setRemoveError(null);
+                setRemoveOpen(true);
+              }}
+            >
+              Delete from MatchReadyTX
+            </button>
+          ) : (
+            <p className="rs-match-card__meta">You can’t delete yourself.</p>
+          )}
+          {canDelete && (
+            <p className="rs-member-delete__hint">
+              Removes society membership, profile data, and Firebase login.
+            </p>
+          )}
+        </div>
+      )}
+
+      {editing && (
+        <div className="rs-detail-sticky rs-detail-sticky--split">
+          <Button
+            variant="primary"
+            className="rs-detail-sticky__half"
+            isLoading={editSaving}
+            isDisabled={editSaving}
+            onClick={saveEdit}
+          >
+            Save changes
+          </Button>
+          <Button
+            variant="link"
+            className="rs-detail-sticky__half"
+            isDisabled={editSaving}
+            onClick={cancelEdit}
+          >
+            Cancel
+          </Button>
+        </div>
       )}
     </div>
   );

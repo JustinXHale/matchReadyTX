@@ -23,6 +23,7 @@ import {
   setTeamDetailsConfirmed as applyTeamDetailsConfirmed,
   enterT72,
   postponeMatch,
+  reactivateMatch,
   releaseMatch,
 } from '@/domain/matchTransitions';
 import {
@@ -3997,6 +3998,32 @@ class DemoStore {
   }
 
   /**
+   * Live-mode optimistic UI: mark approved before the Cloud Function + snapshot
+   * deliver the new match (avoids waiting on the network to drop the row).
+   */
+  markFixtureRequestApprovedOptimistic(
+    requestId: string,
+    reviewedByUserId: string,
+  ): void {
+    const req = this.state.fixtureRequests.find((r) => r.id === requestId);
+    if (!req || req.status !== 'pending') return;
+    const at = new Date().toISOString();
+    this.set((s) => ({
+      ...s,
+      fixtureRequests: s.fixtureRequests.map((r) =>
+        r.id === requestId
+          ? {
+              ...r,
+              status: 'approved' as const,
+              reviewedAt: at,
+              reviewedByUserId,
+            }
+          : r,
+      ),
+    }));
+  }
+
+  /**
    * Assigner approves a pending fixture request (demo: create match in memory).
    * Live mode should call the approveFixtureRequest Cloud Function instead.
    */
@@ -4391,6 +4418,16 @@ class DemoStore {
       matches: s.matches.map((m) => {
         if (m.id !== matchId) return m;
         return kind === 'cancel' ? cancelMatch(m) : postponeMatch(m);
+      }),
+    }));
+  }
+
+  reactivateMatch(matchId: string): void {
+    this.set((s) => ({
+      ...s,
+      matches: s.matches.map((m) => {
+        if (m.id !== matchId) return m;
+        return reactivateMatch(m);
       }),
     }));
   }
