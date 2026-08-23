@@ -1,4 +1,5 @@
 import { Outlet } from 'react-router-dom';
+import './insights.css';
 import { InsightsSubNav } from '@/features/insights/InsightsSubNav';
 
 export function InsightsLayout() {

@@ -27,7 +27,6 @@ import { WhistleIcon } from '@/ui/WhistleIcon';
 import { ThemeToggle } from '@/ui/ThemeToggle';
 import { BrandLogo } from '@/ui/BrandLogo';
 import { UpdatePrompt } from '@/pwa/UpdatePrompt';
-import './shell.css';
 
 const navIconClass = 'rs-bottom-nav__icon';
 

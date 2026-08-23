@@ -1,0 +1,122 @@
+
+.rs-report-stub {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 12px;
+  background: var(--rs-color-surface);
+  border: 1px solid var(--rs-color-border);
+  border-radius: var(--rs-radius-card);
+}
+
+.rs-report-stub__main {
+  min-width: 0;
+}
+
+.rs-report-stub__main p {
+  margin: 4px 0 0;
+}
+
+/* MO match-report form chooser */
+.rs-report-chooser__actions {
+  display: flex;
+  gap: 8px;
+  align-items: stretch;
+  width: 100%;
+}
+
+.rs-report-chooser__half {
+  flex: 1 1 50%;
+  width: 50%;
+  min-width: 0;
+}
+
+.rs-report-view__field {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--rs-color-border);
+}
+
+.rs-report-view__label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--rs-color-muted);
+}
+
+.rs-report-view__value {
+  font: var(--rs-font-body);
+  color: var(--rs-color-ink);
+  white-space: pre-wrap;
+}
+
+.rs-report-view__siblings {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.rs-report-stepper {
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+  padding-bottom: 2px;
+  -webkit-overflow-scrolling: touch;
+}
+
+.rs-report-stepper__step {
+  flex: 1 1 0;
+  min-width: 4.5rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 8px 6px;
+  border: 1px solid var(--rs-color-border);
+  border-radius: var(--rs-radius-chip);
+  background: var(--rs-color-surface);
+  color: var(--rs-color-muted);
+  cursor: pointer;
+  font: var(--rs-font-meta);
+}
+
+.rs-report-stepper__step--current {
+  border-color: var(--rs-color-warn);
+  background: color-mix(in srgb, var(--rs-color-warn) 14%, var(--rs-color-surface));
+  color: var(--rs-color-ink);
+}
+
+.rs-report-stepper__step--done:not(.rs-report-stepper__step--current) {
+  border-color: color-mix(in srgb, var(--rs-color-warn) 40%, var(--rs-color-surface));
+  color: var(--rs-color-charcoal);
+}
+
+.rs-report-stepper__num {
+  width: 1.5rem;
+  height: 1.5rem;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 12px;
+  background: var(--rs-color-surface-muted);
+  color: inherit;
+}
+
+.rs-report-stepper__step--current .rs-report-stepper__num {
+  background: var(--rs-color-warn);
+  color: var(--rs-color-on-primary);
+}
+
+.rs-report-stepper__label {
+  text-align: center;
+  line-height: 1.2;
+}
+
+.rs-perf-report__title.pf-v6-c-title,
+.rs-perf-report__title {
+  color: color-mix(in srgb, var(--rs-color-warn) 75%, var(--rs-color-tint-contrast)) !important;
+}

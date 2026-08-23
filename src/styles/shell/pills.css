@@ -1,0 +1,43 @@
+
+.rs-pill {
+  display: inline-flex;
+  align-items: center;
+  flex: 0 0 auto;
+  padding: 3px 8px;
+  border-radius: var(--rs-radius-chip);
+  font: var(--rs-font-chip);
+  background: var(--rs-color-surface-muted);
+  color: var(--rs-color-charcoal);
+  border: 1px solid var(--rs-color-border);
+  max-width: 100%;
+}
+
+.rs-pill--ink {
+  background: var(--rs-color-primary);
+  color: var(--rs-color-on-primary);
+  border-color: var(--rs-color-primary);
+}
+
+.rs-pill--ok {
+  background: color-mix(in srgb, var(--rs-color-ok) 14%, var(--rs-color-surface));
+  color: color-mix(in srgb, var(--rs-color-ok) 85%, var(--rs-color-tint-contrast));
+  border-color: color-mix(in srgb, var(--rs-color-ok) 40%, var(--rs-color-surface));
+}
+
+.rs-pill--warn {
+  background: color-mix(in srgb, var(--rs-color-warn) 16%, var(--rs-color-surface));
+  color: color-mix(in srgb, var(--rs-color-warn) 80%, var(--rs-color-tint-contrast));
+  border-color: color-mix(in srgb, var(--rs-color-warn) 42%, var(--rs-color-surface));
+}
+
+.rs-pill--urgent {
+  background: var(--rs-color-urgent);
+  color: var(--rs-color-on-urgent);
+  border-color: var(--rs-color-urgent);
+}
+
+.rs-pill--quiet {
+  background: transparent;
+  color: var(--rs-color-ended);
+  border-color: var(--rs-color-border);
+}

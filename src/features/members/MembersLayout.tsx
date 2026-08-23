@@ -1,4 +1,5 @@
 import { Outlet } from 'react-router-dom';
+import './members.css';
 import { MembersSubNav } from '@/features/members/MembersSubNav';
 
 export function MembersLayout() {

@@ -1,0 +1,164 @@
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+  max-width: 100%;
+  overflow-x: clip;
+}
+
+body {
+  font: var(--rs-font-body);
+  font-family: var(--rs-font-family);
+  background: var(--rs-color-bg);
+  color: var(--rs-color-ink);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* PatternFly primary buttons → black */
+.pf-v6-c-button.pf-m-primary {
+  background-color: var(--rs-color-primary) !important;
+  border-color: var(--rs-color-primary) !important;
+  color: var(--rs-color-on-primary) !important;
+}
+
+.pf-v6-c-button.pf-m-primary:hover {
+  background-color: var(--rs-color-primary-muted) !important;
+  border-color: var(--rs-color-primary-muted) !important;
+}
+
+.pf-v6-c-button.pf-m-secondary,
+.pf-v6-c-button.pf-m-link {
+  color: var(--rs-color-primary) !important;
+}
+
+.pf-v6-c-button.pf-m-secondary {
+  border-color: var(--rs-color-primary) !important;
+  background: var(--rs-color-surface) !important;
+}
+
+.pf-v6-c-masthead,
+.pf-v6-c-page__main-section {
+  background: var(--rs-color-bg) !important;
+}
+
+.pf-v6-c-masthead {
+  background: var(--rs-color-surface) !important;
+  border-bottom: none;
+  box-shadow: none !important;
+}
+
+.rs-page-body {
+  padding-bottom: var(--rs-bottom-clearance) !important;
+  max-width: 720px;
+  width: 100%;
+  min-width: 0;
+  margin: 0 auto;
+  box-sizing: border-box;
+  padding-inline: var(--rs-page-pad) !important;
+  background: transparent !important;
+  overflow-x: clip;
+}
+
+/* —— Sign-in placeholder —— */
+.rs-page--auth .rs-page-body {
+  padding-bottom: var(--pf-t--global--spacer--xl) !important;
+  max-width: 420px;
+}
+
+.rs-stack {
+  display: flex;
+  flex-direction: column;
+  gap: var(--rs-space-md);
+  align-items: stretch;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+}
+
+/**
+ * Vertical field stack for FormGroups outside PatternFly Form
+ * (modals, detail cards). Same gap as form GridGap so inputs
+ * never sit flush against buttons.
+ */
+.rs-form-stack {
+  display: flex;
+  flex-direction: column;
+  gap: var(--rs-space-md);
+  width: 100%;
+}
+
+.rs-stack select,
+.rs-stack .pf-v6-c-form-control,
+.rs-actions select,
+.rs-actions .pf-v6-c-form-control {
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
+.rs-actions .pf-v6-c-button {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  width: 100%;
+  min-height: var(--rs-tap-min);
+  border-radius: var(--rs-radius-chip) !important;
+  font-weight: 600 !important;
+  line-height: 1.2 !important;
+}
+@media (min-width: 900px) {
+  .rs-actions {
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: flex-start;
+  }
+  .rs-actions .pf-v6-c-button {
+    width: auto;
+  }
+}
+
+.rs-btn--gold.pf-v6-c-button,
+.rs-btn--gold.pf-v6-c-button.pf-m-primary {
+  background-color: var(--rs-color-warn) !important;
+  border-color: var(--rs-color-warn) !important;
+  color: var(--rs-color-on-primary) !important;
+}
+
+.rs-btn--gold.pf-v6-c-button:hover,
+.rs-btn--gold.pf-v6-c-button:focus-visible {
+  background-color: color-mix(in srgb, var(--rs-color-warn) 88%, var(--rs-color-tint-contrast)) !important;
+  border-color: color-mix(in srgb, var(--rs-color-warn) 88%, var(--rs-color-tint-contrast)) !important;
+  color: var(--rs-color-on-primary) !important;
+}
+
+.rs-btn--gold.pf-v6-c-button.pf-m-secondary {
+  background-color: var(--rs-color-warn) !important;
+  border-color: var(--rs-color-warn) !important;
+  color: var(--rs-color-on-primary) !important;
+}
+
+.rs-btn--disabled-visible.pf-v6-c-button,
+.rs-btn--disabled-visible.pf-v6-c-button:disabled,
+.rs-btn--disabled-visible.pf-v6-c-button.pf-m-aria-disabled {
+  background: var(--rs-color-surface-muted) !important;
+  border-color: var(--rs-color-border) !important;
+  color: var(--rs-color-ended) !important;
+  opacity: 1 !important;
+  cursor: not-allowed;
+}
+
+/**
+ * Modal bodies that stack FormGroups / helpers / action rows.
+ * Prefer this over relying on ad-hoc margins.
+ */
+.pf-v6-c-modal-box__body.rs-form-stack,
+.rs-form-stack.pf-v6-c-modal-box__body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--rs-space-md);
+}
+
+.pf-v6-c-modal-box__body > .rs-form-stack {
+  width: 100%;
+}

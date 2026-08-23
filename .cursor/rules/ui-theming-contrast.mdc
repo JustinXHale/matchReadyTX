@@ -22,3 +22,10 @@ alwaysApply: false
 
 - Mobile-first: 2-up card grid (`.rs-card-grid`), chip filter scroller, fixed bottom nav with ~100px clearance.
 - Document changes in `docs/THEME.md` when adding tokens.
+
+## CSS file placement
+
+- **Shared chrome:** `src/styles/shell/*.css` (barrel: `index.css`, imported from `main.tsx`).
+- **Feature-only prefixes:** co-located `features/<area>/*.css`, imported from that feature’s layout or page.
+- **No monolith:** do not add large style blocks to a single file; see `docs/THEME.md` for the prefix table.
+- **No hex** outside `src/styles/tokens.css`.

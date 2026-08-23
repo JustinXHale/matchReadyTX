@@ -8,11 +8,12 @@
 |------|------|
 | [`src/styles/tokens.css`](../src/styles/tokens.css) | Palette hex literals, `--rs-color-*` semantics, `--pf-t--global-*` overrides |
 | [`src/styles/theme-high-contrast.css`](../src/styles/theme-high-contrast.css) | Custom `rs-*` chrome aligned with PF high contrast |
+| [`src/styles/shell/index.css`](../src/styles/shell/index.css) | Shared chrome barrel (imported from `main.tsx`) |
 | [`src/app/theme.ts`](../src/app/theme.ts) | Applies `pf-v6-theme-dark` + `pf-v6-theme-high-contrast` on `<html>` |
-| [`src/app/shell.css`](../src/app/shell.css) | Layout and components — **no raw hex** |
+| Feature `*.css` next to layouts/pages | Feature-only `rs-*` rules (lazy-loaded with routes) |
 | Mirror: [`.design/theme.md`](../.design/theme.md) |
 
-**Last updated:** 2026-08-22  
+**Last updated:** 2026-08-23  
 **Inspiration:** T03 / to3-app monochrome — adapted for Vite + PatternFly.
 
 **PatternFly references:**
@@ -40,10 +41,41 @@ MatchReadyTX uses PatternFly’s layered model:
 ## Token layers (no hex in components)
 
 1. **`--rs-palette-*`** — literal colors **only in `tokens.css`**
-2. **`--rs-color-*`** — semantic tokens used in `shell.css` and features
+2. **`--rs-color-*`** — semantic tokens used in shell + feature CSS
 3. **`--pf-t--global--*`** — PatternFly globals remapped for monochrome; PF components consume these automatically
 
-**Rule:** Do not use `#…` or color names in `shell.css` or feature CSS. Add a palette + semantic pair in `tokens.css` instead.
+**Rule:** Do not use `#…` or color names in CSS files. Add a palette + semantic pair in `tokens.css` instead.
+
+---
+
+## CSS file placement (hybrid)
+
+**Shared chrome** — [`src/styles/shell/`](../src/styles/shell/) (imported once from [`main.tsx`](../src/main.tsx)):
+
+| File | Prefixes / scope |
+|------|------------------|
+| `base.css` | `html/body`, PF button overrides, `.rs-page-*`, `.rs-stack` |
+| `brand-masthead.css` | `.rs-brand*`, masthead, demo badge, bottom nav, FAB |
+| `layout.css` | Card grids, filters, match cards, modals, misc shared layout |
+| `pills.css` | `.rs-pill*` |
+| `signin.css` | `.rs-signin*`, social sign-in buttons |
+| `list-row.css` | `.rs-list-row*` (urgent/warn), appointments crew column |
+
+**Feature-co-located** — import from the feature layout or page:
+
+| CSS | Import from |
+|-----|-------------|
+| `features/matches/match-detail.css` | `MatchDetailPage.tsx` |
+| `features/insights/insights.css` | `InsightsLayout.tsx` |
+| `features/auth/onboarding.css` | `OnboardingPage.tsx` |
+| `features/teamAdmin/team-admin.css` | `TeamAdminLayout.tsx` |
+| `features/scheduler/scheduler.css` | `SchedulerLayout.tsx` |
+| `features/referee/reports/reports.css` | `RefereeLayout.tsx` |
+| `features/availability/availability.css` | `AvailabilityPage.tsx` |
+| `features/members/members.css` | `MembersLayout.tsx` |
+| `features/about/about.css` | `AboutLayout.tsx` |
+
+When adding styles: pick the file by prefix. Do not append large blocks to a single CSS file — split when a file grows past ~400 lines.
 
 ---
 

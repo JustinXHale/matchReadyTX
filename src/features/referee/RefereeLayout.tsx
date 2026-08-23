@@ -1,5 +1,6 @@
 import { useMemo } from 'react';
 import { NavLink, Outlet } from 'react-router-dom';
+import './reports/reports.css';
 import { useApp, useAppHref } from '@/app/AppContext';
 import { applyMatchScope } from '@/domain/visibility';
 import { countPendingAppointments } from '@/features/referee/appointments/crewLines';

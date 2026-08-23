@@ -1,0 +1,173 @@
+/**
+ * Shared detail-page primitives used across features (member profile, insights, upload, etc.).
+ * Match-specific detail chrome stays in features/matches/match-detail.css.
+ */
+
+.rs-detail-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--rs-space-md);
+  padding: var(--rs-space-md);
+  background: var(--rs-color-surface);
+  border: 1px solid var(--rs-color-border);
+  border-radius: var(--rs-radius-card);
+  box-sizing: border-box;
+}
+
+.rs-detail-card__head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--rs-space-sm);
+}
+
+.rs-detail-card__head .rs-detail-section__label {
+  margin: 0;
+}
+
+.rs-detail-card__action.pf-v6-c-button {
+  font-size: 13px;
+  padding: 0;
+}
+
+.rs-detail-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.rs-detail-meta__row {
+  display: grid;
+  grid-template-columns: 6.5rem 1fr;
+  gap: 8px;
+  align-items: start;
+  font-size: 14px;
+  color: var(--rs-color-ink);
+}
+
+.rs-detail-meta__label {
+  font-weight: 600;
+  color: var(--rs-color-muted);
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  padding-top: 2px;
+}
+
+.rs-detail-meta__value {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  min-width: 0;
+}
+
+.rs-detail-meta__value > span,
+.rs-detail-meta__value > a {
+  flex: 1;
+  min-width: 0;
+  word-break: break-word;
+}
+
+.rs-detail-meta__edit {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  margin: -4px 0;
+  padding: 0;
+  border: none;
+  border-radius: var(--rs-radius-chip);
+  background: transparent;
+  color: var(--rs-color-muted);
+  cursor: pointer;
+}
+
+.rs-detail-meta__edit:hover,
+.rs-detail-meta__edit:focus-visible {
+  color: var(--rs-color-ink);
+  background: var(--rs-color-surface-muted);
+}
+
+.rs-detail-meta__edit:focus-visible {
+  outline: 2px solid var(--rs-color-ink);
+  outline-offset: 1px;
+}
+
+.rs-detail-meta__maps {
+  color: var(--rs-color-ink);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  word-break: break-word;
+}
+
+button.rs-detail-meta__maps {
+  background: none;
+  border: none;
+  padding: 0;
+  font: inherit;
+  cursor: pointer;
+  text-align: left;
+}
+
+.rs-detail-meta__maps:hover,
+.rs-detail-meta__maps:focus-visible {
+  text-decoration-thickness: 2px;
+}
+
+.rs-detail-note {
+  margin: 0;
+  font-size: 13px;
+  color: var(--rs-color-charcoal);
+  line-height: 1.4;
+}
+
+.rs-detail-section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--rs-space-sm);
+}
+
+.rs-detail-section__label {
+  margin: 0;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--rs-color-ended);
+}
+
+.rs-detail-inline-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.rs-profile-card .rs-detail-section__label {
+  margin: 0 0 var(--rs-space-xs);
+}
+
+.rs-form-stack > .pf-v6-c-form__group,
+.rs-detail-card > .pf-v6-c-form__group,
+.pf-v6-c-modal-box__body > .pf-v6-c-form__group {
+  margin-block: 0;
+}
+
+/* Parent already provides section gap — don't double it */
+.rs-stack > .rs-actions,
+.rs-detail-card > .rs-actions,
+.rs-form-stack > .rs-actions {
+  margin-top: 0;
+}
+
+.rs-member-teams {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 14px;
+}

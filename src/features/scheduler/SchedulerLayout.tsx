@@ -1,5 +1,6 @@
 import { useMemo } from 'react';
 import { NavLink, Navigate, Outlet } from 'react-router-dom';
+import './scheduler.css';
 import { ROLE_HOME, useApp, useAppHref } from '@/app/AppContext';
 import { countSchedulerQueues } from '@/features/scheduler/queues/selectors';
 import { formatDueBadge } from '@/features/referee/reports/dueCounts';

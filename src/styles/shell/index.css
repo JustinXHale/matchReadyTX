@@ -1,0 +1,12 @@
+/**
+ * Shared app chrome — imported once from main.tsx.
+ * Feature-specific styles live in features/<area>/*.css (imported from layouts/pages).
+ */
+@import './base.css';
+@import './brand-masthead.css';
+@import './layout.css';
+@import './detail-shared.css';
+@import './onboard-widgets.css';
+@import './pills.css';
+@import './signin.css';
+@import './list-row.css';

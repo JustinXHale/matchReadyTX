@@ -1,4 +1,5 @@
 import { useCallback, useMemo, useState, type MouseEvent } from 'react';
+import './availability.css';
 import {
   Button,
   FormGroup,

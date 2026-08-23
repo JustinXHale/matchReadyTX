@@ -5,6 +5,7 @@ import {
   useState,
   type KeyboardEvent,
 } from 'react';
+import './onboarding.css';
 import { Button, FormSelect, FormSelectOption, TextInput } from '@patternfly/react-core';
 import { useNavigate } from 'react-router-dom';
 import { defaultRoleView, ROLE_HOME, useApp } from '@/app/AppContext';

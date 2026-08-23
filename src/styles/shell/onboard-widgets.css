@@ -1,0 +1,112 @@
+/**
+ * Onboarding form widgets reused on profile, member admin, scheduler queues, and RefereeLevelChart.
+ */
+
+.rs-onboard__level {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.rs-onboard__level-chart {
+  margin: 8px 0 0;
+  padding: 0;
+}
+
+.rs-onboard__level-chart-hit {
+  position: relative;
+  display: block;
+  width: 100%;
+  padding: 0;
+  margin: 0;
+  border: none;
+  background: transparent;
+  cursor: zoom-in;
+  text-align: left;
+  border-radius: 12px;
+}
+
+.rs-onboard__level-chart-hit:focus-visible {
+  outline: 2px solid var(--rs-color-focus-ring);
+  outline-offset: 2px;
+}
+
+.rs-onboard__level-chart-img {
+  display: block;
+  width: 100%;
+  height: auto;
+  max-height: min(52vh, 420px);
+  object-fit: contain;
+  object-position: top center;
+  border-radius: 12px;
+  border: 1px solid var(--rs-color-border);
+  background: var(--rs-color-surface);
+}
+
+.rs-onboard__level-chart-zoom {
+  position: absolute;
+  right: 10px;
+  bottom: 10px;
+  padding: 4px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: var(--rs-color-on-primary);
+  background: color-mix(in srgb, var(--rs-color-overlay-scrim) 72%, transparent);
+  pointer-events: none;
+}
+
+.rs-onboard__level-chart-cap {
+  margin: 8px 0 0;
+  font-size: 13px;
+  line-height: 1.35;
+  color: var(--rs-color-muted);
+}
+
+.rs-onboard__sizes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.rs-onboard__size {
+  min-width: 2.75rem;
+  margin: 0;
+  padding: 10px 12px;
+  border: 1.5px solid var(--rs-color-border);
+  border-radius: 10px;
+  background: var(--rs-color-surface);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  color: var(--rs-color-ink);
+}
+
+.rs-onboard__size--selected {
+  border-color: var(--rs-color-ok);
+  background: color-mix(in srgb, var(--rs-color-ok) 10%, var(--rs-color-surface));
+}
+
+.rs-onboard__input.pf-v6-c-form-control,
+.rs-onboard .pf-v6-c-form-control,
+.rs-onboard .rs-icon-field .pf-v6-c-form-control {
+  font-size: 1.15rem !important;
+  min-height: 3rem !important;
+  padding-block: 0.65rem !important;
+}
+
+.rs-onboarding__roles {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.rs-profile .rs-onboarding__roles {
+  gap: var(--rs-space-sm);
+}
+
+.pf-v6-theme-dark .rs-onboard__level-chart-img {
+  filter: brightness(0.92);
+}

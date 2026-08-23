@@ -1,0 +1,228 @@
+
+.rs-avail-day__time {
+  font-size: 0.62rem;
+  line-height: 1.1;
+  color: var(--rs-color-muted);
+}
+
+.rs-avail-day--available .rs-avail-day__time,
+.rs-avail-day--blocked .rs-avail-day__time {
+  color: var(--rs-color-ink);
+}
+
+/* —— Availability calendar —— */
+.rs-avail-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--rs-space-sm) var(--rs-space-md);
+  font-size: 0.85rem;
+  color: var(--rs-color-muted);
+}
+
+.rs-avail-legend__item {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--rs-space-sm);
+}
+
+.rs-avail-swatch {
+  width: 12px;
+  height: 12px;
+  border-radius: 4px;
+  border: 1px solid var(--rs-color-border);
+}
+
+.rs-avail-swatch--available {
+  background: color-mix(in srgb, var(--rs-color-ok) 35%, var(--rs-color-surface));
+  border-color: var(--rs-color-ok);
+}
+
+.rs-avail-swatch--blocked {
+  background: color-mix(in srgb, var(--rs-color-urgent) 25%, var(--rs-color-surface));
+  border-color: var(--rs-color-urgent);
+}
+
+.rs-avail-swatch--unmarked {
+  background: var(--rs-color-surface);
+}
+
+.rs-avail-cal__nav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--rs-space-sm);
+  margin-bottom: var(--rs-space-md);
+}
+
+.rs-avail-cal__nav-btn.pf-v6-c-button {
+  min-width: var(--rs-tap-min);
+  min-height: var(--rs-tap-min);
+  padding: 0 !important;
+  font-size: 2rem !important;
+  font-weight: 700 !important;
+  line-height: 1 !important;
+  color: var(--rs-color-ink) !important;
+}
+
+.rs-avail-cal__title {
+  margin: 0;
+  font-size: 1.05rem;
+  font-weight: 650;
+}
+
+.rs-avail-cal__dow {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: var(--rs-space-xs);
+  margin-bottom: var(--rs-space-xs);
+  text-align: center;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--rs-color-muted);
+}
+
+.rs-avail-cal__dow--busy {
+  color: var(--rs-color-ink);
+}
+
+.rs-avail-cal__grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: var(--rs-space-xs);
+}
+
+.rs-avail-day {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  justify-content: flex-start;
+  min-height: 3.4rem;
+  padding: 0;
+  border: 1px solid var(--rs-color-border);
+  border-radius: 10px;
+  background: var(--rs-color-surface);
+  color: var(--rs-color-ink);
+  overflow: hidden;
+}
+
+.rs-avail-day__hit {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 2px;
+  flex: 1;
+  width: 100%;
+  min-height: 2.6rem;
+  padding: 6px 2px 2px;
+  margin: 0;
+  border: none;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  font: inherit;
+}
+
+.rs-avail-day--empty {
+  visibility: hidden;
+  pointer-events: none;
+  border: none;
+  min-height: 3.4rem;
+}
+
+.rs-avail-day--available {
+  background: color-mix(in srgb, var(--rs-color-ok) 22%, var(--rs-color-surface));
+  border-color: color-mix(in srgb, var(--rs-color-ok) 55%, var(--rs-color-border));
+}
+
+.rs-avail-day--blocked {
+  background: color-mix(in srgb, var(--rs-color-urgent) 16%, var(--rs-color-surface));
+  border-color: color-mix(in srgb, var(--rs-color-urgent) 45%, var(--rs-color-border));
+}
+
+.rs-avail-day--today {
+  box-shadow: inset 0 0 0 2px var(--rs-color-ink);
+}
+
+.rs-avail-day__num {
+  font-size: 0.9rem;
+  font-weight: 650;
+  line-height: 1.1;
+}
+
+.rs-avail-day__edit {
+  margin: 0;
+  padding: 0 0 4px;
+  border: none;
+  background: transparent;
+  font-size: 0.62rem;
+  font-weight: 600;
+  color: var(--rs-color-primary);
+  text-decoration: underline;
+  cursor: pointer;
+  width: 100%;
+}
+
+.rs-avail-weekdays {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--rs-space-sm);
+}
+
+.rs-avail-weekday {
+  width: 2.4rem;
+  height: 2.4rem;
+  border-radius: 999px;
+  border: 1.5px solid var(--rs-color-border);
+  background: var(--rs-color-surface);
+  font-weight: 650;
+  cursor: pointer;
+}
+
+.rs-avail-weekday--busy {
+  border-color: var(--rs-color-charcoal);
+}
+
+.rs-avail-weekday--on {
+  background: var(--rs-color-primary);
+  border-color: var(--rs-color-primary);
+  color: var(--rs-color-on-primary);
+}
+
+.rs-avail-toolbar,
+.rs-avail-modal-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--rs-space-sm);
+  align-items: center;
+}
+
+.rs-avail-toolbar .pf-v6-c-button,
+.rs-avail-modal-actions .pf-v6-c-button {
+  width: auto;
+  min-height: var(--rs-tap-min);
+}
+
+.rs-avail-windows {
+  display: flex;
+  flex-direction: column;
+  gap: var(--rs-space-md);
+}
+
+.rs-avail-windows__row {
+  display: flex;
+  flex-direction: column;
+  gap: var(--rs-space-xs);
+  padding-bottom: var(--rs-space-sm);
+  border-bottom: 1px solid var(--rs-color-border);
+}
+
+.rs-avail-windows__row:last-child {
+  border-bottom: none;
+  padding-bottom: 0;
+}
+
+.rs-avail-page .pf-v6-c-modal-box {
+  width: min(100% - 2rem, 28rem) !important;
+}

@@ -1,0 +1,209 @@
+
+/* Page titles: semantic h1 at the compact title size (not PF’s oversized default). */
+.rs-page-body .pf-v6-c-title.pf-m-h1,
+.rs-stack > h1.pf-v6-c-title,
+.rs-about-hero .pf-v6-c-title.pf-m-h1 {
+  font: var(--rs-font-title) !important;
+  letter-spacing: -0.02em;
+}
+
+.rs-about {
+  font: var(--rs-font-body);
+  font-family: var(--rs-font-family);
+}
+
+.rs-about .pf-v6-c-title {
+  font-family: var(--rs-font-family) !important;
+  font-weight: 600 !important;
+  letter-spacing: -0.02em;
+  color: var(--rs-color-ink) !important;
+}
+
+.rs-about h2.pf-v6-c-title {
+  font-size: 18px !important;
+  line-height: 1.3 !important;
+}
+
+.rs-about h3.pf-v6-c-title {
+  font-size: 16px !important;
+  line-height: 1.3 !important;
+}
+
+.rs-about-hero {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.rs-about-hero p {
+  margin: 0;
+  font: var(--rs-font-body);
+}
+
+.rs-about-toc {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  margin: 0 calc(-1 * var(--rs-page-pad));
+  padding: 8px var(--rs-page-pad) 10px;
+  background: color-mix(in srgb, var(--rs-color-bg) 92%, var(--rs-color-surface));
+  backdrop-filter: blur(8px);
+  border-bottom: 1px solid var(--rs-color-border);
+}
+
+.rs-about-toc__label {
+  margin: 0 0 8px;
+  font: var(--rs-font-chip);
+  color: var(--rs-color-muted);
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+.rs-about-toc__chips {
+  display: flex;
+  flex-wrap: nowrap;
+  gap: 8px;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+  padding-bottom: 2px;
+}
+
+.rs-about-toc__chips::-webkit-scrollbar {
+  display: none;
+}
+
+.rs-about-toc__chip {
+  flex: 0 0 auto;
+  text-decoration: none;
+  padding: 6px 12px;
+  cursor: pointer;
+  font: var(--rs-font-chip);
+  white-space: nowrap;
+  max-width: none;
+  transition:
+    background-color 0.12s ease,
+    color 0.12s ease,
+    border-color 0.12s ease;
+}
+
+.rs-about-toc__chip:hover {
+  border-color: var(--rs-color-charcoal);
+  color: var(--rs-color-ink);
+}
+
+.rs-about-toc__chip--active,
+.rs-about-toc__chip[aria-current='true'] {
+  background: var(--rs-color-primary);
+  color: var(--rs-color-on-primary);
+  border-color: var(--rs-color-primary);
+  font-weight: 600;
+}
+
+.rs-about-toc__chip:focus-visible {
+  outline: none;
+  box-shadow:
+    0 0 0 2px var(--rs-color-surface),
+    0 0 0 4px var(--rs-color-primary);
+}
+
+.rs-about-section {
+  scroll-margin-top: 5.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.rs-about-section p {
+  margin: 0;
+  font: var(--rs-font-body);
+  line-height: 1.55;
+}
+
+.rs-about-lead {
+  font-weight: 600;
+  color: var(--rs-color-ink);
+}
+
+.rs-about-features {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.rs-about-feature {
+  padding: 12px 14px;
+  border: 1px solid var(--rs-color-border);
+  border-radius: var(--rs-radius-card, 12px);
+  background: var(--rs-color-surface);
+}
+
+.rs-about-feature p {
+  margin: 0;
+  font: var(--rs-font-body);
+  color: var(--rs-color-charcoal);
+  line-height: 1.5;
+}
+
+.rs-about-feature__title {
+  margin: 0 0 4px;
+  font: var(--rs-font-card-title);
+  color: var(--rs-color-ink);
+}
+
+.rs-about-maker {
+  display: flex;
+  gap: 14px;
+  align-items: flex-start;
+  padding: 14px;
+  border: 1px solid var(--rs-color-border);
+  border-radius: var(--rs-radius-card, 12px);
+  background: var(--rs-color-surface);
+}
+
+.rs-about-maker__avatar {
+  flex: 0 0 auto;
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: var(--rs-color-primary);
+  color: var(--rs-color-on-primary);
+  font: 700 18px/1 var(--rs-font-family);
+}
+
+.rs-about-maker__body {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.rs-about-maker__body p {
+  margin: 0;
+  font: var(--rs-font-body);
+  line-height: 1.5;
+  color: var(--rs-color-charcoal);
+}
+
+.rs-about-maker__name {
+  font: var(--rs-font-card-title) !important;
+  font-size: 16px !important;
+  color: var(--rs-color-ink) !important;
+}
+
+.rs-about-maker__role {
+  font: var(--rs-font-meta) !important;
+  font-weight: 500 !important;
+  color: var(--rs-color-muted) !important;
+}
+
+.rs-about-list {
+  margin: 0;
+  padding-left: 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  font: var(--rs-font-body);
+}

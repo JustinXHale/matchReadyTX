@@ -1,0 +1,19 @@
+---
+description: CSS modularization — where to add rs-* styles
+globs: src/**/*.{tsx,css}
+alwaysApply: false
+---
+
+# CSS modularization (MatchReadyTX)
+
+## Where to add styles
+
+1. **Tokens** — colors/spacing only in `src/styles/tokens.css`.
+2. **Shared chrome** — masthead, nav, list rows, pills, sign-in → `src/styles/shell/`.
+3. **Feature UI** — import `*.css` from the feature layout/page (see `docs/THEME.md` table).
+
+## Rules
+
+- Do not recreate `shell.css` monolith or dump unrelated prefixes into one file.
+- If a CSS file exceeds ~400 lines, split by prefix or sub-feature.
+- Move-only refactors: keep selectors identical; no markup changes required for CSS splits.

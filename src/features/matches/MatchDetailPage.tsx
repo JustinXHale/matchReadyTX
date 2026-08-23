@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import './match-detail.css';
 import { useNavigate, useParams, useSearchParams, useLocation } from 'react-router-dom';
 import {
   Button,

@@ -1,4 +1,5 @@
 import { NavLink, Outlet } from 'react-router-dom';
+import './team-admin.css';
 import { useAppHref } from '@/app/AppContext';
 
 /** Top tabs for Team Admin — Schedule vs Referee Feedback. */
