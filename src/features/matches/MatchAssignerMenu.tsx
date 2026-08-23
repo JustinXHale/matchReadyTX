@@ -4,7 +4,6 @@ import {
   DropdownItem,
   DropdownList,
   MenuToggle,
-  type MenuToggleElement,
 } from '@patternfly/react-core';
 import { EllipsisVIcon } from '@patternfly/react-icons';
 import type { Match } from '@/domain/types';
@@ -29,7 +28,7 @@ export function MatchAssignerMenu({
   onAction,
 }: Props) {
   const [isOpen, setIsOpen] = useState(false);
-  const toggleRef = useRef<MenuToggleElement>(null);
+  const toggleRef = useRef<HTMLButtonElement>(null);
   const isTerminal =
     match.status === 'cancelled' || match.status === 'postponed';
   const hasItems =
