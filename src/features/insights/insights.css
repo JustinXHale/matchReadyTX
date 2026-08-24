@@ -330,8 +330,8 @@
 
 .rs-insights-official-row {
   display: grid;
-  grid-template-columns: auto minmax(0, 1.35fr) minmax(0, 1fr) minmax(0, 1fr);
-  gap: 10px 12px;
+  grid-template-columns: auto minmax(0, 1fr) minmax(4.5rem, 0.85fr) minmax(5rem, 0.95fr);
+  gap: 10px 8px;
   align-items: center;
   padding: 12px 0;
   border-bottom: 1px solid var(--rs-color-border);
@@ -376,15 +376,28 @@
   font: var(--rs-font-meta);
   font-size: 10px;
   font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.03em;
+  letter-spacing: 0.02em;
   color: var(--rs-color-muted);
+  line-height: 1.2;
 }
 
 .rs-insights-official-row__metric-value {
-  font-size: 13px;
-  font-weight: 600;
+  display: flex;
+  align-items: baseline;
+  justify-content: center;
+  gap: 4px;
+  font-size: 14px;
+  font-weight: 650;
   color: var(--rs-color-ink);
+  line-height: 1.2;
+}
+
+.rs-insights-official-row__metric-count {
+  font: var(--rs-font-meta);
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--rs-color-muted);
+  line-height: 1.2;
 }
 
 .rs-insights-official-filters {
@@ -412,33 +425,29 @@
 }
 @media (max-width: 480px) {
   .rs-insights-official-row {
-    grid-template-columns: auto 1fr;
-    grid-template-areas:
-      'avatar identity'
-      'cmo cmo'
-      'coach coach';
+    gap: 8px 6px;
+    padding: 10px 0;
   }
 
-  .rs-insights-official-row > :first-child {
-    grid-area: avatar;
+  .rs-insights-official-row .rs-avatar {
+    width: 40px;
+    height: 40px;
+    font-size: 14px;
   }
 
-  .rs-insights-official-row__identity {
-    grid-area: identity;
+  .rs-insights-official-row__name {
+    font-size: 15px;
   }
 
-  .rs-insights-official-row__metric {
-    border-left: none;
-    padding-left: 0;
-    padding-top: 4px;
-    border-top: 1px solid var(--rs-color-border);
+  .rs-insights-official-row__metric-label {
+    font-size: 9px;
   }
 
-  .rs-insights-official-row__metric:nth-child(3) {
-    grid-area: cmo;
+  .rs-insights-official-row__metric-value {
+    font-size: 13px;
   }
 
-  .rs-insights-official-row__metric:nth-child(4) {
-    grid-area: coach;
+  .rs-insights-official-row__metric-count {
+    font-size: 10px;
   }
 }

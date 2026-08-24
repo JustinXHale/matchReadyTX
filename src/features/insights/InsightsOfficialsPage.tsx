@@ -49,17 +49,22 @@ function officialTier(
   return grade;
 }
 
+type MetricDisplay = {
+  label: string;
+  avg: string;
+  count: string | null;
+};
+
 function metricCell(
   label: string,
   count: number,
   avg: number | null,
-  emptyLabel = '—',
-): { label: string; value: string } {
+): MetricDisplay {
   if (count <= 0) {
-    return { label, value: emptyLabel };
+    return { label, avg: '—', count: null };
   }
-  const avgText = avg != null ? `${formatInsightsAvg(avg)} avg` : '—';
-  return { label, value: `${avgText} · ${count}` };
+  const avgText = avg != null ? formatInsightsAvg(avg) : '—';
+  return { label, avg: avgText, count: `(${count})` };
 }
 
 function officialsBackHref(
@@ -231,12 +236,12 @@ export function InsightsOfficialsPage() {
             const user = state.users.find((u) => u.uid === row.userId);
             if (!user) return null;
             const cmo = metricCell(
-              'CMO reports',
+              'CMO Rating',
               row.cmoReportCount,
               row.cmoRatingAvg,
             );
             const coach = metricCell(
-              'Coach feedback',
+              'Team Feedback',
               row.coachFeedbackCount,
               row.coachFeedbackAvg,
             );
@@ -262,7 +267,12 @@ export function InsightsOfficialsPage() {
                     {cmo.label}
                   </span>
                   <span className="rs-insights-official-row__metric-value">
-                    {cmo.value}
+                    <span>{cmo.avg}</span>
+                    {cmo.count ? (
+                      <span className="rs-insights-official-row__metric-count">
+                        {cmo.count}
+                      </span>
+                    ) : null}
                   </span>
                 </div>
                 <div className="rs-insights-official-row__metric">
@@ -270,7 +280,12 @@ export function InsightsOfficialsPage() {
                     {coach.label}
                   </span>
                   <span className="rs-insights-official-row__metric-value">
-                    {coach.value}
+                    <span>{coach.avg}</span>
+                    {coach.count ? (
+                      <span className="rs-insights-official-row__metric-count">
+                        {coach.count}
+                      </span>
+                    ) : null}
                   </span>
                 </div>
               </Link>
