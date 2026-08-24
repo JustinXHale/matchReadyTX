@@ -106,7 +106,7 @@ export function SchedulerTeamsPage() {
                     ) : null}
                   </div>
                   <p className="rs-team-card__hint">
-                    {teamConferenceLabel(competitions)}
+                    {teamConferenceLabel(competitions, team)}
                   </p>
                   <p className="rs-team-card__hint">{address}</p>
                   <p className="rs-team-card__hint">

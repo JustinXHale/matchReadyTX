@@ -439,6 +439,14 @@ export function slugTeamId(name: string): string {
   return s ? `t_${s}` : `t_unknown`;
 }
 
+/** Stable id for a club row: schedule abbreviation + competition (men/women split). */
+export function teamIdFromAbbrevAndCompetition(
+  abbreviation: string,
+  competition: string,
+): string {
+  return slugTeamId(`${abbreviation.trim()} ${competition.trim()}`);
+}
+
 export function sanitizeMatchId(id: string): string {
   return id.trim().replace(/[^a-zA-Z0-9_-]/g, '_').slice(0, 80);
 }

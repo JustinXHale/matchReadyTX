@@ -164,3 +164,35 @@
   line-height: 1.4;
   color: var(--rs-color-muted);
 }
+
+.rs-form-field--error .pf-v6-c-form__label,
+.rs-form-field--error .pf-v6-c-form__group-label {
+  color: var(--pf-t--global--color--status--danger--default);
+}
+
+.rs-form-field--error .pf-v6-c-form-control,
+.rs-form-field--error input.pf-v6-c-form-control {
+  border-color: var(--pf-t--global--color--status--danger--default);
+  box-shadow: 0 0 0 1px
+    var(--pf-t--global--color--status--danger--default);
+}
+
+.rs-form-error-banner {
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: var(--rs-radius-chip);
+  background: color-mix(
+    in srgb,
+    var(--pf-t--global--color--status--danger--default) 12%,
+    transparent
+  );
+  border: 1px solid
+    color-mix(
+      in srgb,
+      var(--pf-t--global--color--status--danger--default) 35%,
+      transparent
+    );
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--pf-t--global--color--status--danger--default);
+}

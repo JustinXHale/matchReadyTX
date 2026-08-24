@@ -737,6 +737,19 @@ input.rs-filter-search {
   white-space: nowrap;
 }
 
+.rs-update-toast--error {
+  border-color: color-mix(
+    in srgb,
+    var(--pf-t--global--color--status--danger--default) 45%,
+    var(--rs-color-border)
+  );
+  background: color-mix(
+    in srgb,
+    var(--pf-t--global--color--status--danger--default) 8%,
+    var(--rs-color-surface)
+  );
+}
+
 @keyframes rs-update-toast-in {
   from {
     opacity: 0;

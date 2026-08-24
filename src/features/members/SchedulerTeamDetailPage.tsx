@@ -110,7 +110,7 @@ export function SchedulerTeamDetailPage() {
         <dl className="rs-member-dl">
           <div>
             <dt>Conference</dt>
-            <dd>{teamConferenceLabel(competitions)}</dd>
+            <dd>{teamConferenceLabel(competitions, team)}</dd>
           </div>
           <div>
             <dt>Home location</dt>

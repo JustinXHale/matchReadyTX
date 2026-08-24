@@ -224,31 +224,59 @@ export function teamContactPeople(team: Team): TeamContactPerson[] {
   return people;
 }
 
-export function teamConferenceLabel(competitions: string[]): string {
+export function primaryTeamConference(
+  team: Team,
+  competitionsFromMatches: string[],
+): string {
+  const fromTeam = team.competition?.trim();
+  if (fromTeam) return fromTeam;
+  const unique = [
+    ...new Set(
+      competitionsFromMatches.map((c) => c.trim()).filter(Boolean),
+    ),
+  ];
+  if (unique.length === 1) return unique[0]!;
+  if (team.gender) {
+    const fromGender = competitionFromGender(team.gender);
+    if (fromGender && unique.includes(fromGender)) return fromGender;
+  }
+  if (unique.length > 0) {
+    return [...unique].sort((a, b) => a.localeCompare(b))[0]!;
+  }
+  return 'Conference unknown';
+}
+
+/** Single conference label — never joins men/women into one header. */
+export function teamConferenceLabel(
+  competitions: string[],
+  team?: Team,
+): string {
+  if (team) return primaryTeamConference(team, competitions);
   if (competitions.length === 0) return 'Conference unknown';
   if (competitions.length === 1) return competitions[0]!;
-  return competitions.join(' · ');
+  return [...competitions].sort((a, b) => a.localeCompare(b))[0]!;
 }
 
 /**
  * Shared picker options for conference-grouped team selection.
- * Keeps member edit + profile request flows in sync.
+ * Roster comes from Locations-synced teams (abbreviation + competition).
  */
 export function conferenceTeamOptions(
-  matches: Match[],
+  _matches: Match[],
   teams: Team[],
   allowedTeamIds?: Set<string>,
 ): ConferenceTeamOption[] {
-  return scheduleTeamEntries(matches, teams)
-    .filter((entry) =>
-      allowedTeamIds ? allowedTeamIds.has(entry.team.id) : true,
-    )
-    .map((entry) => ({
-      id: entry.team.id,
-      name: entry.team.name,
-      conference: teamConferenceLabel(entry.competitions),
+  return teams
+    .filter((team) => {
+      if (!team.competition?.trim()) return false;
+      if (allowedTeamIds && !allowedTeamIds.has(team.id)) return false;
+      return true;
+    })
+    .map((team) => ({
+      id: team.id,
+      name: team.name,
+      conference: team.competition!.trim(),
     }))
-    .filter((entry) => entry.conference !== 'Conference unknown')
     .sort((a, b) =>
       a.conference === b.conference
         ? a.name.localeCompare(b.name)

@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import {
+  Alert,
   Button,
   Checkbox,
   EmptyState,
@@ -98,6 +99,117 @@ type EditDraft = {
   shortsSize: string;
 };
 
+type EditFieldKey =
+  | 'firstName'
+  | 'lastName'
+  | 'roles'
+  | 'phone'
+  | 'birthday'
+  | 'teamIds'
+  | 'homeStreet'
+  | 'homeCity'
+  | 'homeRegion'
+  | 'homePostalCode'
+  | 'refereeLevel'
+  | 'refereeingSince'
+  | 'jerseySize'
+  | 'shortsSize';
+
+function validateMemberEditDraft(
+  draft: EditDraft,
+  hasAssignableClubs: boolean,
+): { message: string; fields: EditFieldKey[] } | null {
+  const fields: EditFieldKey[] = [];
+  const push = (field: EditFieldKey) => {
+    if (!fields.includes(field)) fields.push(field);
+  };
+
+  if (!draft.firstName.trim()) push('firstName');
+  if (!draft.lastName.trim()) push('lastName');
+  if (!draft.firstName.trim() || !draft.lastName.trim()) {
+    return {
+      message: 'First and last name are required.',
+      fields,
+    };
+  }
+
+  const hasRole =
+    draft.roleOfficial ||
+    draft.roleTeamAdmin ||
+    draft.roleCmo ||
+    draft.roleAssigner ||
+    draft.roleReportAnalytics ||
+    draft.roleFan;
+  if (!hasRole) {
+    return { message: 'Pick at least one role.', fields: ['roles'] };
+  }
+
+  const fanOnly =
+    draft.roleFan &&
+    !draft.roleOfficial &&
+    !draft.roleTeamAdmin &&
+    !draft.roleCmo &&
+    !draft.roleAssigner &&
+    !draft.roleReportAnalytics;
+
+  if (!fanOnly && !draft.phone.trim()) push('phone');
+
+  const needsRef = draft.roleOfficial || draft.roleCmo;
+  if (needsRef && !draft.birthday.trim()) push('birthday');
+
+  if (
+    draft.roleTeamAdmin &&
+    hasAssignableClubs &&
+    draft.teamIds.length === 0
+  ) {
+    push('teamIds');
+  }
+
+  if (needsRef) {
+    if (!draft.homeStreet.trim()) push('homeStreet');
+    if (!draft.homeCity.trim()) push('homeCity');
+    if (!draft.homeRegion.trim()) push('homeRegion');
+    if (!draft.homePostalCode.trim()) push('homePostalCode');
+    if (!draft.levelUnknown) {
+      const n = Number(draft.refereeLevel);
+      if (!Number.isFinite(n) || n < 1 || n > 20) push('refereeLevel');
+    }
+    const year = draft.refereeingSince.trim();
+    const yearNum = Number(year);
+    const thisYear = new Date().getFullYear();
+    if (!/^\d{4}$/.test(year) || yearNum < 1950 || yearNum > thisYear) {
+      push('refereeingSince');
+    }
+    if (!draft.jerseySize.trim()) push('jerseySize');
+    if (!draft.shortsSize.trim()) push('shortsSize');
+  }
+
+  if (fields.length === 0) return null;
+
+  let message = 'Fix the highlighted fields below.';
+  if (fields.includes('phone')) message = 'Phone is required.';
+  else if (fields.includes('birthday')) {
+    message = 'Birthday is required for Referee / CMO.';
+  } else if (fields.includes('teamIds')) {
+    message = 'Pick at least one club for Team Admin.';
+  } else if (
+    fields.includes('homeStreet') ||
+    fields.includes('homeCity') ||
+    fields.includes('homeRegion') ||
+    fields.includes('homePostalCode')
+  ) {
+    message = 'Street, city, state, and ZIP are required for Referee/CMO.';
+  } else if (fields.includes('refereeLevel')) {
+    message = 'Referee level must be 1–20, or mark “I don’t know”.';
+  } else if (fields.includes('refereeingSince')) {
+    message = `Year started refereeing must be 1950–${new Date().getFullYear()}.`;
+  } else if (fields.includes('jerseySize') || fields.includes('shortsSize')) {
+    message = 'Jersey and shorts size are required for Referee/CMO.';
+  }
+
+  return { message, fields };
+}
+
 function draftFromUser(user: UserProfile): EditDraft {
   return {
     firstName: user.firstName ?? '',
@@ -193,6 +305,8 @@ export function MemberDetailPage() {
   const [editSaving, setEditSaving] = useState(false);
   const [editSaved, setEditSaved] = useState(false);
   const [editError, setEditError] = useState<string | null>(null);
+  const [editFieldErrors, setEditFieldErrors] = useState<EditFieldKey[]>([]);
+  const [editErrorToast, setEditErrorToast] = useState(false);
   const [availYear, setAvailYear] = useState(availNow.getFullYear());
   const [availMonth, setAvailMonth] = useState(availNow.getMonth() + 1);
 
@@ -210,7 +324,15 @@ export function MemberDetailPage() {
     setEditDraft(null);
     setEditSaved(false);
     setEditError(null);
+    setEditFieldErrors([]);
+    setEditErrorToast(false);
   }, [user?.uid]);
+
+  useEffect(() => {
+    if (!editErrorToast) return;
+    const id = window.setTimeout(() => setEditErrorToast(false), 5000);
+    return () => window.clearTimeout(id);
+  }, [editErrorToast]);
 
   const listName = user ? memberListName(user) : '';
   const joinedLabel =
@@ -351,22 +473,39 @@ export function MemberDetailPage() {
     setEditing(true);
     setEditSaved(false);
     setEditError(null);
+    setEditFieldErrors([]);
+    setEditErrorToast(false);
   };
 
   const cancelEdit = () => {
     setEditing(false);
     setEditDraft(null);
     setEditError(null);
+    setEditFieldErrors([]);
+    setEditErrorToast(false);
   };
+
+  const fieldHasError = (field: EditFieldKey) => editFieldErrors.includes(field);
+  const fieldErrorClass = (field: EditFieldKey) =>
+    fieldHasError(field) ? 'rs-form-field--error' : undefined;
 
   const saveEdit = () => {
     if (!editDraft) return;
-    const firstName = editDraft.firstName.trim();
-    const lastName = editDraft.lastName.trim();
-    if (!firstName || !lastName) {
-      setEditError('First and last name are required.');
+    const validation = validateMemberEditDraft(
+      editDraft,
+      teamPickerOptions.length > 0,
+    );
+    if (validation) {
+      setEditFieldErrors(validation.fields);
+      setEditError(validation.message);
+      setEditErrorToast(true);
       return;
     }
+    setEditFieldErrors([]);
+    setEditErrorToast(false);
+
+    const firstName = editDraft.firstName.trim();
+    const lastName = editDraft.lastName.trim();
     const roles: Role[] = [];
     if (editDraft.roleOfficial) roles.push('official');
     if (editDraft.roleTeamAdmin) roles.push('teamAdmin');
@@ -374,10 +513,6 @@ export function MemberDetailPage() {
     if (editDraft.roleAssigner) roles.push('assigner');
     if (editDraft.roleReportAnalytics) roles.push('reportAnalytics');
     if (editDraft.roleFan) roles.push('fan');
-    if (roles.length === 0) {
-      setEditError('Pick at least one role.');
-      return;
-    }
 
     const fanOnly =
       editDraft.roleFan &&
@@ -387,46 +522,10 @@ export function MemberDetailPage() {
       !editDraft.roleAssigner &&
       !editDraft.roleReportAnalytics;
 
-    if (!fanOnly && !editDraft.phone.trim()) {
-      setEditError('Phone is required.');
-      return;
-    }
-
     const needsRef = editDraft.roleOfficial || editDraft.roleCmo;
-    if (needsRef && !editDraft.birthday.trim()) {
-      setEditError('Birthday is required for Referee / CMO.');
-      return;
-    }
     let refereeLevel: number | undefined;
-    if (needsRef) {
-      if (
-        !editDraft.homeStreet.trim() ||
-        !editDraft.homeCity.trim() ||
-        !editDraft.homeRegion.trim() ||
-        !editDraft.homePostalCode.trim()
-      ) {
-        setEditError('Street, city, state, and ZIP are required for Referee/CMO.');
-        return;
-      }
-      if (!editDraft.levelUnknown) {
-        const n = Number(editDraft.refereeLevel);
-        if (!Number.isFinite(n) || n < 1 || n > 20) {
-          setEditError('Referee level must be 1–20, or mark “I don’t know”.');
-          return;
-        }
-        refereeLevel = n;
-      }
-      const year = editDraft.refereeingSince.trim();
-      const yearNum = Number(year);
-      const thisYear = new Date().getFullYear();
-      if (!/^\d{4}$/.test(year) || yearNum < 1950 || yearNum > thisYear) {
-        setEditError(`Year started refereeing must be 1950–${thisYear}.`);
-        return;
-      }
-      if (!editDraft.jerseySize.trim() || !editDraft.shortsSize.trim()) {
-        setEditError('Jersey and shorts size are required for Referee/CMO.');
-        return;
-      }
+    if (needsRef && !editDraft.levelUnknown) {
+      refereeLevel = Number(editDraft.refereeLevel);
     }
 
     let next: UserProfile = {
@@ -521,6 +620,12 @@ export function MemberDetailPage() {
     setEditDraft((d) => (d ? { ...d, ...partial } : d));
     setEditSaved(false);
     setEditError(null);
+    const cleared = Object.keys(partial) as EditFieldKey[];
+    if (cleared.length > 0) {
+      setEditFieldErrors((prev) =>
+        prev.filter((field) => !cleared.includes(field)),
+      );
+    }
   };
 
   return (
@@ -666,13 +771,21 @@ export function MemberDetailPage() {
         ) : editDraft ? (
           <div className="rs-stack rs-member-edit">
             <div className="rs-form-row rs-form-row--2">
-              <FormGroup label="First name" isRequired>
+              <FormGroup
+                label="First name"
+                isRequired
+                className={fieldErrorClass('firstName')}
+              >
                 <TextInput
                   value={editDraft.firstName}
                   onChange={(_, v) => patchDraft({ firstName: v })}
                 />
               </FormGroup>
-              <FormGroup label="Last name" isRequired>
+              <FormGroup
+                label="Last name"
+                isRequired
+                className={fieldErrorClass('lastName')}
+              >
                 <TextInput
                   value={editDraft.lastName}
                   onChange={(_, v) => patchDraft({ lastName: v })}
@@ -684,7 +797,11 @@ export function MemberDetailPage() {
                 <TextInput value={user.email} isDisabled readOnly />
               </FormGroup>
               {!editFanOnly && (
-                <FormGroup label="Phone" isRequired>
+                <FormGroup
+                  label="Phone"
+                  isRequired
+                  className={fieldErrorClass('phone')}
+                >
                   <TextInput
                     type="tel"
                     value={editDraft.phone}
@@ -693,7 +810,11 @@ export function MemberDetailPage() {
                 </FormGroup>
               )}
             </div>
-            <FormGroup label="Roles" isRequired>
+            <FormGroup
+              label="Roles"
+              isRequired
+              className={fieldErrorClass('roles')}
+            >
               <div className="rs-onboarding__roles">
                 <Checkbox
                   id="member-role-official"
@@ -741,19 +862,31 @@ export function MemberDetailPage() {
               </div>
             </FormGroup>
             {editDraft.roleTeamAdmin && (
-              <FormGroup label="Clubs they manage" isRequired>
+              <FormGroup
+                label="Clubs they manage"
+                isRequired
+                className={fieldErrorClass('teamIds')}
+              >
                 {assignableTeams.length === 0 ? (
                   <p className="rs-match-card__meta">
                     Sync the schedule first to list clubs.
                   </p>
                 ) : (
                   <div className="rs-stack">
+                  <div
+                    className={
+                      fieldHasError('teamIds')
+                        ? 'rs-form-field--error'
+                        : undefined
+                    }
+                  >
                     <ConferenceTeamPicker
                       options={teamPickerOptions}
                       selectedIds={editDraft.teamIds}
                       onChange={(teamIds) => patchDraft({ teamIds })}
                       ariaLabel="Assign clubs by conference"
                     />
+                  </div>
                     {editDraft.teamIds.length > 0 && (
                       <div
                         className="rs-filter-chips"
@@ -765,7 +898,7 @@ export function MemberDetailPage() {
                             (t) => t.team.id === id,
                           );
                           const label = entry
-                            ? `${entry.team.name} (${teamConferenceLabel(entry.competitions)})`
+                            ? `${entry.team.name} (${teamConferenceLabel(entry.competitions, entry.team)})`
                             : id;
                           return (
                             <button
@@ -795,7 +928,11 @@ export function MemberDetailPage() {
               </FormGroup>
             )}
             {showsRefereeProfileFields && (
-              <FormGroup label="Birthday" isRequired>
+              <FormGroup
+                label="Birthday"
+                isRequired
+                className={fieldErrorClass('birthday')}
+              >
                 <TextInput
                   type="date"
                   value={editDraft.birthday}
@@ -806,7 +943,11 @@ export function MemberDetailPage() {
             {showsRefereeProfileFields && (
               <>
                 <div className="rs-form-row rs-form-row--2">
-                  <FormGroup label="Street address" isRequired>
+                  <FormGroup
+                    label="Street address"
+                    isRequired
+                    className={fieldErrorClass('homeStreet')}
+                  >
                     <TextInput
                       value={editDraft.homeStreet}
                       onChange={(_, v) => patchDraft({ homeStreet: v })}
@@ -820,26 +961,41 @@ export function MemberDetailPage() {
                   </FormGroup>
                 </div>
                 <div className="rs-form-row rs-form-row--3">
-                  <FormGroup label="City" isRequired>
+                  <FormGroup
+                    label="City"
+                    isRequired
+                    className={fieldErrorClass('homeCity')}
+                  >
                     <TextInput
                       value={editDraft.homeCity}
                       onChange={(_, v) => patchDraft({ homeCity: v })}
                     />
                   </FormGroup>
-                  <FormGroup label="State" isRequired>
+                  <FormGroup
+                    label="State"
+                    isRequired
+                    className={fieldErrorClass('homeRegion')}
+                  >
                     <TextInput
                       value={editDraft.homeRegion}
                       onChange={(_, v) => patchDraft({ homeRegion: v })}
                     />
                   </FormGroup>
-                  <FormGroup label="ZIP" isRequired>
+                  <FormGroup
+                    label="ZIP"
+                    isRequired
+                    className={fieldErrorClass('homePostalCode')}
+                  >
                     <TextInput
                       value={editDraft.homePostalCode}
                       onChange={(_, v) => patchDraft({ homePostalCode: v })}
                     />
                   </FormGroup>
                 </div>
-                <FormGroup label="Self-reported referee level">
+                <FormGroup
+                  label="Self-reported referee level"
+                  className={fieldErrorClass('refereeLevel')}
+                >
                   <TextInput
                     type="number"
                     min={1}
@@ -865,7 +1021,11 @@ export function MemberDetailPage() {
                     }
                   />
                 </FormGroup>
-                <FormGroup label="Year started refereeing" isRequired>
+                <FormGroup
+                  label="Year started refereeing"
+                  isRequired
+                  className={fieldErrorClass('refereeingSince')}
+                >
                   <TextInput
                     type="number"
                     inputMode="numeric"
@@ -880,7 +1040,11 @@ export function MemberDetailPage() {
                     placeholder="e.g. 2018"
                   />
                 </FormGroup>
-                <FormGroup label="Jersey size" isRequired>
+                <FormGroup
+                  label="Jersey size"
+                  isRequired
+                  className={fieldErrorClass('jerseySize')}
+                >
                   <div
                     className="rs-onboard__sizes"
                     role="group"
@@ -902,7 +1066,11 @@ export function MemberDetailPage() {
                     ))}
                   </div>
                 </FormGroup>
-                <FormGroup label="Shorts size" isRequired>
+                <FormGroup
+                  label="Shorts size"
+                  isRequired
+                  className={fieldErrorClass('shortsSize')}
+                >
                   <div
                     className="rs-onboard__sizes"
                     role="group"
@@ -927,7 +1095,7 @@ export function MemberDetailPage() {
               </>
             )}
             {editError && (
-              <p className="rs-match-card__meta" role="alert">
+              <p className="rs-form-error-banner" role="alert">
                 {editError}
               </p>
             )}
@@ -1176,6 +1344,15 @@ export function MemberDetailPage() {
           >
             Cancel
           </Button>
+        </div>
+      )}
+
+      {editErrorToast && editError && (
+        <div
+          className="rs-update-toast rs-update-toast--error"
+          role="alert"
+        >
+          <Alert variant="danger" isInline isPlain title={editError} />
         </div>
       )}
     </div>

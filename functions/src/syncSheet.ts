@@ -24,6 +24,7 @@ import {
   rowToKickoffIso,
   sanitizeMatchId,
   slugTeamId,
+  teamIdFromAbbrevAndCompetition,
   type ContactRow,
   type LocationRow,
 } from './sheetParse';
@@ -193,6 +194,41 @@ function teamIdsForContact(
   return list;
 }
 
+function rosterTeamKey(abbreviation: string, competition: string): string {
+  return `${abbreviation.trim().toUpperCase()}|${competition.trim().toLowerCase()}`;
+}
+
+/** Map legacy team doc ids to Locations-sync ids (abbreviation + competition). */
+function buildTeamIdRemap(
+  existingTeamDocs: Array<{ id: string; data: () => DocumentData | undefined }>,
+  teamsById: Map<string, TeamShape>,
+): Map<string, string> {
+  const newIdByKey = new Map<string, string>();
+  for (const [id, team] of teamsById) {
+    const abbr = (team.abbreviation ?? '').trim().toUpperCase();
+    const comp = (team.competition ?? '').trim();
+    if (abbr && comp) newIdByKey.set(rosterTeamKey(abbr, comp), id);
+  }
+  const remap = new Map<string, string>();
+  for (const doc of existingTeamDocs) {
+    const data = doc.data();
+    if (!data) continue;
+    const oldId = doc.id;
+    if (teamsById.has(oldId)) {
+      remap.set(oldId, oldId);
+      continue;
+    }
+    const abbr = String(data.abbreviation ?? data.name ?? '')
+      .trim()
+      .toUpperCase();
+    const comp = String(data.competition ?? '').trim();
+    if (!abbr || !comp) continue;
+    const newId = newIdByKey.get(rosterTeamKey(abbr, comp));
+    if (newId) remap.set(oldId, newId);
+  }
+  return remap;
+}
+
 function genderForRow(row: { competition?: string; gender?: string }): 'men' | 'women' {
   if (row.gender?.trim()) return normalizeGender(row.gender);
   return genderFromCompetitionName(row.competition) ?? 'men';
@@ -232,7 +268,7 @@ function buildTeamIdResolver(rows: ReturnType<typeof parseScheduleRows>) {
     if (!key) return slugTeamId('unknown');
     if (splitNames.has(key)) {
       const comp = resolvedCompetition(row);
-      return slugTeamId(`${teamName} ${comp}`);
+      return teamIdFromAbbrevAndCompetition(teamName, comp);
     }
     return slugTeamId(teamName);
   };
@@ -316,6 +352,25 @@ export async function runSheetSync(opts: {
     teamsById.set(id, next);
     return next;
   };
+
+  for (const loc of locations) {
+    const abbr = (loc.abbreviation ?? '').trim().toUpperCase();
+    if (!abbr) continue;
+    const gender = loc.gender?.trim()
+      ? normalizeGender(loc.gender)
+      : genderFromCompetitionName(loc.competition) ?? 'men';
+    const competition =
+      loc.competition?.trim() || competitionForGender(gender);
+    const id = teamIdFromAbbrevAndCompetition(abbr, competition);
+    const team = getOrCreateTeam(
+      id,
+      loc.teamName?.trim() || abbr,
+      competition,
+      { abbreviation: abbr, gender },
+    );
+    if (loc.address) team.address = loc.address;
+  }
+
   for (const row of rows) {
     const comp = resolvedCompetition(row);
     const gender = genderForRow(row);
@@ -580,6 +635,31 @@ export async function runSheetSync(opts: {
     if (away) keepTeamIds.add(away);
   }
   const existingTeams = await db.collection(`orgs/${orgId}/teams`).get();
+  const teamIdRemap = buildTeamIdRemap(existingTeams.docs, teamsById);
+  if (teamIdRemap.size > 0) {
+    const membersSnap = await db.collection(`orgs/${orgId}/members`).get();
+    for (const doc of membersSnap.docs) {
+      const raw = doc.data().teamIds;
+      if (!Array.isArray(raw)) continue;
+      const teamIds = raw.map(String);
+      const next = [
+        ...new Set(teamIds.map((id) => teamIdRemap.get(id) ?? id).filter(Boolean)),
+      ];
+      if (next.join('|') === teamIds.join('|')) continue;
+      batch.update(doc.ref, {
+        teamIds: next,
+        updatedAt: FieldValue.serverTimestamp(),
+      });
+      batchOps += 1;
+      batch.set(
+        db.doc(`users/${doc.id}`),
+        { teamIds: next, updatedAt: FieldValue.serverTimestamp() },
+        { merge: true },
+      );
+      batchOps += 1;
+      if (batchOps >= 400) await flushBatch();
+    }
+  }
   let teamsRemoved = 0;
   for (const docSnap of existingTeams.docs) {
     if (keepTeamIds.has(docSnap.id)) continue;

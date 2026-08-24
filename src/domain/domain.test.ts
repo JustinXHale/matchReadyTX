@@ -83,7 +83,7 @@ import {
 } from '@/domain/members';
 import { defaultRoleView, lensesForUser } from '@/app/AppContext';
 import { standingsByDivision } from '@/domain/standings';
-import { scheduleTeamEntries, teamContactPeople } from '@/domain/teams';
+import { scheduleTeamEntries, teamContactPeople, conferenceTeamOptions } from '@/domain/teams';
 import { crewColumnLines } from '@/features/referee/appointments/crewLines';
 
 function baseMatch(): Match {
@@ -1673,6 +1673,36 @@ describe('scheduleTeamEntries', () => {
     ];
     const ids = scheduleTeamEntries([], teams).map((e) => e.team.id);
     expect(ids).toContain('new-club');
+  });
+});
+
+describe('conferenceTeamOptions', () => {
+  it('lists Locations-synced teams by competition, not schedule inference', () => {
+    const teams: Team[] = [
+      {
+        id: 't_uh_lonestar_men',
+        name: 'University of Houston',
+        abbreviation: 'UH',
+        competition: 'Lonestar Men',
+        contactEmails: [],
+      },
+      {
+        id: 't_uh_lonestar_women',
+        name: 'University of Houston',
+        abbreviation: 'UH',
+        competition: 'Lonestar Women',
+        contactEmails: [],
+      },
+      { id: 'guest', name: 'Guest RFC', contactEmails: [] },
+    ];
+    const options = conferenceTeamOptions([], teams);
+    expect(options).toHaveLength(2);
+    expect(options.map((o) => o.id)).toEqual([
+      't_uh_lonestar_men',
+      't_uh_lonestar_women',
+    ]);
+    expect(options[0]?.conference).toBe('Lonestar Men');
+    expect(options[1]?.conference).toBe('Lonestar Women');
   });
 });
 
