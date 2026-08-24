@@ -719,3 +719,44 @@ button.rs-detail-people__confirm:focus-visible {
   font-size: 12px;
   color: var(--rs-color-muted);
 }
+
+.rs-raise-hand-heading {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--rs-space-sm) var(--rs-space-md);
+}
+
+.rs-raise-hand-heading .rs-pill {
+  text-transform: none;
+  letter-spacing: 0.02em;
+}
+
+.rs-raise-hand-card {
+  position: relative;
+  overflow: hidden;
+}
+
+.rs-raise-hand-card--locked .rs-raise-hand-card__body {
+  filter: grayscale(0.55);
+  opacity: 0.55;
+  pointer-events: none;
+  user-select: none;
+}
+
+/* Keep selected vs unselected chips readable under the overlay. */
+.rs-raise-hand-card--locked .rs-filter-chip:disabled {
+  opacity: 1;
+  cursor: default;
+}
+
+.rs-raise-hand-card__overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--rs-space-md);
+  background: color-mix(in srgb, var(--rs-color-surface) 42%, transparent);
+}

@@ -515,10 +515,7 @@ export function MatchDetailPage() {
       crewPeople(match.crew[s]).some((a) => a.userId === currentUser.uid),
     ) &&
     (Boolean(pendingRequest) || canRequest);
-  const raiseHandPickerSlots =
-    pendingRequest && !requestEditing
-      ? gameRequestPreferredSlots(pendingRequest)
-      : requestSlots;
+  const raiseHandLocked = Boolean(pendingRequest) && !requestEditing;
   const canSubmitRequest =
     showRaiseHandCard &&
     requestEditing &&
@@ -2269,73 +2266,86 @@ export function MatchDetailPage() {
 
       {showRaiseHandCard && (
         <section
-          className="rs-detail-card"
+          className={`rs-detail-card rs-raise-hand-card${
+            raiseHandLocked ? ' rs-raise-hand-card--locked' : ''
+          }`}
           aria-labelledby="raise-hand-heading"
           ref={requestSectionRef}
         >
-          <h3 id="raise-hand-heading" className="rs-detail-section__label">
-            Raise hand
-            {pendingRequest && !requestEditing && (
-              <span className="rs-pill rs-pill--warn pf-v6-u-ml-sm">
-                Pending
-              </span>
-            )}
-          </h3>
-          <FormGroup
-            label="Select roles you're open to"
-            isRequired
-            fieldId="request-role"
-          >
-            <div
-              className="rs-slot-picker"
-              role="group"
-              aria-label="Select roles you're open to"
+          <div className="rs-raise-hand-card__body">
+            <h3 id="raise-hand-heading" className="rs-detail-section__label rs-raise-hand-heading">
+              <span>Raise hand</span>
+              {pendingRequest && (
+                <span className="rs-pill rs-pill--warn">Pending</span>
+              )}
+            </h3>
+            <FormGroup
+              label="Select roles you're open to"
+              isRequired
+              fieldId="request-role"
             >
-              {raiseHandPickerSlots.map((s) => {
-                const selected = requestSelectedSlots.includes(s);
-                const disabled = !requestEditing;
-                return (
-                  <button
-                    key={s}
-                    type="button"
-                    aria-pressed={selected}
-                    disabled={disabled}
-                    className={`rs-filter-chip${
-                      selected ? ' rs-filter-chip--selected' : ''
-                    }`}
-                    onClick={() => {
-                      if (disabled) return;
-                      setRequestSelectedSlots((prev) =>
-                        selected
-                          ? prev.filter((slot) => slot !== s)
-                          : [...prev, s],
-                      );
-                    }}
-                  >
-                    {REQUESTABLE_SLOT_SHORT[s]}
-                  </button>
-                );
-              })}
+              <div
+                className="rs-slot-picker"
+                role="group"
+                aria-label="Select roles you're open to"
+              >
+                {requestSlots.map((s) => {
+                  const selected = requestSelectedSlots.includes(s);
+                  return (
+                    <button
+                      key={s}
+                      type="button"
+                      aria-pressed={selected}
+                      disabled={raiseHandLocked}
+                      className={`rs-filter-chip${
+                        selected ? ' rs-filter-chip--selected' : ''
+                      }`}
+                      onClick={() => {
+                        if (raiseHandLocked) return;
+                        setRequestSelectedSlots((prev) =>
+                          selected
+                            ? prev.filter((slot) => slot !== s)
+                            : [...prev, s],
+                        );
+                      }}
+                    >
+                      {REQUESTABLE_SLOT_SHORT[s]}
+                    </button>
+                  );
+                })}
+              </div>
+              {requestSlots.length === 0 && (
+                <p className="rs-detail-note">No open roles on this match.</p>
+              )}
+            </FormGroup>
+            <FormGroup label="Note (optional)" fieldId="request-note">
+              <TextArea
+                id="request-note"
+                value={requestNote}
+                onChange={(_, v) => setRequestNote(v)}
+                rows={2}
+                resizeOrientation="vertical"
+                isDisabled={raiseHandLocked}
+              />
+            </FormGroup>
+          </div>
+          {raiseHandLocked && pendingRequest && (
+            <div className="rs-raise-hand-card__overlay">
+              <Button
+                variant="primary"
+                onClick={() => {
+                  setRequestSelectedSlots(
+                    gameRequestPreferredSlots(pendingRequest).filter((s) =>
+                      requestSlots.includes(s),
+                    ),
+                  );
+                  setRequestEditing(true);
+                }}
+              >
+                Edit request
+              </Button>
             </div>
-            {raiseHandPickerSlots.length === 0 && (
-              <p className="rs-detail-note">No open roles on this match.</p>
-            )}
-            {pendingRequest && !requestEditing && (
-              <p className="rs-detail-note">
-                Tap Edit request below to change roles or your note.
-              </p>
-            )}
-          </FormGroup>
-          <FormGroup label="Note (optional)" fieldId="request-note">
-            <TextArea
-              id="request-note"
-              value={requestNote}
-              onChange={(_, v) => setRequestNote(v)}
-              rows={2}
-              resizeOrientation="vertical"
-              isDisabled={!requestEditing}
-            />
-          </FormGroup>
+          )}
         </section>
       )}
 
@@ -2407,38 +2417,21 @@ export function MatchDetailPage() {
         </div>
       )}
 
-      {showRaiseHandCard && (
+      {showRaiseHandCard && !raiseHandLocked && (
         <div className="rs-detail-sticky">
-          {pendingRequest && !requestEditing ? (
-            <Button
-              variant="primary"
-              isBlock
-              onClick={() => {
-                setRequestSelectedSlots(
-                  gameRequestPreferredSlots(pendingRequest).filter((s) =>
-                    requestSlots.includes(s),
-                  ),
-                );
-                setRequestEditing(true);
-              }}
-            >
-              Edit request
-            </Button>
-          ) : (
-            <Button
-              variant="primary"
-              isBlock
-              isDisabled={!canSubmitRequest}
-              className={
-                canSubmitRequest
-                  ? undefined
-                  : 'rs-detail-sticky__submit--disabled'
-              }
-              onClick={() => void submitRequest()}
-            >
-              {pendingRequest ? 'Update request' : 'Submit request'}
-            </Button>
-          )}
+          <Button
+            variant="primary"
+            isBlock
+            isDisabled={!canSubmitRequest}
+            className={
+              canSubmitRequest
+                ? undefined
+                : 'rs-detail-sticky__submit--disabled'
+            }
+            onClick={() => void submitRequest()}
+          >
+            {pendingRequest ? 'Update request' : 'Submit request'}
+          </Button>
         </div>
       )}
 
