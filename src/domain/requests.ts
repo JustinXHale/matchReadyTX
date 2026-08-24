@@ -1,6 +1,7 @@
 import type { CrewSlot, GameRequest, Match, RequestableSlot } from './types';
 import {
   CREW_SLOTS,
+  REQUESTABLE_SLOTS,
   crewBlocks,
   crewPeople,
   emptyCrewBlocks,
@@ -66,6 +67,48 @@ export function matchNeedsCrewCoverage(match: Match): boolean {
   return openCrewSlotsExcludingCmo(match).length > 0;
 }
 
+const REQUESTABLE_SLOT_SET = new Set<RequestableSlot>(REQUESTABLE_SLOTS);
+
+/** Normalize raise-hand slot prefs (supports legacy single preferredSlot). */
+export function normalizeRequestableSlots(
+  slots: RequestableSlot[] | undefined,
+  legacy?: RequestableSlot,
+): RequestableSlot[] {
+  const out: RequestableSlot[] = [];
+  const seen = new Set<RequestableSlot>();
+  for (const slot of slots ?? []) {
+    if (!REQUESTABLE_SLOT_SET.has(slot) || seen.has(slot)) continue;
+    seen.add(slot);
+    out.push(slot);
+  }
+  if (
+    legacy &&
+    REQUESTABLE_SLOT_SET.has(legacy) &&
+    !seen.has(legacy)
+  ) {
+    out.push(legacy);
+  }
+  return out;
+}
+
+export function gameRequestPreferredSlots(req: GameRequest): RequestableSlot[] {
+  return normalizeRequestableSlots(req.preferredSlots, req.preferredSlot);
+}
+
+/** First still-open preferred slot for assigner approval (fallback: first pref). */
+export function resolveRaiseHandApprovalSlot(
+  match: Match,
+  request: GameRequest,
+): RequestableSlot | undefined {
+  const prefs = gameRequestPreferredSlots(request);
+  if (prefs.length === 0) return undefined;
+  const open = openRequestSlots(match);
+  for (const slot of prefs) {
+    if (open.includes(slot)) return slot;
+  }
+  return prefs[0];
+}
+
 export function pendingRequestForUser(
   requests: GameRequest[],
   matchId: string,
@@ -103,11 +146,10 @@ export function isPendingRequestActive(
     return false;
   }
   if (isMatchFilled(match)) return false;
-  if (
-    request.preferredSlot &&
-    preferredSlotIsFilled(match, request.preferredSlot)
-  ) {
-    return false;
+  const prefs = gameRequestPreferredSlots(request);
+  if (prefs.length > 0) {
+    const anyStillOpen = prefs.some((s) => !preferredSlotIsFilled(match, s));
+    if (!anyStillOpen) return false;
   }
   return true;
 }

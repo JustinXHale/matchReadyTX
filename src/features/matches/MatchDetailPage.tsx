@@ -279,7 +279,9 @@ export function MatchDetailPage() {
   const [feeDrafts, setFeeDrafts] = useState<
     Partial<Record<RequestableSlot, string>>
   >({});
-  const [requestSlot, setRequestSlot] = useState<RequestableSlot | ''>('');
+  const [requestSelectedSlots, setRequestSelectedSlots] = useState<
+    RequestableSlot[]
+  >([]);
   const [requestNote, setRequestNote] = useState('');
   const [requestToast, setRequestToast] = useState(false);
   const requestSectionRef = useRef<HTMLElement | null>(null);
@@ -375,7 +377,7 @@ export function MatchDetailPage() {
   );
 
   useEffect(() => {
-    setRequestSlot('');
+    setRequestSelectedSlots([]);
     setRequestNote('');
     setProposeKickoff(match?.kickoffAt ? toDatetimeLocalValue(match.kickoffAt) : '');
     setProposeVenueName(match?.venueName ?? '');
@@ -1072,8 +1074,8 @@ export function MatchDetailPage() {
   const showAcceptDecline = Boolean(needsOfficialConfirm && mySlot);
   const canSubmitRequest =
     canRequest &&
-    Boolean(requestSlot) &&
-    requestSlots.includes(requestSlot as RequestableSlot);
+    requestSelectedSlots.length > 0 &&
+    requestSelectedSlots.every((s) => requestSlots.includes(s));
 
   const reportActions = matchDetailReportActions(
     match,
@@ -1094,11 +1096,11 @@ export function MatchDetailPage() {
     !stickyPrimary;
 
   const submitRequest = async () => {
-    if (!requestSlot || !canSubmitRequest || !currentUser || !match) return;
+    if (!canSubmitRequest || !currentUser || !match) return;
     const reqId = store.requestGame(
       match.id,
       currentUser.uid,
-      requestSlot,
+      requestSelectedSlots,
       requestNote.trim() || undefined,
     );
     if (!reqId) return;
@@ -1121,7 +1123,7 @@ export function MatchDetailPage() {
       }
     }
 
-    setRequestSlot('');
+    setRequestSelectedSlots([]);
     setRequestNote('');
     setRequestToast(true);
     window.requestAnimationFrame(() => {
@@ -2203,24 +2205,38 @@ export function MatchDetailPage() {
           <h3 id="raise-hand-heading" className="rs-detail-section__label">
             Raise hand
           </h3>
-          <FormGroup label="Select one role" isRequired fieldId="request-role">
+          <FormGroup
+            label="Select roles you're open to"
+            isRequired
+            fieldId="request-role"
+          >
             <div
               className="rs-slot-picker"
-              role="radiogroup"
-              aria-label="Select one role"
+              role="group"
+              aria-label="Select roles you're open to"
             >
-              {requestSlots.map((s) => (
-                <button
-                  key={s}
-                  type="button"
-                  role="radio"
-                  aria-checked={requestSlot === s}
-                  className={`rs-filter-chip${requestSlot === s ? ' rs-filter-chip--selected' : ''}`}
-                  onClick={() => setRequestSlot(s)}
-                >
-                  {REQUESTABLE_SLOT_SHORT[s]}
-                </button>
-              ))}
+              {requestSlots.map((s) => {
+                const selected = requestSelectedSlots.includes(s);
+                return (
+                  <button
+                    key={s}
+                    type="button"
+                    aria-pressed={selected}
+                    className={`rs-filter-chip${
+                      selected ? ' rs-filter-chip--selected' : ''
+                    }`}
+                    onClick={() =>
+                      setRequestSelectedSlots((prev) =>
+                        selected
+                          ? prev.filter((slot) => slot !== s)
+                          : [...prev, s],
+                      )
+                    }
+                  >
+                    {REQUESTABLE_SLOT_SHORT[s]}
+                  </button>
+                );
+              })}
             </div>
             {requestSlots.length === 0 && (
               <p className="rs-detail-note">No open roles on this match.</p>
@@ -2319,7 +2335,7 @@ export function MatchDetailPage() {
             }
             onClick={() => void submitRequest()}
           >
-            {canSubmitRequest ? 'Submit request' : 'Select one role'}
+            {canSubmitRequest ? 'Submit request' : 'Select at least one role'}
           </Button>
         </div>
       )}

@@ -33,7 +33,7 @@ import {
   releaseMatch,
 } from '@/domain/matchTransitions';
 import { assignOfficial, confirmOfficialSlot, markUnavailableAndRelease } from '@/domain/crew';
-import { emptyCrew, crewBlocks, crewPeople, emptyCrewBlocks, emptyAssignment, isCrewVisibleToTeams, type Match, type OrgSettings, type Team, type UserProfile } from '@/domain/types';
+import { emptyCrew, crewBlocks, crewPeople, emptyCrewBlocks, emptyAssignment, isCrewVisibleToTeams, type Match, type OrgSettings, type Team, type UserProfile, type RequestableSlot } from '@/domain/types';
 import {
   matchFromFixtureRequest,
   newAppMatchId,
@@ -50,6 +50,7 @@ import {
   isMatchRequestable,
   isPendingRequestActive,
   matchNeedsCrewCoverage,
+  normalizeRequestableSlots,
 } from '@/domain/requests';
 import { matchesNeedingOfficials } from '@/features/scheduler/queues/selectors';
 import { parseScheduleCsv } from '@/domain/csvImport';
@@ -645,7 +646,7 @@ describe('game requests', () => {
           userName: 'U',
           status: 'pending',
           createdAt: new Date().toISOString(),
-          preferredSlot: 'mo',
+          preferredSlots: ['mo'],
         },
       ]),
     ).toBe(false);
@@ -716,7 +717,7 @@ describe('game requests', () => {
       userName: 'U',
       status: 'pending' as const,
       createdAt: new Date().toISOString(),
-      preferredSlot: 'mo' as const,
+      preferredSlots: ['mo'] as RequestableSlot[],
     };
     expect(isPendingRequestActive(released, pendingReq)).toBe(true);
     expect(isPendingRequestActive(past, pendingReq)).toBe(false);
@@ -741,6 +742,31 @@ describe('game requests', () => {
         pendingReq,
       ),
     ).toBe(false);
+  });
+
+  it('normalizeRequestableSlots merges legacy preferredSlot', () => {
+    expect(normalizeRequestableSlots(['ar1'], 'mo')).toEqual(['ar1', 'mo']);
+  });
+
+  it('isPendingRequestActive stays until all preferred slots fill', () => {
+    let m = releaseMatch(baseMatch());
+    m = withCrewRoleAdded(m, 'ar1');
+    m = withCrewRoleAdded(m, 'ar2');
+    const request = {
+      id: 'gr1',
+      matchId: m.id,
+      userId: 'u1',
+      userName: 'U',
+      preferredSlots: ['mo', 'ar1', 'ar2'] as RequestableSlot[],
+      status: 'pending' as const,
+      createdAt: new Date().toISOString(),
+    };
+    expect(isPendingRequestActive(m, request)).toBe(true);
+    m = assignOfficial(m, 'mo', { uid: 'r1', displayName: 'MO' });
+    expect(isPendingRequestActive(m, request)).toBe(true);
+    m = assignOfficial(m, 'ar1', { uid: 'r2', displayName: 'AR1' });
+    m = assignOfficial(m, 'ar2', { uid: 'r3', displayName: 'AR2' });
+    expect(isPendingRequestActive(m, request)).toBe(false);
   });
 });
 

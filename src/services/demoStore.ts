@@ -27,6 +27,9 @@ import {
   releaseMatch,
 } from '@/domain/matchTransitions';
 import {
+  resolveRaiseHandApprovalSlot,
+} from '@/domain/requests';
+import {
   applyContactRowsToTeams,
   linkTeamAdminsByEmail,
   type ContactRow,
@@ -1388,7 +1391,7 @@ function seedGameRequests(matches: Match[]): GameRequest[] {
       matchId: m.id,
       userId: who.userId,
       userName: who.userName,
-      preferredSlot: slots[i % slots.length],
+      preferredSlots: [slots[i % slots.length]],
       status: 'pending' as const,
       createdAt: created,
     };
@@ -3805,12 +3808,13 @@ class DemoStore {
   requestGame(
     matchId: string,
     userId: string,
-    preferredSlot: RequestableSlot,
+    preferredSlots: RequestableSlot[],
     note?: string,
   ): string | null {
     const user = this.state.users.find((u) => u.uid === userId);
     if (!user) return null;
-    if (!preferredSlot) return null;
+    const slots = [...new Set(preferredSlots)].filter(Boolean);
+    if (slots.length === 0) return null;
     const existing = this.state.requests.find(
       (r) => r.matchId === matchId && r.userId === userId && r.status === 'pending',
     );
@@ -3820,7 +3824,7 @@ class DemoStore {
       matchId,
       userId,
       userName: user.displayName,
-      preferredSlot,
+      preferredSlots: slots,
       note,
       status: 'pending',
       createdAt: new Date().toISOString(),
@@ -4334,7 +4338,12 @@ class DemoStore {
   ): void {
     const req = this.state.requests.find((r) => r.id === requestId);
     if (!req) return;
-    const chosen = slot ?? req.preferredSlot;
+    const match = this.state.matches.find((m) => m.id === req.matchId);
+    const chosen =
+      slot ??
+      (match
+        ? resolveRaiseHandApprovalSlot(match, req)
+        : req.preferredSlots[0] ?? req.preferredSlot);
     if (!chosen) return;
     if (chosen === 'cmo') {
       const user = this.state.users.find((u) => u.uid === req.userId);

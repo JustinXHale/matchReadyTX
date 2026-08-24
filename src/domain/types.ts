@@ -189,7 +189,10 @@ export interface GameRequest {
   matchId: string;
   userId: string;
   userName: string;
-  preferredSlot?: RequestableSlot; // required when submitting a raise-hand request
+  /** Roles the official is willing to take on this match. */
+  preferredSlots: RequestableSlot[];
+  /** Legacy single-slot field — normalized into preferredSlots on read. */
+  preferredSlot?: RequestableSlot;
   note?: string;
   status: GameRequestStatus;
   createdAt: string;

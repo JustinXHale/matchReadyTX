@@ -13,6 +13,10 @@ import {
 } from '@patternfly/react-core';
 import { useApp } from '@/app/AppContext';
 import { formatMemberCityState } from '@/domain/members';
+import {
+  gameRequestPreferredSlots,
+  resolveRaiseHandApprovalSlot,
+} from '@/domain/requests';
 import type { CoachingReportStub } from '@/services/demoStore';
 import {
   CREW_SLOTS,
@@ -26,6 +30,12 @@ import {
 import { backState } from '@/nav/backNav';
 import { MatchListRow } from '@/ui/MatchListRow';
 import { UserAvatar } from '@/ui/UserAvatar';
+
+function formatPreferredSlots(request: GameRequest): string {
+  const slots = gameRequestPreferredSlots(request);
+  if (slots.length === 0) return 'Position TBD';
+  return slots.map((s) => REQUESTABLE_SLOT_LABELS[s]).join(' · ');
+}
 
 const QUEUES_BACK = {
   to: '/scheduler/queues/requests/raise-hand',
@@ -151,7 +161,13 @@ export function RaiseHandQueue({
             key={r.id}
             request={r}
             user={state.users.find((u) => u.uid === r.userId)}
-            onApprove={() => onApprove(r.id, r.preferredSlot ?? 'mo')}
+            onApprove={() => {
+              const match = state.matches.find((m) => m.id === r.matchId);
+              const slot = match
+                ? resolveRaiseHandApprovalSlot(match, r)
+                : r.preferredSlots[0];
+              if (slot) onApprove(r.id, slot);
+            }}
             onDecline={() => {
               if (matchMissing) {
                 onDecline(r.id, 'Match removed from schedule');
@@ -186,8 +202,8 @@ export function RaiseHandQueue({
               <p id="decline-request-desc" className="rs-modal-lede">
                 Decline{' '}
                 <strong>{declineTarget.userName}</strong>
-                {declineTarget.preferredSlot
-                  ? ` for ${REQUESTABLE_SLOT_LABELS[declineTarget.preferredSlot]}`
+                {gameRequestPreferredSlots(declineTarget).length > 0
+                  ? ` for ${formatPreferredSlots(declineTarget)}`
                   : ''}
                 ? You can leave an optional reason for the official.
               </p>
@@ -360,9 +376,7 @@ function RaiseHandItem({
 }) {
   const { state } = useApp();
   const match = state.matches.find((m) => m.id === request.matchId);
-  const slotLabel = request.preferredSlot
-    ? REQUESTABLE_SLOT_LABELS[request.preferredSlot]
-    : 'Position TBD';
+  const slotLabel = formatPreferredSlots(request);
   const name = user?.displayName ?? request.userName;
   const level = levelLabel(user?.refereeLevel);
   const cityState = user ? formatMemberCityState(user) : null;

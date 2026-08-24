@@ -23,7 +23,14 @@ import {
   COACH_FEEDBACK_SCALE_KEYS,
   normalizeScaleValue,
 } from '@/domain/coachFeedback';
-import { applyLevelCrewDefaultsIfStock, applyLevelCrewDefaults, matchEligibleForCrewDefaultsReapply } from '@/domain/crewDefaults';
+import {
+  applyLevelCrewDefaultsIfStock,
+  applyLevelCrewDefaults,
+  matchEligibleForCrewDefaultsReapply,
+} from '@/domain/crewDefaults';
+import {
+  normalizeRequestableSlots,
+} from '@/domain/requests';
 import { releaseMatch } from '@/domain/matchTransitions';
 import {
   type CardReport,
@@ -56,6 +63,7 @@ import {
   type Team,
   type TeamContactPerson,
   type TeamLinkRequest,
+  type RequestableSlot,
 } from '@/domain/types';
 
 const DEFAULT_ORG =
@@ -578,20 +586,37 @@ export function gameRequestFromFirestore(
   matchId: string,
   data: Record<string, unknown>,
 ): GameRequest {
+  const rawSlots = data.preferredSlots;
+  const preferredSlotsFromArray = Array.isArray(rawSlots)
+    ? rawSlots.filter(
+        (s): s is RequestableSlot =>
+          s === 'mo' ||
+          s === 'ar1' ||
+          s === 'ar2' ||
+          s === 'no4' ||
+          s === 'cmo',
+      )
+    : undefined;
   const preferredSlot = data.preferredSlot;
+  const legacySlot =
+    preferredSlot === 'mo' ||
+    preferredSlot === 'ar1' ||
+    preferredSlot === 'ar2' ||
+    preferredSlot === 'no4' ||
+    preferredSlot === 'cmo'
+      ? preferredSlot
+      : undefined;
+  const preferredSlots = normalizeRequestableSlots(
+    preferredSlotsFromArray,
+    legacySlot,
+  );
   return {
     id,
     matchId,
     userId: String(data.userId ?? ''),
     userName: String(data.userName ?? ''),
-    preferredSlot:
-      preferredSlot === 'mo' ||
-      preferredSlot === 'ar1' ||
-      preferredSlot === 'ar2' ||
-      preferredSlot === 'no4' ||
-      preferredSlot === 'cmo'
-        ? preferredSlot
-        : undefined,
+    preferredSlots,
+    preferredSlot: legacySlot,
     note: typeof data.note === 'string' ? data.note : undefined,
     status:
       data.status === 'approved' || data.status === 'declined'
@@ -1226,7 +1251,8 @@ export async function createGameRequestInFirestore(
       matchId,
       userId: req.userId,
       userName: req.userName,
-      preferredSlot: req.preferredSlot ?? null,
+      preferredSlots: req.preferredSlots,
+      preferredSlot: req.preferredSlots[0] ?? null,
       note: req.note?.trim() || null,
       status: 'pending',
       createdAt: req.createdAt,

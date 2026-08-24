@@ -1,3 +1,4 @@
+import { resolveRaiseHandApprovalSlot } from '@/domain/requests';
 import type { RequestableSlot } from '@/domain/types';
 import type { AppState } from '@/services/demoStore';
 import { isFirebaseConfigured } from '@/services/firebase';
@@ -30,7 +31,9 @@ export async function approveRaiseHandRequest(opts: {
 
   if (dataMode !== 'live' || !isFirebaseConfigured) return;
 
-  const chosen = slot ?? before.preferredSlot;
+  const match = store.getState().matches.find((m) => m.id === before.matchId);
+  const chosen =
+    slot ?? (match ? resolveRaiseHandApprovalSlot(match, before) : undefined);
   if (!chosen) return;
 
   if (chosen === 'cmo') {

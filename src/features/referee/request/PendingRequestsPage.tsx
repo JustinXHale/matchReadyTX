@@ -23,6 +23,7 @@ import { MatchListRow } from '@/ui/MatchListRow';
 import type { GameRequest, Match, MatchGender } from '@/domain/types';
 import { REQUESTABLE_SLOT_SHORT } from '@/domain/types';
 import {
+  gameRequestPreferredSlots,
   isDeclinedRequestVisible,
   isPendingRequestActive,
 } from '@/domain/requests';
@@ -81,11 +82,11 @@ function RequestStatusTrailing({
       ) : (
         <span className="rs-pill rs-pill--warn">Pending {pendingDays}d</span>
       )}
-      {request.preferredSlot && (
-        <span className="rs-pill rs-pill--ink">
-          {REQUESTABLE_SLOT_SHORT[request.preferredSlot]}
+      {gameRequestPreferredSlots(request).map((slot) => (
+        <span key={slot} className="rs-pill rs-pill--ink">
+          {REQUESTABLE_SLOT_SHORT[slot]}
         </span>
-      )}
+      ))}
       <span className="rs-request-remove-hit__label">
         {declined ? 'Dismiss' : 'Remove'}
       </span>
