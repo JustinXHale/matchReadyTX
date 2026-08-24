@@ -94,6 +94,8 @@
   --rs-page-pad: 0.75rem;
   --rs-gap-grid: var(--rs-space-sm);
   --rs-bottom-nav-height: 4rem;
+  /** Space below fixed masthead for overlays (mobile brand block is taller). */
+  --rs-masthead-offset: 5.75rem;
   --rs-bottom-clearance: 6.25rem;
   --rs-tap-min: var(--pf-t--global--spacer--2xl);
 

@@ -27,6 +27,7 @@ import { WhistleIcon } from '@/ui/WhistleIcon';
 import { ThemeToggle } from '@/ui/ThemeToggle';
 import { BrandLogo } from '@/ui/BrandLogo';
 import { UpdatePrompt } from '@/pwa/UpdatePrompt';
+import { OfficialQuickLookHost } from '@/features/scheduler/OfficialQuickLookHost';
 
 const navIconClass = 'rs-bottom-nav__icon';
 
@@ -194,6 +195,8 @@ export function MobileShell() {
     setRoleView,
     hasInsightsAccess,
     state,
+    hasAssignerRole,
+    isAssignerView,
   } = useApp();
   const navigate = useNavigate();
   const location = useLocation();
@@ -274,6 +277,7 @@ export function MobileShell() {
                   Sign in
                 </Button>
               )}
+              {isAssignerView && hasAssignerRole && <OfficialQuickLookHost />}
               {canSwitchRoleView && (
                 <div className="rs-role-switch">
                   <FormSelect

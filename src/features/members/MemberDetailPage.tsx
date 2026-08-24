@@ -59,6 +59,7 @@ import {
 import { RefereeLevelChart } from '@/ui/RefereeLevelChart';
 import { UserAvatar } from '@/ui/UserAvatar';
 import { AvailabilityMonthCalendar } from '@/features/availability/AvailabilityMonthCalendar';
+import { OfficialInsightsPanel } from '@/features/scheduler/OfficialInsightsPanel';
 
 function formatBirthdayLabel(birthday: string | undefined): string | null {
   const raw = birthday?.slice(0, 10) ?? '';
@@ -309,6 +310,7 @@ export function MemberDetailPage() {
   const [editErrorToast, setEditErrorToast] = useState(false);
   const [availYear, setAvailYear] = useState(availNow.getFullYear());
   const [availMonth, setAvailMonth] = useState(availNow.getMonth() + 1);
+  const [officialTab, setOfficialTab] = useState<'profile' | 'insights'>('profile');
 
   useEffect(() => {
     if (!user) return;
@@ -326,6 +328,7 @@ export function MemberDetailPage() {
     setEditError(null);
     setEditFieldErrors([]);
     setEditErrorToast(false);
+    setOfficialTab('profile');
   }, [user?.uid]);
 
   useEffect(() => {
@@ -1223,6 +1226,52 @@ export function MemberDetailPage() {
 
       {isOfficialLens && (
         <>
+          {canSeeAssignerPii && user.roles.includes('official') && (
+            <nav className="rs-inline-tabs" aria-label="Official profile">
+              <button
+                type="button"
+                className={
+                  officialTab === 'profile'
+                    ? 'rs-inline-tabs__tab active'
+                    : 'rs-inline-tabs__tab'
+                }
+                aria-current={officialTab === 'profile' ? 'page' : undefined}
+                onClick={() => setOfficialTab('profile')}
+              >
+                Profile
+              </button>
+              <button
+                type="button"
+                className={
+                  officialTab === 'insights'
+                    ? 'rs-inline-tabs__tab active'
+                    : 'rs-inline-tabs__tab'
+                }
+                aria-current={officialTab === 'insights' ? 'page' : undefined}
+                onClick={() => setOfficialTab('insights')}
+              >
+                Insights
+              </button>
+            </nav>
+          )}
+
+          {officialTab === 'insights' &&
+          canSeeAssignerPii &&
+          user.roles.includes('official') ? (
+            <section
+              className="rs-detail-card"
+              aria-labelledby="member-official-insights"
+            >
+              <h2
+                id="member-official-insights"
+                className="rs-detail-section__label"
+              >
+                Referee insights
+              </h2>
+              <OfficialInsightsPanel userId={user.uid} />
+            </section>
+          ) : (
+            <>
           <section className="rs-detail-card rs-member-collapse-wrap">
             <details className="rs-detail-tools rs-member-collapse" open>
               <summary>Upcoming schedule</summary>
@@ -1300,6 +1349,8 @@ export function MemberDetailPage() {
               )}
             </details>
           </section>
+            </>
+          )}
         </>
       )}
 

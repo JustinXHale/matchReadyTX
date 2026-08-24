@@ -824,6 +824,40 @@ input.rs-filter-search {
   border-bottom-style: dashed;
 }
 
+/** Local Profile | Insights toggles (quick look drawer, member detail). */
+.rs-inline-tabs {
+  display: flex;
+  gap: 0;
+  border-bottom: 1px solid var(--rs-color-border);
+  margin: 0 0 12px;
+  max-width: 100%;
+  min-width: 0;
+}
+
+.rs-inline-tabs__tab {
+  flex: 1 1 0;
+  min-height: var(--rs-tap-min);
+  min-width: 0;
+  padding: 10px 8px;
+  border: none;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+  background: transparent;
+  font: var(--rs-font-nav);
+  color: var(--rs-color-ended);
+  cursor: pointer;
+}
+
+.rs-inline-tabs__tab:hover {
+  color: var(--rs-color-ink);
+}
+
+.rs-inline-tabs__tab.active {
+  color: var(--rs-color-primary);
+  border-bottom-color: var(--rs-color-primary);
+  font-weight: 600;
+}
+
 .rs-schedule-sort {
   margin-top: 4px;
   margin-bottom: 8px;

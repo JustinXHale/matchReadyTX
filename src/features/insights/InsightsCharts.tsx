@@ -26,6 +26,36 @@ export function InsightsStatCard({
   );
 }
 
+/** Non-link stat tile (e.g. official quick look). */
+export function InsightsStatTile({
+  title,
+  count,
+  avg,
+  avgLabel,
+  meta,
+}: {
+  title: string;
+  count: number | string;
+  avg?: number | null;
+  avgLabel?: string;
+  meta?: string;
+}) {
+  return (
+    <div className="rs-insights-stat-card rs-insights-stat-card--static">
+      <span className="rs-insights-stat-card__title">{title}</span>
+      <span className="rs-insights-stat-card__count">{count}</span>
+      {avgLabel != null && (
+        <span className="rs-insights-stat-card__avg">
+          {avgLabel}: {formatInsightsAvg(avg ?? null)}
+        </span>
+      )}
+      {meta && (
+        <span className="rs-insights-stat-card__avg">{meta}</span>
+      )}
+    </div>
+  );
+}
+
 type BarItem = {
   key: string;
   label: string;

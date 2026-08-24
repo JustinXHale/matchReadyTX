@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   cmoReportStats,
   globalCoachFeedbackStats,
+  officialSeasonStats,
   reviewedOfficialInsightRows,
   gradePyramid,
   GRADE_TIER_ORDER,
@@ -10,7 +11,8 @@ import {
 } from '@/domain/insights';
 import type { CoachFeedback } from '@/domain/coachFeedback';
 import type { MatchReport } from '@/domain/reports';
-import type { UserProfile } from '@/domain/types';
+import type { Match, UserProfile } from '@/domain/types';
+import { emptyCrew } from '@/domain/types';
 
 function baseCoach(
   overrides: Partial<CoachFeedback> = {},
@@ -240,5 +242,91 @@ describe('insights', () => {
       },
     ];
     expect(submittedCmoReports(reports)).toHaveLength(1);
+  });
+
+  it('aggregates official season stats from matches and reports', () => {
+    const pastKickoff = '2025-06-01T15:00:00.000Z';
+    const matches: Match[] = [
+      {
+        id: 'm1',
+        sheetRowKey: 's1',
+        status: 'team_confirmed',
+        kickoffAt: pastKickoff,
+        venueName: 'Field',
+        venueAddress: 'Austin, TX',
+        homeTeamId: 'h',
+        awayTeamId: 'a',
+        homeTeamName: 'Home',
+        awayTeamName: 'Away',
+        level: 'D1',
+        gender: 'men',
+        flightProvided: false,
+        housingProvided: false,
+        homeScore: 24,
+        awayScore: 10,
+        crew: {
+          ...emptyCrew(),
+          mo: [
+            {
+              id: 'mo1',
+              slot: 'mo',
+              userId: 'ref1',
+              userName: 'Ref',
+              status: 'confirmed',
+              history: [],
+            },
+          ],
+        },
+      },
+    ];
+    const matchReports: MatchReport[] = [
+      {
+        id: 'mo1',
+        matchId: 'm1',
+        officialId: 'ref1',
+        slot: 'mo',
+        status: 'submitted',
+        dueAt: pastKickoff,
+        kickoffAt: pastKickoff,
+        moPayload: {
+          homePoints: 24,
+          awayPoints: 10,
+          yellowCards: 2,
+          redCards: 0,
+        },
+      },
+      {
+        id: 'cmo1',
+        matchId: 'm1',
+        officialId: 'cmo1',
+        slot: 'cmo',
+        status: 'submitted',
+        dueAt: pastKickoff,
+        kickoffAt: pastKickoff,
+        subjectOfficialId: 'ref1',
+        cmoPayload: { scales: {}, comments: {}, assessedRating: 4 },
+      },
+    ];
+    const coachFeedback: CoachFeedback[] = [
+      baseCoach({
+        officialUserId: 'ref1',
+        scales: { overall: 5 },
+      }),
+    ];
+    const stats = officialSeasonStats(
+      'ref1',
+      matches,
+      matchReports,
+      [],
+      coachFeedback,
+    );
+    expect(stats.gamesPast).toBe(1);
+    expect(stats.gamesMo).toBe(1);
+    expect(stats.moReportsSubmitted).toBe(1);
+    expect(stats.yellowCards).toBe(2);
+    expect(stats.avgScoreMargin).toBe(14);
+    expect(stats.coachFeedbackCount).toBe(1);
+    expect(stats.cmoReportsReceived).toBe(1);
+    expect(stats.cmoRatingAvg).toBe(4);
   });
 });

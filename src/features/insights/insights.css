@@ -60,6 +60,15 @@
   outline: none;
 }
 
+.rs-insights-stat-card--static {
+  cursor: default;
+}
+
+.rs-insights-stat-card--static:hover,
+.rs-insights-stat-card--static:focus-visible {
+  border-color: var(--rs-color-border);
+}
+
 .rs-insights-stat-card__title {
   font: var(--rs-font-meta);
   color: var(--rs-color-muted);

@@ -4,8 +4,15 @@ import {
   type CoachFeedback,
 } from '@/domain/coachFeedback';
 import { isFivePointValue } from '@/domain/fivePointScale';
-import type { MatchReport } from '@/domain/reports';
-import { crewPeople, type Match, type UserProfile } from '@/domain/types';
+import { pastMatchesForMember } from '@/domain/members';
+import type { CardReport, MatchReport } from '@/domain/reports';
+import { totalCardsFromMoPayload } from '@/domain/reports';
+import {
+  assignmentForUser,
+  crewPeople,
+  type Match,
+  type UserProfile,
+} from '@/domain/types';
 
 export type GradeTier = {
   level: number;
@@ -339,4 +346,183 @@ export function reportTrendByMonth(
       cmoCount,
     };
   });
+}
+
+/** Cumulative season-style totals for one official (org matches on file). */
+export type OfficialSeasonStats = {
+  gamesPast: number;
+  gamesMo: number;
+  gamesAr: number;
+  gamesCmo: number;
+  moReportsSubmitted: number;
+  coachFeedbackCount: number;
+  coachFeedbackAvg: number | null;
+  cmoReportsReceived: number;
+  cmoRatingAvg: number | null;
+  cmoReportsFiled: number;
+  yellowCards: number;
+  redCards: number;
+  avgScoreMargin: number | null;
+  moGamesWithScore: number;
+};
+
+export function officialCoachFeedbackStatsForUser(
+  userId: string,
+  feedback: CoachFeedback[],
+): {
+  submittedCount: number;
+  globalAverage: number | null;
+  criterionAverages: Partial<Record<string, number>>;
+} {
+  const submitted = feedback.filter(
+    (f) => f.status === 'submitted' && f.officialUserId === userId,
+  );
+  const avgs = submitted
+    .map((f) => coachFeedbackAverage(f.scales))
+    .filter((a): a is number => a != null);
+  const globalAverage =
+    avgs.length ? avgs.reduce((s, v) => s + v, 0) / avgs.length : null;
+
+  const criterionSums: Record<string, { sum: number; count: number }> = {};
+  for (const key of COACH_FEEDBACK_SCALE_KEYS) {
+    criterionSums[key] = { sum: 0, count: 0 };
+  }
+  for (const f of submitted) {
+    for (const key of COACH_FEEDBACK_SCALE_KEYS) {
+      const v = f.scales[key];
+      if (isFivePointValue(v)) {
+        criterionSums[key].sum += v;
+        criterionSums[key].count += 1;
+      }
+    }
+  }
+  const criterionAverages: Partial<Record<string, number>> = {};
+  for (const key of COACH_FEEDBACK_SCALE_KEYS) {
+    const { sum, count } = criterionSums[key];
+    if (count > 0) criterionAverages[key] = sum / count;
+  }
+
+  return {
+    submittedCount: submitted.length,
+    globalAverage,
+    criterionAverages,
+  };
+}
+
+function scoreMarginForMoGame(
+  match: Match,
+  moReport: MatchReport | undefined,
+): number | null {
+  if (match.homeScore != null && match.awayScore != null) {
+    return Math.abs(match.homeScore - match.awayScore);
+  }
+  const p = moReport?.moPayload;
+  if (p && typeof p.homePoints === 'number' && typeof p.awayPoints === 'number') {
+    return Math.abs(p.homePoints - p.awayPoints);
+  }
+  return null;
+}
+
+export function officialSeasonStats(
+  userId: string,
+  matches: Match[],
+  matchReports: MatchReport[],
+  cardReports: CardReport[],
+  coachFeedback: CoachFeedback[] = [],
+): OfficialSeasonStats {
+  const past = pastMatchesForMember(matches, userId);
+  let gamesMo = 0;
+  let gamesAr = 0;
+  let gamesCmo = 0;
+  for (const m of past) {
+    const slot = assignmentForUser(m, userId)?.slot;
+    if (slot === 'mo') gamesMo += 1;
+    else if (slot === 'ar1' || slot === 'ar2') gamesAr += 1;
+    else if (slot === 'cmo') gamesCmo += 1;
+  }
+
+  const moReportsSubmitted = matchReports.filter(
+    (r) =>
+      r.officialId === userId && r.slot === 'mo' && r.status === 'submitted',
+  ).length;
+
+  const cmoReportsFiled = matchReports.filter(
+    (r) =>
+      r.officialId === userId && r.slot === 'cmo' && r.status === 'submitted',
+  ).length;
+
+  const matchById = matchMap(matches);
+  const cmoReceived = matchReports.filter(
+    (r) =>
+      r.slot === 'cmo' &&
+      r.status === 'submitted' &&
+      cmoSubjectOfficialId(r, matchById) === userId,
+  );
+  const cmoRatings = cmoReceived
+    .map((r) => r.cmoPayload?.assessedRating)
+    .filter((n): n is number => typeof n === 'number');
+
+  const coachStats = officialCoachFeedbackStatsForUser(userId, coachFeedback);
+
+  let yellowCards = 0;
+  let redCards = 0;
+  const submittedCardReports = cardReports.filter(
+    (c) => c.officialId === userId && c.status === 'submitted',
+  );
+  if (submittedCardReports.length > 0) {
+    for (const report of submittedCardReports) {
+      for (const card of report.cards) {
+        if (card.color === 'yellow') yellowCards += 1;
+        else if (card.color === 'red') redCards += 1;
+      }
+    }
+  } else {
+    for (const r of matchReports) {
+      if (
+        r.officialId !== userId ||
+        r.slot !== 'mo' ||
+        r.status !== 'submitted'
+      ) {
+        continue;
+      }
+      const totals = totalCardsFromMoPayload(r.moPayload);
+      yellowCards += totals.yellow;
+      redCards += totals.red;
+    }
+  }
+
+  const margins: number[] = [];
+  for (const m of past) {
+    if (!crewPeople(m.crew.mo).some((a) => a.userId === userId)) continue;
+    const moReport = matchReports.find(
+      (r) =>
+        r.matchId === m.id &&
+        r.officialId === userId &&
+        r.slot === 'mo' &&
+        r.status === 'submitted',
+    );
+    const margin = scoreMarginForMoGame(m, moReport);
+    if (margin != null) margins.push(margin);
+  }
+
+  return {
+    gamesPast: past.length,
+    gamesMo,
+    gamesAr,
+    gamesCmo,
+    moReportsSubmitted,
+    coachFeedbackCount: coachStats.submittedCount,
+    coachFeedbackAvg: coachStats.globalAverage,
+    cmoReportsReceived: cmoReceived.length,
+    cmoRatingAvg: cmoRatings.length
+      ? cmoRatings.reduce((s, v) => s + v, 0) / cmoRatings.length
+      : null,
+    cmoReportsFiled,
+    yellowCards,
+    redCards,
+    avgScoreMargin: margins.length
+      ? margins.reduce((s, v) => s + v, 0) / margins.length
+      : null,
+    moGamesWithScore: margins.length,
+  };
 }

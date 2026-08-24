@@ -20,8 +20,15 @@ import {
   readFileAsDataUrl,
   validateProfilePhoto,
 } from '@/domain/profile';
-import { APPAREL_SIZES, ASSESSED_LEVEL_MAX, ASSESSED_LEVEL_MIN, type Role } from '@/domain/types';
+import {
+  APPAREL_SIZES,
+  ASSESSED_LEVEL_MAX,
+  ASSESSED_LEVEL_MIN,
+  hasRefereeLensRole,
+  type Role,
+} from '@/domain/types';
 import { conferenceTeamOptions } from '@/domain/teams';
+import { OfficialInsightsPanel } from '@/features/scheduler/OfficialInsightsPanel';
 import { isFirebaseConfigured } from '@/services/firebase';
 import {
   callSubmitTeamLinkRequests,
@@ -36,7 +43,14 @@ import {
 import { UserAvatar } from '@/ui/UserAvatar';
 
 export function ProfilePage() {
-  const { currentUser, store, signOut, state } = useApp();
+  const {
+    currentUser,
+    store,
+    signOut,
+    state,
+    hasInsightsAccess,
+    isAssignerView,
+  } = useApp();
   const navigate = useNavigate();
   const fileRef = useRef<HTMLInputElement>(null);
 
@@ -99,6 +113,7 @@ export function ProfilePage() {
   const [photoUrl, setPhotoUrl] = useState(currentUser?.photoUrl);
   const [photoError, setPhotoError] = useState<string | null>(null);
   const [savedFlash, setSavedFlash] = useState(false);
+  const [profileTab, setProfileTab] = useState<'profile' | 'insights'>('profile');
   const [requestLevelDraft, setRequestLevelDraft] = useState('');
   const [requestLevelBusy, setRequestLevelBusy] = useState(false);
   const [requestLevelNote, setRequestLevelNote] = useState<string | null>(null);
@@ -115,6 +130,9 @@ export function ProfilePage() {
   );
 
   if (!currentUser) return null;
+
+  const showInsightsTab = hasRefereeLensRole(currentUser.roles);
+  const showSchedulerCoachFeedback = hasInsightsAccess && isAssignerView;
 
   const needsRefDetails = roleOfficial || roleCmo;
   const needsWorkingFields = roleOfficial || roleTeamAdmin || roleCmo;
@@ -374,6 +392,40 @@ export function ProfilePage() {
   return (
     <div className="rs-stack">
       <Title headingLevel="h1">Profile</Title>
+      {showInsightsTab && (
+        <nav className="rs-inline-tabs" aria-label="Profile">
+          <button
+            type="button"
+            className={
+              profileTab === 'profile'
+                ? 'rs-inline-tabs__tab active'
+                : 'rs-inline-tabs__tab'
+            }
+            aria-current={profileTab === 'profile' ? 'page' : undefined}
+            onClick={() => setProfileTab('profile')}
+          >
+            Edit profile
+          </button>
+          <button
+            type="button"
+            className={
+              profileTab === 'insights'
+                ? 'rs-inline-tabs__tab active'
+                : 'rs-inline-tabs__tab'
+            }
+            aria-current={profileTab === 'insights' ? 'page' : undefined}
+            onClick={() => setProfileTab('insights')}
+          >
+            Insights
+          </button>
+        </nav>
+      )}
+      {profileTab === 'insights' && showInsightsTab ? (
+        <OfficialInsightsPanel
+          userId={currentUser.uid}
+          showCoachFeedback={showSchedulerCoachFeedback}
+        />
+      ) : (
       <Form className="rs-profile-form">
         <FormGroup label="Photo" fieldId="pf-photo">
           <div className="rs-profile-photo">
@@ -889,6 +941,7 @@ export function ProfilePage() {
           Sign out
         </Button>
       </Form>
+      )}
     </div>
   );
 }
