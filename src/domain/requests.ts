@@ -109,6 +109,16 @@ export function resolveRaiseHandApprovalSlot(
   return prefs[0];
 }
 
+/** Slots the assigner can place this official into (preferred ∩ still open). */
+export function approvalSlotsForRaiseHand(
+  match: Match,
+  request: GameRequest,
+): RequestableSlot[] {
+  const prefs = gameRequestPreferredSlots(request);
+  const open = new Set(openRequestSlots(match));
+  return prefs.filter((s) => open.has(s));
+}
+
 export function pendingRequestForUser(
   requests: GameRequest[],
   matchId: string,

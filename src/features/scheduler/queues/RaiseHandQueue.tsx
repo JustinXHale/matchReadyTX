@@ -14,13 +14,14 @@ import {
 import { useApp } from '@/app/AppContext';
 import { formatMemberCityState } from '@/domain/members';
 import {
+  approvalSlotsForRaiseHand,
   gameRequestPreferredSlots,
-  resolveRaiseHandApprovalSlot,
 } from '@/domain/requests';
 import type { CoachingReportStub } from '@/services/demoStore';
 import {
   CREW_SLOTS,
   REQUESTABLE_SLOT_LABELS,
+  REQUESTABLE_SLOT_SHORT,
   crewPeople,
   type GameRequest,
   type Match,
@@ -109,6 +110,8 @@ export function RaiseHandQueue({
   const { state } = useApp();
   const [declineTarget, setDeclineTarget] = useState<GameRequest | null>(null);
   const [declineReason, setDeclineReason] = useState('');
+  const [approveTarget, setApproveTarget] = useState<GameRequest | null>(null);
+  const [approveSlot, setApproveSlot] = useState<RequestableSlot | ''>('');
   const [profileUserId, setProfileUserId] = useState<string | null>(null);
 
   const profileUser = useMemo(
@@ -151,6 +154,33 @@ export function RaiseHandQueue({
     closeDecline();
   };
 
+  const closeApprove = () => {
+    setApproveTarget(null);
+    setApproveSlot('');
+  };
+
+  const openApprove = (request: GameRequest) => {
+    const match = state.matches.find((m) => m.id === request.matchId);
+    if (!match) return;
+    const slots = approvalSlotsForRaiseHand(match, request);
+    if (slots.length === 0) {
+      window.alert('No open slots match this request anymore.');
+      return;
+    }
+    if (slots.length === 1) {
+      onApprove(request.id, slots[0]);
+      return;
+    }
+    setApproveTarget(request);
+    setApproveSlot(slots[0] ?? '');
+  };
+
+  const confirmApprove = () => {
+    if (!approveTarget || !approveSlot) return;
+    onApprove(approveTarget.id, approveSlot);
+    closeApprove();
+  };
+
   return (
     <>
       <ul className="rs-list">
@@ -161,13 +191,7 @@ export function RaiseHandQueue({
             key={r.id}
             request={r}
             user={state.users.find((u) => u.uid === r.userId)}
-            onApprove={() => {
-              const match = state.matches.find((m) => m.id === r.matchId);
-              const slot = match
-                ? resolveRaiseHandApprovalSlot(match, r)
-                : r.preferredSlots[0];
-              if (slot) onApprove(r.id, slot);
-            }}
+            onApprove={() => openApprove(r)}
             onDecline={() => {
               if (matchMissing) {
                 onDecline(r.id, 'Match removed from schedule');
@@ -226,6 +250,73 @@ export function RaiseHandQueue({
           </Button>
           <Button type="button" variant="danger" onClick={confirmDecline}>
             Decline
+          </Button>
+        </ModalFooter>
+      </Modal>
+
+      <Modal
+        variant={ModalVariant.small}
+        isOpen={Boolean(approveTarget)}
+        onClose={closeApprove}
+        aria-labelledby="approve-request-title"
+        aria-describedby="approve-request-desc"
+      >
+        <ModalHeader>
+          <Title headingLevel="h2" id="approve-request-title" size="lg">
+            Assign to role
+          </Title>
+        </ModalHeader>
+        <ModalBody>
+          {approveTarget && (
+            <>
+              <p id="approve-request-desc" className="rs-modal-lede">
+                Place <strong>{approveTarget.userName}</strong> in which open
+                role?
+              </p>
+              <FormGroup label="Role" isRequired fieldId="approve-slot">
+                <div
+                  className="rs-slot-picker"
+                  role="radiogroup"
+                  aria-label="Assign to role"
+                >
+                  {(() => {
+                    const match = state.matches.find(
+                      (m) => m.id === approveTarget.matchId,
+                    );
+                    const slots = match
+                      ? approvalSlotsForRaiseHand(match, approveTarget)
+                      : [];
+                    return slots.map((s) => (
+                      <button
+                        key={s}
+                        type="button"
+                        role="radio"
+                        aria-checked={approveSlot === s}
+                        className={`rs-filter-chip${
+                          approveSlot === s ? ' rs-filter-chip--selected' : ''
+                        }`}
+                        onClick={() => setApproveSlot(s)}
+                      >
+                        {REQUESTABLE_SLOT_SHORT[s]}
+                      </button>
+                    ));
+                  })()}
+                </div>
+              </FormGroup>
+            </>
+          )}
+        </ModalBody>
+        <ModalFooter>
+          <Button type="button" variant="link" onClick={closeApprove}>
+            Cancel
+          </Button>
+          <Button
+            type="button"
+            variant="primary"
+            isDisabled={!approveSlot}
+            onClick={confirmApprove}
+          >
+            Approve
           </Button>
         </ModalFooter>
       </Modal>

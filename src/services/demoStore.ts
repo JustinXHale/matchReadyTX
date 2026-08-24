@@ -4301,6 +4301,33 @@ class DemoStore {
     this.set((s) => ({ ...s, fixtureRequests }));
   }
 
+  /** Official edits a pending raise-hand (roles + note). */
+  updateGameRequest(
+    requestId: string,
+    userId: string,
+    patch: { preferredSlots: RequestableSlot[]; note?: string },
+  ): boolean {
+    const req = this.state.requests.find((r) => r.id === requestId);
+    if (!req) return false;
+    if (req.userId !== userId) return false;
+    if (req.status !== 'pending') return false;
+    const slots = [...new Set(patch.preferredSlots)].filter(Boolean);
+    if (slots.length === 0) return false;
+    this.set((s) => ({
+      ...s,
+      requests: s.requests.map((r) =>
+        r.id === requestId
+          ? {
+              ...r,
+              preferredSlots: slots,
+              note: patch.note?.trim() || undefined,
+            }
+          : r,
+      ),
+    }));
+    return true;
+  }
+
   /** Official withdraws a pending request, or dismisses a declined one. */
   withdrawRequest(requestId: string, userId: string): void {
     const req = this.state.requests.find((r) => r.id === requestId);

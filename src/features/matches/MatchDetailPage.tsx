@@ -68,13 +68,14 @@ import { IconDateInput } from '@/ui/IconDateInput';
 import { formatMemberCityState, officialEffectiveLevel } from '@/domain/members';
 import {
   canOfficialRequestMatch,
+  gameRequestPreferredSlots,
   isPendingRequestActive,
   openRequestSlots,
   pendingRequestForUser,
 } from '@/domain/requests';
 import { openGroupMailto, uniqueEmails } from '@/services/mailto';
 import { persistCrewAssignmentAndEmail, persistCrewUnassignmentAndEmail, resendCrewAssignmentEmail } from '@/services/liveAssignment';
-import { defaultOrgId, createGameRequestInFirestore, saveMatchCrewAssignment, callMatchSelfService } from '@/services/orgData';
+import { defaultOrgId, createGameRequestInFirestore, patchGameRequestContentInFirestore, saveMatchCrewAssignment, callMatchSelfService } from '@/services/orgData';
 import { isFirebaseConfigured } from '@/services/firebase';
 import { backState, readBackNav } from '@/nav/backNav';
 import {
@@ -283,6 +284,7 @@ export function MatchDetailPage() {
     RequestableSlot[]
   >([]);
   const [requestNote, setRequestNote] = useState('');
+  const [requestEditing, setRequestEditing] = useState(true);
   const [requestToast, setRequestToast] = useState(false);
   const requestSectionRef = useRef<HTMLElement | null>(null);
   const titleRowRef = useRef<HTMLDivElement | null>(null);
@@ -377,13 +379,31 @@ export function MatchDetailPage() {
   );
 
   useEffect(() => {
-    setRequestSelectedSlots([]);
-    setRequestNote('');
     setProposeKickoff(match?.kickoffAt ? toDatetimeLocalValue(match.kickoffAt) : '');
     setProposeVenueName(match?.venueName ?? '');
     setProposeVenueAddress(match?.venueAddress ?? '');
     setShowProposeModal(false);
   }, [match?.id, match?.kickoffAt, match?.venueName, match?.venueAddress]);
+
+  useEffect(() => {
+    if (!match || !currentUser) return;
+    const pending = pendingRequestForUser(
+      state.requests,
+      match.id,
+      currentUser.uid,
+    );
+    const active =
+      pending && isPendingRequestActive(match, pending) ? pending : undefined;
+    if (active) {
+      setRequestSelectedSlots(gameRequestPreferredSlots(active));
+      setRequestNote(active.note ?? '');
+      setRequestEditing(false);
+    } else {
+      setRequestSelectedSlots([]);
+      setRequestNote('');
+      setRequestEditing(true);
+    }
+  }, [match, currentUser?.uid, state.requests]);
 
   const highlightRequest = searchParams.get('request') === '1';
   const canRequestPreview = Boolean(
@@ -488,6 +508,22 @@ export function MatchDetailPage() {
   const canRequest =
     isOfficial &&
     canOfficialRequestMatch(match, currentUser.uid, state.requests);
+  const showRaiseHandCard =
+    isOfficial &&
+    !(match.cmo ?? []).some((c) => c.userId === currentUser.uid) &&
+    !CREW_SLOTS.some((s) =>
+      crewPeople(match.crew[s]).some((a) => a.userId === currentUser.uid),
+    ) &&
+    (Boolean(pendingRequest) || canRequest);
+  const raiseHandPickerSlots =
+    pendingRequest && !requestEditing
+      ? gameRequestPreferredSlots(pendingRequest)
+      : requestSlots;
+  const canSubmitRequest =
+    showRaiseHandCard &&
+    requestEditing &&
+    requestSelectedSlots.length > 0 &&
+    requestSelectedSlots.every((s) => requestSlots.includes(s));
 
   const needsOfficialConfirm =
     isOfficialView &&
@@ -1072,10 +1108,6 @@ export function MatchDetailPage() {
   })();
 
   const showAcceptDecline = Boolean(needsOfficialConfirm && mySlot);
-  const canSubmitRequest =
-    canRequest &&
-    requestSelectedSlots.length > 0 &&
-    requestSelectedSlots.every((s) => requestSlots.includes(s));
 
   const reportActions = matchDetailReportActions(
     match,
@@ -1097,6 +1129,45 @@ export function MatchDetailPage() {
 
   const submitRequest = async () => {
     if (!canSubmitRequest || !currentUser || !match) return;
+
+    if (pendingRequest) {
+      const ok = store.updateGameRequest(
+        pendingRequest.id,
+        currentUser.uid,
+        {
+          preferredSlots: requestSelectedSlots,
+          note: requestNote.trim() || undefined,
+        },
+      );
+      if (!ok) return;
+
+      if (dataMode === 'live' && isFirebaseConfigured) {
+        try {
+          await patchGameRequestContentInFirestore(
+            defaultOrgId(),
+            match.id,
+            pendingRequest.id,
+            {
+              preferredSlots: requestSelectedSlots,
+              note: requestNote.trim() || undefined,
+            },
+          );
+        } catch (err) {
+          console.error('Raise-hand update failed', err);
+          window.alert(
+            err instanceof Error
+              ? err.message
+              : 'Could not update your request. Try again.',
+          );
+          return;
+        }
+      }
+
+      setRequestEditing(false);
+      setRequestToast(true);
+      return;
+    }
+
     const reqId = store.requestGame(
       match.id,
       currentUser.uid,
@@ -2196,7 +2267,7 @@ export function MatchDetailPage() {
         </section>
       )}
 
-      {canRequest && (
+      {showRaiseHandCard && (
         <section
           className="rs-detail-card"
           aria-labelledby="raise-hand-heading"
@@ -2204,6 +2275,11 @@ export function MatchDetailPage() {
         >
           <h3 id="raise-hand-heading" className="rs-detail-section__label">
             Raise hand
+            {pendingRequest && !requestEditing && (
+              <span className="rs-pill rs-pill--warn pf-v6-u-ml-sm">
+                Pending
+              </span>
+            )}
           </h3>
           <FormGroup
             label="Select roles you're open to"
@@ -2215,31 +2291,39 @@ export function MatchDetailPage() {
               role="group"
               aria-label="Select roles you're open to"
             >
-              {requestSlots.map((s) => {
+              {raiseHandPickerSlots.map((s) => {
                 const selected = requestSelectedSlots.includes(s);
+                const disabled = !requestEditing;
                 return (
                   <button
                     key={s}
                     type="button"
                     aria-pressed={selected}
+                    disabled={disabled}
                     className={`rs-filter-chip${
                       selected ? ' rs-filter-chip--selected' : ''
                     }`}
-                    onClick={() =>
+                    onClick={() => {
+                      if (disabled) return;
                       setRequestSelectedSlots((prev) =>
                         selected
                           ? prev.filter((slot) => slot !== s)
                           : [...prev, s],
-                      )
-                    }
+                      );
+                    }}
                   >
                     {REQUESTABLE_SLOT_SHORT[s]}
                   </button>
                 );
               })}
             </div>
-            {requestSlots.length === 0 && (
+            {raiseHandPickerSlots.length === 0 && (
               <p className="rs-detail-note">No open roles on this match.</p>
+            )}
+            {pendingRequest && !requestEditing && (
+              <p className="rs-detail-note">
+                Tap Edit request below to change roles or your note.
+              </p>
             )}
           </FormGroup>
           <FormGroup label="Note (optional)" fieldId="request-note">
@@ -2249,6 +2333,7 @@ export function MatchDetailPage() {
               onChange={(_, v) => setRequestNote(v)}
               rows={2}
               resizeOrientation="vertical"
+              isDisabled={!requestEditing}
             />
           </FormGroup>
         </section>
@@ -2322,21 +2407,38 @@ export function MatchDetailPage() {
         </div>
       )}
 
-      {canRequest && (
+      {showRaiseHandCard && (
         <div className="rs-detail-sticky">
-          <Button
-            variant="primary"
-            isBlock
-            isDisabled={!canSubmitRequest}
-            className={
-              canSubmitRequest
-                ? undefined
-                : 'rs-detail-sticky__submit--disabled'
-            }
-            onClick={() => void submitRequest()}
-          >
-            {canSubmitRequest ? 'Submit request' : 'Select at least one role'}
-          </Button>
+          {pendingRequest && !requestEditing ? (
+            <Button
+              variant="primary"
+              isBlock
+              onClick={() => {
+                setRequestSelectedSlots(
+                  gameRequestPreferredSlots(pendingRequest).filter((s) =>
+                    requestSlots.includes(s),
+                  ),
+                );
+                setRequestEditing(true);
+              }}
+            >
+              Edit request
+            </Button>
+          ) : (
+            <Button
+              variant="primary"
+              isBlock
+              isDisabled={!canSubmitRequest}
+              className={
+                canSubmitRequest
+                  ? undefined
+                  : 'rs-detail-sticky__submit--disabled'
+              }
+              onClick={() => void submitRequest()}
+            >
+              {pendingRequest ? 'Update request' : 'Submit request'}
+            </Button>
+          )}
         </div>
       )}
 

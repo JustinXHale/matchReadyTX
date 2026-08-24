@@ -1289,6 +1289,33 @@ export async function updateGameRequestInFirestore(
   );
 }
 
+/** Official updates roles / note on a pending raise-hand. */
+export async function patchGameRequestContentInFirestore(
+  orgId: string,
+  matchId: string,
+  requestId: string,
+  patch: { preferredSlots: RequestableSlot[]; note?: string },
+): Promise<void> {
+  const slots = [...new Set(patch.preferredSlots)].filter(Boolean);
+  await updateDoc(
+    doc(
+      requireDb(),
+      'orgs',
+      orgId,
+      'matches',
+      matchId,
+      'gameRequests',
+      requestId,
+    ),
+    {
+      preferredSlots: slots,
+      preferredSlot: slots[0] ?? null,
+      note: patch.note?.trim() || null,
+      updatedAt: new Date().toISOString(),
+    },
+  );
+}
+
 /** Official withdraws their own pending raise-hand request. */
 export async function deleteGameRequestInFirestore(
   orgId: string,
