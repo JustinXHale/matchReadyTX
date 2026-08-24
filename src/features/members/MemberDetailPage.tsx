@@ -349,7 +349,7 @@ export function MemberDetailPage() {
     : undefined;
 
   const teamPickerOptions = useMemo(
-    () => conferenceTeamOptions(state.matches, state.teams),
+    () => conferenceTeamOptions(state.teams),
     [state.matches, state.teams],
   );
 
@@ -534,7 +534,9 @@ export function MemberDetailPage() {
       lastName,
       phone: fanOnly ? '' : editDraft.phone.trim(),
       smsOptIn: false,
-      birthday: needsRef ? editDraft.birthday.trim() || undefined : undefined,
+      birthday: needsRef
+        ? editDraft.birthday.trim() || undefined
+        : user.birthday,
       roles,
       teamIds: editDraft.roleTeamAdmin ? [...editDraft.teamIds] : [],
       homeStreet: needsRef ? editDraft.homeStreet.trim() : '',

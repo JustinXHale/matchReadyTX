@@ -162,11 +162,13 @@ export function isProfileComplete(user: Pick<
     return user.roles.includes('fan');
   }
 
-  if (!user.phone?.trim() || !user.birthday?.trim()) {
+  if (!user.phone?.trim()) {
     return false;
   }
-  // Home address + kit only for Referee / CMO (mileage & society kit).
+
+  // Birthday, home address, and kit only for Referee / CMO.
   if (hasRefereeLensRole(user.roles)) {
+    if (!user.birthday?.trim()) return false;
     if (!hasCompleteHomeAddress(user)) return false;
     if (
       !user.refereeingSince?.trim() ||

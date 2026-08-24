@@ -491,7 +491,8 @@ describe('profile helpers', () => {
       roles: ['teamAdmin' as const],
     };
     expect(isProfileComplete(teamAdmin)).toBe(true);
-    expect(isProfileComplete({ ...teamAdmin, birthday: '' })).toBe(false);
+    expect(isProfileComplete({ ...teamAdmin, birthday: '' })).toBe(true);
+    expect(isProfileComplete({ ...teamAdmin, phone: '' })).toBe(false);
     expect(isProfileComplete({ ...teamAdmin, roles: ['official'] })).toBe(
       false,
     );
@@ -1695,7 +1696,7 @@ describe('conferenceTeamOptions', () => {
       },
       { id: 'guest', name: 'Guest RFC', contactEmails: [] },
     ];
-    const options = conferenceTeamOptions([], teams);
+    const options = conferenceTeamOptions(teams);
     expect(options).toHaveLength(2);
     expect(options.map((o) => o.id)).toEqual([
       't_uh_lonestar_men',

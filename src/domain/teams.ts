@@ -262,7 +262,6 @@ export function teamConferenceLabel(
  * Roster comes from Locations-synced teams (abbreviation + competition).
  */
 export function conferenceTeamOptions(
-  _matches: Match[],
   teams: Team[],
   allowedTeamIds?: Set<string>,
 ): ConferenceTeamOption[] {

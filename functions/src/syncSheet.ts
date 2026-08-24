@@ -200,7 +200,7 @@ function rosterTeamKey(abbreviation: string, competition: string): string {
 
 /** Map legacy team doc ids to Locations-sync ids (abbreviation + competition). */
 function buildTeamIdRemap(
-  existingTeamDocs: Array<{ id: string; data: () => DocumentData | undefined }>,
+  existingTeamDocs: FirebaseFirestore.QueryDocumentSnapshot[],
   teamsById: Map<string, TeamShape>,
 ): Map<string, string> {
   const newIdByKey = new Map<string, string>();

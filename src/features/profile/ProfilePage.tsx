@@ -141,7 +141,6 @@ export function ProfilePage() {
   const requestableTeamOptions = useMemo(
     () =>
       conferenceTeamOptions(
-        state.matches,
         state.teams,
         new Set(requestableTeams.map((team) => team.id)),
       ),
@@ -163,20 +162,21 @@ export function ProfilePage() {
     (fanOnly
       ? true
       : Boolean(phone.trim()) &&
-        Boolean(birthday.trim()) &&
-        (!needsRefDetails ||
-          (hasCompleteHomeAddress({
-            homeStreet,
-            homeCity,
-            homeRegion,
-            homePostalCode,
-          }) &&
+        (needsRefDetails
+          ? Boolean(birthday.trim()) &&
+            hasCompleteHomeAddress({
+              homeStreet,
+              homeCity,
+              homeRegion,
+              homePostalCode,
+            }) &&
             levelOk &&
             /^\d{4}$/.test(refereeingSince.trim()) &&
             Number(refereeingSince) >= 1950 &&
             Number(refereeingSince) <= new Date().getFullYear() &&
             Boolean(jerseySize) &&
-            Boolean(shortsSize))));
+            Boolean(shortsSize)
+          : true));
 
   const onPickPhoto = async (file: File | undefined) => {
     setPhotoError(null);
