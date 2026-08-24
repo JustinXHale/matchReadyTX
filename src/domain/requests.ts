@@ -56,6 +56,16 @@ export function openRequestSlots(match: Match): RequestableSlot[] {
   });
 }
 
+/** Fee crew slots still open for assignment (CMO excluded from coverage queues). */
+export function openCrewSlotsExcludingCmo(match: Match): CrewSlot[] {
+  return openRequestSlots(match).filter((s): s is CrewSlot => s !== 'cmo');
+}
+
+/** Released matches that still need fee-crew officials (any open slot except CMO). */
+export function matchNeedsCrewCoverage(match: Match): boolean {
+  return openCrewSlotsExcludingCmo(match).length > 0;
+}
+
 export function pendingRequestForUser(
   requests: GameRequest[],
   matchId: string,

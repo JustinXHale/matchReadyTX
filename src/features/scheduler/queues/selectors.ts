@@ -1,9 +1,9 @@
+import type { Match } from '@/domain/types';
+import { matchNeedsCrewCoverage } from '@/domain/requests';
 import {
-  crewPeople,
   type ChangeProposal,
   type FixtureRequest,
   type GameRequest,
-  type Match,
   type MatchGender,
 } from '@/domain/types';
 import {
@@ -35,7 +35,7 @@ export function proposalMatchesDivisionFilters(
   );
 }
 
-/** Released matches still missing Match Official (not already in reassignment). */
+/** Released matches still missing fee-crew officials (CMO excluded). */
 export function matchesNeedingOfficials(matches: Match[]): Match[] {
   return sortByKickoffAsc(matches.filter((m) => {
     if (
@@ -47,7 +47,7 @@ export function matchesNeedingOfficials(matches: Match[]): Match[] {
       return false;
     }
     if (!m.releasedAt) return false;
-    return crewPeople(m.crew.mo).length === 0;
+    return matchNeedsCrewCoverage(m);
   }));
 }
 

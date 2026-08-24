@@ -110,7 +110,7 @@ export function SchedulerQueuesCoveragePage() {
       >
         <MatchQueueList
           matches={needsOfficials}
-          emptyText="Every released match has a Match Official."
+          emptyText="All crew slots are filled (except optional CMO)."
           ctaLabel="Assign"
           onAlert={(matchId) => store.sendCoverageAlert(matchId)}
         />

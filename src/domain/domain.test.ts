@@ -49,7 +49,9 @@ import {
   isMatchFilled,
   isMatchRequestable,
   isPendingRequestActive,
+  matchNeedsCrewCoverage,
 } from '@/domain/requests';
+import { matchesNeedingOfficials } from '@/features/scheduler/queues/selectors';
 import { parseScheduleCsv } from '@/domain/csvImport';
 import {
   applyWeekdayPattern,
@@ -192,6 +194,36 @@ describe('crew visibility gate', () => {
     expect(emptyCrewBlocks(m.crew.mo).length).toBe(openBefore - 1);
     expect(isMatchFilled(m)).toBe(false);
     expect(canOfficialRequestMatch(m, 'u_other', [])).toBe(true);
+  });
+
+  it('matchNeedsCrewCoverage ignores CMO-only gaps', () => {
+    let m = releaseMatch(baseMatch());
+    m = assignOfficial(m, 'mo', { uid: 'r1', displayName: 'Ref One' });
+    m = {
+      ...m,
+      cmo: [{ id: 'cmo_1' }],
+      rolesNeeded: ['mo', 'cmo'],
+    };
+    expect(matchNeedsCrewCoverage(m)).toBe(false);
+    m = withCrewRoleAdded(m, 'mo');
+    expect(matchNeedsCrewCoverage(m)).toBe(true);
+    m = assignOfficial(m, 'mo', {
+      uid: 'r2',
+      displayName: 'Ref Two',
+    });
+    expect(matchNeedsCrewCoverage(m)).toBe(false);
+  });
+
+  it('matchesNeedingOfficials includes partial crew, not only zero MO', () => {
+    let m = releaseMatch(baseMatch());
+    m = assignOfficial(m, 'mo', { uid: 'r1', displayName: 'Ref One' });
+    m = assignOfficial(m, 'mo', { uid: 'r2', displayName: 'Ref Two' });
+    m = withCrewRoleAdded(m, 'mo');
+    m = withCrewRoleAdded(m, 'mo');
+    expect(matchesNeedingOfficials([m]).map((x) => x.id)).toEqual([m.id]);
+    m = assignOfficial(m, 'mo', { uid: 'r3', displayName: 'Ref Three' });
+    m = assignOfficial(m, 'mo', { uid: 'r4', displayName: 'Ref Four' });
+    expect(matchesNeedingOfficials([m])).toHaveLength(0);
   });
 
   it('teams see crew when any MO is confirmed', () => {
