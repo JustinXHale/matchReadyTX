@@ -248,6 +248,10 @@ export function MemberDetailPage() {
   const pills = rolePillsForMember(user.roles);
   const isOfficialLens =
     user.roles.includes('official') || user.roles.includes('cmo');
+  const showsRefereeProfileFields =
+    editDraft != null
+      ? editDraft.roleOfficial || editDraft.roleCmo
+      : isOfficialLens;
   const isTeamAdmin = user.roles.includes('teamAdmin');
   const isFan = user.roles.includes('fan');
   const fanFavorite = isFan ? fanFavoriteLabel(user, state.teams) : null;
@@ -387,13 +391,12 @@ export function MemberDetailPage() {
       setEditError('Phone is required.');
       return;
     }
-    if (!fanOnly && !editDraft.birthday.trim()) {
-      setEditError('Birthday is required.');
+
+    const needsRef = editDraft.roleOfficial || editDraft.roleCmo;
+    if (needsRef && !editDraft.birthday.trim()) {
+      setEditError('Birthday is required for Referee / CMO.');
       return;
     }
-
-    const needsRef =
-      editDraft.roleOfficial || editDraft.roleCmo;
     let refereeLevel: number | undefined;
     if (needsRef) {
       if (
@@ -432,9 +435,7 @@ export function MemberDetailPage() {
       lastName,
       phone: fanOnly ? '' : editDraft.phone.trim(),
       smsOptIn: false,
-      birthday: fanOnly
-        ? undefined
-        : editDraft.birthday.trim() || undefined,
+      birthday: needsRef ? editDraft.birthday.trim() || undefined : undefined,
       roles,
       teamIds: editDraft.roleTeamAdmin ? [...editDraft.teamIds] : [],
       homeStreet: needsRef ? editDraft.homeStreet.trim() : '',
@@ -462,6 +463,10 @@ export function MemberDetailPage() {
         : undefined,
       shortsSize: needsRef
         ? (editDraft.shortsSize as UserProfile['shortsSize']) || undefined
+        : undefined,
+      assessedLevel: needsRef ? user.assessedLevel : undefined,
+      requestedAssessedLevel: needsRef
+        ? user.requestedAssessedLevel
         : undefined,
     };
     next = syncDisplayName(next);
@@ -789,14 +794,16 @@ export function MemberDetailPage() {
                 </p>
               </FormGroup>
             )}
-            <FormGroup label="Birthday" isRequired={!editFanOnly}>
-              <TextInput
-                type="date"
-                value={editDraft.birthday}
-                onChange={(_, v) => patchDraft({ birthday: v })}
-              />
-            </FormGroup>
-            {(editDraft.roleOfficial || editDraft.roleCmo) && (
+            {showsRefereeProfileFields && (
+              <FormGroup label="Birthday" isRequired>
+                <TextInput
+                  type="date"
+                  value={editDraft.birthday}
+                  onChange={(_, v) => patchDraft({ birthday: v })}
+                />
+              </FormGroup>
+            )}
+            {showsRefereeProfileFields && (
               <>
                 <div className="rs-form-row rs-form-row--2">
                   <FormGroup label="Street address" isRequired>
@@ -928,7 +935,7 @@ export function MemberDetailPage() {
         ) : null}
       </section>
 
-      {canManage && isOfficialLens && (
+      {canManage && showsRefereeProfileFields && (
         <section className="rs-detail-card" aria-labelledby="member-assessed">
           <h2 id="member-assessed" className="rs-detail-section__label">
             Set Assessed Level

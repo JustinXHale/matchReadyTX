@@ -65,7 +65,7 @@ import { namedOfficialsNeedingAvailability } from '@/domain/crew';
 import { availableCrewRolesToAdd, roleHasAssignee } from '@/domain/crewSize';
 import { UserAvatar } from '@/ui/UserAvatar';
 import { IconDateInput } from '@/ui/IconDateInput';
-import { formatMemberCityState } from '@/domain/members';
+import { formatMemberCityState, officialEffectiveLevel } from '@/domain/members';
 import {
   canOfficialRequestMatch,
   isPendingRequestActive,
@@ -713,7 +713,8 @@ export function MatchDetailPage() {
   const refereeLevels = (() => {
     const levels = new Set<number>();
     for (const o of officials) {
-      if (o.refereeLevel != null) levels.add(o.refereeLevel);
+      const level = officialEffectiveLevel(o);
+      if (level != null) levels.add(level);
     }
     return [...levels].sort((a, b) => a - b);
   })();
@@ -721,11 +722,12 @@ export function MatchDetailPage() {
   const orgTz = state.org.timezone || 'America/Chicago';
   const filteredOfficials = officials
     .filter((o) => {
-      if (pickLevelFilter != null && o.refereeLevel !== pickLevelFilter) {
+      const level = officialEffectiveLevel(o);
+      if (pickLevelFilter != null && level !== pickLevelFilter) {
         return false;
       }
       if (!pickQuery) return true;
-      return `${o.displayName} ${o.refereeLevel ?? ''}`
+      return `${o.displayName} ${level ?? ''}`
         .toLowerCase()
         .includes(pickQuery);
     })
@@ -2558,6 +2560,7 @@ export function MatchDetailPage() {
                 ({ official: o, location, availStatus }) => {
                 const isCurrent = currentPickUserId === o.uid;
                 const availLabel = availabilityStatusLabel(availStatus);
+                const level = officialEffectiveLevel(o);
                 return (
                   <li key={o.uid}>
                     <button
@@ -2572,9 +2575,7 @@ export function MatchDetailPage() {
                         <span className="rs-official-picker__main">
                           <span className="rs-official-picker__name">
                             {o.displayName}
-                            {o.refereeLevel != null
-                              ? ` (${o.refereeLevel})`
-                              : ''}
+                            {level != null ? ` (${level})` : ''}
                           </span>
                           {location ? (
                             <span className="rs-official-picker__dist">

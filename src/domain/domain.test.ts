@@ -74,6 +74,7 @@ import {
 import {
   fanFavoriteLabel,
   formatMemberCityState,
+  officialEffectiveLevel,
   formatMemberJoinedAt,
   memberListName,
   memberMatchesTab,
@@ -1354,6 +1355,18 @@ describe('member directory helpers', () => {
     expect(
       formatMemberCityState({ ...base, homeCity: 'Dallas', homeRegion: '' }),
     ).toBe('Dallas');
+  });
+
+  it('officialEffectiveLevel prefers assessed over self-reported', () => {
+    expect(
+      officialEffectiveLevel({ ...base, assessedLevel: 8, refereeLevel: 2 }),
+    ).toBe(8);
+    expect(
+      officialEffectiveLevel({ ...base, assessedLevel: undefined, refereeLevel: 2 }),
+    ).toBe(2);
+    expect(
+      officialEffectiveLevel({ ...base, assessedLevel: undefined, refereeLevel: undefined }),
+    ).toBeNull();
   });
 
   it('membersForTab hides incomplete unless includeIncomplete', () => {

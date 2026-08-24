@@ -197,6 +197,13 @@ export function groupTeamAdminsByTeam(
   return groups;
 }
 
+/** Assessed grade when set; otherwise self-reported referee level. */
+export function officialEffectiveLevel(user: UserProfile): number | null {
+  if (user.assessedLevel != null) return user.assessedLevel;
+  if (user.refereeLevel != null) return user.refereeLevel;
+  return null;
+}
+
 /** City and state from the official’s profile (e.g. Austin, TX). */
 export function formatMemberCityState(user: UserProfile): string | null {
   const line = [user.homeCity, user.homeRegion]
