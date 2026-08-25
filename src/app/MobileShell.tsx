@@ -27,7 +27,10 @@ import { WhistleIcon } from '@/ui/WhistleIcon';
 import { ThemeToggle } from '@/ui/ThemeToggle';
 import { BrandLogo } from '@/ui/BrandLogo';
 import { UpdatePrompt } from '@/pwa/UpdatePrompt';
-import { OfficialQuickLookHost } from '@/features/scheduler/OfficialQuickLookHost';
+import {
+  OfficialQuickLookPicker,
+  OfficialQuickLookProvider,
+} from '@/features/scheduler/officialQuickLookContext';
 
 const navIconClass = 'rs-bottom-nav__icon';
 
@@ -226,6 +229,7 @@ export function MobileShell() {
   };
 
   return (
+    <OfficialQuickLookProvider>
     <Page
       className={!showChrome ? 'rs-page--auth' : undefined}
       masthead={
@@ -277,7 +281,6 @@ export function MobileShell() {
                   Sign in
                 </Button>
               )}
-              {isAssignerView && hasAssignerRole && <OfficialQuickLookHost />}
               {canSwitchRoleView && (
                 <div className="rs-role-switch">
                   <FormSelect
@@ -297,6 +300,7 @@ export function MobileShell() {
                   </FormSelect>
                 </div>
               )}
+              {isAssignerView && hasAssignerRole && <OfficialQuickLookPicker />}
             </MastheadContent>
           </Masthead>
         ) : undefined
@@ -332,5 +336,6 @@ export function MobileShell() {
         </nav>
       )}
     </Page>
+    </OfficialQuickLookProvider>
   );
 }

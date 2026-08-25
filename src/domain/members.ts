@@ -262,6 +262,15 @@ export function pastMatchesForMember(
   );
 }
 
+/** Most recent assignments (any crew role), default last five. */
+export function recentAssignmentsForMember(
+  matches: Match[],
+  userId: string,
+  limit = 5,
+): Match[] {
+  return matchesForMember(matches, userId).slice(0, limit);
+}
+
 export function nextMatchForMember(
   matches: Match[],
   userId: string,

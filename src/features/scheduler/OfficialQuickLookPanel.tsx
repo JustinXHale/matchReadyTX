@@ -9,9 +9,11 @@ import {
 import type { UserProfile } from '@/domain/types';
 import { AvailabilityMonthCalendar } from '@/features/availability/AvailabilityMonthCalendar';
 import { OfficialInsightsPanel } from '@/features/scheduler/OfficialInsightsPanel';
+import { OfficialRecentMatches } from '@/features/scheduler/OfficialRecentMatches';
+import type { BackNav } from '@/nav/backNav';
 import { UserAvatar } from '@/ui/UserAvatar';
 
-type QuickLookTab = 'profile' | 'insights';
+type QuickLookTab = 'profile' | 'insights' | 'recent';
 
 function levelLabel(user: UserProfile): string {
   const n = officialEffectiveLevel(user);
@@ -24,10 +26,17 @@ function formatBegan(value: string | undefined): string {
   return /^\d{4}$/.test(y) ? y : '—';
 }
 
-/** Profile + insights tabs for scheduler quick look. */
-export function OfficialQuickLookPanel({ user }: { user: UserProfile }) {
+/** Profile + insights + recent matches for scheduler quick look. */
+export function OfficialQuickLookPanel({
+  user,
+  onNavigate,
+  matchBack,
+}: {
+  user: UserProfile;
+  onNavigate?: () => void;
+  matchBack?: BackNav;
+}) {
   const { state } = useApp();
-  const membersHref = useAppHref('/about/members');
   const memberHref = useAppHref(`/about/members/${user.uid}`);
   const timeZone = state.org.timezone || 'America/Chicago';
   const now = new Date();
@@ -40,6 +49,8 @@ export function OfficialQuickLookPanel({ user }: { user: UserProfile }) {
     [state.availability, user.uid],
   );
   const cityState = formatMemberCityState(user);
+
+  const followLink = () => onNavigate?.();
 
   return (
     <div className="rs-official-quicklook">
@@ -55,6 +66,18 @@ export function OfficialQuickLookPanel({ user }: { user: UserProfile }) {
           onClick={() => setTab('profile')}
         >
           Profile
+        </button>
+        <button
+          type="button"
+          className={
+            tab === 'recent'
+              ? 'rs-inline-tabs__tab active'
+              : 'rs-inline-tabs__tab'
+          }
+          aria-current={tab === 'recent' ? 'page' : undefined}
+          onClick={() => setTab('recent')}
+        >
+          Recent
         </button>
         <button
           type="button"
@@ -106,11 +129,12 @@ export function OfficialQuickLookPanel({ user }: { user: UserProfile }) {
                 </div>
               )}
             </dl>
-            <Link className="rs-official-quicklook__link" to={memberHref}>
+            <Link
+              className="rs-official-quicklook__link"
+              to={memberHref}
+              onClick={followLink}
+            >
               Open full profile
-            </Link>
-            <Link className="rs-official-quicklook__link" to={membersHref}>
-              Members directory
             </Link>
           </div>
 
@@ -140,6 +164,20 @@ export function OfficialQuickLookPanel({ user }: { user: UserProfile }) {
             />
           </section>
         </>
+      ) : tab === 'recent' ? (
+        <section aria-labelledby="official-quicklook-recent">
+          <h3
+            id="official-quicklook-recent"
+            className="rs-detail-section__label"
+          >
+            Last 5 matches
+          </h3>
+          <OfficialRecentMatches
+            userId={user.uid}
+            matchBack={matchBack}
+            onNavigate={onNavigate}
+          />
+        </section>
       ) : (
         <OfficialInsightsPanel userId={user.uid} compact />
       )}

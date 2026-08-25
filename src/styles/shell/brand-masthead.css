@@ -290,11 +290,12 @@
 .rs-masthead__content {
   flex: 0 1 auto;
   min-width: 0;
-  max-width: 48%;
+  max-width: 52%;
   margin-inline-start: 0 !important;
   display: flex;
   align-items: center;
   justify-content: flex-end;
+  flex-wrap: nowrap;
   gap: 4px;
 }
 

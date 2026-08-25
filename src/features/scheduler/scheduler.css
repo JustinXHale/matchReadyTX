@@ -183,14 +183,15 @@
 
 /* Scheduler official quick look — masthead picker + side drawer */
 .rs-masthead-official-pick {
-  flex: 1 1 auto;
+  flex: 0 1 auto;
   min-width: 0;
-  max-width: 11rem;
+  max-width: 8.5rem;
 }
 
 .rs-masthead-official-pick__select {
   width: 100%;
   min-width: 0;
+  max-width: 8.5rem;
   font-size: 0.8125rem;
 }
 
@@ -200,10 +201,11 @@
   }
 
   .rs-masthead-official-pick {
-    max-width: 14rem;
+    max-width: 10rem;
   }
 
   .rs-masthead-official-pick__select {
+    max-width: 10rem;
     font-size: 0.875rem;
   }
 }
@@ -334,6 +336,10 @@
   }
 
   .rs-masthead-official-pick {
-    max-width: 9.5rem;
+    max-width: 7.5rem;
+  }
+
+  .rs-masthead-official-pick__select {
+    max-width: 7.5rem;
   }
 }

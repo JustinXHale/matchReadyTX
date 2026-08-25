@@ -1,5 +1,4 @@
-import { useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { useState } from 'react';
 import {
   Button,
   FormGroup,
@@ -12,25 +11,20 @@ import {
   Title,
 } from '@patternfly/react-core';
 import { useApp } from '@/app/AppContext';
-import { formatMemberCityState } from '@/domain/members';
+import { formatMemberCityState, officialEffectiveLevel } from '@/domain/members';
 import {
   approvalSlotsForRaiseHand,
   gameRequestPreferredSlots,
 } from '@/domain/requests';
-import type { CoachingReportStub } from '@/services/demoStore';
 import {
-  CREW_SLOTS,
   REQUESTABLE_SLOT_LABELS,
   REQUESTABLE_SLOT_SHORT,
-  crewPeople,
   type GameRequest,
-  type Match,
   type RequestableSlot,
   type UserProfile,
 } from '@/domain/types';
-import { backState } from '@/nav/backNav';
+import { useOfficialQuickLook } from '@/features/scheduler/officialQuickLookContext';
 import { MatchListRow } from '@/ui/MatchListRow';
-import { UserAvatar } from '@/ui/UserAvatar';
 
 function formatPreferredSlots(request: GameRequest): string {
   const slots = gameRequestPreferredSlots(request);
@@ -43,61 +37,6 @@ const QUEUES_BACK = {
   label: 'Raise-hand',
 } as const;
 
-function recentMatchesForOfficial(
-  matches: Match[],
-  userId: string,
-  limit = 5,
-): Match[] {
-  return matches
-    .filter((m) => {
-      if ((m.cmo ?? []).some((c) => c.userId === userId)) return true;
-      return CREW_SLOTS.some((s) =>
-        crewPeople(m.crew[s]).some((a) => a.userId === userId),
-      );
-    })
-    .sort(
-      (a, b) =>
-        new Date(b.kickoffAt).getTime() - new Date(a.kickoffAt).getTime(),
-    )
-    .slice(0, limit);
-}
-
-function coachingReportsForOfficial(
-  reports: CoachingReportStub[],
-  userId: string,
-): CoachingReportStub[] {
-  return reports
-    .filter((r) => r.officialId === userId)
-    .sort(
-      (a, b) =>
-        new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
-    );
-}
-
-function hasMatchScore(match: Match): boolean {
-  return (
-    match.homeScore != null &&
-    match.awayScore != null &&
-    Number.isFinite(match.homeScore) &&
-    Number.isFinite(match.awayScore)
-  );
-}
-
-function formatScore(match: Match): string {
-  if (!hasMatchScore(match)) return '–';
-  return `${match.homeScore}–${match.awayScore}`;
-}
-
-function formatBegan(value: string | undefined): string {
-  if (!value?.trim()) return '—';
-  const y = value.trim().slice(0, 4);
-  return /^\d{4}$/.test(y) ? y : '—';
-}
-
-function levelLabel(level: number | undefined): string {
-  return level != null ? String(level) : '—';
-}
-
 export function RaiseHandQueue({
   requests,
   onApprove,
@@ -108,33 +47,11 @@ export function RaiseHandQueue({
   onDecline: (id: string, reason?: string) => void;
 }) {
   const { state } = useApp();
+  const { openOfficial } = useOfficialQuickLook();
   const [declineTarget, setDeclineTarget] = useState<GameRequest | null>(null);
   const [declineReason, setDeclineReason] = useState('');
   const [approveTarget, setApproveTarget] = useState<GameRequest | null>(null);
   const [approveSlot, setApproveSlot] = useState<RequestableSlot | ''>('');
-  const [profileUserId, setProfileUserId] = useState<string | null>(null);
-
-  const profileUser = useMemo(
-    () => state.users.find((u) => u.uid === profileUserId) ?? null,
-    [state.users, profileUserId],
-  );
-  const profileCityState = profileUser
-    ? formatMemberCityState(profileUser)
-    : null;
-  const recentMatches = useMemo(
-    () =>
-      profileUserId
-        ? recentMatchesForOfficial(state.matches, profileUserId)
-        : [],
-    [state.matches, profileUserId],
-  );
-  const coachingReports = useMemo(
-    () =>
-      profileUserId
-        ? coachingReportsForOfficial(state.coachingReports, profileUserId)
-        : [],
-    [state.coachingReports, profileUserId],
-  );
 
   if (requests.length === 0) {
     return (
@@ -201,7 +118,7 @@ export function RaiseHandQueue({
               setDeclineTarget(r);
             }}
             onOpenProfile={() => {
-              setProfileUserId(r.userId);
+              openOfficial(r.userId, { matchBack: QUEUES_BACK });
             }}
           />
           );
@@ -320,134 +237,6 @@ export function RaiseHandQueue({
           </Button>
         </ModalFooter>
       </Modal>
-
-      <Modal
-        variant={ModalVariant.small}
-        isOpen={Boolean(profileUserId)}
-        onClose={() => {
-          setProfileUserId(null);
-        }}
-        aria-labelledby="ref-profile-title"
-      >
-        <ModalHeader>
-          <Title headingLevel="h2" id="ref-profile-title" size="lg">
-            {profileUser?.displayName ?? 'Official'}
-          </Title>
-        </ModalHeader>
-        <ModalBody>
-          {profileUser ? (
-            <div className="rs-ref-profile">
-              <div className="rs-ref-profile__top">
-                <div className="rs-ref-profile__identity">
-                  <UserAvatar user={profileUser} />
-                  <p className="rs-ref-profile__name">
-                    {profileUser.displayName}
-                  </p>
-                </div>
-                <dl className="rs-ref-profile__facts">
-                  <div>
-                    <dt>Referee level</dt>
-                    <dd>{levelLabel(profileUser.refereeLevel)}</dd>
-                  </div>
-                  <div>
-                    <dt>Started refereeing</dt>
-                    <dd>{formatBegan(profileUser.refereeingSince)}</dd>
-                  </div>
-                  {profileCityState ? (
-                    <div>
-                      <dt>Location</dt>
-                      <dd>{profileCityState}</dd>
-                    </div>
-                  ) : null}
-                </dl>
-
-                <div className="rs-ref-profile__coaching-col">
-                  <h3 className="rs-ref-profile__heading">Coaching reports</h3>
-                  {coachingReports.length === 0 ? (
-                    <p className="rs-match-card__meta">None on file.</p>
-                  ) : (
-                    <ul className="rs-ref-profile__coaching">
-                      {coachingReports.map((r) => (
-                        <li key={r.id}>
-                          <div>
-                            <strong>{r.title}</strong>
-                            <p className="rs-match-card__meta">{r.summary}</p>
-                          </div>
-                          <span
-                            className={`rs-pill${
-                              r.status === 'missing' ? ' rs-pill--urgent' : ''
-                            }`}
-                          >
-                            {r.status === 'missing' ? 'Missing' : 'On file'}
-                          </span>
-                        </li>
-                      ))}
-                    </ul>
-                  )}
-                </div>
-              </div>
-
-              <div>
-                <h3 className="rs-ref-profile__heading">Last 5 matches</h3>
-                {recentMatches.length === 0 ? (
-                  <p className="rs-match-card__meta">No recent assignments.</p>
-                ) : (
-                  <ul className="rs-ref-profile__matches">
-                    {recentMatches.map((m) => {
-                      const scored = hasMatchScore(m);
-                      return (
-                        <li key={m.id}>
-                          <Link
-                            to={`/matches/${m.id}`}
-                            state={backState(QUEUES_BACK)}
-                            className="rs-ref-profile__match"
-                            onClick={() => setProfileUserId(null)}
-                          >
-                            <span className="rs-ref-profile__match-top">
-                              <span className="rs-ref-profile__match-teams">
-                                {m.homeTeamName} vs {m.awayTeamName}
-                              </span>
-                              <span
-                                className={`rs-ref-profile__score${
-                                  scored ? '' : ' rs-ref-profile__score--empty'
-                                }`}
-                              >
-                                {formatScore(m)}
-                              </span>
-                            </span>
-                            <span className="rs-match-card__meta">
-                              {new Date(m.kickoffAt).toLocaleDateString(
-                                undefined,
-                                {
-                                  month: 'short',
-                                  day: 'numeric',
-                                  year: 'numeric',
-                                },
-                              )}
-                              {m.venueName ? ` · ${m.venueName}` : ''}
-                            </span>
-                          </Link>
-                        </li>
-                      );
-                    })}
-                  </ul>
-                )}
-              </div>
-            </div>
-          ) : (
-            <p className="rs-match-card__meta">Profile unavailable.</p>
-          )}
-        </ModalBody>
-        <ModalFooter>
-          <Button
-            type="button"
-            variant="primary"
-            onClick={() => setProfileUserId(null)}
-          >
-            Close
-          </Button>
-        </ModalFooter>
-      </Modal>
     </>
   );
 }
@@ -469,7 +258,10 @@ function RaiseHandItem({
   const match = state.matches.find((m) => m.id === request.matchId);
   const slotLabel = formatPreferredSlots(request);
   const name = user?.displayName ?? request.userName;
-  const level = levelLabel(user?.refereeLevel);
+  const level =
+    user != null && officialEffectiveLevel(user) != null
+      ? String(officialEffectiveLevel(user))
+      : '—';
   const cityState = user ? formatMemberCityState(user) : null;
 
   if (!match) {
