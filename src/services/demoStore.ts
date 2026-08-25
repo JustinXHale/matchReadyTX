@@ -106,6 +106,72 @@ function isLiveDataMode(): boolean {
   }
 }
 
+type LiveSnapshotExpect =
+  | 'assignment_confirmed'
+  | 'assignment_cleared'
+  | 'assignment_assigned'
+  | 'request_approved'
+  | 'request_declined';
+
+type LiveSnapshotGuard = {
+  expiresAt: number;
+  expect: LiveSnapshotExpect;
+  userId?: string;
+  slot?: CrewSlot | 'cmo';
+  assignmentId?: string;
+};
+
+const LIVE_SNAPSHOT_GUARD_TTL_MS = 15000;
+
+function findCrewAssignmentOnMatch(
+  match: Match,
+  slot?: CrewSlot | 'cmo',
+  assignmentId?: string,
+  userId?: string,
+): CrewAssignment | undefined {
+  if (!slot || slot === 'cmo') return undefined;
+  const list = match.crew[slot] ?? [];
+  if (assignmentId) return list.find((a) => a.id === assignmentId);
+  if (userId) return list.find((a) => a.userId === userId);
+  return list[0];
+}
+
+function serverReflectsMatchGuard(guard: LiveSnapshotGuard, server: Match): boolean {
+  if (guard.expect === 'assignment_assigned' && guard.slot === 'cmo') {
+    return (server.cmo ?? []).some((c) => c.userId === guard.userId);
+  }
+  const assignment = findCrewAssignmentOnMatch(
+    server,
+    guard.slot,
+    guard.assignmentId,
+    guard.userId,
+  );
+  switch (guard.expect) {
+    case 'assignment_confirmed':
+      return assignment?.status === 'confirmed';
+    case 'assignment_cleared':
+      return !assignment?.userId || assignment.status === 'empty';
+    case 'assignment_assigned':
+      return Boolean(assignment?.userId);
+    default:
+      return false;
+  }
+}
+
+function serverReflectsRequestGuard(
+  guard: LiveSnapshotGuard,
+  server: GameRequest,
+): boolean {
+  switch (guard.expect) {
+    case 'request_approved':
+      return server.status === 'approved';
+    case 'request_declined':
+      return server.status === 'declined';
+    default:
+      return false;
+  }
+}
+
 /** Urgent assigner → official alert shown atop Request → Pending. */
 export interface OfficialAlert {
   id: string;
@@ -2269,6 +2335,67 @@ function createInitialState(): AppState {
 class DemoStore {
   private state: AppState = createInitialState();
   private listeners = new Set<Listener>();
+  private liveSnapshotGuards = new Map<string, LiveSnapshotGuard>();
+
+  private pruneLiveSnapshotGuards(now = Date.now()): void {
+    for (const [key, guard] of this.liveSnapshotGuards) {
+      if (now >= guard.expiresAt) this.liveSnapshotGuards.delete(key);
+    }
+  }
+
+  private registerLiveSnapshotGuard(
+    key: string,
+    guard: Omit<LiveSnapshotGuard, 'expiresAt'>,
+    ttlMs = LIVE_SNAPSHOT_GUARD_TTL_MS,
+  ): void {
+    this.liveSnapshotGuards.set(key, {
+      ...guard,
+      expiresAt: Date.now() + ttlMs,
+    });
+  }
+
+  /** Drop optimistic overlay after a failed live write so server truth can show. */
+  releaseLiveSnapshotGuard(key: string): void {
+    this.liveSnapshotGuards.delete(key);
+  }
+
+  private shouldPreferLocalMatch(
+    local: Match | undefined,
+    server: Match,
+  ): boolean {
+    const key = `match:${server.id}`;
+    const guard = this.liveSnapshotGuards.get(key);
+    if (!guard) return false;
+    const now = Date.now();
+    if (now >= guard.expiresAt) {
+      this.liveSnapshotGuards.delete(key);
+      return false;
+    }
+    if (serverReflectsMatchGuard(guard, server)) {
+      this.liveSnapshotGuards.delete(key);
+      return false;
+    }
+    return Boolean(local);
+  }
+
+  private shouldPreferLocalRequest(
+    local: GameRequest | undefined,
+    server: GameRequest,
+  ): boolean {
+    const key = `request:${server.id}`;
+    const guard = this.liveSnapshotGuards.get(key);
+    if (!guard) return false;
+    const now = Date.now();
+    if (now >= guard.expiresAt) {
+      this.liveSnapshotGuards.delete(key);
+      return false;
+    }
+    if (serverReflectsRequestGuard(guard, server)) {
+      this.liveSnapshotGuards.delete(key);
+      return false;
+    }
+    return Boolean(local);
+  }
 
   subscribe(fn: Listener): () => void {
     this.listeners.add(fn);
@@ -2572,31 +2699,54 @@ class DemoStore {
     proposals?: ChangeProposal[];
     gameRequests?: GameRequest[];
   }): void {
-    this.set((s) => ({
-      ...s,
-      org: {
-        ...s.org,
-        ...Object.fromEntries(
-          Object.entries(snap.org).filter(([, v]) => v !== undefined),
-        ),
-        id: snap.org.id || s.org.id,
-      } as OrgSettings,
-      matches: snap.matches,
-      teams: snap.teams.length > 0 ? snap.teams : s.teams,
-      proposals:
-        snap.proposals !== undefined ? snap.proposals : s.proposals,
-      requests:
-        snap.gameRequests !== undefined ? snap.gameRequests : s.requests,
-      fixtureRequests: snap.fixtureRequests ?? [],
-      teamLinkRequests: snap.teamLinkRequests ?? [],
-      // coachFeedback / matchReports / cardReports filled by live subscriptions.
-      coachFeedback: s.coachFeedback,
-      matchReports: s.matchReports,
-      cardReports: s.cardReports,
-      coachingReports: s.coachingReports,
-      officialAlerts: [],
-      notifications: [],
-    }));
+    this.pruneLiveSnapshotGuards();
+    this.set((s) => {
+      const localMatchById = new Map(s.matches.map((m) => [m.id, m]));
+      const matches = snap.matches.map((serverM) => {
+        const local = localMatchById.get(serverM.id);
+        if (local && this.shouldPreferLocalMatch(local, serverM)) {
+          return local;
+        }
+        return serverM;
+      });
+
+      const localRequestById = new Map(s.requests.map((r) => [r.id, r]));
+      const requests =
+        snap.gameRequests !== undefined
+          ? snap.gameRequests.map((serverR) => {
+              const local = localRequestById.get(serverR.id);
+              if (local && this.shouldPreferLocalRequest(local, serverR)) {
+                return local;
+              }
+              return serverR;
+            })
+          : s.requests;
+
+      return {
+        ...s,
+        org: {
+          ...s.org,
+          ...Object.fromEntries(
+            Object.entries(snap.org).filter(([, v]) => v !== undefined),
+          ),
+          id: snap.org.id || s.org.id,
+        } as OrgSettings,
+        matches,
+        teams: snap.teams.length > 0 ? snap.teams : s.teams,
+        proposals:
+          snap.proposals !== undefined ? snap.proposals : s.proposals,
+        requests,
+        fixtureRequests: snap.fixtureRequests ?? [],
+        teamLinkRequests: snap.teamLinkRequests ?? [],
+        // coachFeedback / matchReports / cardReports filled by live subscriptions.
+        coachFeedback: s.coachFeedback,
+        matchReports: s.matchReports,
+        cardReports: s.cardReports,
+        coachingReports: s.coachingReports,
+        officialAlerts: [],
+        notifications: [],
+      };
+    });
   }
 
   applyLiveCoachFeedback(coachFeedback: CoachFeedback[]): void {
@@ -3609,6 +3759,22 @@ class DemoStore {
   }
 
   confirmCrewSlot(matchId: string, slot: CrewSlot, assignmentId?: string): void {
+    const match = this.state.matches.find((m) => m.id === matchId);
+    if (match) {
+      const list = match.crew[slot] ?? [];
+      const target =
+        (assignmentId
+          ? list.find((a) => a.id === assignmentId)
+          : list.find((a) => a.userId)) ?? null;
+      if (target?.userId) {
+        this.registerLiveSnapshotGuard(`match:${matchId}`, {
+          expect: 'assignment_confirmed',
+          userId: target.userId,
+          slot,
+          assignmentId: target.id,
+        });
+      }
+    }
     this.set((s) => {
       const matches = s.matches.map((m) => {
         if (m.id !== matchId) return m;
@@ -3651,6 +3817,22 @@ class DemoStore {
       | 'released' = 'declined',
     assignmentId?: string,
   ): void {
+    const beforeMatch = this.state.matches.find((m) => m.id === matchId);
+    if (beforeMatch) {
+      const list = beforeMatch.crew[slot] ?? [];
+      const target =
+        (assignmentId
+          ? list.find((a) => a.id === assignmentId)
+          : list.find((a) => a.userId)) ?? null;
+      if (target?.userId) {
+        this.registerLiveSnapshotGuard(`match:${matchId}`, {
+          expect: 'assignment_cleared',
+          userId: target.userId,
+          slot,
+          assignmentId: target.id,
+        });
+      }
+    }
     this.set((s) => {
       const matches = s.matches.map((m) => {
         if (m.id !== matchId) return m;
@@ -4343,6 +4525,9 @@ class DemoStore {
   declineRequest(requestId: string, reason?: string): void {
     const req = this.state.requests.find((r) => r.id === requestId);
     if (!req) return;
+    this.registerLiveSnapshotGuard(`request:${requestId}`, {
+      expect: 'request_declined',
+    });
     this.set((s) => ({
       ...s,
       requests: s.requests.map((r) =>
@@ -4372,6 +4557,14 @@ class DemoStore {
         ? resolveRaiseHandApprovalSlot(match, req)
         : req.preferredSlots[0] ?? req.preferredSlot);
     if (!chosen) return;
+    this.registerLiveSnapshotGuard(`request:${requestId}`, {
+      expect: 'request_approved',
+    });
+    this.registerLiveSnapshotGuard(`match:${req.matchId}`, {
+      expect: 'assignment_assigned',
+      userId: req.userId,
+      slot: chosen,
+    });
     if (chosen === 'cmo') {
       const user = this.state.users.find((u) => u.uid === req.userId);
       if (!user) return;

@@ -286,6 +286,7 @@ export function MatchDetailPage() {
   const [requestNote, setRequestNote] = useState('');
   const [requestEditing, setRequestEditing] = useState(true);
   const [requestToast, setRequestToast] = useState(false);
+  const [selfServiceBusy, setSelfServiceBusy] = useState(false);
   const requestSectionRef = useRef<HTMLElement | null>(null);
   const titleRowRef = useRef<HTMLDivElement | null>(null);
 
@@ -294,21 +295,26 @@ export function MatchDetailPage() {
   }, [id]);
 
   const persistSelfServiceIfLive = useCallback(
-    (input: Parameters<typeof callMatchSelfService>[0]) => {
-      if (dataMode !== 'live' || !isFirebaseConfigured) return;
-      void callMatchSelfService({
-        orgId: defaultOrgId(),
-        ...input,
-      }).catch((err) => {
+    async (input: Parameters<typeof callMatchSelfService>[0]) => {
+      if (dataMode !== 'live' || !isFirebaseConfigured) return true;
+      try {
+        await callMatchSelfService({
+          orgId: defaultOrgId(),
+          ...input,
+        });
+        return true;
+      } catch (err) {
         console.error('Failed to save match response', err);
+        store.releaseLiveSnapshotGuard(`match:${input.matchId}`);
         window.alert(
           err instanceof Error
             ? `Updated locally, but save failed: ${err.message}`
             : 'Updated locally, but save failed.',
         );
-      });
+        return false;
+      }
     },
-    [dataMode],
+    [dataMode, store],
   );
 
   const officials = useMemo(
@@ -941,8 +947,9 @@ export function MatchDetailPage() {
     setShowDecline(true);
   };
 
-  const confirmDecline = () => {
-    if (!mySlot || !reason.trim()) return;
+  const confirmDecline = async () => {
+    if (!mySlot || !reason.trim() || !match) return;
+    setSelfServiceBusy(true);
     if (declineMode === 't72') {
       store.answerT72Official(match.id, mySlot, 'no', reason);
     } else {
@@ -956,27 +963,31 @@ export function MatchDetailPage() {
         myAssignment?.id,
       );
     }
-    persistSelfServiceIfLive({
+    const ok = await persistSelfServiceIfLive({
       matchId: match.id,
       action: declineMode === 't72' ? 't72_official_no' : 'decline',
       slot: mySlot,
       assignmentId: myAssignment?.id,
       reason: reason.trim() || undefined,
     });
+    setSelfServiceBusy(false);
+    if (!ok) return;
     setShowDecline(false);
     setReason('');
     navigate(-1);
   };
 
-  const acceptAppointment = () => {
-    if (!mySlot || !match) return;
+  const acceptAppointment = async () => {
+    if (!mySlot || !match || selfServiceBusy) return;
+    setSelfServiceBusy(true);
     store.confirmCrewSlot(match.id, mySlot, myAssignment?.id);
-    persistSelfServiceIfLive({
+    await persistSelfServiceIfLive({
       matchId: match.id,
       action: 'confirm',
       slot: mySlot,
       assignmentId: myAssignment?.id,
     });
+    setSelfServiceBusy(false);
   };
 
   const openProposeModal = () => {
@@ -2399,7 +2410,9 @@ export function MatchDetailPage() {
           <Button
             variant="primary"
             className="rs-detail-sticky__half"
-            onClick={acceptAppointment}
+            isLoading={selfServiceBusy}
+            isDisabled={selfServiceBusy}
+            onClick={() => void acceptAppointment()}
           >
             {match.status === 'needs_reconfirmation'
               ? 'Confirm new details'
@@ -2408,6 +2421,7 @@ export function MatchDetailPage() {
           <Button
             variant="secondary"
             className="rs-detail-sticky__half"
+            isDisabled={selfServiceBusy}
             onClick={() => openDecline('assignment')}
           >
             {match.status === 'needs_reconfirmation'
@@ -2535,8 +2549,9 @@ export function MatchDetailPage() {
           </Button>
           <Button
             variant="danger"
-            isDisabled={!reason.trim()}
-            onClick={confirmDecline}
+            isDisabled={!reason.trim() || selfServiceBusy}
+            isLoading={selfServiceBusy}
+            onClick={() => void confirmDecline()}
           >
             Confirm decline
           </Button>
