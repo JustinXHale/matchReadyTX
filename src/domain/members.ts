@@ -262,6 +262,19 @@ export function pastMatchesForMember(
   );
 }
 
+/** All assignments for a member, oldest kickoff first (newest at bottom). */
+export function allAssignmentsForMember(
+  matches: Match[],
+  userId: string,
+): Match[] {
+  return matches
+    .filter((m) => assignmentForUser(m, userId) != null)
+    .sort(
+      (a, b) =>
+        new Date(a.kickoffAt).getTime() - new Date(b.kickoffAt).getTime(),
+    );
+}
+
 /** Most recent assignments (any crew role), default last five. */
 export function recentAssignmentsForMember(
   matches: Match[],

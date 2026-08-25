@@ -9,11 +9,11 @@ import {
 import type { UserProfile } from '@/domain/types';
 import { AvailabilityMonthCalendar } from '@/features/availability/AvailabilityMonthCalendar';
 import { OfficialInsightsPanel } from '@/features/scheduler/OfficialInsightsPanel';
-import { OfficialRecentMatches } from '@/features/scheduler/OfficialRecentMatches';
+import { OfficialAssignmentMatches } from '@/features/scheduler/OfficialAssignmentMatches';
 import type { BackNav } from '@/nav/backNav';
 import { UserAvatar } from '@/ui/UserAvatar';
 
-type QuickLookTab = 'profile' | 'insights' | 'recent';
+type QuickLookTab = 'profile' | 'matches' | 'insights';
 
 function levelLabel(user: UserProfile): string {
   const n = officialEffectiveLevel(user);
@@ -70,14 +70,14 @@ export function OfficialQuickLookPanel({
         <button
           type="button"
           className={
-            tab === 'recent'
+            tab === 'matches'
               ? 'rs-inline-tabs__tab active'
               : 'rs-inline-tabs__tab'
           }
-          aria-current={tab === 'recent' ? 'page' : undefined}
-          onClick={() => setTab('recent')}
+          aria-current={tab === 'matches' ? 'page' : undefined}
+          onClick={() => setTab('matches')}
         >
-          Recent
+          Matches
         </button>
         <button
           type="button"
@@ -164,15 +164,15 @@ export function OfficialQuickLookPanel({
             />
           </section>
         </>
-      ) : tab === 'recent' ? (
-        <section aria-labelledby="official-quicklook-recent">
+      ) : tab === 'matches' ? (
+        <section aria-labelledby="official-quicklook-matches">
           <h3
-            id="official-quicklook-recent"
+            id="official-quicklook-matches"
             className="rs-detail-section__label"
           >
-            Last 5 matches
+            Matches
           </h3>
-          <OfficialRecentMatches
+          <OfficialAssignmentMatches
             userId={user.uid}
             matchBack={matchBack}
             onNavigate={onNavigate}

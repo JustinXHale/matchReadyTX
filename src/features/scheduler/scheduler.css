@@ -288,6 +288,12 @@
   gap: 20px;
 }
 
+.rs-official-quicklook .rs-inline-tabs {
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  -webkit-overflow-scrolling: touch;
+}
+
 .rs-official-insights {
   display: flex;
   flex-direction: column;
@@ -296,6 +302,10 @@
 
 .rs-official-insights__note {
   margin: 0;
+}
+
+.rs-official-matches-sort {
+  margin-bottom: 8px;
 }
 
 .rs-official-quicklook__profile {
