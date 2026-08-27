@@ -3424,19 +3424,61 @@ class DemoStore {
         console.error('updateChangeProposalInFirestore failed', err),
       );
     }
-    // If other team already accepted, apply local facts (idempotent) + Sheet write-back.
-    this.tryCompleteProposal(proposalId);
+  }
+
+  /** Apply proposal facts to the match + Sheet (assigner authority — in-app team accept optional). */
+  applyProposalAsAssigner(proposalId: string, userId?: string): void {
+    const existing = this.state.proposals.find((x) => x.id === proposalId);
+    if (!existing || existing.status === 'rejected_by_other_team') {
+      return;
+    }
+    const user = userId
+      ? this.state.users.find((u) => u.uid === userId)
+      : undefined;
+    const at = new Date().toISOString();
+    if (!existing.assignerAckAt) {
+      this.set((s) => ({
+        ...s,
+        proposals: s.proposals.map((p) =>
+          p.id === proposalId
+            ? {
+                ...p,
+                assignerAckAt: at,
+                assignerAckByUserId: userId,
+                assignerAckByName: user?.displayName,
+              }
+            : p,
+        ),
+      }));
+      if (isLiveDataMode()) {
+        void updateChangeProposalInFirestore(
+          defaultOrgId(),
+          existing.matchId,
+          proposalId,
+          {
+            assignerAckAt: at,
+            assignerAckByUserId: userId,
+            assignerAckByName: user?.displayName,
+          },
+        ).catch((err) =>
+          console.error('updateChangeProposalInFirestore failed', err),
+        );
+      }
+    }
     void this.writebackProposalToSheet(proposalId);
   }
 
   /**
-   * When both other-team accept + assigner ack are done, push facts to Schedule SoR
-   * via Admin SDK (live). Demo mode applies facts locally in tryCompleteProposal.
+   * Assigner apply: push facts to Schedule SoR via Admin SDK (live) or locally (demo).
    */
   private async writebackProposalToSheet(proposalId: string): Promise<void> {
     const p = this.state.proposals.find((x) => x.id === proposalId);
-    if (!p?.otherTeamAcceptedAt || !p.assignerAckAt) return;
-    if (!isFirebaseConfigured) return;
+    if (!p?.assignerAckAt) return;
+
+    if (!isFirebaseConfigured) {
+      this.applyProposalFactsLocally(proposalId);
+      return;
+    }
 
     try {
       await callProposalWriteback({
@@ -3447,54 +3489,65 @@ class DemoStore {
         venueName: p.venueName,
         venueAddress: p.venueAddress,
       });
-      let appliedMatch: Match | undefined;
-      this.set((s) => ({
-        ...s,
-        proposals: s.proposals.map((x) =>
-          x.id === proposalId ? { ...x, status: 'approved' as const } : x,
-        ),
-        matches: s.matches.map((m) => {
-          if (m.id !== p.matchId) return m;
-          appliedMatch = applySheetFacts(m, {
-            kickoffAt: p.kickoffAt,
-            venueName: p.venueName,
-            venueAddress: p.venueAddress,
-          });
-          return appliedMatch!;
-        }),
-        org: {
-          ...s.org,
-          sheetSyncedAt: new Date().toISOString(),
-          sheetSyncError: undefined,
-        },
-      }));
-      if (appliedMatch) {
-        this.notifyOfficialsReconfirmAfterProposal(appliedMatch, p);
-        for (const u of this.state.users) {
-          if (
-            u.roles.includes('teamAdmin') &&
-            u.teamIds.includes(p.proposedByTeamId)
-          ) {
-            this.notify(
-              'change_proposed',
-              u.uid,
-              'Schedule change applied',
-              'The assigner wrote the accepted change back to the Sheet.',
-            );
-          }
-        }
-      }
+      this.applyProposalFactsLocally(proposalId);
     } catch (err) {
       const message =
         err && typeof err === 'object' && 'message' in err
           ? String((err as { message: unknown }).message)
           : err instanceof Error
             ? err.message
-            : 'Sheet write-back failed. Open Upload and sync, or retry acknowledge.';
+            : 'Sheet write-back failed. Open Upload and sync, or retry apply.';
       this.set((s) => ({
         ...s,
         org: { ...s.org, sheetSyncError: message },
       }));
+    }
+  }
+
+  private applyProposalFactsLocally(proposalId: string): void {
+    const p = this.state.proposals.find((x) => x.id === proposalId);
+    if (!p || p.status === 'rejected_by_other_team') return;
+
+    let appliedMatch: Match | undefined;
+    this.set((s) => ({
+      ...s,
+      proposals: s.proposals.map((x) =>
+        x.id === proposalId ? { ...x, status: 'approved' as const } : x,
+      ),
+      matches: s.matches.map((m) => {
+        if (m.id !== p.matchId) return m;
+        appliedMatch = applySheetFacts(m, {
+          kickoffAt: p.kickoffAt,
+          venueName: p.venueName,
+          venueAddress: p.venueAddress,
+        });
+        return appliedMatch!;
+      }),
+      org: {
+        ...s.org,
+        sheetSyncedAt: new Date().toISOString(),
+        sheetSyncError: undefined,
+      },
+    }));
+    if (appliedMatch) {
+      this.notifyOfficialsReconfirmAfterProposal(appliedMatch, p);
+      const match = appliedMatch;
+      for (const u of this.state.users) {
+        if (
+          u.roles.includes('teamAdmin') &&
+          (u.teamIds.includes(match.homeTeamId) ||
+            u.teamIds.includes(match.awayTeamId))
+        ) {
+          this.notify(
+            'change_proposed',
+            u.uid,
+            'Schedule change applied',
+            p.otherTeamAcceptedAt
+              ? 'The assigner applied the accepted change to the schedule.'
+              : 'The assigner applied the proposed schedule change.',
+          );
+        }
+      }
     }
   }
 
@@ -3518,7 +3571,7 @@ class DemoStore {
           'change_proposed',
           u.uid,
           'Schedule change accepted',
-          'Other team accepted a proposal — acknowledge when you’ve seen it to write back to the Sheet.',
+          'Other team accepted — apply the change or acknowledge when you’ve seen it.',
         );
       }
     }
@@ -3569,9 +3622,6 @@ class DemoStore {
 
     if (isLiveDataMode()) {
       this.notifyProposalOtherTeamAccepted(p);
-      if (p.assignerAckAt) {
-        void this.writebackProposalToSheet(proposalId);
-      }
       return;
     }
 
@@ -3602,13 +3652,10 @@ class DemoStore {
             'change_proposed',
             u.uid,
             'Schedule change accepted',
-            'Other team accepted a proposal — acknowledge when you’ve seen it to write back to the Sheet.',
+            'Other team accepted — apply the change or acknowledge when you’ve seen it.',
           );
         }
       }
-    }
-    if (p.assignerAckAt) {
-      void this.writebackProposalToSheet(proposalId);
     }
   }
 

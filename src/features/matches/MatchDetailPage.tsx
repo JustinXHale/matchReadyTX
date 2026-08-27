@@ -1377,7 +1377,9 @@ export function MatchDetailPage() {
               ? ` (${pendingProposal.proposedByName})`
               : ''}
             . The other team must accept before this becomes the schedule.
-            Scheduler acknowledge is for awareness only.
+            {isAssigner
+              ? ' Apply updates the match and Sheet for everyone (you don’t need in-app team accept if you confirmed offline). Acknowledge only dismisses this from your queue.'
+              : ''}
           </p>
           <div className="rs-proposal-compare">
             {(pendingProposal.kickoffAt ||
@@ -1510,7 +1512,18 @@ export function MatchDetailPage() {
           {isAssigner && !pendingProposal.assignerAckAt && (
             <div className="rs-detail-inline-actions">
               <Button
-                variant="secondary"
+                variant="primary"
+                onClick={() =>
+                  store.applyProposalAsAssigner(
+                    pendingProposal.id,
+                    currentUser.uid,
+                  )
+                }
+              >
+                Apply change
+              </Button>
+              <Button
+                variant="link"
                 onClick={() =>
                   store.acknowledgeProposal(
                     pendingProposal.id,
@@ -1518,7 +1531,7 @@ export function MatchDetailPage() {
                   )
                 }
               >
-                Acknowledge (seen)
+                Acknowledge only
               </Button>
             </div>
           )}
@@ -1634,8 +1647,8 @@ export function MatchDetailPage() {
             <p className="rs-detail-note">
               {proposalTeamName(assignerAckProposal.proposedByTeamId)} proposed
               a change that the other team accepted. Officials must reconfirm
-              appointments. Acknowledge when you’ve seen it — this is not a
-              blocker.
+              appointments. Apply to update the match and Sheet, or acknowledge
+              only when you’ve seen it.
             </p>
             <ul className="rs-proposal-activity">
               <li>

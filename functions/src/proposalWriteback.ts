@@ -86,16 +86,10 @@ export async function runProposalWriteback(
     throw new HttpsError('not-found', 'Change proposal not found.');
   }
   const proposal = proposalSnap.data() as Record<string, unknown>;
-  if (!proposal.otherTeamAcceptedAt) {
+  if (!proposal.otherTeamAcceptedAt && !proposal.assignerAckAt) {
     throw new HttpsError(
       'failed-precondition',
-      'Other team must accept the proposal before write-back.',
-    );
-  }
-  if (!proposal.assignerAckAt) {
-    throw new HttpsError(
-      'failed-precondition',
-      'Assigner must acknowledge the proposal before write-back.',
+      'Assigner must apply or acknowledge the proposal before write-back.',
     );
   }
   if (proposal.status === 'rejected_by_other_team') {

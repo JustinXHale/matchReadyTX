@@ -78,11 +78,13 @@ export function ProposalQueueList({
   matches,
   emptyText,
   onAcknowledge,
+  onApply,
 }: {
   proposals: ChangeProposal[];
   matches: Match[];
   emptyText: string;
   onAcknowledge: (proposalId: string) => void;
+  onApply: (proposalId: string) => void;
 }) {
   const { state } = useApp();
   const timeZone = orgTimeZone(state.org.timezone);
@@ -144,10 +146,22 @@ export function ProposalQueueList({
                     onClick={(e) => {
                       e.preventDefault();
                       e.stopPropagation();
+                      onApply(p.id);
+                    }}
+                  >
+                    Apply change
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="link"
+                    isInline
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
                       onAcknowledge(p.id);
                     }}
                   >
-                    Acknowledge
+                    Acknowledge only
                   </Button>
                 </div>
               }

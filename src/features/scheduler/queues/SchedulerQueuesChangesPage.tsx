@@ -118,6 +118,9 @@ export function SchedulerQueuesChangesPage() {
           onAcknowledge={(id) =>
             store.acknowledgeProposal(id, currentUser?.uid)
           }
+          onApply={(id) =>
+            store.applyProposalAsAssigner(id, currentUser?.uid)
+          }
         />
       </QueueSection>
     </>
