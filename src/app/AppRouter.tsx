@@ -458,6 +458,11 @@ function RootRedirect() {
   }
 
   if (!currentUser) return <Navigate to="/login" replace />;
+
+  if (!currentUser.profileComplete) {
+    return <Navigate to="/onboarding" replace />;
+  }
+
   return <Navigate to={ROLE_HOME[roleView]} replace />;
 }
 

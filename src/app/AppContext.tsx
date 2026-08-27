@@ -19,6 +19,7 @@ import {
   subscribeCoachFeedback,
   subscribeCardReports,
   subscribeLiveOrg,
+  subscribeLiveTeams,
   subscribeMatchReports,
 } from '@/services/orgData';
 import { subscribeOrgRoster } from '@/services/orgMembers';
@@ -386,6 +387,31 @@ export function AppProvider({ children }: { children: ReactNode }) {
     state.users
       .find((u) => u.uid === state.currentUserId)
       ?.roles.join(','),
+  ]);
+
+  /** Club list for onboarding before profileComplete (matches/org still gated). */
+  useEffect(() => {
+    if (!isFirebaseConfigured) return;
+    if (dataMode !== 'live') return;
+    const uid = state.currentUserId;
+    if (!uid || uid.startsWith('u_')) return;
+    const me = state.users.find((u) => u.uid === uid);
+    if (me?.profileComplete) return;
+
+    const unsub = subscribeLiveTeams(
+      defaultOrgId(),
+      (teams) => {
+        if (dataModeRef.current !== 'live') return;
+        demoStore.applyLiveTeamsSnapshot(teams);
+        setState(demoStore.getState());
+      },
+      (err) => console.error('Live teams subscription failed', err),
+    );
+    return unsub;
+  }, [
+    dataMode,
+    state.currentUserId,
+    state.users.find((u) => u.uid === state.currentUserId)?.profileComplete,
   ]);
 
   const refreshLiveProfile = useCallback(async () => {

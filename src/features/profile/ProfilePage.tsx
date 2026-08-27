@@ -28,6 +28,7 @@ import {
   type Role,
 } from '@/domain/types';
 import { conferenceTeamOptions } from '@/domain/teams';
+import { dedupeTeamsForPicker } from '@/domain/teamList';
 import { OfficialInsightsPanel } from '@/features/scheduler/OfficialInsightsPanel';
 import { isFirebaseConfigured } from '@/services/firebase';
 import {
@@ -123,8 +124,10 @@ export function ProfilePage() {
 
   const sortedTeams = useMemo(
     () =>
-      [...state.teams].sort((a, b) =>
-        a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }),
+      dedupeTeamsForPicker(
+        [...state.teams].sort((a, b) =>
+          a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }),
+        ),
       ),
     [state.teams],
   );

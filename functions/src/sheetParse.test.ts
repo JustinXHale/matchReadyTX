@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   contactMatchKeys,
   parseContactRows,
+  rowToKickoffIso,
 } from './sheetParse';
 
 describe('parseContactRows', () => {
@@ -69,5 +70,26 @@ describe('contactMatchKeys', () => {
     const a = new Set(contactMatchKeys("St. Edward's University"));
     const b = new Set(contactMatchKeys('Saint Edwards University'));
     expect([...a].some((k) => b.has(k))).toBe(true);
+  });
+});
+
+describe('rowToKickoffIso', () => {
+  it('parses September wall time as CDT (not +1 hour)', () => {
+    const iso = rowToKickoffIso({
+      match_id: 'T1090501',
+      date: '2026-09-05',
+      kickoff_time: '9:00',
+      location: 'TXST',
+      home_team: 'TXST',
+      away_team: 'TXST',
+      competition: 'Lonestar Men',
+    });
+    const label = new Date(iso).toLocaleString('en-US', {
+      timeZone: 'America/Chicago',
+      hour: 'numeric',
+      minute: '2-digit',
+      hour12: true,
+    });
+    expect(label).toMatch(/9:00\s*AM/i);
   });
 });

@@ -835,6 +835,27 @@ export function subscribeLiveOrg(
   };
 }
 
+/** Teams roster for onboarding — readable before profileComplete (see firestore.rules). */
+export function subscribeLiveTeams(
+  orgId: string,
+  onTeams: (teams: Team[]) => void,
+  onError?: (err: Error) => void,
+): Unsubscribe {
+  const database = requireDb();
+  return onSnapshot(
+    collection(database, 'orgs', orgId, 'teams'),
+    (snap) => {
+      onTeams(
+        snap.docs.map((d) =>
+          teamFromFirestore(d.id, d.data() as Record<string, unknown>),
+        ),
+      );
+    },
+    (err) =>
+      onError?.(new Error(`teams: ${err.message}`, { cause: err })),
+  );
+}
+
 /**
  * Coach feedback is assigner-wide or club-owned (reportingTeamId in member teams).
  * Separate from org schedule so Team Admins do not get a full-collection query denial.

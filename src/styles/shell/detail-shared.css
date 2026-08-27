@@ -30,6 +30,13 @@
   padding: 0;
 }
 
+.rs-upload-draft-preview__list {
+  max-height: min(60vh, 28rem);
+  overflow-y: auto;
+  margin: 0;
+  padding: 0;
+}
+
 .rs-detail-meta {
   display: flex;
   flex-direction: column;
@@ -160,6 +167,19 @@ button.rs-detail-meta__maps {
 .rs-detail-card > .rs-actions,
 .rs-form-stack > .rs-actions {
   margin-top: 0;
+}
+
+.rs-actions--inline {
+  flex-direction: row;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--rs-space-md);
+  width: auto;
+}
+
+.rs-actions--inline .pf-v6-c-button {
+  width: auto;
+  min-height: auto;
 }
 
 .rs-member-teams {

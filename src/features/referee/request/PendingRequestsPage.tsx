@@ -58,11 +58,12 @@ function RequestStatusTrailing({
 }) {
   const declined = request.status === 'declined';
   const pendingDays = daysPending(request.createdAt);
+  const declineReason = request.declineReason?.trim();
 
   return (
     <button
       type="button"
-      className="rs-raise-hand-col rs-request-remove-hit"
+      className="rs-raise-hand-col rs-request-remove-hit rs-request-status-trailing"
       aria-label={declined ? 'Dismiss declined request' : 'Remove request'}
       onClick={(e) => {
         e.preventDefault();
@@ -71,7 +72,7 @@ function RequestStatusTrailing({
       }}
     >
       {declined ? (
-        <span className="rs-pill rs-pill--urgent">Declined</span>
+        <span className="rs-pill rs-appt-crew__mine">Declined</span>
       ) : (
         <span className="rs-pill rs-pill--warn">Pending {pendingDays}d</span>
       )}
@@ -80,6 +81,13 @@ function RequestStatusTrailing({
           {REQUESTABLE_SLOT_SHORT[slot]}
         </span>
       ))}
+      {declined && (
+        <span className="rs-request-status-trailing__reason">
+          {declineReason
+            ? `Declined: ${declineReason}`
+            : 'Declined by the assigner.'}
+        </span>
+      )}
       <span className="rs-request-remove-hit__label">
         {declined ? 'Dismiss' : 'Remove'}
       </span>
@@ -264,15 +272,6 @@ export function PendingRequestsPage() {
                         split="action"
                         urgent={request.status === 'declined'}
                         back={PENDING_BACK}
-                        meta={
-                          request.status === 'declined' ? (
-                            <span className="rs-list-row__hint">
-                              {request.declineReason?.trim()
-                                ? `Declined: ${request.declineReason.trim()}`
-                                : 'Declined by the assigner.'}
-                            </span>
-                          ) : undefined
-                        }
                         trailing={
                           <RequestStatusTrailing
                             request={request}

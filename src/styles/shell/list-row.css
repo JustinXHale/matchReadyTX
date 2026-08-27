@@ -100,6 +100,53 @@
   border-color: var(--rs-color-urgent-chip-bg);
 }
 
+.rs-list-row--urgent .rs-list-row__hint {
+  color: color-mix(in srgb, var(--rs-color-on-urgent) 88%, transparent);
+  font-weight: 600;
+  line-height: 1.35;
+}
+
+.rs-list-row--urgent .rs-request-remove-hit:hover,
+.rs-list-row--urgent .rs-request-remove-hit:focus-visible {
+  background: color-mix(
+    in srgb,
+    var(--rs-color-on-urgent) 12%,
+    var(--rs-color-urgent)
+  );
+  outline: none;
+}
+
+.rs-list-row--urgent .rs-request-remove-hit:focus-visible {
+  box-shadow: inset 0 0 0 2px var(--rs-color-on-urgent);
+}
+
+.rs-list-row--urgent .rs-request-remove-hit__label {
+  color: color-mix(in srgb, var(--rs-color-on-urgent) 92%, transparent);
+}
+
+.rs-list-row--urgent .rs-request-remove-hit:hover .rs-request-remove-hit__label,
+.rs-list-row--urgent
+  .rs-request-remove-hit:focus-visible
+  .rs-request-remove-hit__label {
+  color: var(--rs-color-on-urgent);
+  text-decoration: underline;
+}
+
+.rs-request-status-trailing__reason {
+  margin: 0;
+  width: 100%;
+  font-size: 11px;
+  line-height: 1.3;
+  font-weight: 600;
+  text-align: center;
+  color: var(--rs-color-charcoal);
+  word-break: break-word;
+}
+
+.rs-list-row--urgent .rs-request-status-trailing__reason {
+  color: color-mix(in srgb, var(--rs-color-on-urgent) 88%, transparent);
+}
+
 .rs-list-row--warn {
   background: color-mix(in srgb, var(--rs-color-warn) 14%, var(--rs-color-surface));
   border-color: color-mix(in srgb, var(--rs-color-warn) 45%, var(--rs-color-surface));

@@ -71,9 +71,11 @@ function splitCsvLine(line: string): string[] {
   return out;
 }
 
-/** Combine date + time into ISO assuming America/Chicago offset approx -06:00 for demo */
+import { chicagoWallTimeToUtcIso } from '@/domain/sheetTime';
+
+/** Combine date + time into ISO using America/Chicago wall time from the sheet. */
 export function csvRowToKickoffIso(row: CsvMatchRow): string {
   const d = row.date.includes('T') ? row.date.slice(0, 10) : row.date;
   const t = row.kickoff_time.length === 5 ? `${row.kickoff_time}:00` : row.kickoff_time;
-  return new Date(`${d}T${t}-06:00`).toISOString();
+  return chicagoWallTimeToUtcIso(d, t);
 }

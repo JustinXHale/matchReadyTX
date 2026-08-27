@@ -18,6 +18,8 @@ import {
   splitDisplayName,
   validateProfilePhoto,
 } from '@/domain/profile';
+import { normalizeEmail } from '@/domain/contacts';
+import { dedupeTeamsForPicker } from '@/domain/teamList';
 import { APPAREL_SIZES, type Role } from '@/domain/types';
 import { isFirebaseConfigured } from '@/services/firebase';
 import {
@@ -180,11 +182,28 @@ export function OnboardingPage() {
 
   const sortedTeams = useMemo(
     () =>
-      [...state.teams].sort((a, b) =>
-        a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }),
+      dedupeTeamsForPicker(
+        [...state.teams].sort((a, b) =>
+          a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }),
+        ),
       ),
     [state.teams],
   );
+
+  const autoSelectedTeamsRef = useRef(false);
+
+  useEffect(() => {
+    if (!roleTeamAdmin || !currentUser?.email?.trim() || autoSelectedTeamsRef.current) {
+      return;
+    }
+    const email = normalizeEmail(currentUser.email);
+    const matched = sortedTeams.filter((t) =>
+      t.contactEmails.some((c) => normalizeEmail(c) === email),
+    );
+    if (matched.length === 0) return;
+    autoSelectedTeamsRef.current = true;
+    setSelectedTeamIds(matched.map((t) => t.id));
+  }, [roleTeamAdmin, currentUser?.email, sortedTeams]);
 
   const safeIndex = Math.min(stepIndex, steps.length - 1);
   const step = steps[safeIndex]!;
@@ -341,24 +360,12 @@ export function OnboardingPage() {
             store.getState().users.find((u) => u.uid === currentUser.uid) ??
             saved;
           if (roleTeamAdmin && selectedTeamIds.length > 0) {
-            const result = await callSubmitTeamLinkRequests({
+            await callSubmitTeamLinkRequests({
               orgId: defaultOrgId(),
               teamIds: selectedTeamIds,
             });
-            if (result.autoApproved.length) {
-              store.updateProfile(currentUser.uid, {
-                teamIds: [
-                  ...new Set([
-                    ...(store
-                      .getState()
-                      .users.find((u) => u.uid === currentUser.uid)?.teamIds ??
-                      []),
-                    ...result.autoApproved,
-                  ]),
-                ],
-              });
-            }
           }
+          await refreshLiveProfile();
         } catch (err) {
           setSaveError(
             err instanceof Error
@@ -369,7 +376,6 @@ export function OnboardingPage() {
           return;
         }
         setSaving(false);
-        await refreshLiveProfile();
       } else if (roleTeamAdmin && selectedTeamIds.length > 0) {
         store.submitTeamLinkRequests(currentUser.uid, selectedTeamIds);
       }

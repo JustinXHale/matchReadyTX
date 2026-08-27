@@ -134,6 +134,68 @@ function attachContact(team: TeamShape, c: ContactRow) {
   });
 }
 
+function mergeTeamShapes(into: TeamShape, from: TeamShape): void {
+  for (const e of from.contactEmails) into.contactEmails.add(e);
+  for (const p of from.contactPhones) into.contactPhones.add(p);
+  for (const [email, person] of from.contactPeople) {
+    const prev = into.contactPeople.get(email);
+    into.contactPeople.set(email, {
+      name: person.name || prev?.name,
+      phone: person.phone || prev?.phone,
+    });
+  }
+  if (!into.address && from.address) into.address = from.address;
+  if (!into.abbreviation && from.abbreviation) {
+    into.abbreviation = from.abbreviation;
+  }
+  if (from.name.trim().length > into.name.trim().length) {
+    into.name = from.name;
+  }
+}
+
+/** One Firestore team per Locations abbreviation + competition (drops slug-only dupes). */
+function canonicalizeTeamsByRosterKey(
+  teamsById: Map<string, TeamShape>,
+  locations: LocationRow[],
+): { teams: Map<string, TeamShape>; remap: Map<string, string> } {
+  const remap = new Map<string, string>();
+  const canonical = new Map<string, TeamShape>();
+
+  for (const team of teamsById.values()) {
+    let abbr = (team.abbreviation ?? '').trim().toUpperCase();
+    const comp = (team.competition ?? '').trim();
+    if (!abbr && comp) {
+      const loc = lookupLocation(
+        locations,
+        team.name,
+        team.gender ?? 'men',
+        comp,
+      );
+      if (loc?.abbreviation) abbr = loc.abbreviation.trim().toUpperCase();
+    }
+    const canonicalId =
+      abbr && comp
+        ? teamIdFromAbbrevAndCompetition(abbr, comp)
+        : team.id;
+
+    if (team.id !== canonicalId) remap.set(team.id, canonicalId);
+
+    const existing = canonical.get(canonicalId);
+    if (!existing) {
+      canonical.set(canonicalId, {
+        ...team,
+        id: canonicalId,
+        abbreviation: abbr || team.abbreviation,
+      });
+      continue;
+    }
+    mergeTeamShapes(existing, team);
+    if (abbr) existing.abbreviation = abbr;
+  }
+
+  return { teams: canonical, remap };
+}
+
 function addContactIndexKey(
   index: Map<string, string[]>,
   raw: string | undefined,
@@ -245,33 +307,41 @@ function resolvedCompetition(row: {
   return row.competition?.trim() || competitionForGender(genderForRow(row));
 }
 
-function buildTeamIdResolver(rows: ReturnType<typeof parseScheduleRows>) {
-  const compsByName = new Map<string, Set<string>>();
-  for (const row of rows) {
-    const comp = resolvedCompetition(row);
-    for (const name of [row.home_team, row.away_team]) {
-      const key = normNameKey(name);
-      if (!key) continue;
-      const set = compsByName.get(key) ?? new Set<string>();
-      set.add(comp);
-      compsByName.set(key, set);
-    }
-  }
-
-  const splitNames = new Set<string>();
-  for (const [nameKey, comps] of compsByName) {
-    if (comps.size > 1) splitNames.add(nameKey);
-  }
-
+function buildTeamIdResolver() {
   return (teamName: string, row: { competition?: string; gender?: string }) => {
     const key = normNameKey(teamName);
     if (!key) return slugTeamId('unknown');
-    if (splitNames.has(key)) {
-      const comp = resolvedCompetition(row);
-      return teamIdFromAbbrevAndCompetition(teamName, comp);
-    }
-    return slugTeamId(teamName);
+    return teamIdFromAbbrevAndCompetition(teamName, resolvedCompetition(row));
   };
+}
+
+function contactKeysOverlap(a: string, b: string): boolean {
+  const keysA = new Set(contactMatchKeys(a));
+  for (const k of contactMatchKeys(b)) {
+    if (keysA.has(k)) return true;
+  }
+  return false;
+}
+
+function findTeamForContact(
+  teamsById: Map<string, TeamShape>,
+  contact: ContactRow,
+): TeamShape | undefined {
+  const conf = (contact.conference ?? '').trim().toLowerCase();
+  const candidates = [...teamsById.values()].filter(
+    (t) =>
+      contactKeysOverlap(contact.team_name, t.name) ||
+      (t.abbreviation
+        ? contactKeysOverlap(contact.team_name, t.abbreviation)
+        : false),
+  );
+  if (conf) {
+    const narrowed = candidates.filter(
+      (t) => (t.competition ?? '').trim().toLowerCase() === conf,
+    );
+    if (narrowed.length === 1) return narrowed[0];
+  }
+  return candidates.length === 1 ? candidates[0] : undefined;
 }
 
 /**
@@ -310,7 +380,7 @@ export async function runSheetSync(opts: {
   const locations = parseLocationRows(
     await readFirstTab(sheets, sheetId, ['Locations', 'locations']),
   );
-  const resolveTeamId = buildTeamIdResolver(rows);
+  const resolveTeamId = buildTeamIdResolver();
 
   const orgSnap = await db.doc(`orgs/${orgId}`).get();
   const orgData = orgSnap.data() ?? {};
@@ -413,6 +483,29 @@ export async function runSheetSync(opts: {
       continue;
     }
     if (ids.length === 0) {
+      const matched = findTeamForContact(teamsById, c);
+      if (matched) {
+        attachContact(matched, c);
+        continue;
+      }
+      const conf = (c.conference ?? '').trim();
+      const gender = genderFromCompetitionName(conf) ?? 'men';
+      const loc = lookupLocation(locations, c.team_name, gender, conf);
+      if (loc?.abbreviation?.trim() && conf) {
+        const id = teamIdFromAbbrevAndCompetition(loc.abbreviation, conf);
+        const team = getOrCreateTeam(
+          id,
+          loc.teamName?.trim() || c.team_name,
+          conf,
+          {
+            abbreviation: loc.abbreviation.trim().toUpperCase(),
+            gender,
+          },
+        );
+        attachContact(team, c);
+        addContactIndexKey(contactIndex, c.team_name, team.id);
+        continue;
+      }
       const id = slugTeamId(
         c.conference ? `${c.team_name} ${c.conference}` : c.team_name,
       );
@@ -428,6 +521,11 @@ export async function runSheetSync(opts: {
       candidateIds: ids,
     });
   }
+
+  const { teams: canonicalTeams, remap: canonicalTeamRemap } =
+    canonicalizeTeamsByRosterKey(teamsById, locations);
+  teamsById.clear();
+  for (const [id, team] of canonicalTeams) teamsById.set(id, team);
 
   let batch = db.batch();
   let batchOps = 0;
@@ -495,6 +593,8 @@ export async function runSheetSync(opts: {
     const kickoffAt = rowToKickoffIso(row);
     const homeTeamId = resolveTeamId(row.home_team, row);
     const awayTeamId = resolveTeamId(row.away_team, row);
+    const homeTeam = teamsById.get(homeTeamId);
+    const awayTeam = teamsById.get(awayTeamId);
     const level = row.level || 'Tier 1';
     const sheetCancelled =
       (row.status ?? '').toUpperCase() === 'CANCELLED' ||
@@ -504,8 +604,8 @@ export async function runSheetSync(opts: {
       kickoffAt,
       venueName,
       venueAddress,
-      homeTeamName: row.home_team,
-      awayTeamName: row.away_team,
+      homeTeamName: homeTeam?.name ?? row.home_team,
+      awayTeamName: awayTeam?.name ?? row.away_team,
     };
     const sheetTitle = (row.title ?? '').trim();
 
@@ -636,6 +736,9 @@ export async function runSheetSync(opts: {
   }
   const existingTeams = await db.collection(`orgs/${orgId}/teams`).get();
   const teamIdRemap = buildTeamIdRemap(existingTeams.docs, teamsById);
+  for (const [oldId, newId] of canonicalTeamRemap) {
+    teamIdRemap.set(oldId, newId);
+  }
   if (teamIdRemap.size > 0) {
     const membersSnap = await db.collection(`orgs/${orgId}/members`).get();
     for (const doc of membersSnap.docs) {
@@ -656,6 +759,21 @@ export async function runSheetSync(opts: {
         { teamIds: next, updatedAt: FieldValue.serverTimestamp() },
         { merge: true },
       );
+      batchOps += 1;
+      if (batchOps >= 400) await flushBatch();
+    }
+    for (const docSnap of remainingMatches.docs) {
+      const data = docSnap.data();
+      const home = String(data.homeTeamId ?? '').trim();
+      const away = String(data.awayTeamId ?? '').trim();
+      const newHome = home ? (teamIdRemap.get(home) ?? home) : home;
+      const newAway = away ? (teamIdRemap.get(away) ?? away) : away;
+      if (newHome === home && newAway === away) continue;
+      batch.update(docSnap.ref, {
+        homeTeamId: newHome,
+        awayTeamId: newAway,
+        updatedAt: FieldValue.serverTimestamp(),
+      });
       batchOps += 1;
       if (batchOps >= 400) await flushBatch();
     }

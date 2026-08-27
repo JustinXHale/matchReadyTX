@@ -2688,6 +2688,14 @@ class DemoStore {
    * Replace org schedule cache with Firestore live data (real Sheet sync).
    * Clears demo fixtures when a signed-in Firebase user is connected.
    */
+  applyLiveTeamsSnapshot(teams: Team[]): void {
+    this.set((s) => ({ ...s, teams }));
+  }
+
+  /**
+   * Replace org schedule cache with Firestore live data (real Sheet sync).
+   * Clears demo fixtures when a signed-in Firebase user is connected.
+   */
   applyLiveOrgSnapshot(snap: {
     org: Partial<OrgSettings> & { id: string };
     matches: Match[];

@@ -6,8 +6,10 @@ import {
   Title,
 } from '@patternfly/react-core';
 import { useApp } from '@/app/AppContext';
+import { compareKickoffAsc } from '@/domain/divisionFilters';
 import { parseGoogleSheetId } from '@/domain/sheetLink';
 import { formatDueBadge } from '@/features/referee/reports/dueCounts';
+import { ReleaseDraftPreviewModal } from '@/features/scheduler/upload/ReleaseDraftPreviewModal';
 import { isFirebaseConfigured } from '@/services/firebase';
 import {
   callSyncSheet,
@@ -15,6 +17,24 @@ import {
   releaseDraftMatchesInFirestore,
   saveOrgSheetId,
 } from '@/services/orgData';
+import type { Match } from '@/domain/types';
+
+type DraftPreviewMode = 'all' | 'range';
+
+function draftMatchesInRange(
+  matches: Match[],
+  from: string,
+  to: string,
+): Match[] {
+  const start = new Date(from).getTime();
+  const end = new Date(to).getTime();
+  if (Number.isNaN(start) || Number.isNaN(end)) return [];
+  return matches.filter((m) => {
+    if (m.status !== 'draft') return false;
+    const t = new Date(m.kickoffAt).getTime();
+    return t >= start && t <= end;
+  });
+}
 
 function callableErrorMessage(err: unknown): string {
   if (err && typeof err === 'object') {
@@ -62,28 +82,36 @@ export function SchedulerUploadPage() {
   const [busy, setBusy] = useState<'sync' | 'release' | null>(null);
   const [from, setFrom] = useState('');
   const [to, setTo] = useState('');
+  const [draftPreview, setDraftPreview] = useState<DraftPreviewMode | null>(
+    null,
+  );
+
+  const draftMatches = useMemo(
+    () =>
+      state.matches
+        .filter((m) => m.status === 'draft')
+        .sort(compareKickoffAsc),
+    [state.matches],
+  );
 
   const parsedId = useMemo(
     () => parseGoogleSheetId(sheetLink),
     [sheetLink],
   );
 
-  const draftCount = useMemo(
-    () => state.matches.filter((m) => m.status === 'draft').length,
-    [state.matches],
-  );
+  const draftCount = draftMatches.length;
 
   const draftInRange = useMemo(() => {
     if (!from || !to) return 0;
-    const start = new Date(from).getTime();
-    const end = new Date(to).getTime();
-    if (Number.isNaN(start) || Number.isNaN(end)) return 0;
-    return state.matches.filter((m) => {
-      if (m.status !== 'draft') return false;
-      const t = new Date(m.kickoffAt).getTime();
-      return t >= start && t <= end;
-    }).length;
-  }, [state.matches, from, to]);
+    return draftMatchesInRange(draftMatches, from, to).length;
+  }, [draftMatches, from, to]);
+
+  const previewDrafts = useMemo(() => {
+    if (!draftPreview) return [];
+    if (draftPreview === 'all') return draftMatches;
+    if (!from || !to) return [];
+    return draftMatchesInRange(draftMatches, from, to).sort(compareKickoffAsc);
+  }, [draftPreview, draftMatches, from, to]);
 
   const syncSchedule = async () => {
     const id = parsedId ?? linkedId ?? null;
@@ -138,6 +166,7 @@ export function SchedulerUploadPage() {
     if (!isFirebaseConfigured) {
       store.releaseMatches(opts);
       setSyncNote('Released drafts (demo store).');
+      setDraftPreview(null);
       refresh();
       return;
     }
@@ -153,12 +182,22 @@ export function SchedulerUploadPage() {
           ? `Released ${n} draft match(es) to teams.`
           : 'No draft matches to release.',
       );
+      setDraftPreview(null);
       refresh();
     } catch (err) {
       setLinkError(callableErrorMessage(err));
     } finally {
       setBusy(null);
     }
+  };
+
+  const releaseFromPreview = () => {
+    if (!draftPreview || previewDrafts.length === 0) return;
+    if (draftPreview === 'all') {
+      void release({ all: true });
+      return;
+    }
+    if (from && to) void release({ from, to });
   };
 
   return (
@@ -241,14 +280,22 @@ export function SchedulerUploadPage() {
           Synced games start as drafts. Release them so Team Admins can confirm
           or propose changes.
         </p>
-        <div className="rs-actions">
+        <div className="rs-actions rs-actions--inline">
           <Button
-            variant="secondary"
+            variant="primary"
             isDisabled={busy != null || draftCount === 0}
-            isLoading={busy === 'release'}
+            isLoading={busy === 'release' && draftPreview === null}
             onClick={() => void release({ all: true })}
           >
             Release all drafts
+          </Button>
+          <Button
+            variant="link"
+            isInline
+            isDisabled={busy != null || draftCount === 0}
+            onClick={() => setDraftPreview('all')}
+          >
+            View pending drafts
             {draftCount > 0 && (
               <span className="rs-nav-badge rs-nav-badge--inline" aria-hidden>
                 {formatDueBadge(draftCount)}
@@ -275,14 +322,22 @@ export function SchedulerUploadPage() {
             onChange={(_, v) => setTo(v)}
           />
         </FormGroup>
-        <div className="rs-actions">
+        <div className="rs-actions rs-actions--inline">
+          <Button
+            variant="primary"
+            isDisabled={!from || !to || busy != null || draftInRange === 0}
+            isLoading={busy === 'release' && draftPreview === null}
+            onClick={() => void release({ from, to })}
+          >
+            Release this range
+          </Button>
           <Button
             variant="link"
             isInline
             isDisabled={!from || !to || busy != null || draftInRange === 0}
-            onClick={() => void release({ from, to })}
+            onClick={() => setDraftPreview('range')}
           >
-            Release this range
+            Preview this range
             {from && to && draftInRange > 0 && (
               <span className="rs-nav-badge rs-nav-badge--inline" aria-hidden>
                 {formatDueBadge(draftInRange)}
@@ -291,6 +346,22 @@ export function SchedulerUploadPage() {
           </Button>
         </div>
       </section>
+
+      <ReleaseDraftPreviewModal
+        isOpen={draftPreview != null}
+        title={
+          draftPreview === 'range'
+            ? 'Drafts in this date range'
+            : 'Pending draft games'
+        }
+        drafts={previewDrafts}
+        releaseLabel={
+          draftPreview === 'range' ? 'Release this range' : 'Release all drafts'
+        }
+        releaseBusy={busy === 'release'}
+        onClose={() => setDraftPreview(null)}
+        onRelease={releaseFromPreview}
+      />
     </div>
   );
 }
