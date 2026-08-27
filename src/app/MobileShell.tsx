@@ -68,7 +68,7 @@ function navForRole(
 
   const about: NavItem = {
     to: prefix('/about'),
-    label: 'About',
+    label: 'Info',
     icon: (
       <FontAwesomeIcon
         icon={faCircleInfo}

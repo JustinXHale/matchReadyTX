@@ -67,6 +67,7 @@ import type {
   GameRequest,
   Match,
   MatchGender,
+  MeetingResource,
   NotificationLogEntry,
   OrgSettings,
   RequestableSlot,
@@ -1399,6 +1400,8 @@ export interface AppState {
   fixtureRequests: FixtureRequest[];
   /** Pending / resolved Team Admin club-link requests. */
   teamLinkRequests: TeamLinkRequest[];
+  /** Society meeting recordings and slide decks (Info → Resources). */
+  meetingResources: MeetingResource[];
   /** Team Admin referee feedback (scheduler-confidential). */
   coachFeedback: CoachFeedback[];
   availability: AvailabilityRange[];
@@ -2259,6 +2262,7 @@ function emptyLiveQueueState(): Pick<
   | 'requests'
   | 'fixtureRequests'
   | 'teamLinkRequests'
+  | 'meetingResources'
   | 'coachFeedback'
   | 'availability'
   | 'notifications'
@@ -2274,6 +2278,7 @@ function emptyLiveQueueState(): Pick<
     requests: [],
     fixtureRequests: [],
     teamLinkRequests: [],
+    meetingResources: [],
     coachFeedback: [],
     availability: [],
     notifications: [],
@@ -2296,6 +2301,7 @@ function createInitialState(): AppState {
         requests: seedGameRequests(seeded.matches),
         fixtureRequests: seedFixtureRequests(),
         teamLinkRequests: [],
+        meetingResources: [],
         coachFeedback: seedCoachFeedback(seeded.matches),
         availability: seedDemoAvailability(),
         notifications: [
@@ -2702,6 +2708,7 @@ class DemoStore {
     teams: Team[];
     fixtureRequests?: FixtureRequest[];
     teamLinkRequests?: TeamLinkRequest[];
+    meetingResources?: MeetingResource[];
     proposals?: ChangeProposal[];
     gameRequests?: GameRequest[];
   }): void {
@@ -2744,6 +2751,7 @@ class DemoStore {
         requests,
         fixtureRequests: snap.fixtureRequests ?? [],
         teamLinkRequests: snap.teamLinkRequests ?? [],
+        meetingResources: snap.meetingResources ?? [],
         // coachFeedback / matchReports / cardReports filled by live subscriptions.
         coachFeedback: s.coachFeedback,
         matchReports: s.matchReports,

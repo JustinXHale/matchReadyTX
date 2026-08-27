@@ -61,6 +61,17 @@ body {
 }
 
 /* —— Sign-in placeholder —— */
+/* PF Page grid still allocates a sidebar column without masthead/sidebar. */
+.rs-page--auth.pf-v6-c-page {
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-areas: 'main';
+}
+
+.rs-page--auth .pf-v6-c-page__main-container {
+  grid-column: 1 / -1;
+  grid-area: main;
+}
+
 .rs-page--auth .rs-page-body {
   padding-bottom: var(--pf-t--global--spacer--xl) !important;
   max-width: 420px;

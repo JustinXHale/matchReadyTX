@@ -2,6 +2,7 @@ import {
   collection,
   collectionGroup,
   deleteDoc,
+  deleteField,
   doc,
   getDoc,
   onSnapshot,
@@ -28,9 +29,7 @@ import {
   applyLevelCrewDefaults,
   matchEligibleForCrewDefaultsReapply,
 } from '@/domain/crewDefaults';
-import {
-  normalizeRequestableSlots,
-} from '@/domain/requests';
+import { normalizeRequestableSlots } from '@/domain/requests';
 import { releaseMatch } from '@/domain/matchTransitions';
 import {
   type CardReport,
@@ -59,12 +58,18 @@ import {
   type GameRequest,
   type Match,
   type MatchGender,
+  type MeetingResource,
   type OrgSettings,
   type Team,
   type TeamContactPerson,
   type TeamLinkRequest,
   type RequestableSlot,
 } from '@/domain/types';
+
+import {
+  validateMeetingResourceInput,
+  type MeetingResourceInput,
+} from '@/features/about/meetingResources';
 
 const DEFAULT_ORG =
   import.meta.env.VITE_DEFAULT_ORG_ID?.trim() || 'lonestar';
@@ -317,6 +322,7 @@ export type LiveOrgSnapshot = {
   teams: Team[];
   fixtureRequests: FixtureRequest[];
   teamLinkRequests: TeamLinkRequest[];
+  meetingResources: MeetingResource[];
   proposals?: ChangeProposal[];
   gameRequests?: GameRequest[];
 };
@@ -661,6 +667,30 @@ export function teamLinkRequestFromFirestore(
   };
 }
 
+export function meetingResourceFromFirestore(
+  id: string,
+  data: Record<string, unknown>,
+): MeetingResource | null {
+  const title = typeof data.title === 'string' ? data.title.trim() : '';
+  const date = typeof data.date === 'string' ? data.date.trim() : '';
+  if (!title || !date) return null;
+  return {
+    id,
+    title,
+    date,
+    description:
+      typeof data.description === 'string' ? data.description : undefined,
+    recordingUrl:
+      typeof data.recordingUrl === 'string' ? data.recordingUrl : undefined,
+    slidesUrl:
+      typeof data.slidesUrl === 'string' ? data.slidesUrl : undefined,
+    createdAt:
+      typeof data.createdAt === 'string' ? data.createdAt : undefined,
+    updatedAt:
+      typeof data.updatedAt === 'string' ? data.updatedAt : undefined,
+  };
+}
+
 export type LiveOrgSubscribeOpts = {
   viewerUid: string;
   /** Assigner may list all raise-hand requests in the org. */
@@ -680,6 +710,7 @@ export function subscribeLiveOrg(
   let teams: Team[] = [];
   let fixtureRequests: FixtureRequest[] = [];
   let teamLinkRequests: TeamLinkRequest[] = [];
+  let meetingResources: MeetingResource[] = [];
   let proposals: ChangeProposal[] = [];
   let gameRequests: GameRequest[] = [];
   let proposalsHydrated = false;
@@ -692,6 +723,7 @@ export function subscribeLiveOrg(
       teams,
       fixtureRequests,
       teamLinkRequests,
+      meetingResources,
       ...(proposalsHydrated ? { proposals } : {}),
       ...(gameRequestsHydrated ? { gameRequests } : {}),
     });
@@ -768,6 +800,21 @@ export function subscribeLiveOrg(
         emit();
       },
       (err) => onSnapError('teamLinkRequests')(err),
+    ),
+  );
+
+  unsubs.push(
+    onSnapshot(
+      collection(database, 'orgs', orgId, 'resources'),
+      (snap) => {
+        meetingResources = snap.docs
+          .map((d) =>
+            meetingResourceFromFirestore(d.id, d.data() as Record<string, unknown>),
+          )
+          .filter((r): r is MeetingResource => r != null);
+        emit();
+      },
+      (err) => onSnapError('resources')(err),
     ),
   );
 
@@ -1885,3 +1932,41 @@ export function moOfficialIdOnMatch(match: Match): string | undefined {
   }
   return undefined;
 }
+
+export async function saveMeetingResourceInFirestore(
+  orgId: string,
+  input: MeetingResourceInput,
+  resourceId?: string,
+): Promise<string> {
+  const validated = validateMeetingResourceInput(input);
+  if (!validated.ok) {
+    throw new Error(validated.error);
+  }
+  const database = requireDb();
+  const ref = resourceId
+    ? doc(database, 'orgs', orgId, 'resources', resourceId)
+    : doc(collection(database, 'orgs', orgId, 'resources'));
+  const now = new Date().toISOString();
+  const existing = resourceId ? await getDoc(ref) : null;
+  const payload: Record<string, unknown> = {
+    title: validated.value.title,
+    date: validated.value.date,
+    updatedAt: now,
+    description: validated.value.description ?? deleteField(),
+    recordingUrl: validated.value.recordingUrl ?? deleteField(),
+    slidesUrl: validated.value.slidesUrl ?? deleteField(),
+  };
+  if (!existing?.exists()) {
+    payload.createdAt = now;
+  }
+  await setDoc(ref, payload, { merge: true });
+  return ref.id;
+}
+
+export async function deleteMeetingResourceInFirestore(
+  orgId: string,
+  resourceId: string,
+): Promise<void> {
+  await deleteDoc(doc(requireDb(), 'orgs', orgId, 'resources', resourceId));
+}
+

@@ -345,6 +345,20 @@ export function displayNameFromParts(
   return `${firstName.trim()} ${lastName.trim()}`.trim();
 }
 
+export interface MeetingResource {
+  id: string;
+  title: string;
+  /** ISO calendar date (YYYY-MM-DD). */
+  date: string;
+  description?: string;
+  /** Google Drive / Meet recording link */
+  recordingUrl?: string;
+  /** Google Slides or other deck link */
+  slidesUrl?: string;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
 export interface OrgSettings {
   id: string;
   name: string;

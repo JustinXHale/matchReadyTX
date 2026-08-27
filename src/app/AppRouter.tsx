@@ -37,6 +37,11 @@ const AboutLayout = lazy(() =>
     default: m.AboutLayout,
   })),
 );
+const AboutResourcesPage = lazy(() =>
+  import('@/features/about/AboutResourcesPage').then((m) => ({
+    default: m.AboutResourcesPage,
+  })),
+);
 const GlobalLayout = lazy(() =>
   import('@/features/global/GlobalLayout').then((m) => ({
     default: m.GlobalLayout,
@@ -476,6 +481,7 @@ function FeatureRoutes() {
       <Route path="about" element={<AboutLayout />}>
         <Route index element={<AboutPage />} />
         <Route element={<RequireMembersAccess />}>
+          <Route path="resources" element={<AboutResourcesPage />} />
           <Route path="members" element={<MembersLayout />}>
             <Route index element={<MembersPage />} />
             <Route path="teams" element={<SchedulerTeamsPage />} />

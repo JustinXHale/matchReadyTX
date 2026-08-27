@@ -220,6 +220,10 @@ service cloud.firestore {
         allow read: if signedIn();
         allow write: if isAssigner(orgId);
       }
+      match /resources/{resourceId} {
+        allow read: if isMember(orgId);
+        allow create, update, delete: if isAssigner(orgId);
+      }
       match /matches/{matchId} {
         allow read: if isMember(orgId);
         allow write: if isAssigner(orgId)
