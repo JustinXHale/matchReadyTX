@@ -16,6 +16,7 @@ import {
   competitionForGender,
   contactMatchKeys,
   genderFromCompetitionName,
+  isVenueOnlyLocationRow,
   lookupLocation,
   normalizeGender,
   parseContactRows,
@@ -218,6 +219,7 @@ function buildContactTeamIndex(
     addContactIndexKey(index, team.abbreviation, team.id);
   }
   for (const loc of locations) {
+    if (isVenueOnlyLocationRow(loc)) continue;
     const locAbbr = (loc.abbreviation ?? '').trim().toUpperCase();
     const locComp = (loc.competition ?? '').trim().toLowerCase();
     for (const team of teamsById.values()) {
@@ -425,7 +427,7 @@ export async function runSheetSync(opts: {
 
   for (const loc of locations) {
     const abbr = (loc.abbreviation ?? '').trim().toUpperCase();
-    if (!abbr) continue;
+    if (!abbr || isVenueOnlyLocationRow(loc)) continue;
     const gender = loc.gender?.trim()
       ? normalizeGender(loc.gender)
       : genderFromCompetitionName(loc.competition) ?? 'men';
@@ -459,9 +461,11 @@ export async function runSheetSync(opts: {
       team.gender ?? 'men',
       team.competition,
     );
-    if (loc?.teamName) team.name = loc.teamName;
+    if (loc?.teamName && !isVenueOnlyLocationRow(loc)) team.name = loc.teamName;
     if (loc?.address) team.address = loc.address;
-    if (loc?.competition) team.competition = loc.competition;
+    if (loc?.competition && !isVenueOnlyLocationRow(loc)) {
+      team.competition = loc.competition;
+    }
     if (!team.gender && loc) {
       const fromLoc =
         loc.gender?.trim()
@@ -608,6 +612,7 @@ export async function runSheetSync(opts: {
       awayTeamName: awayTeam?.name ?? row.away_team,
     };
     const sheetTitle = (row.title ?? '').trim();
+    const sheetMatchType = (row.match_type ?? '').trim();
 
     if (!snap.exists) {
       const status = sheetCancelled ? 'cancelled' : 'draft';
@@ -628,6 +633,7 @@ export async function runSheetSync(opts: {
           gender,
           notes: row.notes || null,
           ...(sheetTitle ? { title: sheetTitle } : {}),
+          ...(sheetMatchType ? { matchType: sheetMatchType } : {}),
           flightProvided: false,
           housingProvided: false,
           ...crewFields,
@@ -652,6 +658,7 @@ export async function runSheetSync(opts: {
         gender,
         notes: row.notes || null,
         title: sheetTitle ? sheetTitle : FieldValue.delete(),
+        matchType: sheetMatchType ? sheetMatchType : FieldValue.delete(),
         updatedAt: FieldValue.serverTimestamp(),
       };
       if (loc?.lat != null) patch.venueLat = loc.lat;

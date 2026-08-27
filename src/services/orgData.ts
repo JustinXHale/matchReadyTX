@@ -171,6 +171,10 @@ export function matchFromFirestore(
       typeof data.title === 'string' && data.title.trim()
         ? data.title.trim()
         : undefined,
+    matchType:
+      typeof data.matchType === 'string' && data.matchType.trim()
+        ? data.matchType.trim()
+        : undefined,
     competition:
       typeof data.competition === 'string' ? data.competition : undefined,
     level: String(data.level ?? 'Tier 1'),

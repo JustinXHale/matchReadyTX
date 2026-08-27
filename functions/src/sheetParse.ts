@@ -13,6 +13,8 @@ export type ScheduleRow = {
   notes?: string;
   status?: string;
   title?: string;
+  /** Short format label from Schedule (e.g. 2nd Side) — not tier or event title. */
+  match_type?: string;
 };
 
 export type ContactRow = {
@@ -175,6 +177,14 @@ export function parseScheduleRows(values: string[][]): ScheduleRow[] {
     notes: alias(['notes', 'note', 'comments']),
     status: alias(['status', 'state']),
     title: alias(['title', 'event', 'event_name', 'match_title']),
+    match_type: alias([
+      'match_type',
+      'matchtype',
+      'match_label',
+      'label',
+      'format',
+      'squad',
+    ]),
   };
 
   for (const key of [
@@ -209,6 +219,7 @@ export function parseScheduleRows(values: string[][]): ScheduleRow[] {
         notes: get('notes') || undefined,
         status: get('status') || undefined,
         title: get('title') || undefined,
+        match_type: get('match_type') || undefined,
       };
     })
     .filter((row) => row.match_id);
@@ -316,6 +327,16 @@ export function genderFromCompetitionName(
   if (/\bwomen\b|\bfemale\b/i.test(n)) return 'women';
   if (/\bmen\b|\bmale\b/i.test(n)) return 'men';
   return null;
+}
+
+/** Locations-tab rows with Competition = VENUE are fields only — not clubs. */
+export function isVenueOnlyLocationCompetition(competition?: string): boolean {
+  const c = (competition ?? '').trim().toLowerCase();
+  return c === 'venue' || c === 'venues';
+}
+
+export function isVenueOnlyLocationRow(loc: LocationRow): boolean {
+  return isVenueOnlyLocationCompetition(loc.competition);
 }
 
 function locationGender(loc: LocationRow): 'men' | 'women' | null {

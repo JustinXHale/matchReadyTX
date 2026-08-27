@@ -111,6 +111,8 @@ export interface Match {
   awayTeamName: string;
   /** Optional event name from the Schedule sheet `title` column. */
   title?: string;
+  /** Short format label from Schedule `match_type` (e.g. 2nd Side). */
+  matchType?: string;
   competition?: string;
   /** Competition level — defaults from org.matchLevels (e.g. D1, D2, D3) */
   level: string;

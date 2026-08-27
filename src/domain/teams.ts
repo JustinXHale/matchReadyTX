@@ -1,4 +1,5 @@
 import type { Match, Team, TeamContactPerson, UserProfile } from '@/domain/types';
+import { isVenueOnlyCompetition } from '@/domain/competitions';
 import { memberListName } from '@/domain/members';
 import { mapsDirectionsUrl } from '@/services/maps';
 
@@ -268,6 +269,7 @@ export function conferenceTeamOptions(
   return teams
     .filter((team) => {
       if (!team.competition?.trim()) return false;
+      if (isVenueOnlyCompetition(team.competition)) return false;
       if (allowedTeamIds && !allowedTeamIds.has(team.id)) return false;
       return true;
     })

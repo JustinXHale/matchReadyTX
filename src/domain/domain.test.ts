@@ -298,6 +298,27 @@ describe('crew visibility gate', () => {
     expect(m.title).toBe('Conference final');
   });
 
+  it('reads optional match type from Firestore', () => {
+    const m = matchFromFirestore('m_type', {
+      sheetRowKey: 's1',
+      status: 'crew_pending',
+      kickoffAt: new Date().toISOString(),
+      venueName: 'Field',
+      venueAddress: 'Austin',
+      homeTeamId: 'h',
+      awayTeamId: 'a',
+      homeTeamName: 'Home',
+      awayTeamName: 'Away',
+      matchType: '  2nd Side  ',
+      level: 'Tier 1',
+      gender: 'men',
+      flightProvided: false,
+      housingProvided: false,
+      crew: {},
+    });
+    expect(m.matchType).toBe('2nd Side');
+  });
+
   it('filters matches by local calendar date', () => {
     const d = new Date();
     d.setHours(15, 0, 0, 0);
@@ -1762,6 +1783,28 @@ describe('conferenceTeamOptions', () => {
     ]);
     expect(options[0]?.conference).toBe('Lonestar Men');
     expect(options[1]?.conference).toBe('Lonestar Women');
+  });
+
+  it('excludes VENUE-only Locations rows from team pickers', () => {
+    const teams: Team[] = [
+      {
+        id: 't_huns_venue',
+        name: 'Huns Rugby Ranch',
+        abbreviation: 'HUNS',
+        competition: 'VENUE',
+        contactEmails: [],
+      },
+      {
+        id: 't_uh_lonestar_men',
+        name: 'University of Houston',
+        abbreviation: 'UH',
+        competition: 'Lonestar Men',
+        contactEmails: [],
+      },
+    ];
+    const options = conferenceTeamOptions(teams);
+    expect(options).toHaveLength(1);
+    expect(options[0]?.id).toBe('t_uh_lonestar_men');
   });
 });
 

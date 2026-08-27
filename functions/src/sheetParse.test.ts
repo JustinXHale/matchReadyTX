@@ -1,8 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import {
   contactMatchKeys,
+  isVenueOnlyLocationCompetition,
+  isVenueOnlyLocationRow,
+  lookupLocation,
   parseContactRows,
+  parseScheduleRows,
   rowToKickoffIso,
+  type LocationRow,
 } from './sheetParse';
 
 describe('parseContactRows', () => {
@@ -70,6 +75,60 @@ describe('contactMatchKeys', () => {
     const a = new Set(contactMatchKeys("St. Edward's University"));
     const b = new Set(contactMatchKeys('Saint Edwards University'));
     expect([...a].some((k) => b.has(k))).toBe(true);
+  });
+});
+
+describe('venue-only Locations rows', () => {
+  it('detects VENUE competition (case-insensitive)', () => {
+    expect(isVenueOnlyLocationCompetition('VENUE')).toBe(true);
+    expect(isVenueOnlyLocationCompetition('venue')).toBe(true);
+    expect(isVenueOnlyLocationCompetition('Venues')).toBe(true);
+    expect(isVenueOnlyLocationCompetition('Lonestar Men')).toBe(false);
+  });
+
+  it('still resolves venue address for schedule location abbrev', () => {
+    const locations: LocationRow[] = [
+      {
+        abbreviation: 'HUNS',
+        competition: 'VENUE',
+        teamName: 'Huns Rugby Ranch',
+        address: '4107 Nixon Lane, Austin, TX',
+      },
+    ];
+    const loc = lookupLocation(locations, 'Huns', 'men', 'Lonestar Men');
+    expect(loc?.address).toContain('4107 Nixon Lane');
+    expect(isVenueOnlyLocationRow(loc!)).toBe(true);
+  });
+});
+
+describe('parseScheduleRows match_type', () => {
+  it('reads optional match_type column', () => {
+    const rows = parseScheduleRows([
+      [
+        'match_id',
+        'date',
+        'kickoff_time',
+        'location',
+        'home_team',
+        'away_team',
+        'level',
+        'match_type',
+        'title',
+      ],
+      [
+        'T1091102',
+        '2026-09-11',
+        '19:00',
+        'TXST',
+        'TXST',
+        'SHSU',
+        'Tier 1',
+        '2nd Side',
+        '',
+      ],
+    ]);
+    expect(rows[0]?.match_type).toBe('2nd Side');
+    expect(rows[0]?.level).toBe('Tier 1');
   });
 });
 

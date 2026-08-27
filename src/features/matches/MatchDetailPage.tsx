@@ -1308,6 +1308,9 @@ export function MatchDetailPage() {
               </button>
             ))}
           </div>
+          {match.matchType?.trim() ? (
+            <span className="rs-pill rs-pill--quiet">{match.matchType.trim()}</span>
+          ) : null}
         </div>
       ) : (
         <div
@@ -1318,6 +1321,9 @@ export function MatchDetailPage() {
             {genderLabel(match.gender)}
           </span>
           <span className="rs-pill rs-pill--ink">{match.level}</span>
+          {match.matchType?.trim() ? (
+            <span className="rs-pill rs-pill--quiet">{match.matchType.trim()}</span>
+          ) : null}
         </div>
       )}
 

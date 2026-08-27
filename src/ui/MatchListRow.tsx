@@ -198,6 +198,11 @@ export function MatchListRow({
           <span className="rs-pill rs-pill--ink rs-list-row__chip">
             {match.level}
           </span>
+          {match.matchType?.trim() ? (
+            <span className="rs-pill rs-pill--quiet rs-list-row__chip">
+              {match.matchType.trim()}
+            </span>
+          ) : null}
         </div>
         <p className="rs-list-row__venue">
           {match.venueAddress?.trim() || match.venueName}

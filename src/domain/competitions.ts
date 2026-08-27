@@ -36,3 +36,9 @@ export function competitionForGender(
 ): string {
   return gender === 'women' ? 'Lonestar Women' : 'Lonestar Men';
 }
+
+/** Locations-tab rows with Competition = VENUE are fields only — not clubs. */
+export function isVenueOnlyCompetition(competition?: string): boolean {
+  const c = (competition ?? '').trim().toLowerCase();
+  return c === 'venue' || c === 'venues';
+}
