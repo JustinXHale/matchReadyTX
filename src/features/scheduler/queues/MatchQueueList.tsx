@@ -1,5 +1,7 @@
 import { useState } from 'react';
 import { Button } from '@patternfly/react-core';
+import { useApp } from '@/app/AppContext';
+import { formatMatchKickoff, orgTimeZone } from '@/domain/matchTime';
 import { statusLabel } from '@/domain/matchTransitions';
 import type { ChangeProposal, Match } from '@/domain/types';
 import { MatchListRow } from '@/ui/MatchListRow';
@@ -82,6 +84,9 @@ export function ProposalQueueList({
   emptyText: string;
   onAcknowledge: (proposalId: string) => void;
 }) {
+  const { state } = useApp();
+  const timeZone = orgTimeZone(state.org.timezone);
+
   if (proposals.length === 0) {
     return <p className="rs-match-card__meta">{emptyText}</p>;
   }
@@ -115,13 +120,7 @@ export function ProposalQueueList({
           );
         }
         const kickoffHint = p.kickoffAt
-          ? `New kickoff ${new Date(p.kickoffAt).toLocaleString(undefined, {
-              weekday: 'short',
-              month: 'short',
-              day: 'numeric',
-              hour: 'numeric',
-              minute: '2-digit',
-            })}`
+          ? `New kickoff ${formatMatchKickoff(p.kickoffAt, timeZone)}`
           : 'Fact change pending';
         return (
           <li key={p.id}>

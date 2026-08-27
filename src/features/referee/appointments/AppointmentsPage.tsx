@@ -8,6 +8,11 @@ import {
   uniqueMatchCalendarDates,
 } from '@/domain/divisionFilters';
 import { applyMatchScope } from '@/domain/visibility';
+import {
+  formatMatchMonthLabel,
+  matchMonthKey,
+  orgTimeZone,
+} from '@/domain/matchTime';
 import { MatchListRow } from '@/ui/MatchListRow';
 import { MatchCrewTrailing } from '@/ui/MatchCrewTrailing';
 import type { Match, MatchGender } from '@/domain/types';
@@ -22,18 +27,6 @@ const APPOINTMENTS_BACK: BackNav = {
   to: '/referee/appointments',
   label: 'Assigned',
 };
-
-function monthKey(iso: string): string {
-  const d = new Date(iso);
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
-}
-
-function monthLabel(iso: string): string {
-  return new Date(iso).toLocaleDateString(undefined, {
-    month: 'long',
-    year: 'numeric',
-  });
-}
 
 function AppointmentRow({
   match,
@@ -68,6 +61,7 @@ function AppointmentRow({
 
 export function AppointmentsPage() {
   const { currentUser, state } = useApp();
+  const timeZone = orgTimeZone(state.org.timezone);
   const [genderFilter, setGenderFilter] = useState<MatchGender | null>(null);
   const [levelFilter, setLevelFilter] = useState<string | null>(null);
   const [competitionFilter, setCompetitionFilter] = useState<string | null>(
@@ -128,16 +122,20 @@ export function AppointmentsPage() {
   const byMonth = useMemo(() => {
     const groups: { key: string; label: string; matches: Match[] }[] = [];
     for (const m of confirmed) {
-      const key = monthKey(m.kickoffAt);
+      const key = matchMonthKey(m.kickoffAt, timeZone);
       const last = groups[groups.length - 1];
       if (last && last.key === key) {
         last.matches.push(m);
       } else {
-        groups.push({ key, label: monthLabel(m.kickoffAt), matches: [m] });
+        groups.push({
+          key,
+          label: formatMatchMonthLabel(m.kickoffAt, timeZone),
+          matches: [m],
+        });
       }
     }
     return groups;
-  }, [confirmed]);
+  }, [confirmed, timeZone]);
 
   if (!currentUser) return null;
 

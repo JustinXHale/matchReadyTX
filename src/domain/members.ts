@@ -8,6 +8,7 @@ import {
   type UserProfile,
   REQUESTABLE_SLOT_SHORT,
 } from '@/domain/types';
+import { formatMatchKickoff } from '@/domain/matchTime';
 
 export type MemberTab = 'referees' | 'teamAdmins' | 'cmos' | 'fans';
 
@@ -291,16 +292,14 @@ export function nextMatchForMember(
   return upcomingMatchesForMember(matches, userId)[0];
 }
 
-export function formatMemberScheduleHint(match: Match | undefined): string {
+export function formatMemberScheduleHint(
+  match: Match | undefined,
+  timeZone?: string | null,
+): string {
   if (!match) return 'No upcoming games';
-  const when = new Date(match.kickoffAt).toLocaleString(undefined, {
+  return formatMatchKickoff(match.kickoffAt, timeZone, {
     weekday: 'short',
-    month: 'short',
-    day: 'numeric',
-    hour: 'numeric',
-    minute: '2-digit',
   });
-  return when;
 }
 
 export function availabilityForUser(

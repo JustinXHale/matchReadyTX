@@ -14,6 +14,7 @@ import {
 } from '@/domain/types';
 import { GlobalDivisionFilters } from '@/features/global/GlobalDivisionFilters';
 import { divisionFilterOptionsFromMatches, matchOnCalendarDate, uniqueMatchCalendarDates } from '@/domain/divisionFilters';
+import { formatMatchKickoff, formatMatchMonthLabel, matchMonthKey, orgTimeZone } from '@/domain/matchTime';
 import { TeamLinkRequestQueue } from '@/features/scheduler/queues/TeamLinkRequestQueue';
 import { TeamAdminMatchRow } from '@/features/teamAdmin/TeamAdminMatchRow';
 import { isFirebaseConfigured } from '@/services/firebase';
@@ -35,24 +36,13 @@ type ListedMatch = {
   hasPendingProposal: boolean;
 };
 
-function monthKey(iso: string): string {
-  const d = new Date(iso);
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
-}
-
-function monthLabel(iso: string): string {
-  return new Date(iso).toLocaleDateString(undefined, {
-    month: 'long',
-    year: 'numeric',
-  });
-}
-
 function isActionNeeded(match: Match, hasPendingProposal: boolean): boolean {
   return teamAdminListStatus(match, hasPendingProposal).actionNeeded;
 }
 
 export function TeamAdminHomePage() {
   const { currentUser, state, store, refresh, dataMode } = useApp();
+  const timeZone = orgTimeZone(state.org.timezone);
   const requestFixtureHref = useAppHref('/team-admin/request-fixture');
   const [teamFilter, setTeamFilter] = useState<string | null>(null);
   const [genderFilter, setGenderFilter] = useState<MatchGender | null>(null);
@@ -249,20 +239,20 @@ export function TeamAdminHomePage() {
     const groups: { key: string; label: string; matches: ListedMatch[] }[] =
       [];
     for (const row of settled) {
-      const key = monthKey(row.match.kickoffAt);
+      const key = matchMonthKey(row.match.kickoffAt, timeZone);
       const last = groups[groups.length - 1];
       if (last && last.key === key) {
         last.matches.push(row);
       } else {
         groups.push({
           key,
-          label: monthLabel(row.match.kickoffAt),
+          label: formatMatchMonthLabel(row.match.kickoffAt, timeZone),
           matches: [row],
         });
       }
     }
     return groups;
-  }, [settled, settledByTeam.length]);
+  }, [settled, settledByTeam.length, timeZone]);
 
   const myFixtureRequests = useMemo(() => {
     if (!currentUser) return [];
@@ -487,13 +477,7 @@ export function TeamAdminHomePage() {
           </header>
           <ul className="rs-list" aria-label="Your fixture requests">
             {myFixtureRequests.map((r) => {
-              const when = new Date(r.kickoffAt).toLocaleString(undefined, {
-                weekday: 'short',
-                month: 'short',
-                day: 'numeric',
-                hour: 'numeric',
-                minute: '2-digit',
-              });
+              const when = formatMatchKickoff(r.kickoffAt, timeZone);
               return (
                 <li key={r.id} className="rs-fixture-req-row">
                   <div className="rs-fixture-req-row__main">

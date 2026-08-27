@@ -27,6 +27,11 @@ import { GlobalDivisionFilters } from '@/features/global/GlobalDivisionFilters';
 import { MatchCrewTrailing } from '@/ui/MatchCrewTrailing';
 import type { BackNav } from '@/nav/backNav';
 import { MatchListRow } from '@/ui/MatchListRow';
+import {
+  formatMatchMonthLabel,
+  matchMonthKey,
+  orgTimeZone,
+} from '@/domain/matchTime';
 
 const SCHEDULER_SCHEDULE_BACK: BackNav = {
   to: '/scheduler/schedule',
@@ -45,18 +50,6 @@ const STATUS_FILTERS: {
   { id: 'open_slots', label: 'Open slots' },
   { id: 'locked_confirmed', label: 'Locked' },
 ];
-
-function monthKey(iso: string): string {
-  const d = new Date(iso);
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
-}
-
-function monthLabel(iso: string): string {
-  return new Date(iso).toLocaleDateString(undefined, {
-    month: 'long',
-    year: 'numeric',
-  });
-}
 
 function hasOpenCrewSlot(m: Match): boolean {
   const needed = rolesNeededForMatch(m);
@@ -81,6 +74,7 @@ function matchesCrewPendingFilter(m: Match): boolean {
 /** Assigner schedule browse — all org matches, not only released. */
 export function SchedulerSchedulePage() {
   const { currentUser, state } = useApp();
+  const timeZone = orgTimeZone(state.org.timezone);
   const [genderFilter, setGenderFilter] = useState<MatchGender | null>(null);
   const [levelFilter, setLevelFilter] = useState<string | null>(null);
   const [competitionFilter, setCompetitionFilter] = useState<string | null>(
@@ -147,13 +141,19 @@ export function SchedulerSchedulePage() {
   const byMonth = useMemo(() => {
     const groups: { key: string; label: string; matches: Match[] }[] = [];
     for (const m of list) {
-      const key = monthKey(m.kickoffAt);
+      const key = matchMonthKey(m.kickoffAt, timeZone);
       const last = groups[groups.length - 1];
       if (last && last.key === key) last.matches.push(m);
-      else groups.push({ key, label: monthLabel(m.kickoffAt), matches: [m] });
+      else {
+        groups.push({
+          key,
+          label: formatMatchMonthLabel(m.kickoffAt, timeZone),
+          matches: [m],
+        });
+      }
     }
     return groups;
-  }, [list]);
+  }, [list, timeZone]);
 
   return (
     <div className="rs-stack">

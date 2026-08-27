@@ -31,6 +31,7 @@ import {
   OfficialQuickLookPicker,
   OfficialQuickLookProvider,
 } from '@/features/scheduler/officialQuickLookContext';
+import { orgTimeZone } from '@/domain/matchTime';
 
 const navIconClass = 'rs-bottom-nav__icon';
 
@@ -204,7 +205,7 @@ export function MobileShell() {
   const navigate = useNavigate();
   const location = useLocation();
   const [now, setNow] = useState(() => new Date());
-  const tz = state.org.timezone || undefined;
+  const tz = orgTimeZone(state.org.timezone);
   const bottomNav = navForRole(
     roleView,
     isDemoShowcase,

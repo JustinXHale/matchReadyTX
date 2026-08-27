@@ -5,6 +5,11 @@ import {
   type Match,
   type RequestableSlot,
 } from '@/domain/types';
+import {
+  formatMatchKickoffDate,
+  formatMatchKickoffTime,
+  DEFAULT_ORG_TIMEZONE,
+} from '@/domain/matchTime';
 import { allActiveAssignments } from '@/domain/crew';
 import { defaultOrgId, saveMatchCrewAssignment } from '@/services/orgData';
 import { callNotifyUser } from '@/services/notify';
@@ -12,23 +17,14 @@ import { isFirebaseConfigured } from '@/services/firebase';
 import { mapsDirectionsUrl } from '@/services/maps';
 import { matchAppUrl } from '@/services/appLinks';
 
-function formatKickoffDate(iso: string): string {
+function formatKickoffDate(iso: string, timeZone = DEFAULT_ORG_TIMEZONE): string {
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return iso;
-  return d.toLocaleDateString(undefined, {
-    weekday: 'short',
-    month: 'short',
-    day: 'numeric',
-  });
+  return formatMatchKickoffDate(iso, timeZone);
 }
 
-function formatKickoffTime(iso: string): string {
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return '';
-  return d.toLocaleTimeString(undefined, {
-    hour: 'numeric',
-    minute: '2-digit',
-  });
+function formatKickoffTime(iso: string, timeZone = DEFAULT_ORG_TIMEZONE): string {
+  return formatMatchKickoffTime(iso, timeZone);
 }
 
 function roleLabel(slot: RequestableSlot): string {

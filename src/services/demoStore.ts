@@ -15,6 +15,7 @@ import {
   type DefaultCrewByLevel,
 } from '@/domain/crewDefaults';
 import { defaultFees, demoGeocode } from '@/domain/economics';
+import { formatMatchKickoff, orgTimeZone } from '@/domain/matchTime';
 import {
   applySheetFacts,
   applyT72Team,
@@ -2621,13 +2622,10 @@ class DemoStore {
   sendCoverageAlert(matchId: string): void {
     const match = this.state.matches.find((m) => m.id === matchId);
     if (!match) return;
-    const when = new Date(match.kickoffAt).toLocaleString(undefined, {
-      weekday: 'short',
-      month: 'short',
-      day: 'numeric',
-      hour: 'numeric',
-      minute: '2-digit',
-    });
+    const when = formatMatchKickoff(
+      match.kickoffAt,
+      orgTimeZone(this.state.org.timezone),
+    );
     const title = `Coverage needed: ${match.homeTeamName} vs ${match.awayTeamName}`;
     const body = `Assigner needs officials for ${when} at ${match.venueName}. Raise your hand if available.`;
     const alert: OfficialAlert = {

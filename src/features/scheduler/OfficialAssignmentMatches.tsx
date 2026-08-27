@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useApp, useAppHref } from '@/app/AppContext';
 import { allAssignmentsForMember, memberSlotLabel } from '@/domain/members';
+import { formatMatchKickoff, orgTimeZone } from '@/domain/matchTime';
 import type { Match } from '@/domain/types';
 import { backState, type BackNav } from '@/nav/backNav';
 
@@ -31,6 +32,7 @@ export function OfficialAssignmentMatches({
   onNavigate?: () => void;
 }) {
   const { state } = useApp();
+  const timeZone = orgTimeZone(state.org.timezone);
   const matchBase = useAppHref('/matches');
   const [sortDir, setSortDir] = useState<SortDir>('asc');
   const matches = useMemo(() => {
@@ -74,12 +76,10 @@ export function OfficialAssignmentMatches({
         const isPast = new Date(m.kickoffAt).getTime() < now;
         const scored = isPast && hasMatchScore(m);
         const slot = memberSlotLabel(m, userId);
-        const when = new Date(m.kickoffAt).toLocaleString(undefined, {
+        const when = formatMatchKickoff(m.kickoffAt, timeZone, {
           month: 'short',
           day: 'numeric',
           year: 'numeric',
-          hour: 'numeric',
-          minute: '2-digit',
         });
         return (
           <li key={m.id}>

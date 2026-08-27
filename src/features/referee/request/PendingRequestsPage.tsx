@@ -33,6 +33,11 @@ import {
   defaultOrgId,
   deleteGameRequestInFirestore,
 } from '@/services/orgData';
+import {
+  formatMatchMonthLabel,
+  matchMonthKey,
+  orgTimeZone,
+} from '@/domain/matchTime';
 
 const PENDING_BACK: BackNav = {
   to: '/referee/appointments/requested',
@@ -42,18 +47,6 @@ const PENDING_BACK: BackNav = {
 function daysPending(iso: string): number {
   const ms = Date.now() - new Date(iso).getTime();
   return Math.max(0, Math.floor(ms / (24 * 60 * 60 * 1000)));
-}
-
-function monthKey(iso: string): string {
-  const d = new Date(iso);
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
-}
-
-function monthLabel(iso: string): string {
-  return new Date(iso).toLocaleDateString(undefined, {
-    month: 'long',
-    year: 'numeric',
-  });
 }
 
 function RequestStatusTrailing({
@@ -96,6 +89,7 @@ function RequestStatusTrailing({
 
 export function PendingRequestsPage() {
   const { currentUser, state, store, refresh, dataMode } = useApp();
+  const timeZone = orgTimeZone(state.org.timezone);
   const [pendingRemoval, setPendingRemoval] = useState<{
     request: GameRequest;
     match: Match;
@@ -180,18 +174,18 @@ export function PendingRequestsPage() {
       items: { request: GameRequest; match: Match }[];
     }[] = [];
     for (const row of rows) {
-      const key = monthKey(row.match.kickoffAt);
+      const key = matchMonthKey(row.match.kickoffAt, timeZone);
       const last = groups[groups.length - 1];
       if (last && last.key === key) last.items.push(row);
       else
         groups.push({
           key,
-          label: monthLabel(row.match.kickoffAt),
+          label: formatMatchMonthLabel(row.match.kickoffAt, timeZone),
           items: [row],
         });
     }
     return groups;
-  }, [rows]);
+  }, [rows, timeZone]);
 
   if (!currentUser) return null;
 

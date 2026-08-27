@@ -325,7 +325,7 @@ export function MembersPage() {
                 : undefined;
             const scheduleHint =
               tab === 'referees' || tab === 'cmos'
-                ? formatMemberScheduleHint(next)
+                ? formatMemberScheduleHint(next, state.org.timezone)
                 : null;
 
             return (

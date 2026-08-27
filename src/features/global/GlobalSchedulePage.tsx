@@ -11,21 +11,14 @@ import type { Match, MatchGender } from '@/domain/types';
 import { GlobalDivisionFilters } from '@/features/global/GlobalDivisionFilters';
 import { GlobalScheduleSubNav } from '@/features/global/GlobalScheduleSubNav';
 import type { BackNav } from '@/nav/backNav';
+import {
+  formatMatchMonthLabel,
+  matchMonthKey,
+  orgTimeZone,
+} from '@/domain/matchTime';
 
 type SchedulePane = 'upcoming' | 'completed';
 type SortDir = 'asc' | 'desc';
-
-function monthKey(iso: string): string {
-  const d = new Date(iso);
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
-}
-
-function monthLabel(iso: string): string {
-  return new Date(iso).toLocaleDateString(undefined, {
-    month: 'long',
-    year: 'numeric',
-  });
-}
 
 function parsePane(raw: string | undefined): SchedulePane | null {
   if (raw === 'upcoming' || raw === 'completed') return raw;
@@ -37,6 +30,7 @@ export function GlobalSchedulePage() {
   const { pane: paneParam } = useParams<{ pane?: string }>();
   const pane = parsePane(paneParam);
   const { currentUser, state, isFanView } = useApp();
+  const timeZone = orgTimeZone(state.org.timezone);
   const upcomingHref = useAppHref('/global/schedule/upcoming');
   const completedHref = useAppHref('/global/schedule/completed');
   const [genderFilter, setGenderFilter] = useState<MatchGender | null>(null);
@@ -136,13 +130,19 @@ export function GlobalSchedulePage() {
   const byMonth = useMemo(() => {
     const groups: { key: string; label: string; matches: Match[] }[] = [];
     for (const m of list) {
-      const key = monthKey(m.kickoffAt);
+      const key = matchMonthKey(m.kickoffAt, timeZone);
       const last = groups[groups.length - 1];
       if (last && last.key === key) last.matches.push(m);
-      else groups.push({ key, label: monthLabel(m.kickoffAt), matches: [m] });
+      else {
+        groups.push({
+          key,
+          label: formatMatchMonthLabel(m.kickoffAt, timeZone),
+          matches: [m],
+        });
+      }
     }
     return groups;
-  }, [list]);
+  }, [list, timeZone]);
 
   if (!pane) {
     return <Navigate to={upcomingHref} replace />;

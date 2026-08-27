@@ -10,6 +10,8 @@ import {
   TextArea,
 } from '@patternfly/react-core';
 import type { FixtureRequest } from '@/domain/types';
+import { useApp } from '@/app/AppContext';
+import { formatMatchKickoff, orgTimeZone } from '@/domain/matchTime';
 
 export function FixtureRequestQueue({
   requests,
@@ -22,6 +24,8 @@ export function FixtureRequestQueue({
   onDecline: (id: string, reason?: string) => void;
   busyId?: string | null;
 }) {
+  const { state } = useApp();
+  const timeZone = orgTimeZone(state.org.timezone);
   const [declineTarget, setDeclineTarget] = useState<FixtureRequest | null>(
     null,
   );
@@ -37,13 +41,7 @@ export function FixtureRequestQueue({
     <>
       <ul className="rs-list rs-queue-list">
         {requests.map((r) => {
-          const when = new Date(r.kickoffAt).toLocaleString(undefined, {
-            weekday: 'short',
-            month: 'short',
-            day: 'numeric',
-            hour: 'numeric',
-            minute: '2-digit',
-          });
+          const when = formatMatchKickoff(r.kickoffAt, timeZone);
           const busy = busyId === r.id;
           return (
             <li key={r.id} className="rs-queue-card">

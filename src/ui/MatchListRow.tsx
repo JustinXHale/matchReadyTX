@@ -1,7 +1,12 @@
 import { Link } from 'react-router-dom';
+import {
+  formatMatchKickoffTime,
+  orgTimeZone,
+} from '@/domain/matchTime';
 import { genderLabel, type Match } from '@/domain/types';
 import type { ReactNode } from 'react';
 import { backState, type BackNav } from '@/nav/backNav';
+import { useApp } from '@/app/AppContext';
 
 function dayOrdinal(day: number): string {
   const j = day % 10;
@@ -13,17 +18,19 @@ function dayOrdinal(day: number): string {
   return `${day}th`;
 }
 
-function formatCardDate(iso: string): { month: string; day: string } {
+function formatCardDate(
+  iso: string,
+  timeZone: string,
+): { month: string; day: string } {
   const d = new Date(iso);
-  const month = d.toLocaleDateString(undefined, { month: 'short' });
-  return { month, day: dayOrdinal(d.getDate()) };
-}
-
-function formatKickoffTime(iso: string): string {
-  return new Date(iso).toLocaleTimeString(undefined, {
-    hour: 'numeric',
-    minute: '2-digit',
+  const month = d.toLocaleDateString(undefined, {
+    month: 'short',
+    timeZone,
   });
+  const dayNum = Number(
+    d.toLocaleDateString(undefined, { day: 'numeric', timeZone }),
+  );
+  return { month, day: dayOrdinal(dayNum) };
 }
 
 function SideLabel({
@@ -97,7 +104,9 @@ export function MatchListRow({
   warn?: boolean;
   back?: BackNav;
 }) {
-  const { month, day } = formatCardDate(match.kickoffAt);
+  const { state } = useApp();
+  const timeZone = orgTimeZone(state.org.timezone);
+  const { month, day } = formatCardDate(match.kickoffAt, timeZone);
   const scored = !hideScore && hasMatchScore(match);
   const homeScoreLabel = scored ? String(match.homeScore) : '–';
   const awayScoreLabel = scored ? String(match.awayScore) : '–';
@@ -195,7 +204,9 @@ export function MatchListRow({
         </p>
         {teams}
         {showTime && (
-          <p className="rs-list-row__time">{formatKickoffTime(match.kickoffAt)}</p>
+          <p className="rs-list-row__time">
+            {formatMatchKickoffTime(match.kickoffAt, timeZone)}
+          </p>
         )}
         {match.title?.trim() ? (
           <p className="rs-list-row__event-title">{match.title.trim()}</p>

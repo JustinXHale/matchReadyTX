@@ -88,6 +88,10 @@ import {
   matchDetailReportActions,
 } from '@/features/referee/reports/reportLinks';
 import {
+  formatMatchKickoff,
+  orgTimeZone,
+} from '@/domain/matchTime';
+import {
   MatchAssignerMenu,
   type AssignerMenuAction,
 } from '@/features/matches/MatchAssignerMenu';
@@ -115,16 +119,6 @@ function teamConfirmChip(
     return { label: 'Confirmed', tone: 'ok' };
   }
   return { label: 'Unconfirmed', tone: 'urgent' };
-}
-
-function formatWhen(iso: string): string {
-  return new Date(iso).toLocaleString(undefined, {
-    weekday: 'short',
-    month: 'short',
-    day: 'numeric',
-    hour: 'numeric',
-    minute: '2-digit',
-  });
 }
 
 function formatActivityAt(iso: string): string {
@@ -234,6 +228,7 @@ export function MatchDetailPage() {
     roleView,
     dataMode,
   } = useApp();
+  const orgTz = orgTimeZone(state.org.timezone);
   const match = state.matches.find((m) => m.id === id);
   const back = readBackNav(location.state);
   const goBack = () => {
@@ -760,7 +755,6 @@ export function MatchDetailPage() {
     return [...levels].sort((a, b) => a - b);
   })();
   const pickQuery = pickSearch.trim().toLowerCase();
-  const orgTz = state.org.timezone || 'America/Chicago';
   const filteredOfficials = officials
     .filter((o) => {
       const level = officialEffectiveLevel(o);
@@ -908,7 +902,7 @@ export function MatchDetailPage() {
     store.setTeamDetailsConfirmed(match.id, side, !confirmed);
   };
 
-  const emailSubject = `${match.homeTeamName} vs ${match.awayTeamName} — ${formatWhen(match.kickoffAt)}`;
+  const emailSubject = `${match.homeTeamName} vs ${match.awayTeamName} — ${formatMatchKickoff(match.kickoffAt, orgTz)}`;
 
   const emailsForScope = (scope: EmailScope): string[] => {
     if (scope === 'teams') return teamEmails;
@@ -1395,8 +1389,9 @@ export function MatchDetailPage() {
                   <div className="rs-proposal-compare__col">
                     <span className="rs-proposal-compare__eyebrow">Current</span>
                     <span className="rs-proposal-compare__value">
-                      {formatWhen(
+                      {formatMatchKickoff(
                         pendingProposal.previousKickoffAt ?? match.kickoffAt,
+                        orgTz,
                       )}
                     </span>
                   </div>
@@ -1412,7 +1407,7 @@ export function MatchDetailPage() {
                     </span>
                     <span className="rs-proposal-compare__value">
                       {pendingProposal.kickoffAt
-                        ? formatWhen(pendingProposal.kickoffAt)
+                        ? formatMatchKickoff(pendingProposal.kickoffAt, orgTz)
                         : 'No change'}
                     </span>
                   </div>
@@ -1700,7 +1695,7 @@ export function MatchDetailPage() {
           <div className="rs-detail-meta__row">
             <span className="rs-detail-meta__label">When</span>
             <div className="rs-detail-meta__value">
-              <span>{formatWhen(match.kickoffAt)}</span>
+              <span>{formatMatchKickoff(match.kickoffAt, orgTz)}</span>
               {canProposeChange && (
                 <button
                   type="button"

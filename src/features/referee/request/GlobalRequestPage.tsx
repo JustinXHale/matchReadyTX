@@ -19,6 +19,11 @@ import {
   type RequestableSlot,
 } from '@/domain/types';
 import { backState, type BackNav } from '@/nav/backNav';
+import {
+  formatMatchMonthLabel,
+  matchMonthKey,
+  orgTimeZone,
+} from '@/domain/matchTime';
 
 const GLOBAL_REQUEST_BACK: BackNav = {
   to: '/referee/appointments/open',
@@ -33,18 +38,6 @@ const ROLE_FILTERS: { id: RoleFilter; label: string }[] = [
   { id: 'cmo', label: 'CMO Only' },
   { id: 'no4', label: '#4 Only' },
 ];
-
-function monthKey(iso: string): string {
-  const d = new Date(iso);
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
-}
-
-function monthLabel(iso: string): string {
-  return new Date(iso).toLocaleDateString(undefined, {
-    month: 'long',
-    year: 'numeric',
-  });
-}
 
 function matchHasOpenRole(match: Match, filter: RoleFilter): boolean {
   const open = openRequestSlots(match);
@@ -87,6 +80,7 @@ function RaiseHandTrailing({ match }: { match: Match }) {
 
 export function GlobalRequestPage() {
   const { currentUser, state } = useApp();
+  const timeZone = orgTimeZone(state.org.timezone);
   const [roleFilter, setRoleFilter] = useState<RoleFilter | null>(null);
   const [genderFilter, setGenderFilter] = useState<MatchGender | null>(null);
   const [levelFilter, setLevelFilter] = useState<string | null>(null);
@@ -237,13 +231,19 @@ export function GlobalRequestPage() {
   const byMonth = useMemo(() => {
     const groups: { key: string; label: string; matches: Match[] }[] = [];
     for (const m of filteredOpen) {
-      const key = monthKey(m.kickoffAt);
+      const key = matchMonthKey(m.kickoffAt, timeZone);
       const last = groups[groups.length - 1];
       if (last && last.key === key) last.matches.push(m);
-      else groups.push({ key, label: monthLabel(m.kickoffAt), matches: [m] });
+      else {
+        groups.push({
+          key,
+          label: formatMatchMonthLabel(m.kickoffAt, timeZone),
+          matches: [m],
+        });
+      }
     }
     return groups;
-  }, [filteredOpen]);
+  }, [filteredOpen, timeZone]);
 
   if (!currentUser) return null;
 

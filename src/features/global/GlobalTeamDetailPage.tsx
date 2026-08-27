@@ -9,18 +9,11 @@ import { MatchCrewTrailing } from '@/ui/MatchCrewTrailing';
 import { formatTeamAddress, teamHomeMapsUrl } from '@/domain/teams';
 import { readBackNav, type BackNav } from '@/nav/backNav';
 import { MapsAddressLink } from '@/ui/MapsAddressLink';
-
-function monthKey(iso: string): string {
-  const d = new Date(iso);
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
-}
-
-function monthLabel(iso: string): string {
-  return new Date(iso).toLocaleDateString(undefined, {
-    month: 'long',
-    year: 'numeric',
-  });
-}
+import {
+  formatMatchMonthLabel,
+  matchMonthKey,
+  orgTimeZone,
+} from '@/domain/matchTime';
 
 const FALLBACK_BACK: BackNav = { to: '/global/teams', label: 'Teams' };
 
@@ -29,6 +22,7 @@ export function GlobalTeamDetailPage() {
   const navigate = useNavigate();
   const location = useLocation();
   const { currentUser, state } = useApp();
+  const timeZone = orgTimeZone(state.org.timezone);
   const back = readBackNav(location.state) ?? FALLBACK_BACK;
   const goBack = () =>
     navigate(back.to, back.state !== undefined ? { state: back.state } : undefined);
@@ -73,13 +67,19 @@ export function GlobalTeamDetailPage() {
   const byMonth = useMemo(() => {
     const groups: { key: string; label: string; matches: Match[] }[] = [];
     for (const m of matches) {
-      const key = monthKey(m.kickoffAt);
+      const key = matchMonthKey(m.kickoffAt, timeZone);
       const last = groups[groups.length - 1];
       if (last && last.key === key) last.matches.push(m);
-      else groups.push({ key, label: monthLabel(m.kickoffAt), matches: [m] });
+      else {
+        groups.push({
+          key,
+          label: formatMatchMonthLabel(m.kickoffAt, timeZone),
+          matches: [m],
+        });
+      }
     }
     return groups;
-  }, [matches]);
+  }, [matches, timeZone]);
 
   const divisionGenders = useMemo(() => {
     const genders = new Set<string>();
