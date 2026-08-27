@@ -66,7 +66,7 @@ export function SchedulerQueuesChangesPage() {
     return (
       <EmptyState titleText="No pending changes" headingLevel="h3">
         <EmptyStateBody>
-          There are no match change proposals waiting for your acknowledgment.
+          There are no change proposals waiting for your review or apply.
         </EmptyStateBody>
       </EmptyState>
     );
@@ -75,8 +75,8 @@ export function SchedulerQueuesChangesPage() {
   return (
     <>
       <p className="rs-match-card__meta">
-        Change proposals submitted by teams or officials that still need
-        assigner acknowledgment.
+        Change proposals that still need assigner review or apply. Acknowledge
+        only dismisses from your queue; apply updates the match and Sheet.
       </p>
 
       <GlobalDivisionFilters
@@ -102,7 +102,7 @@ export function SchedulerQueuesChangesPage() {
 
       <QueueSection
         id="queue-proposals"
-        title="Proposals awaiting ack"
+        title="Proposals to review"
         count={proposals.length}
       >
         {state.org.sheetSyncError && (

@@ -1509,7 +1509,7 @@ export function MatchDetailPage() {
                 Waiting on the other team to accept or deny.
               </p>
             )}
-          {isAssigner && !pendingProposal.assignerAckAt && (
+          {isAssigner && pendingProposal.status === 'pending' && (
             <div className="rs-detail-inline-actions">
               <Button
                 variant="primary"
@@ -1522,19 +1522,29 @@ export function MatchDetailPage() {
               >
                 Apply change
               </Button>
-              <Button
-                variant="link"
-                onClick={() =>
-                  store.acknowledgeProposal(
-                    pendingProposal.id,
-                    currentUser.uid,
-                  )
-                }
-              >
-                Acknowledge only
-              </Button>
+              {!pendingProposal.assignerAckAt && (
+                <Button
+                  variant="link"
+                  onClick={() =>
+                    store.acknowledgeProposal(
+                      pendingProposal.id,
+                      currentUser.uid,
+                    )
+                  }
+                >
+                  Acknowledge only
+                </Button>
+              )}
             </div>
           )}
+          {isAssigner &&
+            pendingProposal.status === 'pending' &&
+            pendingProposal.assignerAckAt && (
+              <p className="rs-detail-note">
+                You acknowledged this proposal. Apply change when you’re ready to
+                update the match and Sheet.
+              </p>
+            )}
           {isAssigner && state.org.sheetSyncError && (
             <p className="rs-detail-note" role="alert">
               Sheet write-back / sync issue: {state.org.sheetSyncError}

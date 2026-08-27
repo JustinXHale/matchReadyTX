@@ -124,6 +124,8 @@ export function ProposalQueueList({
         const kickoffHint = p.kickoffAt
           ? `New kickoff ${formatMatchKickoff(p.kickoffAt, timeZone)}`
           : 'Fact change pending';
+        const awaitingApply = p.status === 'pending';
+        const awaitingAck = !p.assignerAckAt;
         return (
           <li key={p.id}>
             <MatchListRow
@@ -134,35 +136,45 @@ export function ProposalQueueList({
               back={QUEUES_BACK}
               meta={
                 <>
-                  <span className="rs-pill rs-pill--warn">Awaiting ack</span>
+                  <span className="rs-pill rs-pill--warn">
+                    {awaitingApply
+                      ? p.assignerAckAt
+                        ? 'Ready to apply'
+                        : 'Review'
+                      : 'Awaiting ack'}
+                  </span>
                   <span className="rs-list-row__hint">{kickoffHint}</span>
                 </>
               }
               trailing={
                 <div className="rs-queue-action">
-                  <Button
-                    size="sm"
-                    variant="primary"
-                    onClick={(e) => {
-                      e.preventDefault();
-                      e.stopPropagation();
-                      onApply(p.id);
-                    }}
-                  >
-                    Apply change
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="link"
-                    isInline
-                    onClick={(e) => {
-                      e.preventDefault();
-                      e.stopPropagation();
-                      onAcknowledge(p.id);
-                    }}
-                  >
-                    Acknowledge only
-                  </Button>
+                  {awaitingApply && (
+                    <Button
+                      size="sm"
+                      variant="primary"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        onApply(p.id);
+                      }}
+                    >
+                      Apply change
+                    </Button>
+                  )}
+                  {awaitingAck && (
+                    <Button
+                      size="sm"
+                      variant="link"
+                      isInline
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        onAcknowledge(p.id);
+                      }}
+                    >
+                      Acknowledge only
+                    </Button>
+                  )}
                 </div>
               }
             />

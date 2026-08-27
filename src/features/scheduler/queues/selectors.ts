@@ -66,15 +66,22 @@ export function matchesT72Due(matches: Match[]): Match[] {
   );
 }
 
-/** Assigner awareness queue — not a blocker on applying the change. */
-export function proposalsAwaitingAck(
+/** Pending proposals not yet applied, or approved proposals assigner hasn't seen. */
+export function proposalsNeedingAssignerReview(
   proposals: ChangeProposal[],
 ): ChangeProposal[] {
   return proposals.filter(
     (p) =>
-      !p.assignerAckAt &&
-      (p.status === 'pending' || p.status === 'approved'),
+      p.status === 'pending' ||
+      (!p.assignerAckAt && p.status === 'approved'),
   );
+}
+
+/** Assigner queue — includes ack'd proposals still waiting on apply. */
+export function proposalsAwaitingAck(
+  proposals: ChangeProposal[],
+): ChangeProposal[] {
+  return proposalsNeedingAssignerReview(proposals);
 }
 
 export function pendingRaiseHandRequests(
@@ -107,12 +114,12 @@ export function actionableRaiseHandRequests(
   );
 }
 
-/** Proposals awaiting ack whose match is still on the schedule. */
+/** Proposals needing assigner review whose match is still on the schedule. */
 export function actionableProposalsAwaitingAck(
   proposals: ChangeProposal[],
   matches: Match[],
 ): ChangeProposal[] {
-  return proposalsAwaitingAck(proposals).filter((p) =>
+  return proposalsNeedingAssignerReview(proposals).filter((p) =>
     proposalHasMatch(p, matches),
   );
 }
