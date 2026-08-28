@@ -115,6 +115,8 @@ export function AssignOfficialModal({
             availability={state.availability}
             timeZone={orgTz}
             kickoffAt={liveMatch.kickoffAt}
+            matchId={liveMatch.id}
+            requests={state.requests}
             onPick={onPick}
           />
         ) : null}

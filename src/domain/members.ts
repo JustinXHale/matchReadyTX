@@ -368,6 +368,33 @@ export function allAssignmentsForMember(
     );
 }
 
+/** Assignments for a member within an optional local day range (inclusive). */
+export function assignmentsForMemberInDayRange(
+  matches: Match[],
+  userId: string,
+  opts: {
+    timeZone: string;
+    fromDay?: string | null;
+    toDay?: string | null;
+  },
+): Match[] {
+  const fromMs = opts.fromDay
+    ? new Date(
+        zonedLocalToUtcIso(opts.fromDay, '00:00', opts.timeZone),
+      ).getTime()
+    : null;
+  const toMs = opts.toDay
+    ? new Date(zonedLocalToUtcIso(opts.toDay, '23:59', opts.timeZone)).getTime()
+    : null;
+  return allAssignmentsForMember(matches, userId).filter((m) => {
+    const kickoffMs = new Date(m.kickoffAt).getTime();
+    if (Number.isNaN(kickoffMs)) return false;
+    if (fromMs != null && kickoffMs < fromMs) return false;
+    if (toMs != null && kickoffMs > toMs) return false;
+    return true;
+  });
+}
+
 /** Most recent assignments (any crew role), default last five. */
 export function recentAssignmentsForMember(
   matches: Match[],

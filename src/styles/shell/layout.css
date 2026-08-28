@@ -581,9 +581,20 @@ input.rs-filter-search {
 }
 
 .rs-filter-date.pf-v6-c-date-picker,
-.rs-filter-field .pf-v6-c-date-picker {
+.rs-filter-field .pf-v6-c-date-picker,
+.rs-date-field.pf-v6-c-date-picker {
   width: 100%;
   max-width: 100%;
+}
+
+/* Portaled PF calendars — above bottom nav (300) and quick-look drawer (1200). */
+.pf-v6-c-date-picker__calendar {
+  z-index: 1300 !important;
+}
+
+.pf-v6-c-date-picker__calendar .pf-v6-c-calendar-month {
+  max-height: min(70vh, 22rem);
+  overflow: auto;
 }
 
 .rs-filter-field .pf-v6-c-date-picker .pf-v6-c-input-group {

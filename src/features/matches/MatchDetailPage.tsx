@@ -2599,6 +2599,8 @@ export function MatchDetailPage() {
             availability={state.availability}
             timeZone={orgTz}
             kickoffAt={match.kickoffAt}
+            matchId={match.id}
+            requests={state.requests}
             currentUserId={currentPickUserId}
             onPick={pickOfficial}
           />

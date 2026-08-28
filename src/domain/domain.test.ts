@@ -1113,6 +1113,16 @@ describe('csv + availability', () => {
     );
     expect(matchesAvailabilityFilter('unset', 'unavailable')).toBe(false);
     expect(matchesAvailabilityFilter('unset', 'unset')).toBe(true);
+    expect(
+      matchesAvailabilityFilter('available', 'requested', {
+        hasPendingRequest: true,
+      }),
+    ).toBe(true);
+    expect(
+      matchesAvailabilityFilter('available', 'requested', {
+        hasPendingRequest: false,
+      }),
+    ).toBe(false);
   });
 
   it('availabilitySortRank orders available first', () => {

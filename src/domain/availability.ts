@@ -538,13 +538,20 @@ export function availabilityStatusLabel(status: KickoffAvailability): string {
   }
 }
 
-export type AssignAvailabilityFilter = 'all' | 'available' | 'unavailable' | 'unset';
+export type AssignAvailabilityFilter =
+  | 'all'
+  | 'available'
+  | 'unavailable'
+  | 'unset'
+  | 'requested';
 
 /** Assign-modal buckets: not available = blocked or outside the kickoff window. */
 export function matchesAvailabilityFilter(
   status: KickoffAvailability,
   filter: AssignAvailabilityFilter,
+  opts?: { hasPendingRequest?: boolean },
 ): boolean {
+  if (filter === 'requested') return opts?.hasPendingRequest === true;
   if (filter === 'all') return true;
   if (filter === 'available') return status === 'available';
   if (filter === 'unset') return status === 'unset';
