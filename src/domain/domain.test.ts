@@ -2070,3 +2070,21 @@ describe('crewColumnLines', () => {
     );
   });
 });
+
+describe('demo raise-hand seed', () => {
+  it('stacks multiple volunteers on Austin vs Dallas open game', async () => {
+    const { demoStore, DEMO_CROWD_RAISE_HAND_MATCH_ID } = await import(
+      '@/services/demoStore'
+    );
+    demoStore.resetToSeed();
+    const state = demoStore.getState();
+    const crowd = state.requests.filter(
+      (r) =>
+        r.matchId === DEMO_CROWD_RAISE_HAND_MATCH_ID && r.status === 'pending',
+    );
+    expect(crowd.length).toBe(6);
+    expect(matchesNeedingOfficials(state.matches).some(
+      (m) => m.id === DEMO_CROWD_RAISE_HAND_MATCH_ID,
+    )).toBe(true);
+  });
+});

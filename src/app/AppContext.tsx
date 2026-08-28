@@ -255,6 +255,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     (opts?: { onboarding?: boolean }) => {
       if (!isDemoMode) return;
       flushSync(() => {
+        persistDataMode('demo');
         demoStore.resetToSeed();
         demoStore.ensureDemoTourPersona();
         if (opts?.onboarding) {
@@ -265,7 +266,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
         }
         setState(demoStore.getState());
         setDataModeState('demo');
-        persistDataMode('demo');
       });
     },
     [],

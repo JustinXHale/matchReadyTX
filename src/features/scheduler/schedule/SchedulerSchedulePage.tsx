@@ -28,6 +28,10 @@ import { MatchCrewTrailing } from '@/ui/MatchCrewTrailing';
 import type { BackNav } from '@/nav/backNav';
 import { MatchListRow } from '@/ui/MatchListRow';
 import {
+  matchesNeedingOfficials,
+  matchesNeedingReassignment,
+} from '@/features/scheduler/queues/selectors';
+import {
   formatMatchMonthLabel,
   matchMonthKey,
   orgTimeZone,
@@ -155,15 +159,32 @@ export function SchedulerSchedulePage() {
     return groups;
   }, [list, timeZone]);
 
+  const coverageCount = useMemo(
+    () =>
+      matchesNeedingOfficials(state.matches).length +
+      matchesNeedingReassignment(state.matches).length,
+    [state.matches],
+  );
+
   return (
     <div className="rs-stack">
       <Title headingLevel="h1" size="lg">
         Schedule
       </Title>
       <p className="rs-match-card__meta">
-        Society matches — filter by competition, date, level, or gender. Tap a
-        game to assign crew or edit.
+        Browse the full society calendar. Use Coverage to assign open slots and
+        review raise-hand requests in context.
       </p>
+      {coverageCount > 0 ? (
+        <div className="rs-schedule-coverage-callout">
+          <p>
+            {coverageCount} match{coverageCount === 1 ? '' : 'es'} need
+            assignment.{' '}
+            <Link to="/scheduler/queues/coverage">Open Coverage</Link> to assign
+            crew and approve raise-hand volunteers.
+          </p>
+        </div>
+      ) : null}
       <Link to="/scheduler/upload">
         <Button variant="secondary" isBlock>
           Sync Sheet &amp; release drafts

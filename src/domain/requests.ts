@@ -140,6 +140,16 @@ export function pendingRequestForUser(
   );
 }
 
+/** Pending raise-hand rows for one match (coverage assign hub). */
+export function pendingRaiseHandRequestsForMatch(
+  requests: GameRequest[],
+  matchId: string,
+): GameRequest[] {
+  return requests.filter(
+    (r) => r.matchId === matchId && r.status === 'pending',
+  );
+}
+
 function preferredSlotIsFilled(match: Match, slot: RequestableSlot): boolean {
   if (slot === 'cmo') {
     const list = match.cmo ?? [];

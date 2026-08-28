@@ -12,8 +12,7 @@ export function WorkQueuesSubNav() {
   const notificationsHref = useAppHref('/scheduler/queues/notifications');
 
   const counts = useMemo(() => countSchedulerQueues(state), [state]);
-  const coverageTotal =
-    counts.needsOfficials + counts.needsReassignment + counts.t72;
+  const coverageTotal = counts.needsOfficials + counts.needsReassignment;
 
   return (
     <nav

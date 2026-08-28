@@ -108,6 +108,9 @@ function isLiveDataMode(): boolean {
   }
 }
 
+/** Match used for multi-volunteer raise-hand demo on Coverage. */
+export const DEMO_CROWD_RAISE_HAND_MATCH_ID = 'm_g01';
+
 type LiveSnapshotExpect =
   | 'assignment_confirmed'
   | 'assignment_cleared'
@@ -1438,34 +1441,58 @@ function seedOfficialAlerts(): OfficialAlert[] {
 }
 
 function seedGameRequests(matches: Match[]): GameRequest[] {
-  // Open Global games only — not past results (m_res*), which also start with "m_r".
-  const pendingIds = matches
-    .filter((m) => /^m_g\d/.test(m.id))
-    .sort((a, b) => a.id.localeCompare(b.id))
-    .slice(0, 5);
   const slots: Array<'mo' | 'ar1' | 'ar2' | 'no4'> = ['mo', 'ar1', 'ar2', 'no4'];
   const now = Date.now();
 
-  // Pending tab is waiting-only — seed open requests (not approved/denied history).
   const requesters = [
     { userId: 'u_ref1', userName: 'Riley Official' },
     { userId: 'u_ref2', userName: 'Casey Official' },
+    { userId: 'u_ref3', userName: 'Jordan Smith' },
+    { userId: 'u_ref4', userName: 'Mia Chen' },
+    { userId: 'u_ref5', userName: 'Devon Taylor' },
+    { userId: 'u_ref6', userName: 'Sara Patel' },
     { userId: 'u_assigner', userName: 'Alex Assigner' },
   ] as const;
 
-  return pendingIds.map((m, i) => {
-    const created = new Date(now - (i + 1) * 36 * 60 * 60 * 1000).toISOString();
-    const who = requesters[i % requesters.length];
-    return {
+  const requests: GameRequest[] = [];
+
+  // Austin vs Dallas (Aug 31 in demo): six volunteers on one match for Coverage UX.
+  const crowdMatch = matches.find((m) => m.id === DEMO_CROWD_RAISE_HAND_MATCH_ID);
+  if (crowdMatch) {
+    requesters.slice(0, 6).forEach((who, i) => {
+      requests.push({
+        id: `gr_crowd_${crowdMatch.id}_${i}`,
+        matchId: crowdMatch.id,
+        userId: who.userId,
+        userName: who.userName,
+        preferredSlots: [i < 4 ? 'mo' : slots[(i % 3) + 1]],
+        status: 'pending',
+        createdAt: new Date(now - (i + 1) * 2 * 60 * 60 * 1000).toISOString(),
+        note: i === 0 ? 'Available all day' : undefined,
+      });
+    });
+  }
+
+  // One volunteer each on a few other open global games.
+  const otherOpenGames = matches
+    .filter((m) => /^m_g\d/.test(m.id) && m.id !== DEMO_CROWD_RAISE_HAND_MATCH_ID)
+    .sort((a, b) => a.id.localeCompare(b.id))
+    .slice(0, 4);
+
+  otherOpenGames.forEach((m, i) => {
+    const who = requesters[(i + 1) % requesters.length];
+    requests.push({
       id: `gr_${m.id}`,
       matchId: m.id,
       userId: who.userId,
       userName: who.userName,
       preferredSlots: [slots[i % slots.length]],
-      status: 'pending' as const,
-      createdAt: created,
-    };
+      status: 'pending',
+      createdAt: new Date(now - (i + 2) * 36 * 60 * 60 * 1000).toISOString(),
+    });
   });
+
+  return requests;
 }
 
 function seedFixtureRequests(): FixtureRequest[] {
@@ -2350,9 +2377,10 @@ function emptyLiveQueueState(): Pick<
   };
 }
 
-function createInitialState(): AppState {
+function createInitialState(opts?: { seedDemoQueue?: boolean }): AppState {
   const seeded = seedAssignerQueueDemos(seedMatches());
-  const live = isLiveDataMode();
+  const live =
+    opts?.seedDemoQueue === true ? false : isLiveDataMode();
   const queueState = live
     ? emptyLiveQueueState()
     : {
@@ -2726,7 +2754,7 @@ class DemoStore {
    * have replaced fixtures. Does not sign anyone in.
    */
   resetToSeed(): void {
-    this.state = createInitialState();
+    this.state = createInitialState({ seedDemoQueue: true });
     this.listeners.forEach((l) => l());
   }
 

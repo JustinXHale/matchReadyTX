@@ -5,17 +5,22 @@ import { faUserPlus } from '@fortawesome/free-solid-svg-icons';
 import { useApp } from '@/app/AppContext';
 import { formatMatchKickoff, orgTimeZone } from '@/domain/matchTime';
 import { statusLabel } from '@/domain/matchTransitions';
-import { openCrewAssignTargets } from '@/domain/requests';
+import {
+  openCrewAssignTargets,
+  pendingRaiseHandRequestsForMatch,
+} from '@/domain/requests';
 import {
   REQUESTABLE_SLOT_LABELS,
   REQUESTABLE_SLOT_SHORT,
   type ChangeProposal,
   type Match,
+  type RequestableSlot,
 } from '@/domain/types';
 import {
   AssignOfficialModal,
   type CrewPickTarget,
 } from '@/features/matches/AssignOfficialModal';
+import { CoverageMatchRequesters } from '@/features/scheduler/queues/CoverageMatchRequesters';
 import { MatchListRow } from '@/ui/MatchListRow';
 import { WORK_QUEUES_BACK } from '@/features/scheduler/queues/workQueuePagesShared';
 
@@ -27,6 +32,9 @@ export function MatchQueueList({
   ctaLabel,
   urgent = false,
   assignOpenSlots = false,
+  showRaiseHandRequests = false,
+  onApproveRaiseHand,
+  onDeclineRaiseHand,
   onAlert,
 }: {
   matches: Match[];
@@ -36,9 +44,14 @@ export function MatchQueueList({
   urgent?: boolean;
   /** Coverage: show open positions that open the assign modal. */
   assignOpenSlots?: boolean;
+  /** Coverage: show pending raise-hand requesters under each match row. */
+  showRaiseHandRequests?: boolean;
+  onApproveRaiseHand?: (id: string, slot?: RequestableSlot) => void;
+  onDeclineRaiseHand?: (id: string, reason?: string) => void;
   /** When set, show Alert / Resend coverage for officials. */
   onAlert?: (matchId: string) => void;
 }) {
+  const { state } = useApp();
   const [alerted, setAlerted] = useState<Set<string>>(() => new Set());
   const [pick, setPick] = useState<{
     match: Match;
@@ -55,8 +68,15 @@ export function MatchQueueList({
         {matches.map((m) => {
           const sent = alerted.has(m.id);
           const openSlots = assignOpenSlots ? openCrewAssignTargets(m) : [];
+          const raiseHand =
+            showRaiseHandRequests && onApproveRaiseHand && onDeclineRaiseHand
+              ? pendingRaiseHandRequestsForMatch(state.requests, m.id)
+              : [];
           return (
-            <li key={m.id}>
+            <li
+              key={m.id}
+              className={assignOpenSlots ? 'rs-coverage-match' : undefined}
+            >
               <MatchListRow
                 match={m}
                 to={`/matches/${m.id}`}
@@ -126,6 +146,15 @@ export function MatchQueueList({
                   </div>
                 }
               />
+              {raiseHand.length > 0 && onApproveRaiseHand && onDeclineRaiseHand ? (
+                <CoverageMatchRequesters
+                  match={m}
+                  requests={raiseHand}
+                  matchBack={QUEUES_BACK}
+                  onApprove={onApproveRaiseHand}
+                  onDecline={onDeclineRaiseHand}
+                />
+              ) : null}
             </li>
           );
         })}
