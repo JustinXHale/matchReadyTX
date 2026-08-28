@@ -33,6 +33,7 @@ import {
   shouldShowTeamAdminLens,
 } from '@/domain/teamLinkRequests';
 import { withDemoPrefix } from '@/app/demoPaths';
+import type { BackNav } from '@/nav/backNav';
 
 /** Header role switcher — Referee/CMO combined (Q-R6 locked). Team Admin = club lens. */
 export type RoleView = 'referee' | 'teamAdmin' | 'scheduler' | 'fan';
@@ -201,6 +202,11 @@ export const ROLE_HOME: Record<RoleView, string> = {
   scheduler: '/scheduler',
   fan: '/global/schedule/upcoming',
 };
+
+/** Labeled back target for the active role home (detail-screen fallback). */
+export function roleHomeBack(roleView: RoleView): BackNav {
+  return { to: ROLE_HOME[roleView], label: ROLE_VIEW_LABELS[roleView] };
+}
 
 function pickTourPersonaUid(): string {
   const users = demoStore.getState().users;

@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react';
 import { useEffect, useState } from 'react';
 import { Button, Title } from '@patternfly/react-core';
-import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
+import { Link, useParams } from 'react-router-dom';
 import { useApp, useAppHref } from '@/app/AppContext';
 import {
   COACH_FEEDBACK_COMMENT_BLOCKS,
@@ -30,7 +30,7 @@ import {
 import { formatInsightsAvg } from '@/features/insights/insightsFormat';
 import { InsightsReportTrailing } from '@/features/insights/InsightsReportTrailing';
 import '@/features/referee/reports/reports.css';
-import { backState, readBackNav, type BackNav } from '@/nav/backNav';
+import { backState, useAppBack, type BackNav } from '@/nav/backNav';
 import { isFirebaseConfigured } from '@/services/firebase';
 import {
   defaultOrgId,
@@ -67,9 +67,6 @@ function ScorePill({ value }: { value: string }) {
   return <span className="rs-pill">{value}</span>;
 }
 
-function goBackTo(navigate: ReturnType<typeof useNavigate>, back: BackNav) {
-  navigate(back.to, back.state !== undefined ? { state: back.state } : undefined);
-}
 
 export function CmoPublicReportRow({
   report,
@@ -343,17 +340,17 @@ export function PublishedTeamFeedbackView({
 
 function ReportNotFound({
   title,
-  back,
+  backLabel,
   onBack,
 }: {
   title: string;
-  back: BackNav;
+  backLabel: string;
   onBack: () => void;
 }) {
   return (
     <div className="rs-stack">
       <Button variant="link" className="rs-detail__back" onClick={onBack}>
-        ← Back to {back.label}
+        ← {backLabel}
       </Button>
       <Title headingLevel="h1" size="lg">
         {title}
@@ -365,8 +362,6 @@ function ReportNotFound({
 
 export function MemberCmoReportPage() {
   const { userId = '', reportId = '' } = useParams();
-  const location = useLocation();
-  const navigate = useNavigate();
   const { state, dataMode } = useApp();
   const profileHref = useAppHref(`/about/members/${userId}`);
   const fromStore = state.matchReports.find((r) => r.id === reportId) ?? null;
@@ -389,13 +384,11 @@ export function MemberCmoReportPage() {
   }, [reportId, fromStore, dataMode]);
 
   const member = state.users.find((u) => u.uid === userId);
-  const back =
-    readBackNav(location.state) ??
-    ({
-      to: `${profileHref}#cmo-reports`,
-      label: member ? memberListName(member) : 'Profile',
-    } satisfies BackNav);
-  const onBack = () => goBackTo(navigate, back);
+  const fallback = {
+    to: `${profileHref}#cmo-reports`,
+    label: member ? memberListName(member) : 'Profile',
+  } satisfies BackNav;
+  const { goBack: onBack, backLabel } = useAppBack(fallback);
 
   const report = fromStore ?? fetched;
   const match = report
@@ -415,7 +408,7 @@ export function MemberCmoReportPage() {
     return (
       <ReportNotFound
         title="CMO report not found"
-        back={back}
+        backLabel={backLabel}
         onBack={onBack}
       />
     );
@@ -424,7 +417,7 @@ export function MemberCmoReportPage() {
   return (
     <div className="rs-stack">
       <Button variant="link" className="rs-detail__back" onClick={onBack}>
-        ← Back to {back.label}
+        ← {backLabel}
       </Button>
       <Title headingLevel="h1" size="lg">
         CMO coaching report
@@ -440,8 +433,6 @@ export function MemberCmoReportPage() {
 
 export function MemberTeamFeedbackPage() {
   const { userId = '', feedbackId = '' } = useParams();
-  const location = useLocation();
-  const navigate = useNavigate();
   const { state, dataMode } = useApp();
   const profileHref = useAppHref(`/about/members/${userId}`);
   const fromStore = state.coachFeedback.find((f) => f.id === feedbackId) ?? null;
@@ -464,13 +455,11 @@ export function MemberTeamFeedbackPage() {
   }, [feedbackId, fromStore, dataMode]);
 
   const member = state.users.find((u) => u.uid === userId);
-  const back =
-    readBackNav(location.state) ??
-    ({
-      to: `${profileHref}#team-feedback`,
-      label: member ? memberListName(member) : 'Profile',
-    } satisfies BackNav);
-  const onBack = () => goBackTo(navigate, back);
+  const fallback = {
+    to: `${profileHref}#team-feedback`,
+    label: member ? memberListName(member) : 'Profile',
+  } satisfies BackNav;
+  const { goBack: onBack, backLabel } = useAppBack(fallback);
 
   const feedback = fromStore ?? fetched;
   const isPublicForOfficial =
@@ -487,7 +476,7 @@ export function MemberTeamFeedbackPage() {
     return (
       <ReportNotFound
         title="Team feedback not found"
-        back={back}
+        backLabel={backLabel}
         onBack={onBack}
       />
     );
@@ -496,7 +485,7 @@ export function MemberTeamFeedbackPage() {
   return (
     <div className="rs-stack">
       <Button variant="link" className="rs-detail__back" onClick={onBack}>
-        ← Back to {back.label}
+        ← {backLabel}
       </Button>
       <Title headingLevel="h1" size="lg">
         Team feedback

@@ -20,7 +20,7 @@ import {
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faPen } from '@fortawesome/free-solid-svg-icons';
 import { canSeeMatchFees } from '@/domain/visibility';
-import { ROLE_HOME, useApp } from '@/app/AppContext';
+import { roleHomeBack, useApp } from '@/app/AppContext';
 import { statusLabel } from '@/domain/matchTransitions';
 import {
   crewChipClass,
@@ -75,7 +75,7 @@ import { openGroupMailto, uniqueEmails } from '@/services/mailto';
 import { persistCrewAssignmentAndEmail, persistCrewUnassignmentAndEmail, resendCrewAssignmentEmail } from '@/services/liveAssignment';
 import { defaultOrgId, createGameRequestInFirestore, patchGameRequestContentInFirestore, saveMatchCrewAssignment, callMatchSelfService } from '@/services/orgData';
 import { isFirebaseConfigured } from '@/services/firebase';
-import { backState, readBackNav } from '@/nav/backNav';
+import { backState, useAppBack } from '@/nav/backNav';
 import {
   matchDetailHeaderReportLinks,
   matchDetailReportActions,
@@ -224,18 +224,8 @@ export function MatchDetailPage() {
   } = useApp();
   const orgTz = orgTimeZone(state.org.timezone);
   const match = state.matches.find((m) => m.id === id);
-  const back = readBackNav(location.state);
-  const goBack = () => {
-    if (back) {
-      navigate(
-        back.to,
-        back.state !== undefined ? { state: back.state } : undefined,
-      );
-      return;
-    }
-    navigate(ROLE_HOME[roleView]);
-  };
-  const backLabel = back ? `Back to ${back.label}` : 'Back';
+  const homeBack = useMemo(() => roleHomeBack(roleView), [roleView]);
+  const { goBack, backLabel } = useAppBack(homeBack);
   const [reason, setReason] = useState('');
   const [showDecline, setShowDecline] = useState(false);
   const [declineMode, setDeclineMode] = useState<'assignment' | 't72'>(

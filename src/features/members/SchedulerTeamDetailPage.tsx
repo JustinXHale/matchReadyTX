@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
+import { Link, useLocation, useParams } from 'react-router-dom';
 import { EmptyState, EmptyStateBody } from '@patternfly/react-core';
 import { useApp, useAppHref } from '@/app/AppContext';
 import { memberListName } from '@/domain/members';
@@ -12,7 +12,7 @@ import {
   teamAdminsForTeam,
   teamContactPeople,
 } from '@/domain/teams';
-import { readBackNav, backState, type BackNav } from '@/nav/backNav';
+import { useAppBack, backState, type BackNav } from '@/nav/backNav';
 import { UserAvatar } from '@/ui/UserAvatar';
 import { MatchListRow } from '@/ui/MatchListRow';
 import { MapsAddressLink } from '@/ui/MapsAddressLink';
@@ -21,15 +21,11 @@ const FALLBACK_BACK: BackNav = { to: '/about/members/teams', label: 'Teams' };
 
 export function SchedulerTeamDetailPage() {
   const { teamId } = useParams();
-  const navigate = useNavigate();
   const location = useLocation();
   const { state } = useApp();
   const membersHref = useAppHref('/about/members');
   const teamsBaseHref = useAppHref('/about/members/teams');
-  const back = readBackNav(location.state) ?? FALLBACK_BACK;
-  const goBack = () =>
-    navigate(back.to, back.state !== undefined ? { state: back.state } : undefined);
-  const backLabel = `Back to ${back.label}`;
+  const { goBack, backLabel } = useAppBack(FALLBACK_BACK);
 
   const team = useMemo(() => {
     if (!teamId) return null;

@@ -57,7 +57,7 @@ import {
   subscribePublishedCoachFeedbackForOfficial,
   subscribeSubmittedCmoForOfficial,
 } from '@/services/orgData';
-import { readBackNav, type BackNav } from '@/nav/backNav';
+import { useAppBack, type BackNav } from '@/nav/backNav';
 import { MatchListRow } from '@/ui/MatchListRow';
 import {
   ConferenceTeamPicker,
@@ -267,10 +267,7 @@ export function MemberDetailPage() {
   const memberHref = useAppHref(`/about/members/${userId ?? ''}`);
   const timeZone = state.org.timezone || 'America/Chicago';
   const availNow = new Date();
-  const back = readBackNav(location.state) ?? FALLBACK_BACK;
-  const goBack = () =>
-    navigate(back.to, back.state !== undefined ? { state: back.state } : undefined);
-  const backLabel = `Back to ${back.label}`;
+  const { goBack, backLabel } = useAppBack(FALLBACK_BACK);
   /** Address / availability: must be acting as Scheduler, not merely hold the role. */
   const canSeeAssignerPii = isAssignerView && hasAssignerRole;
   const canManage = isAssignerView && hasAssignerRole;

@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { useLocation, useNavigate, useParams } from 'react-router-dom';
+import { useLocation, useParams } from 'react-router-dom';
 import { EmptyState, EmptyStateBody, Title } from '@patternfly/react-core';
 import { useApp } from '@/app/AppContext';
 import { releasedMatches } from '@/domain/visibility';
@@ -7,7 +7,7 @@ import { genderLabel, type Match } from '@/domain/types';
 import { MatchListRow } from '@/ui/MatchListRow';
 import { MatchCrewTrailing } from '@/ui/MatchCrewTrailing';
 import { formatTeamAddress, teamHomeMapsUrl } from '@/domain/teams';
-import { readBackNav, type BackNav } from '@/nav/backNav';
+import { useAppBack, backState, type BackNav } from '@/nav/backNav';
 import { MapsAddressLink } from '@/ui/MapsAddressLink';
 import {
   formatMatchMonthLabel,
@@ -19,14 +19,10 @@ const FALLBACK_BACK: BackNav = { to: '/global/teams', label: 'Teams' };
 
 export function GlobalTeamDetailPage() {
   const { teamId } = useParams();
-  const navigate = useNavigate();
   const location = useLocation();
   const { currentUser, state } = useApp();
   const timeZone = orgTimeZone(state.org.timezone);
-  const back = readBackNav(location.state) ?? FALLBACK_BACK;
-  const goBack = () =>
-    navigate(back.to, back.state !== undefined ? { state: back.state } : undefined);
-  const backLabel = `Back to ${back.label}`;
+  const { goBack, backLabel } = useAppBack(FALLBACK_BACK);
 
   const team = useMemo(() => {
     if (!teamId) return null;

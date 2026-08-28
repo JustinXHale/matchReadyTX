@@ -11,6 +11,33 @@
   margin-bottom: 10px;
 }
 
+/* Level + availability, then from + to — two columns even on narrow modals */
+.rs-official-picker__filters .rs-insights-official-filters {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-items: end;
+  gap: var(--rs-space-sm);
+  width: 100%;
+}
+
+.rs-official-picker__filters .rs-insights-official-filters__grade.pf-v6-c-form__group {
+  flex: unset;
+  max-width: none;
+  min-width: 0;
+  margin-bottom: 0;
+}
+
+.rs-official-picker__filters .rs-insights-official-filters__grade .pf-v6-c-form-select,
+.rs-official-picker__filters .rs-insights-official-filters__grade .rs-icon-field {
+  width: 100%;
+}
+
+/* Dropdowns open as full-screen sheets on mobile — keep modal compact */
+.pf-v6-c-modal-box:has(.rs-official-picker__filters) {
+  width: min(100% - 2rem, 28rem) !important;
+  max-width: min(100% - 2rem, 28rem) !important;
+}
+
 .rs-official-picker {
   list-style: none;
   margin: 0;

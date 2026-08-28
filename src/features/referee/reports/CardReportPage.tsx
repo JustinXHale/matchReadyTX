@@ -24,6 +24,8 @@ import {
 } from '@/domain/reports';
 import { assignmentForUser } from '@/domain/types';
 import { CardReportViewBody } from '@/features/referee/reports/MatchReportViewPage';
+import { CARD_REPORTS_BACK } from '@/features/referee/reports/reportLinks';
+import { useAppBack } from '@/nav/backNav';
 import { persistSubmittedCardReport } from '@/services/reportsLive';
 import { useScrollReportToTopOnChange } from '@/features/referee/reports/scrollReportToTop';
 import { IconDateInput } from '@/ui/IconDateInput';
@@ -46,6 +48,7 @@ export function CardReportPage() {
   const { matchId = '' } = useParams();
   const { currentUser, state, store, dataMode } = useApp();
   const navigate = useNavigate();
+  const { goBack, backLabel } = useAppBack(CARD_REPORTS_BACK);
 
   const match = state.matches.find((m) => m.id === matchId);
   // Anyone can read a submitted card report for this match.
@@ -117,9 +120,9 @@ export function CardReportPage() {
           <button
             type="button"
             className="rs-detail__back"
-            onClick={() => navigate(-1)}
+            onClick={goBack}
           >
-            ← Back
+            ← {backLabel}
           </button>
           <Title headingLevel="h2" size="lg">
             Card report

@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import { useApp, useAppHref } from '@/app/AppContext';
 import {
   formatMemberCityState,
@@ -10,7 +10,7 @@ import type { UserProfile } from '@/domain/types';
 import { AvailabilityMonthCalendar } from '@/features/availability/AvailabilityMonthCalendar';
 import { OfficialInsightsPanel } from '@/features/scheduler/OfficialInsightsPanel';
 import { OfficialAssignmentMatches } from '@/features/scheduler/OfficialAssignmentMatches';
-import type { BackNav } from '@/nav/backNav';
+import { backState, type BackNav } from '@/nav/backNav';
 import { UserAvatar } from '@/ui/UserAvatar';
 
 type QuickLookTab = 'profile' | 'matches' | 'insights';
@@ -37,6 +37,7 @@ export function OfficialQuickLookPanel({
   matchBack?: BackNav;
 }) {
   const { state } = useApp();
+  const location = useLocation();
   const memberHref = useAppHref(`/about/members/${user.uid}`);
   const timeZone = state.org.timezone || 'America/Chicago';
   const now = new Date();
@@ -49,6 +50,11 @@ export function OfficialQuickLookPanel({
     [state.availability, user.uid],
   );
   const cityState = formatMemberCityState(user);
+  const profileBack: BackNav =
+    matchBack ?? {
+      to: `${location.pathname}${location.search}`,
+      label: 'Previous',
+    };
 
   const followLink = () => onNavigate?.();
 
@@ -132,6 +138,7 @@ export function OfficialQuickLookPanel({
             <Link
               className="rs-official-quicklook__link"
               to={memberHref}
+              state={backState(profileBack)}
               onClick={followLink}
             >
               Open full profile

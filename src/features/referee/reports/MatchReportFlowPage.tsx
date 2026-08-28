@@ -23,7 +23,8 @@ import {
   type MoReportPayload,
   type ReportFormKind,
 } from '@/domain/reports';
-import { backState } from '@/nav/backNav';
+import { backState, useAppBack } from '@/nav/backNav';
+import { MATCH_REPORTS_BACK } from '@/features/referee/reports/reportLinks';
 import {
   cardReportPath,
   MATCH_REPORTS_BACK,
@@ -47,6 +48,8 @@ export function MatchReportFlowPage() {
   const { matchId = '' } = useParams();
   const { currentUser, state, store, dataMode } = useApp();
   const navigate = useNavigate();
+  const { goBack: exitToReports, backLabel: reportsBackLabel } =
+    useAppBack(MATCH_REPORTS_BACK);
 
   const match = state.matches.find((m) => m.id === matchId);
   const report = useMemo(() => {
@@ -137,7 +140,7 @@ export function MatchReportFlowPage() {
         </Title>
         <Button
           variant="link"
-          onClick={() => navigate('/referee/reports/match')}
+          onClick={exitToReports}
         >
           Back to Match Reports
         </Button>
@@ -178,7 +181,7 @@ export function MatchReportFlowPage() {
         )}
         <Button
           variant="link"
-          onClick={() => navigate('/referee/reports/match')}
+          onClick={exitToReports}
         >
           Back to Match Reports
         </Button>
@@ -198,7 +201,7 @@ export function MatchReportFlowPage() {
         </p>
         <Button
           variant="secondary"
-          onClick={() => navigate('/referee/reports/match')}
+          onClick={exitToReports}
         >
           Back to Match Reports
         </Button>
@@ -371,7 +374,7 @@ export function MatchReportFlowPage() {
         ) : (
           <Button
             variant="secondary"
-            onClick={() => navigate('/referee/reports/match')}
+            onClick={exitToReports}
           >
             Back to Match Reports
           </Button>
@@ -390,9 +393,9 @@ export function MatchReportFlowPage() {
         <button
           type="button"
           className="rs-detail__back"
-          onClick={() => navigate('/referee/reports/match')}
+          onClick={exitToReports}
         >
-          ← Match Reports
+          ← {reportsBackLabel}
         </button>
         <Title headingLevel="h2" size="lg">
           Match report
@@ -476,11 +479,11 @@ export function MatchReportFlowPage() {
             setFormKind(null);
             setStep('chooser');
           } else {
-            navigate('/referee/reports/match');
+            exitToReports();
           }
         }}
       >
-        ← {report.slot === 'mo' ? 'Choose form' : 'Match Reports'}
+        ← {report.slot === 'mo' ? 'Choose form' : reportsBackLabel}
       </button>
       <Title headingLevel="h2" size="lg">
         {title}

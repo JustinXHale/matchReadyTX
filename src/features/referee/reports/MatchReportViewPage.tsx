@@ -21,6 +21,8 @@ import {
   submittedMatchReportsForMatch,
 } from '@/features/referee/reports/reportLinks';
 import { SubmittedPerformanceReportView } from '@/features/referee/reports/SubmittedPerformanceReportView';
+import { MATCH_REPORTS_BACK } from '@/features/referee/reports/reportLinks';
+import { useAppBack } from '@/nav/backNav';
 import { MatchListRow } from '@/ui/MatchListRow';
 
 function Field({
@@ -44,6 +46,7 @@ export function MatchReportViewPage() {
   const [params] = useSearchParams();
   const { currentUser, state, isAssignerView } = useApp();
   const navigate = useNavigate();
+  const { goBack, backLabel } = useAppBack(MATCH_REPORTS_BACK);
 
   const report = resolveSubmittedMatchReport(state.matchReports, matchId, {
     officialId: params.get('officialId') ?? undefined,
@@ -101,9 +104,9 @@ export function MatchReportViewPage() {
       <button
         type="button"
         className="rs-detail__back"
-        onClick={() => navigate(-1)}
+        onClick={goBack}
       >
-        ← Back
+        ← {backLabel}
       </button>
       <Title headingLevel="h2" size="lg">
         Match report ({kindLabel})
@@ -283,9 +286,9 @@ export function CmoReportViewPage() {
       <button
         type="button"
         className="rs-detail__back"
-        onClick={() => navigate(-1)}
+        onClick={goBack}
       >
-        ← Back
+        ← {backLabel}
       </button>
       <Title headingLevel="h2" size="lg">
         {youFiled

@@ -1,6 +1,6 @@
 import { Button, FormGroup, Switch, TextInput, TextArea, Title } from '@patternfly/react-core';
-import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
-import { useState } from 'react';
+import { Link, useLocation, useParams } from 'react-router-dom';
+import { useMemo, useState } from 'react';
 import { useApp, useAppHref } from '@/app/AppContext';
 import {
   COACH_FEEDBACK_COMMENT_BLOCKS,
@@ -17,6 +17,7 @@ import {
   defaultOrgId,
   setCoachFeedbackPublicOnProfile,
 } from '@/services/orgData';
+import { useAppBack, type BackNav } from '@/nav/backNav';
 import { MatchListRow } from '@/ui/MatchListRow';
 import { ScaleRatingCards } from '@/ui/ScaleRatingCards';
 
@@ -74,15 +75,21 @@ export function SchedulerFeedbackDetailPage() {
     dataMode,
     store,
   } = useApp();
-  const navigate = useNavigate();
   const insightsList = useAppHref('/insights/reports/coach-feedback');
   const schedulerList = useAppHref('/scheduler/feedback');
   const listHref = location.pathname.includes('/insights')
     ? insightsList
     : schedulerList;
-  const backLabel = location.pathname.includes('/insights')
-    ? 'Back to coach feedback'
-    : 'Back to Feedback';
+  const listFallback = useMemo(
+    (): BackNav => ({
+      to: listHref,
+      label: location.pathname.includes('/insights')
+        ? 'Coach feedback'
+        : 'Feedback',
+    }),
+    [listHref, location.pathname],
+  );
+  const { goBack, backLabel } = useAppBack(listFallback);
   const memberBase = useAppHref('/about/members');
   const [publishBusy, setPublishBusy] = useState(false);
   const [publishError, setPublishError] = useState<string | null>(null);
@@ -106,8 +113,8 @@ export function SchedulerFeedbackDetailPage() {
         <Title headingLevel="h2" size="lg">
           Feedback not found
         </Title>
-        <Button variant="link" onClick={() => navigate(listHref)}>
-          {backLabel}
+        <Button variant="link" onClick={goBack}>
+          ← {backLabel}
         </Button>
       </div>
     );
@@ -168,7 +175,7 @@ export function SchedulerFeedbackDetailPage() {
       <Button
         variant="link"
         className="rs-detail__back"
-        onClick={() => navigate(listHref)}
+        onClick={goBack}
       >
         ← {backLabel}
       </Button>

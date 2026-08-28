@@ -323,6 +323,7 @@ export function MobileShell() {
             <NavLink
               key={item.to}
               to={item.to}
+              replace
               className={() =>
                 `rs-bottom-nav__with-icon${
                   item.isActive(location.pathname) ? ' active' : ''
