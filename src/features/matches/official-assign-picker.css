@@ -1,0 +1,154 @@
+.rs-official-picker__hint {
+  margin: 0 0 8px;
+  font-size: 12px;
+  color: var(--rs-color-muted);
+}
+
+.rs-official-picker__filters {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.rs-official-picker {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  width: 100%;
+  max-height: min(50vh, 22rem);
+  overflow: auto;
+}
+
+.rs-official-picker > li {
+  display: block;
+  width: 100%;
+  margin: 0;
+  padding: 0;
+}
+
+button.rs-official-picker__row {
+  appearance: none;
+  -webkit-appearance: none;
+  box-sizing: border-box;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(4.25rem, 5.5rem);
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  max-width: 100%;
+  margin: 0;
+  padding: 10px 4px;
+  border: 0;
+  border-radius: 0;
+  border-bottom: 1px solid var(--rs-color-border);
+  box-shadow: none;
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+  color: inherit;
+  font: inherit;
+  line-height: inherit;
+}
+
+.rs-official-picker li:last-child .rs-official-picker__row {
+  border-bottom: none;
+}
+
+button.rs-official-picker__row:hover:not(:disabled),
+button.rs-official-picker__row:focus-visible:not(:disabled) {
+  background: var(--rs-color-surface-muted);
+  outline: none;
+}
+
+button.rs-official-picker__row--current {
+  background: color-mix(in srgb, var(--rs-color-ink) 6%, var(--rs-color-surface));
+}
+
+button.rs-official-picker__row:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.rs-official-picker__identity {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 10px 8px;
+  align-items: center;
+  min-width: 0;
+}
+
+.rs-official-picker__copy {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.rs-official-picker__name,
+.rs-official-picker__grade,
+.rs-official-picker__status {
+  display: block;
+}
+
+.rs-official-picker__name {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 650;
+  color: var(--rs-color-charcoal);
+}
+
+.rs-official-picker__grade {
+  margin: 2px 0 0;
+  font: var(--rs-font-meta);
+  color: var(--rs-color-muted);
+}
+
+.rs-official-picker__status {
+  margin: 2px 0 0;
+  font: var(--rs-font-meta);
+  color: var(--rs-color-muted);
+}
+
+.rs-official-picker__games {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  align-self: stretch;
+  gap: 2px;
+  min-width: 0;
+  padding-left: 8px;
+  border-left: 1px solid var(--rs-color-border);
+  text-align: center;
+}
+
+.rs-official-picker__games-label {
+  font: var(--rs-font-meta);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: var(--rs-color-muted);
+  line-height: 1.2;
+}
+
+.rs-official-picker__games-value {
+  display: flex;
+  align-items: baseline;
+  justify-content: center;
+  gap: 4px;
+  font-size: 14px;
+  font-weight: 650;
+  color: var(--rs-color-ink);
+  line-height: 1.2;
+}
+
+.rs-official-picker__games-total {
+  font: var(--rs-font-meta);
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--rs-color-muted);
+  line-height: 1.2;
+}

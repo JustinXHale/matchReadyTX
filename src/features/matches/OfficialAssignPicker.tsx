@@ -26,6 +26,7 @@ import type { AvailabilityRange, Match, UserProfile } from '@/domain/types';
 import { IconDateInput } from '@/ui/IconDateInput';
 import { UserAvatar } from '@/ui/UserAvatar';
 import '@/features/insights/insights.css';
+import './official-assign-picker.css';
 
 const LEVEL_CAPS = Array.from(
   { length: ASSESSED_LEVEL_MAX - ASSESSED_LEVEL_MIN + 1 },
@@ -214,13 +215,13 @@ export function OfficialAssignPicker({
                   }`}
                   onClick={() => onPick(o.uid)}
                 >
-                  <span className="rs-insights-official-row__identity">
+                  <span className="rs-official-picker__identity">
                     <UserAvatar user={o} size="md" />
-                    <span>
-                      <span className="rs-insights-official-row__name">
+                    <span className="rs-official-picker__copy">
+                      <span className="rs-official-picker__name">
                         {memberListName(o)}
                       </span>
-                      <span className="rs-insights-official-row__grade">
+                      <span className="rs-official-picker__grade">
                         {officialGradeLabel(o)}
                       </span>
                       <span className="rs-official-picker__status">
@@ -228,13 +229,13 @@ export function OfficialAssignPicker({
                       </span>
                     </span>
                   </span>
-                  <span className="rs-insights-official-row__metric">
-                    <span className="rs-insights-official-row__metric-label">
+                  <span className="rs-official-picker__games">
+                    <span className="rs-official-picker__games-label">
                       Games
                     </span>
-                    <span className="rs-insights-official-row__metric-value">
+                    <span className="rs-official-picker__games-value">
                       <span>{games.upcoming}</span>
-                      <span className="rs-insights-official-row__metric-count">
+                      <span className="rs-official-picker__games-total">
                         ({games.total})
                       </span>
                     </span>

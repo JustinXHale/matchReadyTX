@@ -218,19 +218,6 @@
   cursor: not-allowed;
 }
 
-.rs-official-picker__hint {
-  margin: 0 0 8px;
-  font-size: 12px;
-  color: var(--rs-color-muted);
-}
-
-.rs-official-picker__filters {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  margin-bottom: 10px;
-}
-
 .rs-detail-card--proposal {
   border-color: color-mix(in srgb, var(--rs-color-urgent) 45%, var(--rs-color-surface));
   background: color-mix(in srgb, var(--rs-color-urgent) 8%, var(--rs-color-surface));
@@ -632,112 +619,6 @@ button.rs-detail-people__confirm:focus-visible {
   display: flex;
   flex-direction: column;
   gap: 8px;
-}
-
-.rs-official-picker {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 0;
-  max-height: min(50vh, 22rem);
-  overflow: auto;
-}
-
-.rs-official-picker__row {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(4.25rem, 5.5rem);
-  align-items: center;
-  gap: 8px;
-  width: 100%;
-  margin: 0;
-  padding: 10px 4px;
-  border: none;
-  border-bottom: 1px solid var(--rs-color-border);
-  background: transparent;
-  text-align: left;
-  cursor: pointer;
-  color: inherit;
-  font: inherit;
-}
-
-.rs-official-picker li:last-child .rs-official-picker__row {
-  border-bottom: none;
-}
-
-.rs-official-picker__row:hover:not(:disabled),
-.rs-official-picker__row:focus-visible:not(:disabled) {
-  background: var(--rs-color-surface-muted);
-  outline: none;
-}
-
-.rs-official-picker__row--current {
-  background: color-mix(in srgb, var(--rs-color-ink) 6%, var(--rs-color-surface));
-}
-
-.rs-official-picker__row:disabled {
-  opacity: 0.45;
-  cursor: not-allowed;
-}
-
-.rs-official-picker__identity {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  width: 100%;
-}
-
-.rs-official-picker__status {
-  display: block;
-  margin: 2px 0 0;
-  font: var(--rs-font-meta);
-  color: var(--rs-color-muted);
-}
-
-.rs-official-picker__row .rs-insights-official-row__identity {
-  min-width: 0;
-}
-
-.rs-official-picker__row .rs-insights-official-row__name,
-.rs-official-picker__row .rs-insights-official-row__grade {
-  display: block;
-}
-
-.rs-official-picker__row .rs-insights-official-row__metric {
-  align-self: stretch;
-}
-
-.rs-official-picker__main {
-  display: flex;
-  flex: 1;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 10px;
-  min-width: 0;
-}
-
-.rs-official-picker__name {
-  font-size: 15px;
-  font-weight: 700;
-  color: var(--rs-color-ink);
-}
-
-.rs-official-picker__dist {
-  flex-shrink: 0;
-  font-size: 13px;
-  font-weight: 500;
-  color: var(--rs-color-muted);
-}
-
-.rs-official-picker__dist--unknown {
-  font-weight: 500;
-  color: var(--rs-color-muted);
-}
-
-.rs-official-picker__meta {
-  font-size: 12px;
-  color: var(--rs-color-muted);
 }
 
 .rs-raise-hand-heading {
