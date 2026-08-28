@@ -71,7 +71,7 @@ export function CardReportPage() {
     : { officialName: '', officialEmail: '', officialPhone: '' };
 
   const [step, setStep] = useState<WizardStep>('identity');
-  const reportTopRef = useScrollReportToTopOnChange(step);
+  const reportTopRef = useScrollReportToTopOnChange<HTMLDivElement>(step);
   const [officialName, setOfficialName] = useState(contact.officialName);
   const [officialEmail, setOfficialEmail] = useState(contact.officialEmail);
   const [officialPhone, setOfficialPhone] = useState(contact.officialPhone);
@@ -298,9 +298,11 @@ export function CardReportPage() {
       >
         ← {step === 'cards' ? 'Identity' : 'Card Reports'}
       </button>
-      <Title headingLevel="h2" size="lg" ref={reportTopRef}>
-        Card report
-      </Title>
+      <div ref={reportTopRef}>
+        <Title headingLevel="h2" size="lg">
+          Card report
+        </Title>
+      </div>
       <p className="rs-match-card__meta">
         {match.homeTeamName} vs {match.awayTeamName}
       </p>

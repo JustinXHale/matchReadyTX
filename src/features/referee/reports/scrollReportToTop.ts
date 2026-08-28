@@ -46,10 +46,10 @@ export function scrollReportSectionIntoView(el: HTMLElement | null): void {
 }
 
 /** After the first paint, scroll to the section titles when `pageKey` changes. */
-export function useScrollReportToTopOnChange(
+export function useScrollReportToTopOnChange<T extends HTMLElement = HTMLElement>(
   pageKey: string | number,
-): RefObject<HTMLElement | null> {
-  const ref = useRef<HTMLElement>(null);
+): RefObject<T | null> {
+  const ref = useRef<T>(null);
   const skipFirst = useRef(true);
 
   useLayoutEffect(() => {
