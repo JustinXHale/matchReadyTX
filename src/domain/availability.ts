@@ -538,6 +538,19 @@ export function availabilityStatusLabel(status: KickoffAvailability): string {
   }
 }
 
+export type AssignAvailabilityFilter = 'all' | 'available' | 'unavailable' | 'unset';
+
+/** Assign-modal buckets: not available = blocked or outside the kickoff window. */
+export function matchesAvailabilityFilter(
+  status: KickoffAvailability,
+  filter: AssignAvailabilityFilter,
+): boolean {
+  if (filter === 'all') return true;
+  if (filter === 'available') return status === 'available';
+  if (filter === 'unset') return status === 'unset';
+  return status === 'blocked' || status === 'outside_window';
+}
+
 /** Compact label like 8a–5p */
 export function formatHmCompact(hm: string): string {
   const [hStr, mStr] = hm.split(':');

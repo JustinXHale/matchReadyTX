@@ -51,6 +51,7 @@ import {
   isPendingRequestActive,
   matchNeedsCrewCoverage,
   normalizeRequestableSlots,
+  openCrewAssignTargets,
 } from '@/domain/requests';
 import { matchesNeedingOfficials } from '@/features/scheduler/queues/selectors';
 import { parseScheduleCsv } from '@/domain/csvImport';
@@ -62,6 +63,7 @@ import {
   dayAvailability,
   dayKeyInZone,
   kickoffAvailabilityStatus,
+  matchesAvailabilityFilter,
   rangesOverlapKickoff,
   setDayState,
   zonedLocalToUtcIso,
@@ -78,6 +80,10 @@ import {
   fanFavoriteLabel,
   formatMemberCityState,
   officialEffectiveLevel,
+  officialGradeLabel,
+  officialMatchesLevelCap,
+  rugbySeasonDayRange,
+  assignmentGameCountsByOfficial,
   formatMemberJoinedAt,
   memberListName,
   memberMatchesTab,
@@ -213,6 +219,23 @@ describe('crew visibility gate', () => {
       displayName: 'Ref Two',
     });
     expect(matchNeedsCrewCoverage(m)).toBe(false);
+  });
+
+  it('openCrewAssignTargets lists empty fee-crew blocks', () => {
+    let m = releaseMatch(baseMatch());
+    m = {
+      ...m,
+      rolesNeeded: ['mo', 'ar1'],
+      crew: {
+        ...m.crew,
+        ar1: [emptyAssignment('ar1')],
+      },
+    };
+    const targets = openCrewAssignTargets(m);
+    expect(targets.map((t) => t.slot)).toEqual(['mo', 'ar1']);
+    expect(targets.every((t) => t.assignmentId)).toBe(true);
+    m = assignOfficial(m, 'mo', { uid: 'r1', displayName: 'Ref One' });
+    expect(openCrewAssignTargets(m).map((t) => t.slot)).toEqual(['ar1']);
   });
 
   it('matchesNeedingOfficials includes partial crew, not only zero MO', () => {
@@ -1080,6 +1103,18 @@ describe('csv + availability', () => {
     ).toBe('blocked');
   });
 
+  it('matchesAvailabilityFilter buckets not-available vs not-set', () => {
+    expect(matchesAvailabilityFilter('available', 'all')).toBe(true);
+    expect(matchesAvailabilityFilter('available', 'available')).toBe(true);
+    expect(matchesAvailabilityFilter('blocked', 'available')).toBe(false);
+    expect(matchesAvailabilityFilter('blocked', 'unavailable')).toBe(true);
+    expect(matchesAvailabilityFilter('outside_window', 'unavailable')).toBe(
+      true,
+    );
+    expect(matchesAvailabilityFilter('unset', 'unavailable')).toBe(false);
+    expect(matchesAvailabilityFilter('unset', 'unset')).toBe(true);
+  });
+
   it('availabilitySortRank orders available first', () => {
     expect(availabilitySortRank('available')).toBeLessThan(
       availabilitySortRank('outside_window'),
@@ -1449,6 +1484,84 @@ describe('member directory helpers', () => {
     ).toBeNull();
   });
 
+  it('officialGradeLabel and progressive level cap (1 is highest)', () => {
+    expect(
+      officialGradeLabel({ ...base, assessedLevel: 8, refereeLevel: 2 }),
+    ).toBe('Assessed 8');
+    expect(
+      officialGradeLabel({
+        ...base,
+        assessedLevel: undefined,
+        refereeLevel: 2,
+      }),
+    ).toBe('Self-assessed 2');
+    expect(
+      officialGradeLabel({
+        ...base,
+        assessedLevel: undefined,
+        refereeLevel: undefined,
+      }),
+    ).toBe('Grade unknown');
+    expect(officialMatchesLevelCap(8, null)).toBe(true);
+    expect(officialMatchesLevelCap(null, null)).toBe(true);
+    expect(officialMatchesLevelCap(null, 10)).toBe(false);
+    expect(officialMatchesLevelCap(10, 10)).toBe(true);
+    expect(officialMatchesLevelCap(9, 10)).toBe(true);
+    expect(officialMatchesLevelCap(10, 9)).toBe(false);
+    expect(officialMatchesLevelCap(1, 9)).toBe(true);
+  });
+
+  it('rugbySeasonDayRange starts in August', () => {
+    const tz = 'America/Chicago';
+    expect(
+      rugbySeasonDayRange(tz, new Date('2026-08-27T12:00:00-05:00')),
+    ).toEqual({ from: '2026-08-01', to: '2027-07-31' });
+    expect(
+      rugbySeasonDayRange(tz, new Date('2026-03-15T12:00:00-05:00')),
+    ).toEqual({ from: '2025-08-01', to: '2026-07-31' });
+  });
+
+  it('assignmentGameCountsByOfficial splits upcoming vs total in range', () => {
+    const tz = 'America/Chicago';
+    const past = {
+      ...baseMatch(),
+      id: 'past',
+      kickoffAt: '2026-09-01T18:00:00.000Z',
+      crew: {
+        ...emptyCrew(),
+        mo: [{ ...emptyAssignment('mo'), userId: 'u1', status: 'confirmed' as const }],
+      },
+    };
+    const future = {
+      ...baseMatch(),
+      id: 'future',
+      kickoffAt: '2026-10-01T18:00:00.000Z',
+      crew: {
+        ...emptyCrew(),
+        mo: [{ ...emptyAssignment('mo'), userId: 'u1', status: 'confirmed' as const }],
+      },
+    };
+    const otherSeason = {
+      ...baseMatch(),
+      id: 'old',
+      kickoffAt: '2025-09-01T18:00:00.000Z',
+      crew: {
+        ...emptyCrew(),
+        mo: [{ ...emptyAssignment('mo'), userId: 'u1', status: 'confirmed' as const }],
+      },
+    };
+    const counts = assignmentGameCountsByOfficial(
+      [past, future, otherSeason],
+      {
+        timeZone: tz,
+        fromDay: '2026-08-01',
+        toDay: '2027-07-31',
+        nowMs: new Date('2026-09-15T12:00:00.000Z').getTime(),
+      },
+    );
+    expect(counts.get('u1')).toEqual({ upcoming: 1, total: 2 });
+  });
+
   it('membersForTab hides incomplete unless includeIncomplete', () => {
     const incomplete: UserProfile = {
       ...base,
@@ -1796,6 +1909,16 @@ describe('parseAssessedRating', () => {
     const allNa = Object.fromEntries(CMO_SCALE_KEYS.map((k) => [k, 'na' as const]));
     expect(validateCmoScales(allNa, CMO_SCALE_KEYS)).toBe(true);
     expect(validateCmoScales({ scrum: 4 }, CMO_SCALE_KEYS)).toBe(false);
+  });
+
+  it('averages CMO scale scores and skips N/A', async () => {
+    const { cmoScaleAverage } = await import('@/domain/reports');
+    expect(cmoScaleAverage(undefined)).toBeNull();
+    expect(cmoScaleAverage({})).toBeNull();
+    expect(cmoScaleAverage({ scrum: 'na', breakdown: 'na' })).toBeNull();
+    expect(cmoScaleAverage({ scrum: 4, breakdown: 5, advantage: 'na' })).toBe(
+      4.5,
+    );
   });
 
   it('requires a complexity factor or Other text', async () => {

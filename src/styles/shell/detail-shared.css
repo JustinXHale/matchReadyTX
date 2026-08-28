@@ -169,7 +169,7 @@ button.rs-detail-meta__maps {
   margin-top: 0;
 }
 
-.rs-actions--inline {
+.rs-actions.rs-actions--inline {
   flex-direction: row;
   flex-wrap: wrap;
   align-items: center;
@@ -177,7 +177,7 @@ button.rs-detail-meta__maps {
   width: auto;
 }
 
-.rs-actions--inline .pf-v6-c-button {
+.rs-actions.rs-actions--inline .pf-v6-c-button {
   width: auto;
   min-height: auto;
 }

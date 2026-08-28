@@ -331,6 +331,7 @@ export function CoachFeedbackFormPage() {
         status === 'submitted'
           ? (existing?.submittedAt ?? now)
           : existing?.submittedAt,
+      publicOnProfile: existing?.publicOnProfile,
       edits: appendCoachFeedbackEdit(existing?.edits, edit),
       createdAt: existing?.createdAt ?? now,
       updatedAt: now,

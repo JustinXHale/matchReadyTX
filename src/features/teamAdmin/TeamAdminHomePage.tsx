@@ -20,6 +20,7 @@ import { TeamAdminMatchRow } from '@/features/teamAdmin/TeamAdminMatchRow';
 import { isFirebaseConfigured } from '@/services/firebase';
 import {
   callReviewTeamLinkRequest,
+  callableErrorMessage,
   defaultOrgId,
 } from '@/services/orgData';
 
@@ -90,9 +91,7 @@ export function TeamAdminHomePage() {
     } catch (err) {
       console.error('Team link review failed', err);
       window.alert(
-        err instanceof Error
-          ? err.message
-          : 'Failed to review Team Admin request.',
+        callableErrorMessage(err, 'Failed to review Team Admin request.'),
       );
     } finally {
       setTeamLinkBusyId(null);

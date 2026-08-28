@@ -429,6 +429,7 @@ export function coachFeedbackFromFirestore(
     status,
     submittedAt:
       typeof data.submittedAt === 'string' ? data.submittedAt : undefined,
+    publicOnProfile: data.publicOnProfile === true,
     edits: parseCoachFeedbackEdits(data.edits),
     createdAt: String(data.createdAt ?? ''),
     updatedAt: String(data.updatedAt ?? ''),
@@ -953,6 +954,121 @@ export function subscribeCoachFeedback(
       onData(feedback);
     },
     (err) => onError?.(err),
+  );
+}
+
+/** Submitted CMO coaching reports about one official (public on their profile). */
+export function subscribeSubmittedCmoForOfficial(
+  orgId: string,
+  officialUid: string,
+  onData: (reports: MatchReport[]) => void,
+  onError?: (err: Error) => void,
+): Unsubscribe {
+  const col = collection(requireDb(), 'orgs', orgId, 'matchReports');
+  return onSnapshot(
+    query(
+      col,
+      where('subjectOfficialId', '==', officialUid),
+      where('slot', '==', 'cmo'),
+      where('status', '==', 'submitted'),
+    ),
+    (snap) => {
+      onData(
+        snap.docs
+          .map((d) =>
+            matchReportFromFirestore(d.id, d.data() as Record<string, unknown>),
+          )
+          .filter((r): r is MatchReport => r != null),
+      );
+    },
+    (err) => onError?.(err),
+  );
+}
+
+/** Team feedback the Scheduler published on this official’s profile. */
+export function subscribePublishedCoachFeedbackForOfficial(
+  orgId: string,
+  officialUid: string,
+  onData: (feedback: CoachFeedback[]) => void,
+  onError?: (err: Error) => void,
+): Unsubscribe {
+  const col = collection(requireDb(), 'orgs', orgId, 'coachFeedback');
+  return onSnapshot(
+    query(
+      col,
+      where('officialUserId', '==', officialUid),
+      where('status', '==', 'submitted'),
+      where('publicOnProfile', '==', true),
+    ),
+    (snap) => {
+      onData(
+        snap.docs
+          .map((d) =>
+            coachFeedbackFromFirestore(
+              d.id,
+              d.data() as Record<string, unknown>,
+            ),
+          )
+          .filter((f): f is CoachFeedback => f != null),
+      );
+    },
+    (err) => onError?.(err),
+  );
+}
+
+/** Single match report (profile drill-down when it is not already in the store). */
+export function subscribeMatchReportDoc(
+  orgId: string,
+  reportId: string,
+  onData: (report: MatchReport | null) => void,
+  onError?: (err: Error) => void,
+): Unsubscribe {
+  return onSnapshot(
+    doc(requireDb(), 'orgs', orgId, 'matchReports', reportId),
+    (snap) => {
+      if (!snap.exists()) {
+        onData(null);
+        return;
+      }
+      onData(
+        matchReportFromFirestore(
+          snap.id,
+          snap.data() as Record<string, unknown>,
+        ),
+      );
+    },
+    (err) => {
+      onData(null);
+      onError?.(err);
+    },
+  );
+}
+
+/** Single coach-feedback doc (profile drill-down when it is not already in the store). */
+export function subscribeCoachFeedbackDoc(
+  orgId: string,
+  feedbackId: string,
+  onData: (feedback: CoachFeedback | null) => void,
+  onError?: (err: Error) => void,
+): Unsubscribe {
+  return onSnapshot(
+    doc(requireDb(), 'orgs', orgId, 'coachFeedback', feedbackId),
+    (snap) => {
+      if (!snap.exists()) {
+        onData(null);
+        return;
+      }
+      onData(
+        coachFeedbackFromFirestore(
+          snap.id,
+          snap.data() as Record<string, unknown>,
+        ),
+      );
+    },
+    (err) => {
+      onData(null);
+      onError?.(err);
+    },
   );
 }
 
@@ -1500,6 +1616,28 @@ export async function callSubmitTeamLinkRequests(input: {
   return result.data as SubmitTeamLinkResult;
 }
 
+/** Unwrap Firebase callable errors (bare "INTERNAL" hides the real cause). */
+export function callableErrorMessage(err: unknown, fallback: string): string {
+  if (!err || typeof err !== 'object') {
+    return err instanceof Error && err.message ? err.message : fallback;
+  }
+  const o = err as { message?: string; code?: string; details?: unknown };
+  const msg = typeof o.message === 'string' ? o.message.trim() : '';
+  const details =
+    typeof o.details === 'string'
+      ? o.details.trim()
+      : o.details &&
+          typeof o.details === 'object' &&
+          'message' in o.details &&
+          typeof (o.details as { message: unknown }).message === 'string'
+        ? String((o.details as { message: string }).message).trim()
+        : '';
+  if (details) return details;
+  if (msg && msg.toUpperCase() !== 'INTERNAL' && msg !== o.code) return msg;
+  if (msg && msg.toUpperCase() !== 'INTERNAL') return msg;
+  return fallback;
+}
+
 /** Assigner or Team Admin reviews a club-link request. */
 export async function callReviewTeamLinkRequest(input: {
   orgId?: string;
@@ -1586,6 +1724,7 @@ export async function saveCoachFeedbackInFirestore(
     reportingTeamName: feedback.reportingTeamName,
     status: feedback.status,
     submittedAt: feedback.submittedAt ?? null,
+    publicOnProfile: feedback.publicOnProfile === true,
     edits: feedback.edits,
     createdAt: feedback.createdAt,
     updatedAt: feedback.updatedAt,
@@ -1593,6 +1732,21 @@ export async function saveCoachFeedbackInFirestore(
   await setDoc(
     doc(requireDb(), 'orgs', orgId, 'coachFeedback', feedback.id),
     payload,
+  );
+}
+
+/** Assigner publishes or hides a submitted report on the official’s profile. */
+export async function setCoachFeedbackPublicOnProfile(
+  orgId: string,
+  feedbackId: string,
+  publicOnProfile: boolean,
+): Promise<void> {
+  await updateDoc(
+    doc(requireDb(), 'orgs', orgId, 'coachFeedback', feedbackId),
+    {
+      publicOnProfile,
+      updatedAt: new Date().toISOString(),
+    },
   );
 }
 

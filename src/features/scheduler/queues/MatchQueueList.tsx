@@ -1,9 +1,21 @@
 import { useState } from 'react';
 import { Button } from '@patternfly/react-core';
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import { faUserPlus } from '@fortawesome/free-solid-svg-icons';
 import { useApp } from '@/app/AppContext';
 import { formatMatchKickoff, orgTimeZone } from '@/domain/matchTime';
 import { statusLabel } from '@/domain/matchTransitions';
-import type { ChangeProposal, Match } from '@/domain/types';
+import { openCrewAssignTargets } from '@/domain/requests';
+import {
+  REQUESTABLE_SLOT_LABELS,
+  REQUESTABLE_SLOT_SHORT,
+  type ChangeProposal,
+  type Match,
+} from '@/domain/types';
+import {
+  AssignOfficialModal,
+  type CrewPickTarget,
+} from '@/features/matches/AssignOfficialModal';
 import { MatchListRow } from '@/ui/MatchListRow';
 import { WORK_QUEUES_BACK } from '@/features/scheduler/queues/workQueuePagesShared';
 
@@ -14,62 +26,116 @@ export function MatchQueueList({
   emptyText,
   ctaLabel,
   urgent = false,
+  assignOpenSlots = false,
   onAlert,
 }: {
   matches: Match[];
   emptyText: string;
-  /** Short action hint in the right column (e.g. Assign, Reassign). */
+  /** Short action hint in the right column (e.g. Review). */
   ctaLabel: string;
   urgent?: boolean;
+  /** Coverage: show open positions that open the assign modal. */
+  assignOpenSlots?: boolean;
   /** When set, show Alert / Resend coverage for officials. */
   onAlert?: (matchId: string) => void;
 }) {
   const [alerted, setAlerted] = useState<Set<string>>(() => new Set());
+  const [pick, setPick] = useState<{
+    match: Match;
+    target: CrewPickTarget;
+  } | null>(null);
 
   if (matches.length === 0) {
     return <p className="rs-match-card__meta">{emptyText}</p>;
   }
 
   return (
-    <ul className="rs-list">
-      {matches.map((m) => {
-        const sent = alerted.has(m.id);
-        return (
-          <li key={m.id}>
-            <MatchListRow
-              match={m}
-              to={`/matches/${m.id}`}
-              showTime
-              split="action"
-              urgent={urgent}
-              back={QUEUES_BACK}
-              meta={
-                <span className="rs-pill">{statusLabel(m.status)}</span>
-              }
-              trailing={
-                <div className="rs-queue-action">
-                  <span className="rs-queue-action__cta">{ctaLabel}</span>
-                  {onAlert && (
-                    <Button
-                      size="sm"
-                      variant="secondary"
-                      onClick={(e) => {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        onAlert(m.id);
-                        setAlerted((prev) => new Set(prev).add(m.id));
-                      }}
-                    >
-                      {sent ? 'Resend alert' : 'Alert refs'}
-                    </Button>
-                  )}
-                </div>
-              }
-            />
-          </li>
-        );
-      })}
-    </ul>
+    <>
+      <ul className="rs-list">
+        {matches.map((m) => {
+          const sent = alerted.has(m.id);
+          const openSlots = assignOpenSlots ? openCrewAssignTargets(m) : [];
+          return (
+            <li key={m.id}>
+              <MatchListRow
+                match={m}
+                to={`/matches/${m.id}`}
+                showTime
+                split="action"
+                urgent={urgent}
+                back={QUEUES_BACK}
+                meta={
+                  <span className="rs-pill">{statusLabel(m.status)}</span>
+                }
+                trailing={
+                  <div className="rs-queue-action">
+                    {assignOpenSlots ? (
+                      <>
+                        <span className="rs-queue-action__sign" aria-hidden>
+                          <FontAwesomeIcon icon={faUserPlus} />
+                        </span>
+                        {openSlots.length > 0 ? (
+                          <div
+                            className="rs-queue-action__slots"
+                            role="group"
+                            aria-label="Open positions"
+                          >
+                            {openSlots.map((target) => (
+                              <button
+                                key={`${target.slot}-${target.assignmentId ?? 'open'}`}
+                                type="button"
+                                className="rs-filter-chip"
+                                aria-label={`Assign ${REQUESTABLE_SLOT_LABELS[target.slot]}`}
+                                onClick={(e) => {
+                                  e.preventDefault();
+                                  e.stopPropagation();
+                                  setPick({
+                                    match: m,
+                                    target: {
+                                      slot: target.slot,
+                                      assignmentId: target.assignmentId,
+                                    },
+                                  });
+                                }}
+                              >
+                                {REQUESTABLE_SLOT_SHORT[target.slot]}
+                              </button>
+                            ))}
+                          </div>
+                        ) : (
+                          <span className="rs-queue-action__cta">{ctaLabel}</span>
+                        )}
+                      </>
+                    ) : (
+                      <span className="rs-queue-action__cta">{ctaLabel}</span>
+                    )}
+                    {onAlert && (
+                      <Button
+                        size="sm"
+                        variant="secondary"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          onAlert(m.id);
+                          setAlerted((prev) => new Set(prev).add(m.id));
+                        }}
+                      >
+                        {sent ? 'Resend alert' : 'Alert refs'}
+                      </Button>
+                    )}
+                  </div>
+                }
+              />
+            </li>
+          );
+        })}
+      </ul>
+      <AssignOfficialModal
+        match={pick?.match ?? null}
+        pickTarget={pick?.target ?? null}
+        onClose={() => setPick(null)}
+      />
+    </>
   );
 }
 

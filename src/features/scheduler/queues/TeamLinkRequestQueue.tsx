@@ -43,9 +43,10 @@ export function TeamLinkRequestQueue({
                 value={reason}
                 onChange={(e) => setReason(e.target.value)}
               />
-              <div className="rs-actions">
+              <div className="rs-actions rs-actions--inline">
                 <Button
                   variant="danger"
+                  className="rs-btn--danger"
                   isDisabled={busyId === r.id}
                   isLoading={busyId === r.id}
                   onClick={() => {
@@ -68,7 +69,7 @@ export function TeamLinkRequestQueue({
               </div>
             </div>
           ) : (
-            <div className="rs-actions">
+            <div className="rs-actions rs-actions--inline">
               <Button
                 variant="primary"
                 isDisabled={busyId === r.id}
@@ -78,8 +79,8 @@ export function TeamLinkRequestQueue({
                 Approve
               </Button>
               <Button
-                variant="secondary"
-                isDanger
+                variant="danger"
+                className="rs-btn--danger"
                 isDisabled={busyId === r.id}
                 onClick={() => setDenyId(r.id)}
               >

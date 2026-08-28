@@ -136,6 +136,28 @@ body {
   color: var(--rs-color-on-primary) !important;
 }
 
+.rs-btn--danger.pf-v6-c-button,
+.rs-btn--danger.pf-v6-c-button.pf-m-danger {
+  background-color: var(--rs-color-urgent) !important;
+  border-color: var(--rs-color-urgent) !important;
+  color: var(--rs-color-on-urgent) !important;
+}
+
+.rs-btn--danger.pf-v6-c-button:hover,
+.rs-btn--danger.pf-v6-c-button:focus-visible {
+  background-color: color-mix(
+    in srgb,
+    var(--rs-color-urgent) 88%,
+    var(--rs-color-tint-contrast)
+  ) !important;
+  border-color: color-mix(
+    in srgb,
+    var(--rs-color-urgent) 88%,
+    var(--rs-color-tint-contrast)
+  ) !important;
+  color: var(--rs-color-on-urgent) !important;
+}
+
 .rs-btn--gold.pf-v6-c-button:hover,
 .rs-btn--gold.pf-v6-c-button:focus-visible {
   background-color: color-mix(in srgb, var(--rs-color-warn) 88%, var(--rs-color-tint-contrast)) !important;

@@ -339,12 +339,11 @@
 
 .rs-insights-official-row {
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr) minmax(4.5rem, 0.85fr) minmax(5rem, 0.95fr);
+  grid-template-columns: minmax(0, 1fr) minmax(4.5rem, 0.85fr) minmax(5rem, 0.95fr);
   gap: 10px 8px;
   align-items: center;
   padding: 12px 0;
   border-bottom: 1px solid var(--rs-color-border);
-  text-decoration: none;
   color: inherit;
 }
 
@@ -353,7 +352,13 @@
 }
 
 .rs-insights-official-row__identity {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 10px 8px;
+  align-items: center;
   min-width: 0;
+  text-decoration: none;
+  color: inherit;
 }
 
 .rs-insights-official-row__name {
@@ -379,6 +384,8 @@
   padding-left: 8px;
   border-left: 1px solid var(--rs-color-border);
   text-align: center;
+  text-decoration: none;
+  color: inherit;
 }
 
 .rs-insights-official-row__metric-label {
@@ -424,6 +431,14 @@
 
 .rs-insights-official-filters__toggle {
   flex: 0 0 auto;
+  margin-bottom: 2px;
+}
+
+.rs-insights-official-filters__chips {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--rs-space-sm);
   margin-bottom: 2px;
 }
 

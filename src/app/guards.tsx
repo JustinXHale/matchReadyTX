@@ -49,12 +49,20 @@ export function RequireInsightsAccess() {
   return <Outlet />;
 }
 
-/** Member directory is for working roles — not the Fan lens. */
+/** Directory and team lists are for working roles. Individual member profiles are allowed. */
 export function RequireMembersAccess() {
   const { isFanView, dataMode } = useApp();
-  if (isFanView) {
+  const location = useLocation();
+  if (isFanView && !isMemberProfilePath(location.pathname)) {
     const about = dataMode === 'demo' ? withDemoPrefix('/about') : '/about';
     return <Navigate to={about} replace />;
   }
   return <Outlet />;
+}
+
+function isMemberProfilePath(pathname: string): boolean {
+  const path = pathname.replace(/^\/demo/, '') || '/';
+  return /^\/about\/members\/(?!teams(?:\/|$))[^/]+(?:\/(cmo|feedback)\/[^/]+)?\/?$/.test(
+    path,
+  );
 }

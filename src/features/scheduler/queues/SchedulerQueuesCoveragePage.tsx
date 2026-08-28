@@ -112,6 +112,7 @@ export function SchedulerQueuesCoveragePage() {
           matches={needsOfficials}
           emptyText="All crew slots are filled (except optional CMO)."
           ctaLabel="Assign"
+          assignOpenSlots
           onAlert={(matchId) => store.sendCoverageAlert(matchId)}
         />
       </QueueSection>
@@ -125,6 +126,7 @@ export function SchedulerQueuesCoveragePage() {
           matches={needsReassignment}
           emptyText="No slots waiting for reassignment."
           ctaLabel="Reassign"
+          assignOpenSlots
           urgent
           onAlert={(matchId) => store.sendCoverageAlert(matchId)}
         />

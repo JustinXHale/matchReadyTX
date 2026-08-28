@@ -538,15 +538,26 @@ export const reviewTeamLinkRequest = onCall(
         'GOOGLE_SERVICE_ACCOUNT_JSON secret is not set',
       );
     }
-    return runReviewTeamLinkRequest({
-      db,
-      orgId,
-      requestId,
-      reviewerUid: request.auth.uid,
-      decision,
-      denyReason: String(request.data?.denyReason ?? '').trim() || undefined,
-      serviceAccountJson: sa,
-    });
+    try {
+      return await runReviewTeamLinkRequest({
+        db,
+        orgId,
+        requestId,
+        reviewerUid: request.auth.uid,
+        decision,
+        denyReason: String(request.data?.denyReason ?? '').trim() || undefined,
+        serviceAccountJson: sa,
+      });
+    } catch (err) {
+      if (err instanceof HttpsError) throw err;
+      logger.error('reviewTeamLinkRequest failed', { orgId, requestId, err });
+      throw new HttpsError(
+        'internal',
+        err instanceof Error
+          ? err.message
+          : 'Failed to review Team Admin request.',
+      );
+    }
   },
 );
 

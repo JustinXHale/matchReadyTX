@@ -309,6 +309,16 @@ const MemberDetailPage = lazy(() =>
     default: m.MemberDetailPage,
   })),
 );
+const MemberCmoReportPage = lazy(() =>
+  import('@/features/members/OfficialPublicReports').then((m) => ({
+    default: m.MemberCmoReportPage,
+  })),
+);
+const MemberTeamFeedbackPage = lazy(() =>
+  import('@/features/members/OfficialPublicReports').then((m) => ({
+    default: m.MemberTeamFeedbackPage,
+  })),
+);
 const SchedulerTeamsPage = lazy(() =>
   import('@/features/members/SchedulerTeamsPage').then((m) => ({
     default: m.SchedulerTeamsPage,
@@ -486,6 +496,14 @@ function FeatureRoutes() {
             <Route index element={<MembersPage />} />
             <Route path="teams" element={<SchedulerTeamsPage />} />
             <Route path="teams/:teamId" element={<SchedulerTeamDetailPage />} />
+            <Route
+              path=":userId/cmo/:reportId"
+              element={<MemberCmoReportPage />}
+            />
+            <Route
+              path=":userId/feedback/:feedbackId"
+              element={<MemberTeamFeedbackPage />}
+            />
             <Route path=":userId" element={<MemberDetailPage />} />
           </Route>
         </Route>

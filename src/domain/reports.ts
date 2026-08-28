@@ -370,6 +370,18 @@ export function validateCmoScales(
   });
 }
 
+/** Mean of 1–5 competency scores. N/A is skipped. Null when nothing rated. */
+export function cmoScaleAverage(
+  scales: Partial<Record<CmoScaleKey, FivePointChoice>> | undefined,
+): number | null {
+  if (!scales) return null;
+  const values = CMO_SCALE_KEYS.map((k) => scales[k]).filter(
+    (v): v is FivePointValue => isFivePointValue(v),
+  );
+  if (values.length === 0) return null;
+  return values.reduce((sum, v) => sum + v, 0) / values.length;
+}
+
 /** Stable Firestore doc id for a match report row. */
 export function matchReportDocId(
   matchId: string,
@@ -389,6 +401,9 @@ export function cardReportDocId(matchId: string, officialId: string): string {
 export const MATCH_REPORT_SOURCE_LEGACY_FORM = 'legacy_form' as const;
 export type MatchReportSource = typeof MATCH_REPORT_SOURCE_LEGACY_FORM;
 
+/** Placeholder officialId on legacy CMO imports when the CMO has no app account yet. */
+export const LEGACY_UNLINKED_OFFICIAL_PREFIX = 'legacy_unlinked_';
+
 /** Display-only fixture facts when the report is not tied to a live schedule match. */
 export interface LegacyCmoFixture {
   teamsText: string;
@@ -397,6 +412,12 @@ export interface LegacyCmoFixture {
   awayTeamName: string;
   homeScore?: number;
   awayScore?: number;
+  /** Form/roster name when subjectOfficialId is not linked yet. */
+  subjectOfficialName?: string;
+  subjectOfficialEmail?: string;
+  /** Form/roster name when officialId is a legacy_unlinked_* placeholder. */
+  cmoOfficialName?: string;
+  cmoOfficialEmail?: string;
 }
 
 export interface MatchReport {
@@ -440,6 +461,10 @@ export function parseLegacyCmoFixture(raw: unknown): LegacyCmoFixture | undefine
     typeof o.awayScore === 'number' && Number.isFinite(o.awayScore)
       ? o.awayScore
       : parsed.awayScore;
+  const optStr = (key: string) => {
+    const v = o[key];
+    return typeof v === 'string' && v.trim() ? v.trim() : undefined;
+  };
   return {
     teamsText: teamsText || `${homeTeamName} vs ${awayTeamName}`.trim(),
     matchLevel: typeof o.matchLevel === 'string' ? o.matchLevel : undefined,
@@ -447,6 +472,18 @@ export function parseLegacyCmoFixture(raw: unknown): LegacyCmoFixture | undefine
     awayTeamName: awayTeamName || parsed.awayTeamName,
     ...(homeScore != null ? { homeScore } : {}),
     ...(awayScore != null ? { awayScore } : {}),
+    ...(optStr('subjectOfficialName')
+      ? { subjectOfficialName: optStr('subjectOfficialName') }
+      : {}),
+    ...(optStr('subjectOfficialEmail')
+      ? { subjectOfficialEmail: optStr('subjectOfficialEmail') }
+      : {}),
+    ...(optStr('cmoOfficialName')
+      ? { cmoOfficialName: optStr('cmoOfficialName') }
+      : {}),
+    ...(optStr('cmoOfficialEmail')
+      ? { cmoOfficialEmail: optStr('cmoOfficialEmail') }
+      : {}),
   };
 }
 

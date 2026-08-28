@@ -25,6 +25,7 @@ import { isFirebaseConfigured } from '@/services/firebase';
 import {
   callApproveFixtureRequest,
   callReviewTeamLinkRequest,
+  callableErrorMessage,
   declineFixtureRequestInFirestore,
   defaultOrgId,
 } from '@/services/orgData';
@@ -272,9 +273,7 @@ export function useSchedulerRequestActions() {
       console.error('Team link review failed', err);
       refresh();
       window.alert(
-        err instanceof Error
-          ? err.message
-          : 'Failed to review Team Admin request.',
+        callableErrorMessage(err, 'Failed to review Team Admin request.'),
       );
     } finally {
       setTeamLinkBusyId(null);

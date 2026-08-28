@@ -1,5 +1,6 @@
 import {
   assignmentForUser,
+  CREW_SLOTS,
   type AvailabilityRange,
   type Match,
   type MatchGender,
@@ -8,6 +9,7 @@ import {
   type UserProfile,
   REQUESTABLE_SLOT_SHORT,
 } from '@/domain/types';
+import { dayKeyInZone, zonedLocalToUtcIso } from '@/domain/availability';
 import { formatMatchKickoff } from '@/domain/matchTime';
 
 export type MemberTab = 'referees' | 'teamAdmins' | 'cmos' | 'fans';
@@ -203,6 +205,96 @@ export function officialEffectiveLevel(user: UserProfile): number | null {
   if (user.assessedLevel != null) return user.assessedLevel;
   if (user.refereeLevel != null) return user.refereeLevel;
   return null;
+}
+
+/** Insights-style grade line: assessed, then self-assessed, else unknown. */
+export function officialGradeLabel(user: UserProfile): string {
+  if (user.assessedLevel != null) return `Assessed ${user.assessedLevel}`;
+  if (user.refereeLevel != null) return `Self-assessed ${user.refereeLevel}`;
+  return 'Grade unknown';
+}
+
+/**
+ * Progressive assign filter. Grade 1 is highest, 10 is lowest.
+ * Cap 10 = this level and above (everyone 1–10). Cap 9 = 1–9 (excludes 10s).
+ * Ungraded officials only match when no cap is set.
+ */
+export function officialMatchesLevelCap(
+  level: number | null,
+  cap: number | null,
+): boolean {
+  if (cap == null) return true;
+  if (level == null) return false;
+  return level <= cap;
+}
+
+/**
+ * US club rugby season as YYYY-MM-DD bounds in the org timezone:
+ * 1 Aug through 31 Jul. August starts the new season.
+ */
+export function rugbySeasonDayRange(
+  timeZone: string,
+  now: Date = new Date(),
+): { from: string; to: string } {
+  const key = dayKeyInZone(now, timeZone);
+  const year = Number(key.slice(0, 4));
+  const month = Number(key.slice(5, 7));
+  const startYear = month >= 8 ? year : year - 1;
+  return {
+    from: `${startYear}-08-01`,
+    to: `${startYear + 1}-07-31`,
+  };
+}
+
+export type AssignmentGameCounts = {
+  upcoming: number;
+  total: number;
+};
+
+function assignedOfficialIds(match: Match): string[] {
+  const ids = new Set<string>();
+  for (const slot of CREW_SLOTS) {
+    for (const a of match.crew[slot] ?? []) {
+      if (a.userId) ids.add(a.userId);
+    }
+  }
+  for (const c of match.cmo ?? []) {
+    if (c.userId) ids.add(c.userId);
+  }
+  return [...ids];
+}
+
+/** Upcoming and in-range assignment counts per official (one count per match). */
+export function assignmentGameCountsByOfficial(
+  matches: Match[],
+  opts: {
+    timeZone: string;
+    fromDay?: string | null;
+    toDay?: string | null;
+    nowMs?: number;
+  },
+): Map<string, AssignmentGameCounts> {
+  const nowMs = opts.nowMs ?? Date.now();
+  const fromMs = opts.fromDay
+    ? new Date(zonedLocalToUtcIso(opts.fromDay, '00:00', opts.timeZone)).getTime()
+    : null;
+  const toMs = opts.toDay
+    ? new Date(zonedLocalToUtcIso(opts.toDay, '23:59', opts.timeZone)).getTime()
+    : null;
+  const map = new Map<string, AssignmentGameCounts>();
+  for (const match of matches) {
+    const kickoffMs = new Date(match.kickoffAt).getTime();
+    if (Number.isNaN(kickoffMs)) continue;
+    if (fromMs != null && kickoffMs < fromMs) continue;
+    if (toMs != null && kickoffMs > toMs) continue;
+    for (const uid of assignedOfficialIds(match)) {
+      const cur = map.get(uid) ?? { upcoming: 0, total: 0 };
+      cur.total += 1;
+      if (kickoffMs >= nowMs) cur.upcoming += 1;
+      map.set(uid, cur);
+    }
+  }
+  return map;
 }
 
 /** City and state from the official’s profile (e.g. Austin, TX). */

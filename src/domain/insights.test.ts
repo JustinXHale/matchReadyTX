@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   cmoReportStats,
   globalCoachFeedbackStats,
+  officialInsightRows,
   officialSeasonStats,
   reviewedOfficialInsightRows,
   gradePyramid,
@@ -217,6 +218,47 @@ describe('insights', () => {
     );
     expect(reviewed).toHaveLength(1);
     expect(reviewed[0].userId).toBe('u1');
+  });
+
+  it('records CMO filer ids on official insight rows', () => {
+    const users: UserProfile[] = [
+      {
+        uid: 'u1',
+        firstName: 'A',
+        lastName: 'B',
+        displayName: 'A B',
+        email: 'a@x.com',
+        phone: '1',
+        smsOptIn: false,
+        homeStreet: '1',
+        homeCity: 'A',
+        homeRegion: 'TX',
+        homePostalCode: '1',
+        homeAddress: '1',
+        roles: ['official'],
+        teamIds: [],
+        profileComplete: true,
+        refereeLevel: 7,
+      },
+    ];
+    const rows = officialInsightRows(
+      users,
+      [],
+      [
+        {
+          id: 'cmo1',
+          matchId: 'm1',
+          officialId: 'cmo-user',
+          slot: 'cmo',
+          status: 'submitted',
+          dueAt: '2026-01-01',
+          kickoffAt: '2026-01-01',
+          subjectOfficialId: 'u1',
+        },
+      ],
+    );
+    expect(rows[0]?.cmoFilerIds).toEqual(['cmo-user']);
+    expect(rows[0]?.cmoReportCount).toBe(1);
   });
 
   it('lists submitted CMO reports only', () => {

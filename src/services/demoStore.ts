@@ -1500,6 +1500,22 @@ function seedFixtureRequests(): FixtureRequest[] {
   ];
 }
 
+function seedTeamLinkRequests(): TeamLinkRequest[] {
+  return [
+    {
+      id: 'tlr_demo_1',
+      orgId: 'demo-org',
+      requesterUserId: 'u_home',
+      requesterName: 'Austin Admin',
+      requesterEmail: 'austin-admin@example.com',
+      teamId: 'team_dallas',
+      teamName: 'Dallas RFC',
+      status: 'pending',
+      createdAt: new Date(Date.now() - 4 * 60 * 60 * 1000).toISOString(),
+    },
+  ];
+}
+
 function seedCoachFeedback(matches: Match[]): CoachFeedback[] {
   const byId = (id: string) => matches.find((x) => x.id === id);
 
@@ -1525,6 +1541,7 @@ function seedCoachFeedback(matches: Match[]): CoachFeedback[] {
       videoLink?: string;
       videoNotes?: string;
       contactAboutReport?: boolean;
+      publicOnProfile?: boolean;
       edits?: CoachFeedback['edits'];
     },
   ): CoachFeedback | null => {
@@ -1568,6 +1585,7 @@ function seedCoachFeedback(matches: Match[]): CoachFeedback[] {
       submitterPhone: opts.submitter.phone,
       clubRole: opts.submitter.clubRole,
       contactAboutReport: opts.contactAboutReport === true,
+      publicOnProfile: opts.publicOnProfile === true,
       reportingTeamId,
       reportingTeamName,
       status: opts.status,
@@ -1641,6 +1659,7 @@ function seedCoachFeedback(matches: Match[]): CoachFeedback[] {
         videoLink: 'https://example.com/demo/austin-dallas-m-res01',
         videoNotes: 'Scrum reset around 34:20; late advantage at 61:05.',
         contactAboutReport: true,
+        publicOnProfile: true,
         edits: [
           {
             at: first,
@@ -2342,7 +2361,7 @@ function createInitialState(): AppState {
         proposals: seeded.proposals,
         requests: seedGameRequests(seeded.matches),
         fixtureRequests: seedFixtureRequests(),
-        teamLinkRequests: [],
+        teamLinkRequests: seedTeamLinkRequests(),
         meetingResources: [],
         coachFeedback: seedCoachFeedback(seeded.matches),
         availability: seedDemoAvailability(),
@@ -4228,6 +4247,7 @@ class DemoStore {
     const next: CoachFeedback = {
       ...feedback,
       slot: 'mo',
+      publicOnProfile: existing?.publicOnProfile,
       edits: feedback.edits ?? existing?.edits ?? [],
       createdAt: existing?.createdAt ?? feedback.createdAt,
       updatedAt: new Date().toISOString(),
@@ -4240,6 +4260,22 @@ class DemoStore {
         : [next, ...s.coachFeedback],
     }));
     return next.id;
+  }
+
+  /** Assigner publishes or hides submitted coach feedback on the official’s profile. */
+  setCoachFeedbackPublicOnProfile(
+    feedbackId: string,
+    publicOnProfile: boolean,
+  ): void {
+    const at = new Date().toISOString();
+    this.set((s) => ({
+      ...s,
+      coachFeedback: s.coachFeedback.map((f) =>
+        f.id === feedbackId && f.status === 'submitted'
+          ? { ...f, publicOnProfile, updatedAt: at }
+          : f,
+      ),
+    }));
   }
 
   /** Optimistic upsert after a live Firestore write (before snapshot arrives). */

@@ -449,8 +449,15 @@ def refresh_token() -> str:
         data=body,
         headers={"Content-Type": "application/x-www-form-urlencoded"},
     )
-    with urllib.request.urlopen(req) as resp:
-        payload = json.loads(resp.read().decode())
+    try:
+        with urllib.request.urlopen(req) as resp:
+            payload = json.loads(resp.read().decode())
+    except urllib.error.HTTPError as exc:
+        sys.exit(
+            "Firebase CLI auth expired. Re-authenticate, then retry:\n"
+            "  firebase login --reauth\n"
+            f"(token refresh failed: HTTP {exc.code})"
+        )
     access = payload["access_token"]
     cfg["tokens"]["access_token"] = access
     FIREBASE_TOOLS.write_text(json.dumps(cfg, indent=2))
@@ -539,6 +546,13 @@ def main() -> None:
         if not ready:
             sys.exit("Nothing to write.")
         token = load_token()
+        status, _ = http_json(
+            "GET",
+            f"https://firestore.googleapis.com/v1/projects/{PROJECT}/databases/(default)/documents/orgs/{ORG_ID}",
+            token,
+        )
+        if status == 401:
+            token = refresh_token()
         write_docs(ready, token)
     else:
         print("\n(dry-run — pass --write to PATCH Firestore)")

@@ -646,10 +646,10 @@ button.rs-detail-people__confirm:focus-visible {
 }
 
 .rs-official-picker__row {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 2px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(4.25rem, 5.5rem);
+  align-items: center;
+  gap: 8px;
   width: 100%;
   margin: 0;
   padding: 10px 4px;
@@ -686,6 +686,26 @@ button.rs-detail-people__confirm:focus-visible {
   align-items: center;
   gap: 10px;
   width: 100%;
+}
+
+.rs-official-picker__status {
+  display: block;
+  margin: 2px 0 0;
+  font: var(--rs-font-meta);
+  color: var(--rs-color-muted);
+}
+
+.rs-official-picker__row .rs-insights-official-row__identity {
+  min-width: 0;
+}
+
+.rs-official-picker__row .rs-insights-official-row__name,
+.rs-official-picker__row .rs-insights-official-row__grade {
+  display: block;
+}
+
+.rs-official-picker__row .rs-insights-official-row__metric {
+  align-self: stretch;
 }
 
 .rs-official-picker__main {

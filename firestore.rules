@@ -372,8 +372,9 @@ service cloud.firestore {
         allow delete: if isAssigner(orgId);
       }
       /**
-       * Team Admin referee feedback — club-owned, Scheduler-confidential.
-       * Officials must never read. Doc id = matchId_reportingTeamId.
+       * Team Admin referee feedback. Unpublished reports are Scheduler /
+       * Insights / filing-club only. Assigners may publish a submitted report
+       * onto the official’s public profile (`publicOnProfile`).
        */
       match /coachFeedback/{feedbackId} {
         function memberDoc() {
@@ -388,6 +389,21 @@ service cloud.firestore {
           return isMember(orgId)
             && 'teamAdmin' in memberDoc().roles
             && resource.data.reportingTeamId in memberDoc().teamIds;
+        }
+        function canReadPublishedFeedback() {
+          return isMember(orgId)
+            && resource.data.status == 'submitted'
+            && resource.data.get('publicOnProfile', false) == true;
+        }
+        function onlyPublishFlagChanged() {
+          return request.resource.data.diff(resource.data).affectedKeys()
+            .hasOnly(['publicOnProfile', 'updatedAt'])
+            && request.resource.data.publicOnProfile is bool
+            && resource.data.status == 'submitted';
+        }
+        function publishFlagUnchanged() {
+          return request.resource.data.get('publicOnProfile', false)
+            == resource.data.get('publicOnProfile', false);
         }
         function matchPath() {
           return /databases/$(database)/documents/orgs/$(orgId)/matches/$(request.resource.data.matchId);
@@ -429,29 +445,46 @@ service cloud.firestore {
           && request.resource.data.officialName is string
           && request.resource.data.officialName.size() > 0
           && request.resource.data.scales is map
-          && matchAllowsCoachFeedback();
+          && matchAllowsCoachFeedback()
+          && (
+            !request.resource.data.keys().hasAny(['publicOnProfile'])
+            || request.resource.data.publicOnProfile == false
+          );
         }
-        allow read: if isAssigner(orgId) || isReportAnalytics(orgId) || canReadClubFeedback();
+        allow read: if isAssigner(orgId)
+          || isReportAnalytics(orgId)
+          || canReadClubFeedback()
+          || canReadPublishedFeedback();
         allow create: if signedIn()
           && isTeamAdminForReportingTeam()
           && coachFeedbackCreateShape();
         allow update: if signedIn()
-          && isTeamAdminForReportingTeam()
-          && resource.data.matchId == request.resource.data.matchId
-          && resource.data.reportingTeamId == request.resource.data.reportingTeamId
-          && resource.data.orgId == request.resource.data.orgId
-          && resource.data.id == request.resource.data.id
-          && coachFeedbackIdOk()
-          && request.resource.data.slot == 'mo'
-          && coachFeedbackStatusOk()
-          && request.resource.data.submitterUserId == request.auth.uid
-          && request.resource.data.scales is map
-          && matchAllowsCoachFeedback();
+          && (
+            (
+              isAssigner(orgId)
+              && onlyPublishFlagChanged()
+            )
+            || (
+              isTeamAdminForReportingTeam()
+              && resource.data.matchId == request.resource.data.matchId
+              && resource.data.reportingTeamId == request.resource.data.reportingTeamId
+              && resource.data.orgId == request.resource.data.orgId
+              && resource.data.id == request.resource.data.id
+              && coachFeedbackIdOk()
+              && request.resource.data.slot == 'mo'
+              && coachFeedbackStatusOk()
+              && request.resource.data.submitterUserId == request.auth.uid
+              && request.resource.data.scales is map
+              && matchAllowsCoachFeedback()
+              && publishFlagUnchanged()
+            )
+          );
         allow delete: if isAssigner(orgId);
       }
 
       /**
        * Post-match MO / AR / CMO reports (Coaching Reports tab uses slot cmo).
+       * Submitted CMO reports are readable by any org member (public profile write-ups).
        */
       match /matchReports/{reportId} {
         function memberDoc() {
@@ -464,6 +497,10 @@ service cloud.firestore {
               || isReportAnalytics(orgId)
               || resource.data.officialId == request.auth.uid
               || resource.data.get('subjectOfficialId', '') == request.auth.uid
+              || (
+                resource.data.slot == 'cmo'
+                && resource.data.status == 'submitted'
+              )
             );
         }
         function matchReportShapeOk() {

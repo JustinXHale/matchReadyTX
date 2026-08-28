@@ -40,6 +40,24 @@
         { "fieldPath": "orgId", "order": "ASCENDING" },
         { "fieldPath": "status", "order": "ASCENDING" }
       ]
+    },
+    {
+      "collectionGroup": "matchReports",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "subjectOfficialId", "order": "ASCENDING" },
+        { "fieldPath": "slot", "order": "ASCENDING" },
+        { "fieldPath": "status", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "coachFeedback",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "officialUserId", "order": "ASCENDING" },
+        { "fieldPath": "status", "order": "ASCENDING" },
+        { "fieldPath": "publicOnProfile", "order": "ASCENDING" }
+      ]
     }
   ],
   "fieldOverrides": [

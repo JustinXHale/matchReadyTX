@@ -28,6 +28,7 @@ const TIER_LABELS: Record<number, string> = {
 };
 
 const ALL_GRADES = '';
+const ALL_CMOS = '';
 
 function gradeLabel(
   assessedLevel?: number,
@@ -71,10 +72,14 @@ function officialsBackHref(
   officialsHref: string,
   gradeFilter: string,
   noCmoOnly: boolean,
+  hasCmoOnly: boolean,
+  cmoFiler: string,
 ): string {
   const params = new URLSearchParams();
   if (gradeFilter) params.set('grade', gradeFilter);
   if (noCmoOnly) params.set('noCmo', '1');
+  if (hasCmoOnly) params.set('hasCmo', '1');
+  if (cmoFiler && !noCmoOnly) params.set('cmo', cmoFiler);
   const q = params.toString();
   return q ? `${officialsHref}?${q}` : officialsHref;
 }
@@ -87,13 +92,17 @@ export function InsightsOfficialsPage() {
 
   const gradeFromUrl = searchParams.get('grade') ?? '';
   const noCmoFromUrl = searchParams.get('noCmo') === '1';
+  const hasCmoFromUrl = searchParams.get('hasCmo') === '1';
+  const cmoFromUrl = searchParams.get('cmo') ?? '';
   const [query, setQuery] = useState('');
   const [gradeFilter, setGradeFilter] = useState(
     gradeFromUrl && TIER_LABELS[Number(gradeFromUrl)]
       ? gradeFromUrl
       : ALL_GRADES,
   );
-  const [noCmoOnly, setNoCmoOnly] = useState(noCmoFromUrl);
+  const [noCmoOnly, setNoCmoOnly] = useState(noCmoFromUrl && !hasCmoFromUrl);
+  const [hasCmoOnly, setHasCmoOnly] = useState(hasCmoFromUrl && !noCmoFromUrl);
+  const [cmoFiler, setCmoFiler] = useState(cmoFromUrl);
 
   useEffect(() => {
     const g = searchParams.get('grade') ?? '';
@@ -102,7 +111,11 @@ export function InsightsOfficialsPage() {
     } else if (!g) {
       setGradeFilter(ALL_GRADES);
     }
-    setNoCmoOnly(searchParams.get('noCmo') === '1');
+    const noCmo = searchParams.get('noCmo') === '1';
+    const hasCmo = searchParams.get('hasCmo') === '1';
+    setNoCmoOnly(noCmo && !hasCmo);
+    setHasCmoOnly(hasCmo && !noCmo);
+    setCmoFiler(searchParams.get('cmo') ?? '');
   }, [searchParams]);
 
   const allRows = useMemo(() => {
@@ -114,12 +127,32 @@ export function InsightsOfficialsPage() {
     );
   }, [state.users, state.coachFeedback, state.matchReports, state.matches]);
 
-  const rows = useMemo(() => {
-    if (noCmoOnly) {
-      return allRows.filter((row) => row.cmoReportCount === 0);
+  const cmoFilers = useMemo(() => {
+    const ids = new Set<string>();
+    for (const row of allRows) {
+      for (const id of row.cmoFilerIds) ids.add(id);
     }
-    return allRows;
-  }, [allRows, noCmoOnly]);
+    return [...ids]
+      .map((id) => {
+        const u = state.users.find((user) => user.uid === id);
+        const name = u
+          ? u.displayName || `${u.firstName} ${u.lastName}`.trim()
+          : id;
+        return { id, name };
+      })
+      .sort((a, b) => a.name.localeCompare(b.name));
+  }, [allRows, state.users]);
+
+  const rows = useMemo(() => {
+    return allRows.filter((row) => {
+      if (noCmoOnly && row.cmoReportCount > 0) return false;
+      if (hasCmoOnly && row.cmoReportCount === 0) return false;
+      if (cmoFiler && !noCmoOnly && !row.cmoFilerIds.includes(cmoFiler)) {
+        return false;
+      }
+      return true;
+    });
+  }, [allRows, noCmoOnly, hasCmoOnly, cmoFiler]);
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -136,10 +169,17 @@ export function InsightsOfficialsPage() {
       .sort((a, b) => a.name.localeCompare(b.name));
   }, [rows, query, gradeFilter]);
 
-  const syncSearchParams = (grade: string, noCmo: boolean) => {
+  const syncSearchParams = (
+    grade: string,
+    noCmo: boolean,
+    hasCmo: boolean,
+    filer: string,
+  ) => {
     const params = new URLSearchParams();
     if (grade) params.set('grade', grade);
     if (noCmo) params.set('noCmo', '1');
+    if (hasCmo) params.set('hasCmo', '1');
+    if (filer && !noCmo) params.set('cmo', filer);
     setSearchParams(params);
   };
 
@@ -148,20 +188,74 @@ export function InsightsOfficialsPage() {
     value: string,
   ) => {
     setGradeFilter(value);
-    syncSearchParams(value, noCmoOnly);
+    syncSearchParams(value, noCmoOnly, hasCmoOnly, cmoFiler);
+  };
+
+  const onCmoFilerChange = (
+    _event: FormEvent<HTMLSelectElement>,
+    value: string,
+  ) => {
+    setCmoFiler(value);
+    const nextNoCmo = false;
+    setNoCmoOnly(nextNoCmo);
+    syncSearchParams(gradeFilter, nextNoCmo, hasCmoOnly, value);
   };
 
   const onNoCmoToggle = () => {
     const next = !noCmoOnly;
     setNoCmoOnly(next);
-    syncSearchParams(gradeFilter, next);
+    const nextHasCmo = next ? false : hasCmoOnly;
+    setHasCmoOnly(nextHasCmo);
+    const nextFiler = next ? ALL_CMOS : cmoFiler;
+    if (next) setCmoFiler(ALL_CMOS);
+    syncSearchParams(gradeFilter, next, nextHasCmo, nextFiler);
   };
 
-  const backHref = officialsBackHref(officialsHref, gradeFilter, noCmoOnly);
+  const onHasCmoToggle = () => {
+    const next = !hasCmoOnly;
+    setHasCmoOnly(next);
+    const nextNoCmo = next ? false : noCmoOnly;
+    setNoCmoOnly(nextNoCmo);
+    syncSearchParams(gradeFilter, nextNoCmo, next, cmoFiler);
+  };
+
+  const backHref = officialsBackHref(
+    officialsHref,
+    gradeFilter,
+    noCmoOnly,
+    hasCmoOnly,
+    cmoFiler,
+  );
 
   const summaryMeta = noCmoOnly
     ? `${filtered.length} registered official${filtered.length === 1 ? '' : 's'} without a CMO coaching report`
-    : `${filtered.length} registered official${filtered.length === 1 ? '' : 's'}`;
+    : hasCmoOnly
+      ? `${filtered.length} registered official${filtered.length === 1 ? '' : 's'} with a CMO coaching report`
+      : cmoFiler
+        ? `${filtered.length} registered official${filtered.length === 1 ? '' : 's'} reviewed by that CMO`
+        : `${filtered.length} registered official${filtered.length === 1 ? '' : 's'}`;
+
+  const emptyHint = (() => {
+    const extra = Boolean(query.trim() || gradeFilter);
+    if (noCmoOnly) {
+      return extra
+        ? 'Try a different search or grade filter.'
+        : 'Every official in the society has at least one CMO coaching report on file.';
+    }
+    if (cmoFiler) {
+      return extra
+        ? 'Try a different search or grade filter.'
+        : 'No officials have a submitted CMO report from that filer.';
+    }
+    if (hasCmoOnly) {
+      return extra
+        ? 'Try a different search or grade filter.'
+        : 'No officials have a submitted CMO coaching report yet.';
+    }
+    return extra
+      ? 'Try a different search or grade filter.'
+      : 'Registered referees appear here with coach and CMO report summaries.';
+  })();
 
   return (
     <div className="rs-stack">
@@ -170,7 +264,7 @@ export function InsightsOfficialsPage() {
       </Title>
       <p className="rs-match-card__meta">
         {summaryMeta}
-        {!noCmoOnly && rows.length !== filtered.length
+        {!noCmoOnly && !hasCmoOnly && !cmoFiler && rows.length !== filtered.length
           ? ` · showing ${filtered.length} of ${rows.length}`
           : ''}
       </p>
@@ -206,29 +300,55 @@ export function InsightsOfficialsPage() {
             ))}
           </FormSelect>
         </FormGroup>
-        <button
-          type="button"
-          className={`rs-filter-chip rs-insights-official-filters__toggle${
-            noCmoOnly ? ' rs-filter-chip--selected' : ''
-          }`}
-          aria-pressed={noCmoOnly}
-          onClick={onNoCmoToggle}
+        <FormGroup
+          label="Filter by CMO"
+          fieldId="insights-officials-cmo"
+          className="rs-insights-official-filters__grade"
         >
-          No CMO report
-        </button>
+          <FormSelect
+            id="insights-officials-cmo"
+            aria-label="Filter by CMO"
+            value={noCmoOnly ? ALL_CMOS : cmoFiler}
+            isDisabled={noCmoOnly || cmoFilers.length === 0}
+            onChange={onCmoFilerChange}
+          >
+            <FormSelectOption value="" label="All CMOs" />
+            {cmoFilers.map((filer) => (
+              <FormSelectOption
+                key={filer.id}
+                value={filer.id}
+                label={filer.name}
+              />
+            ))}
+          </FormSelect>
+        </FormGroup>
+        <div className="rs-insights-official-filters__chips">
+          <button
+            type="button"
+            className={`rs-filter-chip rs-insights-official-filters__toggle${
+              noCmoOnly ? ' rs-filter-chip--selected' : ''
+            }`}
+            aria-pressed={noCmoOnly}
+            onClick={onNoCmoToggle}
+          >
+            No CMO report
+          </button>
+          <button
+            type="button"
+            className={`rs-filter-chip rs-insights-official-filters__toggle${
+              hasCmoOnly ? ' rs-filter-chip--selected' : ''
+            }`}
+            aria-pressed={hasCmoOnly}
+            onClick={onHasCmoToggle}
+          >
+            Has CMO report
+          </button>
+        </div>
       </div>
 
       {filtered.length === 0 ? (
         <EmptyState titleText="No matching officials" headingLevel="h3">
-          <EmptyStateBody>
-            {noCmoOnly
-              ? query.trim() || gradeFilter
-                ? 'Try a different search or grade filter.'
-                : 'Every official in the society has at least one CMO coaching report on file.'
-              : query.trim() || gradeFilter
-                ? 'Try a different search or grade filter.'
-                : 'Registered referees appear here with coach and CMO report summaries.'}
-          </EmptyStateBody>
+          <EmptyStateBody>{emptyHint}</EmptyStateBody>
         </EmptyState>
       ) : (
         <div className="rs-stack rs-insights-official-list">
@@ -245,24 +365,31 @@ export function InsightsOfficialsPage() {
               row.coachFeedbackCount,
               row.coachFeedbackAvg,
             );
+            const profileHref = `${memberBase}/${row.userId}`;
+            const navState = backState({
+              to: backHref,
+              label: 'Officials',
+            });
             return (
-              <Link
-                key={row.userId}
-                to={`${memberBase}/${row.userId}`}
-                state={backState({
-                  to: backHref,
-                  label: 'Officials',
-                })}
-                className="rs-insights-official-row"
-              >
-                <UserAvatar user={user} size="md" />
-                <div className="rs-insights-official-row__identity">
-                  <p className="rs-insights-official-row__name">{row.name}</p>
-                  <p className="rs-insights-official-row__grade">
-                    {gradeLabel(row.assessedLevel, row.refereeLevel)}
-                  </p>
-                </div>
-                <div className="rs-insights-official-row__metric">
+              <div key={row.userId} className="rs-insights-official-row">
+                <Link
+                  to={profileHref}
+                  state={navState}
+                  className="rs-insights-official-row__identity"
+                >
+                  <UserAvatar user={user} size="md" />
+                  <div>
+                    <p className="rs-insights-official-row__name">{row.name}</p>
+                    <p className="rs-insights-official-row__grade">
+                      {gradeLabel(row.assessedLevel, row.refereeLevel)}
+                    </p>
+                  </div>
+                </Link>
+                <Link
+                  to={`${profileHref}#cmo-reports`}
+                  state={navState}
+                  className="rs-insights-official-row__metric"
+                >
                   <span className="rs-insights-official-row__metric-label">
                     {cmo.label}
                   </span>
@@ -274,8 +401,12 @@ export function InsightsOfficialsPage() {
                       </span>
                     ) : null}
                   </span>
-                </div>
-                <div className="rs-insights-official-row__metric">
+                </Link>
+                <Link
+                  to={`${profileHref}#team-feedback`}
+                  state={navState}
+                  className="rs-insights-official-row__metric"
+                >
                   <span className="rs-insights-official-row__metric-label">
                     {coach.label}
                   </span>
@@ -287,8 +418,8 @@ export function InsightsOfficialsPage() {
                       </span>
                     ) : null}
                   </span>
-                </div>
-              </Link>
+                </Link>
+              </div>
             );
           })}
         </div>

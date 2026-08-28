@@ -31,6 +31,8 @@ export type OfficialInsightRow = {
   coachFeedbackAvg: number | null;
   cmoReportCount: number;
   cmoRatingAvg: number | null;
+  /** CMO filer uids who submitted a coaching report about this official. */
+  cmoFilerIds: string[];
 };
 
 const TIER_LABELS: Record<number, string> = {
@@ -158,6 +160,7 @@ export function officialInsightRows(
       cmoRatingAvg: cmoRatings.length
         ? cmoRatings.reduce((s, v) => s + v, 0) / cmoRatings.length
         : null,
+      cmoFilerIds: [...new Set(cmoRows.map((r) => r.officialId))],
     };
   });
 }

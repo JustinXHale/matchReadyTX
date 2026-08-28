@@ -205,6 +205,7 @@ export function TeamAdminReportPage() {
       reportingTeamName,
       status: 'declined',
       submittedAt: existing?.submittedAt,
+      publicOnProfile: existing?.publicOnProfile,
       edits: appendCoachFeedbackEdit(existing?.edits, edit),
       createdAt: existing?.createdAt ?? now,
       updatedAt: now,

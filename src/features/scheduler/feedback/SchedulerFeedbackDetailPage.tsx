@@ -1,5 +1,6 @@
-import { Button, FormGroup, TextInput, TextArea, Title } from '@patternfly/react-core';
+import { Button, FormGroup, Switch, TextInput, TextArea, Title } from '@patternfly/react-core';
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
+import { useState } from 'react';
 import { useApp, useAppHref } from '@/app/AppContext';
 import {
   COACH_FEEDBACK_COMMENT_BLOCKS,
@@ -11,6 +12,11 @@ import {
   type CoachFeedback,
   type CoachFeedbackCommentKey,
 } from '@/domain/coachFeedback';
+import { isFirebaseConfigured } from '@/services/firebase';
+import {
+  defaultOrgId,
+  setCoachFeedbackPublicOnProfile,
+} from '@/services/orgData';
 import { MatchListRow } from '@/ui/MatchListRow';
 import { ScaleRatingCards } from '@/ui/ScaleRatingCards';
 
@@ -60,7 +66,14 @@ function ReadOnlyYesNo({
 export function SchedulerFeedbackDetailPage() {
   const { feedbackId = '' } = useParams();
   const location = useLocation();
-  const { state, hasInsightsAccess } = useApp();
+  const {
+    state,
+    hasInsightsAccess,
+    hasAssignerRole,
+    isAssignerView,
+    dataMode,
+    store,
+  } = useApp();
   const navigate = useNavigate();
   const insightsList = useAppHref('/insights/reports/coach-feedback');
   const schedulerList = useAppHref('/scheduler/feedback');
@@ -71,6 +84,8 @@ export function SchedulerFeedbackDetailPage() {
     ? 'Back to coach feedback'
     : 'Back to Feedback';
   const memberBase = useAppHref('/about/members');
+  const [publishBusy, setPublishBusy] = useState(false);
+  const [publishError, setPublishError] = useState<string | null>(null);
 
   const feedback = state.coachFeedback.find((f) => f.id === feedbackId);
   const match = feedback
@@ -118,6 +133,35 @@ export function SchedulerFeedbackDetailPage() {
   const officialHref = feedback.officialUserId
     ? `${memberBase}/${feedback.officialUserId}`
     : null;
+  const canPublish = isAssignerView && hasAssignerRole;
+  const onProfile = feedback.publicOnProfile === true;
+
+  const setPublished = async (next: boolean) => {
+    setPublishBusy(true);
+    setPublishError(null);
+    try {
+      if (dataMode === 'live' && isFirebaseConfigured) {
+        await setCoachFeedbackPublicOnProfile(
+          defaultOrgId(),
+          feedback.id,
+          next,
+        );
+      } else {
+        store.setCoachFeedbackPublicOnProfile(feedback.id, next);
+      }
+      store.upsertCoachFeedbackLocal({
+        ...feedback,
+        publicOnProfile: next,
+        updatedAt: new Date().toISOString(),
+      });
+    } catch (err) {
+      setPublishError(
+        err instanceof Error ? err.message : 'Could not update visibility.',
+      );
+    } finally {
+      setPublishBusy(false);
+    }
+  };
 
   return (
     <div className="rs-stack">
@@ -141,6 +185,30 @@ export function SchedulerFeedbackDetailPage() {
         · Reporting as {feedback.reportingTeamName}
         {avg != null ? ` · Avg ${Number.isInteger(avg) ? avg : avg.toFixed(1)}` : ''}
       </p>
+
+      {canPublish && (
+        <div className="rs-detail-card">
+          <Switch
+            id="scf-public-profile"
+            label="Show on profile"
+            isChecked={onProfile}
+            isDisabled={publishBusy}
+            onChange={(_e, checked) => {
+              void setPublished(checked);
+            }}
+          />
+          <p className="rs-match-card__meta pf-v6-u-mt-sm">
+            Hidden by default. Publishing lets any society member read this
+            report on the official’s profile, without the submitter’s phone or
+            email.
+          </p>
+          {publishError ? (
+            <p className="rs-match-card__meta" role="alert">
+              {publishError}
+            </p>
+          ) : null}
+        </div>
+      )}
 
       {match ? (
         <MatchListRow match={match} />

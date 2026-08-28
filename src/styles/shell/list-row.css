@@ -726,6 +726,31 @@
   text-align: center;
 }
 
+.rs-coach-feedback-trailing__scores {
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+}
+
+.rs-coach-feedback-trailing__score {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  min-width: 0;
+}
+
+.rs-coach-feedback-trailing__hint {
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  line-height: 1.2;
+  color: var(--rs-color-muted);
+  text-transform: uppercase;
+}
+
 .rs-coach-feedback-trailing__hit {
   display: flex;
   flex-direction: column;

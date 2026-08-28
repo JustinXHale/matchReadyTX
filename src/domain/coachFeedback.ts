@@ -194,6 +194,11 @@ export interface CoachFeedback {
   status: CoachFeedbackStatus;
   /** First time submitted to the Scheduler (unchanged on later edits). */
   submittedAt?: string;
+  /**
+   * Scheduler published this report on the official’s public profile.
+   * Default (missing/false) is hidden from everyone except Scheduler, Insights, and the filing club.
+   */
+  publicOnProfile?: boolean;
   edits: CoachFeedbackEdit[];
   createdAt: string;
   updatedAt: string;

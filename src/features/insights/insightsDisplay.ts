@@ -19,7 +19,10 @@ export function cmoFilerName(
   users: UserProfile[],
 ): string {
   const u = users.find((x) => x.uid === report.officialId);
-  return u ? userDisplayName(u) : 'Unknown CMO';
+  if (u) return userDisplayName(u);
+  const legacy = report.legacyFixture?.cmoOfficialName?.trim();
+  if (legacy) return legacy;
+  return 'Unknown CMO';
 }
 
 export function cmoSubjectName(
@@ -33,5 +36,7 @@ export function cmoSubjectName(
     const u = users.find((x) => x.uid === id);
     if (u) return userDisplayName(u);
   }
+  const legacy = report.legacyFixture?.subjectOfficialName?.trim();
+  if (legacy) return legacy;
   return fallbackMoLabel ?? 'Match official';
 }

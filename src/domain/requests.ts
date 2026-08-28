@@ -62,6 +62,16 @@ export function openCrewSlotsExcludingCmo(match: Match): CrewSlot[] {
   return openRequestSlots(match).filter((s): s is CrewSlot => s !== 'cmo');
 }
 
+/** First empty block per open fee-crew role — tap targets for coverage assign. */
+export function openCrewAssignTargets(
+  match: Match,
+): { slot: CrewSlot; assignmentId?: string }[] {
+  return openCrewSlotsExcludingCmo(match).map((slot) => ({
+    slot,
+    assignmentId: emptyCrewBlocks(match.crew[slot])[0]?.id,
+  }));
+}
+
 /** Released matches that still need fee-crew officials (any open slot except CMO). */
 export function matchNeedsCrewCoverage(match: Match): boolean {
   return openCrewSlotsExcludingCmo(match).length > 0;

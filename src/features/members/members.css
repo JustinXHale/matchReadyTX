@@ -121,6 +121,7 @@
 .rs-member-collapse {
   border-top: none;
   padding-top: 0;
+  scroll-margin-top: 12px;
 }
 
 .rs-member-collapse > summary {
@@ -130,6 +131,10 @@
   text-transform: uppercase;
   color: var(--rs-color-ended);
   margin-bottom: var(--rs-space-sm);
+}
+
+.rs-member-public-report {
+  padding-top: 0;
 }
 
 .rs-member-delete {

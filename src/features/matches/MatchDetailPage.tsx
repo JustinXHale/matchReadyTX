@@ -63,9 +63,7 @@ import {
 } from '@/domain/types';
 import { namedOfficialsNeedingAvailability } from '@/domain/crew';
 import { availableCrewRolesToAdd, roleHasAssignee } from '@/domain/crewSize';
-import { UserAvatar } from '@/ui/UserAvatar';
 import { IconDateInput } from '@/ui/IconDateInput';
-import { formatMemberCityState, officialEffectiveLevel } from '@/domain/members';
 import {
   canOfficialRequestMatch,
   gameRequestPreferredSlots,
@@ -79,14 +77,10 @@ import { defaultOrgId, createGameRequestInFirestore, patchGameRequestContentInFi
 import { isFirebaseConfigured } from '@/services/firebase';
 import { backState, readBackNav } from '@/nav/backNav';
 import {
-  availabilitySortRank,
-  availabilityStatusLabel,
-  kickoffAvailabilityStatus,
-} from '@/domain/availability';
-import {
   matchDetailHeaderReportLinks,
   matchDetailReportActions,
 } from '@/features/referee/reports/reportLinks';
+import { OfficialAssignPicker } from '@/features/matches/OfficialAssignPicker';
 import {
   formatMatchKickoff,
   orgTimeZone,
@@ -259,8 +253,6 @@ export function MatchDetailPage() {
   const [denyProposalReason, setDenyProposalReason] = useState('');
   const [denyProposalId, setDenyProposalId] = useState<string | null>(null);
   const [pickTarget, setPickTarget] = useState<CrewPickTarget | null>(null);
-  const [pickSearch, setPickSearch] = useState('');
-  const [pickLevelFilter, setPickLevelFilter] = useState<number | null>(null);
   const [resendEmailState, setResendEmailState] = useState<
     'idle' | 'sending' | 'sent' | 'error'
   >('idle');
@@ -609,8 +601,6 @@ export function MatchDetailPage() {
   };
 
   const openCrewPick = (target: CrewPickTarget) => {
-    setPickSearch('');
-    setPickLevelFilter(null);
     setResendEmailState('idle');
     setPickTarget(target);
   };
@@ -746,48 +736,6 @@ export function MatchDetailPage() {
   };
 
   const addableRoles = availableCrewRolesToAdd(match);
-  const refereeLevels = (() => {
-    const levels = new Set<number>();
-    for (const o of officials) {
-      const level = officialEffectiveLevel(o);
-      if (level != null) levels.add(level);
-    }
-    return [...levels].sort((a, b) => a - b);
-  })();
-  const pickQuery = pickSearch.trim().toLowerCase();
-  const filteredOfficials = officials
-    .filter((o) => {
-      const level = officialEffectiveLevel(o);
-      if (pickLevelFilter != null && level !== pickLevelFilter) {
-        return false;
-      }
-      if (!pickQuery) return true;
-      return `${o.displayName} ${level ?? ''}`
-        .toLowerCase()
-        .includes(pickQuery);
-    })
-    .map((o) => {
-      const availStatus = kickoffAvailabilityStatus(
-        state.availability,
-        o.uid,
-        match.kickoffAt,
-        orgTz,
-      );
-      return {
-        official: o,
-        availStatus,
-        location: formatMemberCityState(o),
-      };
-    })
-    .sort((a, b) => {
-      const availCmp =
-        availabilitySortRank(a.availStatus) -
-        availabilitySortRank(b.availStatus);
-      if (availCmp !== 0) return availCmp;
-      const locCmp = (a.location ?? '').localeCompare(b.location ?? '');
-      if (locCmp !== 0) return locCmp;
-      return a.official.displayName.localeCompare(b.official.displayName);
-    });
 
   const requestRemoveBlock = (
     role: RequestableSlot,
@@ -2655,95 +2603,15 @@ export function MatchDetailPage() {
           </Title>
         </ModalHeader>
         <ModalBody>
-          <p className="rs-official-picker__hint">
-            Sorted closest first. Distance is round-trip (for mileage pay).
-          </p>
-          <div className="rs-official-picker__filters">
-            <TextInput
-              type="search"
-              value={pickSearch}
-              placeholder="Search name"
-              aria-label="Search officials"
-              onChange={(_, v) => setPickSearch(v)}
-            />
-            {refereeLevels.length > 0 && (
-              <div
-                className="rs-slot-picker"
-                role="radiogroup"
-                aria-label="Filter by referee level"
-              >
-                <button
-                  type="button"
-                  role="radio"
-                  aria-checked={pickLevelFilter == null}
-                  className={`rs-filter-chip${
-                    pickLevelFilter == null ? ' rs-filter-chip--selected' : ''
-                  }`}
-                  onClick={() => setPickLevelFilter(null)}
-                >
-                  All levels
-                </button>
-                {refereeLevels.map((lv) => (
-                  <button
-                    key={lv}
-                    type="button"
-                    role="radio"
-                    aria-checked={pickLevelFilter === lv}
-                    className={`rs-filter-chip${
-                      pickLevelFilter === lv ? ' rs-filter-chip--selected' : ''
-                    }`}
-                    onClick={() =>
-                      setPickLevelFilter(pickLevelFilter === lv ? null : lv)
-                    }
-                  >
-                    Level {lv}
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-          {filteredOfficials.length === 0 ? (
-            <p className="rs-match-card__meta">No officials match.</p>
-          ) : (
-            <ul className="rs-official-picker">
-              {filteredOfficials.map(
-                ({ official: o, location, availStatus }) => {
-                const isCurrent = currentPickUserId === o.uid;
-                const availLabel = availabilityStatusLabel(availStatus);
-                const level = officialEffectiveLevel(o);
-                return (
-                  <li key={o.uid}>
-                    <button
-                      type="button"
-                      className={`rs-official-picker__row${
-                        isCurrent ? ' rs-official-picker__row--current' : ''
-                      }`}
-                      onClick={() => pickOfficial(o.uid)}
-                    >
-                      <span className="rs-official-picker__identity">
-                        <UserAvatar user={o} size="sm" />
-                        <span className="rs-official-picker__main">
-                          <span className="rs-official-picker__name">
-                            {o.displayName}
-                            {level != null ? ` (${level})` : ''}
-                          </span>
-                          {location ? (
-                            <span className="rs-official-picker__dist">
-                              {location}
-                            </span>
-                          ) : null}
-                        </span>
-                      </span>
-                      <span className="rs-official-picker__meta">
-                        {isCurrent ? 'Current' : availLabel}
-                      </span>
-                    </button>
-                  </li>
-                );
-              },
-              )}
-            </ul>
-          )}
+          <OfficialAssignPicker
+            officials={officials}
+            matches={state.matches}
+            availability={state.availability}
+            timeZone={orgTz}
+            kickoffAt={match.kickoffAt}
+            currentUserId={currentPickUserId}
+            onPick={pickOfficial}
+          />
         </ModalBody>
         <ModalFooter>
           {currentPickUserId &&

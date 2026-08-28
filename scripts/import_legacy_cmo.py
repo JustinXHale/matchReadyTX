@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 """One-shot import of 2025 Google Form CMO reports into orgs/lonestar/matchReports.
 
-Joins form rows to Auth users by email. Skips a row unless both CMO and MO have
-accounts. Does not create schedule fixtures. Idempotent doc ids.
+Joins form rows to Auth users by email. Imports when **either** MO or CMO has an
+account (the other side is stored on legacyFixture for a later resync). Skips only
+when neither has an account. Does not create schedule fixtures. Idempotent doc ids.
 
 Usage:
   python3 scripts/import_legacy_cmo.py           # dry-run
@@ -72,6 +73,7 @@ COMPLEXITY_OPTIONS = [
     "NO MAJOR FAVORS. GREAT DAY",
 ]
 MATCH_KINDS = {"League Match", "Friendly", "Play-off", "Championship"}
+UNLINKED_OFFICIAL_PREFIX = "legacy_unlinked_"
 
 # Roster / form emails that are not the Auth login.
 EMAIL_ALIASES = {
@@ -188,8 +190,12 @@ def match_id(date_s: str, teams: str, ref_email: str, cmo_email: str) -> str:
     return "legacy_cmo_" + hashlib.sha1(raw.encode()).hexdigest()[:12]
 
 
-def report_doc_id(match_id_s: str, official_id: str) -> str:
-    return re.sub(r"[^a-zA-Z0-9_-]", "_", f"{match_id_s}_{official_id}_cmo")[:120]
+def unlinked_official_id(match_id_s: str) -> str:
+    return UNLINKED_OFFICIAL_PREFIX + hashlib.sha1(match_id_s.encode()).hexdigest()[:12]
+
+
+def report_doc_id(match_id_s: str) -> str:
+    return re.sub(r"[^a-zA-Z0-9_-]", "_", f"{match_id_s}_cmo")[:120]
 
 
 def load_auth() -> tuple[dict[str, dict], dict[str, dict]]:
@@ -248,12 +254,31 @@ def refresh_token() -> str:
         data=body,
         headers={"Content-Type": "application/x-www-form-urlencoded"},
     )
-    with urllib.request.urlopen(req) as resp:
-        payload = json.loads(resp.read().decode())
+    try:
+        with urllib.request.urlopen(req) as resp:
+            payload = json.loads(resp.read().decode())
+    except urllib.error.HTTPError as exc:
+        sys.exit(
+            "Firebase CLI auth expired. Re-authenticate, then retry:\n"
+            "  firebase login --reauth\n"
+            f"(token refresh failed: HTTP {exc.code})"
+        )
     access = payload["access_token"]
     cfg["tokens"]["access_token"] = access
     FIREBASE_TOOLS.write_text(json.dumps(cfg, indent=2))
     return access
+
+
+def auth_token_or_exit() -> str:
+    token = load_token()
+    status, _ = http_json(
+        "GET",
+        f"https://firestore.googleapis.com/v1/projects/{PROJECT}/databases/(default)/documents/orgs/{ORG_ID}",
+        token,
+    )
+    if status == 401:
+        token = refresh_token()
+    return token
 
 
 def http_json(method: str, url: str, token: str, body: dict | None = None):
@@ -351,42 +376,61 @@ def build_docs(by_email: dict, by_name: dict) -> tuple[list[dict], list[dict]]:
         cmo_names = (prev.get("cmo_name"), form[2])
         ref = lookup(by_email, by_name, ref_email, *ref_names)
         cmo = lookup(by_email, by_name, cmo_email, *cmo_names)
+        ref_label = (
+            prev.get("referee_roster_name")
+            or prev.get("referee_form_name")
+            or form[3]
+        )
+        cmo_label = prev.get("cmo_name") or form[2]
         label = {
             "date": date_s,
             "teams": teams,
-            "referee": prev.get("referee_roster_name")
-            or prev.get("referee_form_name")
-            or form[3],
-            "cmo": prev.get("cmo_name") or form[2],
+            "referee": ref_label,
+            "cmo": cmo_label,
             "referee_email": ref_email,
             "cmo_email": cmo_email,
         }
-        if not ref or not cmo:
+        if not ref and not cmo:
             skipped.append(
                 {
                     **label,
-                    "reason": "missing account: "
-                    + ", ".join(
-                        p
-                        for p, ok in (("MO", ref), ("CMO", cmo))
-                        if not ok
-                    ),
+                    "reason": "missing account: MO and CMO",
                 }
             )
             continue
-        ref_uid, ref_name, ref_e = ref
-        cmo_uid, cmo_name, cmo_e = cmo
+
+        ref_uid = ref[0] if ref else None
+        ref_name = ref[1] if ref else ref_label
+        ref_e = ref[2] if ref else (ref_email or "").strip().lower()
+        cmo_uid = cmo[0] if cmo else None
+        cmo_name = cmo[1] if cmo else cmo_label
+        cmo_e = cmo[2] if cmo else (cmo_email or "").strip().lower()
+
+        link = []
+        if ref_uid and cmo_uid:
+            link.append("both")
+        elif ref_uid:
+            link.append("MO-only")
+        else:
+            link.append("CMO-only")
+
         mid = match_id(date_s, teams, ref_e, cmo_e)
         kickoff = parse_date_noon(date_s)
         submitted = parse_timestamp(form[0])
         teams_fx = parse_teams(teams)
         teams_fx["matchLevel"] = (form[8] or "").strip() or None
+        teams_fx["subjectOfficialName"] = ref_label or None
+        teams_fx["subjectOfficialEmail"] = (ref_email or "").strip() or None
+        teams_fx["cmoOfficialName"] = cmo_label or None
+        teams_fx["cmoOfficialEmail"] = (cmo_email or "").strip() or None
+        teams_fx = {k: v for k, v in teams_fx.items() if v}
+
+        official_id = cmo_uid or unlinked_official_id(mid)
         doc = {
             "orgId": ORG_ID,
-            "id": report_doc_id(mid, cmo_uid),
+            "id": report_doc_id(mid),
             "matchId": mid,
-            "officialId": cmo_uid,
-            "subjectOfficialId": ref_uid,
+            "officialId": official_id,
             "slot": "cmo",
             "formKind": "cmo",
             "status": "submitted",
@@ -397,14 +441,17 @@ def build_docs(by_email: dict, by_name: dict) -> tuple[list[dict], list[dict]]:
             "submittedAt": submitted,
             "createdAt": submitted,
             "updatedAt": submitted,
-            "legacyFixture": {k: v for k, v in teams_fx.items() if v is not None},
+            "legacyFixture": teams_fx,
             "cmoPayload": payload_from_row(form),
         }
+        if ref_uid:
+            doc["subjectOfficialId"] = ref_uid
         ready.append(
             {
                 "doc": doc,
                 "label": {
                     **label,
+                    "link": ",".join(link),
                     "referee_uid": ref_uid,
                     "cmo_uid": cmo_uid,
                     "referee_name": ref_name,
@@ -419,22 +466,31 @@ def build_docs(by_email: dict, by_name: dict) -> tuple[list[dict], list[dict]]:
 
 
 def delete_permcheck(token: str) -> str:
-    # Remove the permission-probe doc from an earlier session if it is still there.
+    """Best-effort removal of an old probe doc; never blocks import."""
     url = (
         f"https://firestore.googleapis.com/v1/projects/{PROJECT}/databases/(default)"
         f"/documents/orgs/{ORG_ID}/matchReports?pageSize=100"
     )
     status, body = http_json("GET", url, token)
     if status == 401:
-        token = refresh_token()
+        try:
+            token = refresh_token()
+        except SystemExit:
+            raise
         status, body = http_json("GET", url, token)
     if status != 200:
-        print("list matchReports failed", status, body.get("error", {}).get("message", "")[:200])
+        print(
+            "skip probe cleanup:",
+            status,
+            body.get("error", {}).get("message", "")[:200],
+        )
         return token
     for doc in body.get("documents") or []:
         name = doc.get("name", "")
         if "legacy_cmo_permcheck_" in name:
-            dstatus, _ = http_json("DELETE", f"https://firestore.googleapis.com/v1/{name}", token)
+            dstatus, _ = http_json(
+                "DELETE", f"https://firestore.googleapis.com/v1/{name}", token
+            )
             print(f"deleted probe doc {name.rsplit('/', 1)[-1]} status={dstatus}")
     return token
 
@@ -480,7 +536,7 @@ def main() -> None:
         lab = item["label"]
         print(
             f"  {lab['date']:<12} {lab['referee']:<22} <- {lab['cmo']:<16} "
-            f"grade={lab['assessed']}  {lab['matchId']}"
+            f"[{lab['link']}] grade={lab['assessed']}  {lab['matchId']}"
         )
     print("\n=== SKIP ===")
     for row in skipped:
@@ -488,7 +544,7 @@ def main() -> None:
     if not args.write:
         print("\nDry-run only. Pass --write to PATCH Firestore.")
         return
-    token = load_token()
+    token = auth_token_or_exit()
     write_docs(ready, token)
 
 

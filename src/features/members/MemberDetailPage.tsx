@@ -14,7 +14,7 @@ import {
   TextInput,
   Title,
 } from '@patternfly/react-core';
-import { useApp } from '@/app/AppContext';
+import { useApp, useAppHref } from '@/app/AppContext';
 import {
   fanFavoriteLabel,
   formatMemberAddress,
@@ -43,6 +43,8 @@ import {
   scheduleTeamEntries,
   teamConferenceLabel,
 } from '@/domain/teams';
+import { submittedCmoReportsAboutOfficial, type MatchReport } from '@/domain/reports';
+import type { CoachFeedback } from '@/domain/coachFeedback';
 import { isFirebaseConfigured } from '@/services/firebase';
 import {
   defaultOrgId,
@@ -51,6 +53,10 @@ import {
   saveAssessedLevel,
   saveAssignerMemberProfile,
 } from '@/services/orgMembers';
+import {
+  subscribePublishedCoachFeedbackForOfficial,
+  subscribeSubmittedCmoForOfficial,
+} from '@/services/orgData';
 import { readBackNav, type BackNav } from '@/nav/backNav';
 import { MatchListRow } from '@/ui/MatchListRow';
 import {
@@ -60,6 +66,10 @@ import { RefereeLevelChart } from '@/ui/RefereeLevelChart';
 import { UserAvatar } from '@/ui/UserAvatar';
 import { AvailabilityMonthCalendar } from '@/features/availability/AvailabilityMonthCalendar';
 import { OfficialInsightsPanel } from '@/features/scheduler/OfficialInsightsPanel';
+import {
+  CmoPublicReportRow,
+  PublishedTeamFeedbackRow,
+} from '@/features/members/OfficialPublicReports';
 
 function formatBirthdayLabel(birthday: string | undefined): string | null {
   const raw = birthday?.slice(0, 10) ?? '';
@@ -252,8 +262,9 @@ export function MemberDetailPage() {
   const { userId } = useParams();
   const navigate = useNavigate();
   const location = useLocation();
-  const { state, hasAssignerRole, isAssignerView, store, currentUser } =
+  const { state, hasAssignerRole, isAssignerView, hasInsightsAccess, dataMode, store, currentUser } =
     useApp();
+  const memberHref = useAppHref(`/about/members/${userId ?? ''}`);
   const timeZone = state.org.timezone || 'America/Chicago';
   const availNow = new Date();
   const back = readBackNav(location.state) ?? FALLBACK_BACK;
@@ -288,6 +299,55 @@ export function MemberDetailPage() {
     () => (user ? pastMatchesForMember(state.matches, user.uid) : []),
     [user, state.matches],
   );
+
+  const [fetchedCmo, setFetchedCmo] = useState<MatchReport[]>([]);
+  const [fetchedFeedback, setFetchedFeedback] = useState<CoachFeedback[]>([]);
+
+  const publicCmoReports = useMemo(() => {
+    if (!userId) return [];
+    if (hasInsightsAccess || dataMode !== 'live') {
+      return submittedCmoReportsAboutOfficial(
+        state.matchReports,
+        state.matches,
+        userId,
+      );
+    }
+    return [...fetchedCmo].sort(
+      (a, b) =>
+        new Date(b.kickoffAt).getTime() - new Date(a.kickoffAt).getTime(),
+    );
+  }, [
+    userId,
+    hasInsightsAccess,
+    dataMode,
+    state.matchReports,
+    state.matches,
+    fetchedCmo,
+  ]);
+
+  const publishedTeamFeedback = useMemo(() => {
+    if (!userId) return [];
+    const fromStore = state.coachFeedback.filter(
+      (f) =>
+        f.officialUserId === userId &&
+        f.status === 'submitted' &&
+        f.publicOnProfile === true,
+    );
+    if (hasInsightsAccess || dataMode !== 'live') return fromStore;
+    const byId = new Map<string, CoachFeedback>();
+    for (const f of [...fromStore, ...fetchedFeedback]) byId.set(f.id, f);
+    return [...byId.values()].sort(
+      (a, b) =>
+        new Date(b.submittedAt ?? b.createdAt).getTime() -
+        new Date(a.submittedAt ?? a.createdAt).getTime(),
+    );
+  }, [
+    userId,
+    hasInsightsAccess,
+    dataMode,
+    state.coachFeedback,
+    fetchedFeedback,
+  ]);
 
   const userAvailRanges = useMemo(
     () =>
@@ -336,6 +396,53 @@ export function MemberDetailPage() {
     const id = window.setTimeout(() => setEditErrorToast(false), 5000);
     return () => window.clearTimeout(id);
   }, [editErrorToast]);
+
+  useEffect(() => {
+    if (!userId) return;
+    if (dataMode !== 'live' || !isFirebaseConfigured || hasInsightsAccess) {
+      setFetchedCmo([]);
+      setFetchedFeedback([]);
+      return;
+    }
+    const orgId = defaultOrgId();
+    const unsubCmo = subscribeSubmittedCmoForOfficial(
+      orgId,
+      userId,
+      setFetchedCmo,
+    );
+    const unsubFb = subscribePublishedCoachFeedbackForOfficial(
+      orgId,
+      userId,
+      setFetchedFeedback,
+    );
+    return () => {
+      unsubCmo();
+      unsubFb();
+    };
+  }, [userId, dataMode, hasInsightsAccess]);
+
+  useEffect(() => {
+    const hash = location.hash.replace('#', '');
+    if (hash !== 'cmo-reports' && hash !== 'team-feedback') return;
+    setOfficialTab('profile');
+  }, [location.hash, userId]);
+
+  useEffect(() => {
+    if (officialTab !== 'profile') return;
+    const hash = location.hash.replace('#', '');
+    if (hash !== 'cmo-reports' && hash !== 'team-feedback') return;
+    const el = document.getElementById(hash);
+    if (el instanceof HTMLDetailsElement) {
+      el.open = true;
+      el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  }, [
+    officialTab,
+    location.hash,
+    userId,
+    publicCmoReports.length,
+    publishedTeamFeedback.length,
+  ]);
 
   const listName = user ? memberListName(user) : '';
   const joinedLabel =
@@ -1291,6 +1398,79 @@ export function MemberDetailPage() {
                             {memberSlotLabel(m, user.uid) ?? 'Crew'}
                           </span>
                         }
+                      />
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </details>
+          </section>
+
+          <section className="rs-detail-card rs-member-collapse-wrap">
+            <details
+              id="cmo-reports"
+              className="rs-detail-tools rs-member-collapse"
+            >
+              <summary>
+                CMO coaching reports
+                {publicCmoReports.length > 0
+                  ? ` (${publicCmoReports.length})`
+                  : ''}
+              </summary>
+              {publicCmoReports.length === 0 ? (
+                <p className="rs-detail-note">
+                  No submitted CMO coaching reports on file.
+                </p>
+              ) : (
+                <ul className="rs-list">
+                  {publicCmoReports.map((report) => (
+                    <li key={report.id}>
+                      <CmoPublicReportRow
+                        report={report}
+                        matches={state.matches}
+                        users={state.users}
+                        to={`${memberHref}/cmo/${report.id}`}
+                        back={{
+                          to: `${memberHref}#cmo-reports`,
+                          label: listName,
+                          state: location.state,
+                        }}
+                      />
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </details>
+          </section>
+
+          <section className="rs-detail-card rs-member-collapse-wrap">
+            <details
+              id="team-feedback"
+              className="rs-detail-tools rs-member-collapse"
+            >
+              <summary>
+                Team feedback
+                {publishedTeamFeedback.length > 0
+                  ? ` (${publishedTeamFeedback.length})`
+                  : ''}
+              </summary>
+              {publishedTeamFeedback.length === 0 ? (
+                <p className="rs-detail-note">
+                  No published team feedback on this profile yet.
+                </p>
+              ) : (
+                <ul className="rs-list">
+                  {publishedTeamFeedback.map((feedback) => (
+                    <li key={feedback.id}>
+                      <PublishedTeamFeedbackRow
+                        feedback={feedback}
+                        matches={state.matches}
+                        to={`${memberHref}/feedback/${feedback.id}`}
+                        back={{
+                          to: `${memberHref}#team-feedback`,
+                          label: listName,
+                          state: location.state,
+                        }}
                       />
                     </li>
                   ))}
