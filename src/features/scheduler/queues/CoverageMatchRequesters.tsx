@@ -38,7 +38,7 @@ function requesterLabel(
   user: UserProfile | undefined,
 ): string {
   const name = user ? memberListName(user) : request.userName;
-  const level = officialEffectiveLevel(user);
+  const level = user != null ? officialEffectiveLevel(user) : null;
   return level != null ? `${name} · Gr. ${level}` : name;
 }
 
@@ -49,7 +49,7 @@ function summarizeRequesters(
   const preview = requests.slice(0, PREVIEW_NAME_COUNT).map((request) => {
     const user = users.find((u) => u.uid === request.userId);
     const name = user ? memberListName(user) : request.userName;
-    const level = officialEffectiveLevel(user);
+    const level = user != null ? officialEffectiveLevel(user) : null;
     return level != null ? `${name} (${level})` : name;
   });
   if (requests.length <= PREVIEW_NAME_COUNT) {

@@ -24,7 +24,6 @@ import {
   type ReportFormKind,
 } from '@/domain/reports';
 import { backState, useAppBack } from '@/nav/backNav';
-import { MATCH_REPORTS_BACK } from '@/features/referee/reports/reportLinks';
 import {
   cardReportPath,
   MATCH_REPORTS_BACK,

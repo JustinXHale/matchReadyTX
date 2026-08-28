@@ -7,7 +7,7 @@ import { genderLabel, type Match } from '@/domain/types';
 import { MatchListRow } from '@/ui/MatchListRow';
 import { MatchCrewTrailing } from '@/ui/MatchCrewTrailing';
 import { formatTeamAddress, teamHomeMapsUrl } from '@/domain/teams';
-import { useAppBack, backState, type BackNav } from '@/nav/backNav';
+import { useAppBack, type BackNav } from '@/nav/backNav';
 import { MapsAddressLink } from '@/ui/MapsAddressLink';
 import {
   formatMatchMonthLabel,

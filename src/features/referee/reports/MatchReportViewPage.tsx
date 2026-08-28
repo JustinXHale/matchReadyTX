@@ -17,11 +17,12 @@ import { cmoSubjectName } from '@/features/insights/insightsDisplay';
 import { moDisplayNames } from '@/features/referee/appointments/crewLines';
 import {
   matchReportViewPath,
+  COACHING_CMO_BACK,
+  MATCH_REPORTS_BACK,
   resolveSubmittedMatchReport,
   submittedMatchReportsForMatch,
 } from '@/features/referee/reports/reportLinks';
 import { SubmittedPerformanceReportView } from '@/features/referee/reports/SubmittedPerformanceReportView';
-import { MATCH_REPORTS_BACK } from '@/features/referee/reports/reportLinks';
 import { useAppBack } from '@/nav/backNav';
 import { MatchListRow } from '@/ui/MatchListRow';
 
@@ -230,6 +231,7 @@ export function CmoReportViewPage() {
   const { matchId = '' } = useParams();
   const { currentUser, state } = useApp();
   const navigate = useNavigate();
+  const { goBack, backLabel } = useAppBack(COACHING_CMO_BACK);
 
   if (!currentUser) return null;
 
