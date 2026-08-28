@@ -2,9 +2,11 @@ import { useMemo, useState } from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
 import { Title, EmptyState, EmptyStateBody } from '@patternfly/react-core';
 import { useApp, useAppHref } from '@/app/AppContext';
-import type { MatchReport } from '@/domain/reports';
-import { crewPeople, type Match } from '@/domain/types';
-import { moDisplayNames } from '@/features/referee/appointments/crewLines';
+import {
+  displayMatchForCmoReport,
+  submittedCmoReportsAboutOfficial,
+} from '@/domain/reports';
+import { cmoSubjectName } from '@/features/insights/insightsDisplay';
 import { CoachingSubNav } from '@/features/referee/reports/CoachingSubNav';
 import { ReportsSubNav } from '@/features/referee/reports/ReportsSubNav';
 import {
@@ -25,32 +27,6 @@ function paneFromPath(pathname: string): CoachingPane | 'index' {
   return 'index';
 }
 
-/** Submitted CMO forms about this user as Match Official (read-only). */
-function cmoReportsAboutOfficial(
-  reports: MatchReport[],
-  matches: Match[],
-  userId: string,
-): MatchReport[] {
-  const moMatchIds = new Set(
-    matches
-      .filter((m) =>
-        crewPeople(m.crew.mo).some((a) => a.userId === userId),
-      )
-      .map((m) => m.id),
-  );
-  return reports
-    .filter(
-      (r) =>
-        r.slot === 'cmo' &&
-        r.status === 'submitted' &&
-        moMatchIds.has(r.matchId),
-    )
-    .sort(
-      (a, b) =>
-        new Date(b.kickoffAt).getTime() - new Date(a.kickoffAt).getTime(),
-    );
-}
-
 export function CoachingReportsPage() {
   const { currentUser, state } = useApp();
   const location = useLocation();
@@ -69,7 +45,7 @@ export function CoachingReportsPage() {
   /** Same CMO form, submitted about this user as MO. */
   const received = useMemo(() => {
     if (!currentUser) return [];
-    return cmoReportsAboutOfficial(
+    return submittedCmoReportsAboutOfficial(
       state.matchReports,
       state.matches,
       currentUser.uid,
@@ -208,9 +184,9 @@ export function CoachingReportsPage() {
           ) : (
             <ul className="rs-list">
               {filedList.map((r) => {
-                const match = state.matches.find((m) => m.id === r.matchId);
+                const match = displayMatchForCmoReport(r, state.matches);
                 if (!match) return null;
-                const moName = moDisplayNames(match);
+                const moName = cmoSubjectName(r, match, state.users);
                 const to =
                   r.status === 'pending'
                     ? cmoReportPath(r.matchId)
@@ -260,7 +236,7 @@ export function CoachingReportsPage() {
           ) : (
             <ul className="rs-list">
               {received.map((r) => {
-                const match = state.matches.find((m) => m.id === r.matchId);
+                const match = displayMatchForCmoReport(r, state.matches);
                 if (!match) return null;
                 const author =
                   state.users.find((u) => u.uid === r.officialId)
@@ -271,7 +247,7 @@ export function CoachingReportsPage() {
                       match={match}
                       to={cmoReportViewPath(r.matchId)}
                       back={listBack}
-                      showTime
+                      showTime={r.source !== 'legacy_form'}
                       meta={
                         <>
                           <span className="rs-pill">About you</span>{' '}

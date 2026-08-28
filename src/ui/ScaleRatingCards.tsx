@@ -1,10 +1,12 @@
 import {
   FIVE_POINT_CHOICES,
   FIVE_POINT_LABELS,
+  FIVE_POINT_VALUES,
   SCALE_NA,
   SCALE_NA_LABEL,
   SCALE_NA_SHORT,
   type FivePointChoice,
+  type FivePointValue,
 } from '@/domain/fivePointScale';
 
 type Props = {
@@ -14,37 +16,54 @@ type Props = {
   ariaLabel: string;
   /** Scheduler / submitted views — no inputs. */
   readOnly?: boolean;
+  /** Default true (coach feedback / CMO competency). Linear 1–5 scales omit N/A. */
+  includeNa?: boolean;
+  /** Override card captions (e.g. temperature 1 = Friendly). */
+  labels?: Partial<Record<FivePointValue, string>>;
 };
 
-function optionCopy(choice: FivePointChoice): { n: string; label: string } {
+function optionCopy(
+  choice: FivePointChoice,
+  labels?: Partial<Record<FivePointValue, string>>,
+): { n: string; label: string } {
   if (choice === SCALE_NA) {
     return { n: SCALE_NA_SHORT, label: SCALE_NA_LABEL };
   }
-  return { n: String(choice), label: FIVE_POINT_LABELS[choice] };
+  const custom = labels?.[choice];
+  return {
+    n: String(choice),
+    label: custom !== undefined ? custom : FIVE_POINT_LABELS[choice],
+  };
 }
 
-/** Number cards (1–5 + N/A) used on coach feedback and CMO reports. */
+/** Number cards (1–5 + optional N/A) used on coach feedback and CMO reports. */
 export function ScaleRatingCards({
   name,
   value,
   onChange,
   ariaLabel,
   readOnly = false,
+  includeNa = true,
+  labels,
 }: Props) {
+  const choices = includeNa ? FIVE_POINT_CHOICES : FIVE_POINT_VALUES;
+  const wide = labels != null;
+
   return (
     <div
       className="rs-coach-fb-radios"
       role={readOnly ? 'group' : 'radiogroup'}
       aria-label={ariaLabel}
     >
-      {FIVE_POINT_CHOICES.map((choice) => {
+      {choices.map((choice) => {
         const selected = value === choice;
-        const { n, label } = optionCopy(choice);
+        const { n, label } = optionCopy(choice, labels);
         const inputId = `${name}-${choice}`;
         const className = [
           'rs-coach-fb-radio',
           selected ? 'rs-coach-fb-radio--selected' : '',
           choice === SCALE_NA ? 'rs-coach-fb-radio--na' : '',
+          wide ? 'rs-coach-fb-radio--labeled' : '',
         ]
           .filter(Boolean)
           .join(' ');
@@ -59,7 +78,9 @@ export function ScaleRatingCards({
               <span className="rs-coach-fb-radio__n" aria-hidden>
                 {n}
               </span>
-              <span className="rs-coach-fb-radio__label">{label}</span>
+              {label ? (
+                <span className="rs-coach-fb-radio__label">{label}</span>
+              ) : null}
             </div>
           );
         }
@@ -77,7 +98,9 @@ export function ScaleRatingCards({
             <span className="rs-coach-fb-radio__n" aria-hidden>
               {n}
             </span>
-            <span className="rs-coach-fb-radio__label">{label}</span>
+            {label ? (
+              <span className="rs-coach-fb-radio__label">{label}</span>
+            ) : null}
           </label>
         );
       })}

@@ -43,6 +43,7 @@ import {
   type ReportAssigneeSlot,
   type ReportFormKind,
   matchReportDocId,
+  parseLegacyCmoFixture,
   buildPendingReport,
 } from '@/domain/reports';
 import {
@@ -1686,6 +1687,8 @@ export function matchReportFromFirestore(
       data.cmoPayload && typeof data.cmoPayload === 'object'
         ? (data.cmoPayload as CmoReportPayload)
         : undefined,
+    source: data.source === 'legacy_form' ? 'legacy_form' : undefined,
+    legacyFixture: parseLegacyCmoFixture(data.legacyFixture),
   };
 }
 
@@ -1752,6 +1755,8 @@ function matchReportToFirestore(
     moPayload: report.moPayload ?? null,
     arPayload: report.arPayload ?? null,
     cmoPayload: report.cmoPayload ?? null,
+    source: report.source ?? null,
+    legacyFixture: report.legacyFixture ?? null,
     updatedAt: new Date().toISOString(),
     createdAt: report.submittedAt ?? new Date().toISOString(),
   });

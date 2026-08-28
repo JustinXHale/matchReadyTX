@@ -25,6 +25,7 @@ import {
 import { assignmentForUser } from '@/domain/types';
 import { CardReportViewBody } from '@/features/referee/reports/MatchReportViewPage';
 import { persistSubmittedCardReport } from '@/services/reportsLive';
+import { useScrollReportToTopOnChange } from '@/features/referee/reports/scrollReportToTop';
 import { IconDateInput } from '@/ui/IconDateInput';
 
 type WizardStep = 'identity' | 'cards' | 'done';
@@ -70,6 +71,7 @@ export function CardReportPage() {
     : { officialName: '', officialEmail: '', officialPhone: '' };
 
   const [step, setStep] = useState<WizardStep>('identity');
+  const reportTopRef = useScrollReportToTopOnChange(step);
   const [officialName, setOfficialName] = useState(contact.officialName);
   const [officialEmail, setOfficialEmail] = useState(contact.officialEmail);
   const [officialPhone, setOfficialPhone] = useState(contact.officialPhone);
@@ -296,7 +298,7 @@ export function CardReportPage() {
       >
         ← {step === 'cards' ? 'Identity' : 'Card Reports'}
       </button>
-      <Title headingLevel="h2" size="lg">
+      <Title headingLevel="h2" size="lg" ref={reportTopRef}>
         Card report
       </Title>
       <p className="rs-match-card__meta">

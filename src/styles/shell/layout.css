@@ -1121,6 +1121,24 @@ input.rs-filter-search {
   max-width: 6.25rem;
 }
 
+.rs-coach-fb-radio--labeled {
+  flex: 1 1 calc(50% - 6px);
+  max-width: none;
+  min-width: 7.5rem;
+  padding: 10px 8px;
+}
+
+.rs-toggle-cards .rs-coach-fb-radio--labeled {
+  flex: 1 1 100%;
+  min-width: 0;
+}
+
+.rs-toggle-cards .rs-coach-fb-radio__label {
+  font-size: 11px;
+  line-height: 1.25;
+  font-weight: 500;
+}
+
 .rs-coach-fb-toggle {
   display: flex;
   flex-wrap: wrap;

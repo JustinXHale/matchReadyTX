@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { Title, EmptyState, EmptyStateBody } from '@patternfly/react-core';
 import { useApp } from '@/app/AppContext';
-import { needsCardReportNudge } from '@/domain/reports';
+import { displayMatchForArchivedReport, needsCardReportNudge } from '@/domain/reports';
 import { ReportsSubNav } from '@/features/referee/reports/ReportsSubNav';
 import {
   MATCH_REPORTS_BACK,
@@ -108,7 +108,7 @@ export function MatchReportsPage() {
       ) : (
         <ul className="rs-list">
           {reports.map((r) => {
-            const match = state.matches.find((m) => m.id === r.matchId);
+            const match = displayMatchForArchivedReport(r, state.matches);
             if (!match) return null;
             const to =
               r.status === 'pending'
@@ -129,6 +129,7 @@ export function MatchReportsPage() {
                   to={to}
                   back={MATCH_REPORTS_BACK}
                   hideScore={r.status === 'pending'}
+                  showTime={r.source !== 'legacy_form'}
                   meta={
                     <>
                       <span className="rs-pill">{slotLabel}</span>{' '}
@@ -139,6 +140,12 @@ export function MatchReportsPage() {
                       >
                         {r.status === 'pending' ? 'Report due' : 'Submitted'}
                       </span>
+                      {r.source === 'legacy_form' && (
+                        <>
+                          {' '}
+                          <span className="rs-pill">Imported</span>
+                        </>
+                      )}
                       {r.status === 'submitted' &&
                         needsCardReportNudge(r, state.cardReports) && (
                           <>

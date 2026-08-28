@@ -12,9 +12,11 @@ import {
 } from '@patternfly/react-core';
 import { useApp } from '@/app/AppContext';
 import {
+  AR_COMFORT_QUESTION,
   crewForAttendance,
   isQuickReportLocked,
   matchHasAssignedCmo,
+  MATCH_FEEDBACK_LABEL,
   totalCardsFromMoPayload,
   type ArReportPayload,
   type CrewAttendanceEntry,
@@ -110,12 +112,19 @@ export function MatchReportFlowPage() {
       console.error('ensureMatchReportReady failed', err),
     );
   }, [dataMode, currentUser?.uid, matchId]);
+
+  useEffect(() => {
+    if (!match) return;
+    setCrewAttendance(crewForAttendance(match));
+  }, [match?.id]);
+
   const [crewIssuesNote, setCrewIssuesNote] = useState('');
   const [stillComfortable, setStillComfortable] = useState<
     ArReportPayload['stillComfortable']
   >('');
   const [arIncidents, setArIncidents] = useState('');
   const [arNote, setArNote] = useState('');
+  const [arMatchFeedback, setArMatchFeedback] = useState('');
   const [error, setError] = useState<string | null>(null);
 
   if (!currentUser) return null;
@@ -248,22 +257,30 @@ export function MatchReportFlowPage() {
       if (formKind === 'ar_basic') {
         if (!stillComfortable) {
           setError(
-            'Please answer whether you still feel comfortable at this level.',
+            'Please answer whether you were comfortable as an assistant referee at this level.',
           );
           return;
         }
+        const someoneAbsentAr = crewAttendance.some((c) => !c.attended);
+        if (someoneAbsentAr && !crewAbsenceNote.trim()) {
+          setError('Note who did not attend (and anything we should know).');
+          return;
+        }
+        const arPayload: ArReportPayload = {
+          stillComfortable,
+          keyIncidents: arIncidents.trim() || undefined,
+          note: arNote.trim() || undefined,
+          matchFeedback: arMatchFeedback.trim() || undefined,
+          crewAttendance,
+          crewAbsenceNote: someoneAbsentAr
+            ? crewAbsenceNote.trim() || undefined
+            : undefined,
+          crewIssuesNote: crewIssuesNote.trim() || undefined,
+        };
         if (dataMode === 'live') {
-          await persistSubmittedMatchReport(report.id, 'ar_basic', {
-            stillComfortable,
-            keyIncidents: arIncidents.trim() || undefined,
-            note: arNote.trim() || undefined,
-          });
+          await persistSubmittedMatchReport(report.id, 'ar_basic', arPayload);
         } else {
-          store.submitMatchReport(report.id, 'ar_basic', {
-            stillComfortable,
-            keyIncidents: arIncidents.trim() || undefined,
-            note: arNote.trim() || undefined,
-          });
+          store.submitMatchReport(report.id, 'ar_basic', arPayload);
         }
         setStep('done');
         setDoneCards(0);
@@ -560,7 +577,7 @@ export function MatchReportFlowPage() {
               onIssuesNoteChange={setCrewIssuesNote}
               idPrefix="quick-attend"
             />
-            <FormGroup label="Light feedback" fieldId="mo-light">
+            <FormGroup label={MATCH_FEEDBACK_LABEL} fieldId="mo-light">
               <TextArea
                 id="mo-light"
                 value={lightFeedback}
@@ -573,10 +590,7 @@ export function MatchReportFlowPage() {
 
         {kind === 'ar_basic' && (
           <>
-            <FormGroup
-              label="Still comfortable officiating at this level?"
-              isRequired
-            >
+            <FormGroup label={AR_COMFORT_QUESTION} isRequired>
               <Radio
                 id="ar-yes"
                 name="ar-comfort"
@@ -592,11 +606,31 @@ export function MatchReportFlowPage() {
                 onChange={() => setStillComfortable('no')}
               />
             </FormGroup>
+            <CrewAttendanceFields
+              crewAttendance={crewAttendance}
+              onAttendanceChange={setCrewAttendance}
+              crewAbsenceNote={crewAbsenceNote}
+              onAbsenceNoteChange={setCrewAbsenceNote}
+              crewIssuesNote={crewIssuesNote}
+              onIssuesNoteChange={setCrewIssuesNote}
+              idPrefix="ar-attend"
+            />
             <FormGroup label="Key incidents" fieldId="ar-inc">
               <TextArea
                 id="ar-inc"
                 value={arIncidents}
                 onChange={(_e, v) => setArIncidents(v)}
+                rows={3}
+              />
+            </FormGroup>
+            <FormGroup
+              label={`${MATCH_FEEDBACK_LABEL} (optional)`}
+              fieldId="ar-feedback"
+            >
+              <TextArea
+                id="ar-feedback"
+                value={arMatchFeedback}
+                onChange={(_e, v) => setArMatchFeedback(v)}
                 rows={3}
               />
             </FormGroup>

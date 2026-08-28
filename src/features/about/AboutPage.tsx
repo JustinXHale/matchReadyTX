@@ -209,7 +209,7 @@ export function AboutPage() {
           <article className="rs-about-feature">
             <h4 className="rs-about-feature__title">Match and travel information</h4>
             <p>
-              Schedulers can view match fees and flight/housing flags when
+              Schedulers can view match fees and flight/lodging flags when
               assigning. Referees, team admins, and fans see kickoff, venue, and
               crew visibility rules only — not pay rates. MatchReadyTX does not
               collect or distribute payments.

@@ -1849,11 +1849,11 @@ export function MatchDetailPage() {
                 </div>
               </div>
               <div className="rs-detail-meta__row">
-                <span className="rs-detail-meta__label">Housing</span>
+                <span className="rs-detail-meta__label">Lodging</span>
                 <div
                   className="rs-slot-picker"
                   role="radiogroup"
-                  aria-label="Housing provided"
+                  aria-label="Lodging provided"
                 >
                   <button
                     type="button"

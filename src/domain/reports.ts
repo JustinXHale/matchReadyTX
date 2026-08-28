@@ -2,14 +2,18 @@ import {
   CREW_SLOTS,
   assignmentForUser,
   crewPeople,
+  emptyCrew,
   type CrewSlot,
   type Match,
+  type MatchGender,
   type UserProfile,
 } from '@/domain/types';
 import {
   isFivePointValue,
+  parseFivePointChoice,
   SCALE_NA,
   type FivePointChoice,
+  type FivePointValue,
 } from '@/domain/fivePointScale';
 
 /** Minutes after kickoff when MO/AR/CMO report notices open. */
@@ -65,6 +69,12 @@ export const BREAKDOWN_REWARD_OPTIONS = [
 ] as const;
 
 export type BreakdownReward = (typeof BREAKDOWN_REWARD_OPTIONS)[number];
+
+/** MO Quick / Performance — optional match-wide comment. */
+export const MATCH_FEEDBACK_LABEL = 'Feedback on the match';
+
+export const AR_COMFORT_QUESTION =
+  "Were you comfortable serving as an assistant referee at this match's level?";
 
 export type CrewAttendanceSlot = CrewSlot | 'cmo';
 
@@ -159,26 +169,110 @@ export interface ArReportPayload {
   stillComfortable: 'yes' | 'no' | '';
   keyIncidents?: string;
   note?: string;
+  /** Optional AR notes on the match (not MO performance review). */
+  matchFeedback?: string;
+  crewAttendance?: CrewAttendanceEntry[];
+  crewAbsenceNote?: string;
+  /** Scheduler-confidential when filed by AR. */
+  crewIssuesNote?: string;
 }
 
 export type CmoScaleKey =
   | 'scrum'
   | 'breakdown'
+  | 'advantage'
   | 'gameControl'
   | 'communication'
+  | 'materiality'
   | 'positioning'
   | 'lineout'
+  | 'fitness'
   | 'bigDecisions';
+
+/** Competency order matches last year’s CMO Google Form. */
+export const CMO_SCALE_KEYS: CmoScaleKey[] = [
+  'scrum',
+  'breakdown',
+  'advantage',
+  'gameControl',
+  'communication',
+  'materiality',
+  'positioning',
+  'lineout',
+  'fitness',
+  'bigDecisions',
+];
 
 export const CMO_SCALE_LABELS: Record<CmoScaleKey, string> = {
   scrum: 'Scrum Management',
   breakdown: 'Breakdown/Tackle Management',
+  advantage: 'Advantage Application',
   gameControl: 'Game Control & Flow',
   communication: 'Communication & Player Management',
+  materiality: 'Materiality',
   positioning: 'Positioning & Movement',
   lineout: 'Lineout/Touch/Maul Management',
+  fitness: 'Level of Fitness',
   bigDecisions: 'Big Decisions',
 };
+
+export const CMO_COMPLEXITY_OPTIONS = [
+  'Severe weather (wind, rain, etc...)',
+  'scrums frequently unstable',
+  'repeated foul play theme',
+  'rivalry/high stakes',
+  'short benches/injuries',
+  'coach/crowd pressure',
+  'travel squad/new players',
+  'NO MAJOR FAVORS. GREAT DAY',
+] as const;
+
+export type CmoComplexityFactor = (typeof CMO_COMPLEXITY_OPTIONS)[number];
+
+/** Last year’s Match Type (League / Friendly / Play-off / Championship). */
+export const CMO_MATCH_KINDS = [
+  'League Match',
+  'Friendly',
+  'Play-off',
+  'Championship',
+] as const;
+
+export type CmoMatchKind = (typeof CMO_MATCH_KINDS)[number];
+
+export const CMO_TEMPERATURE_CARD_LABELS: Partial<
+  Record<FivePointValue, string>
+> = {
+  1: 'Friendly / low emotion',
+  2: '',
+  3: 'Competitive',
+  4: '',
+  5: 'Very hot, high stakes',
+};
+
+export const CMO_BALANCE_CARD_LABELS: Partial<Record<FivePointValue, string>> = {
+  1: 'Heavy mismatch',
+  2: '',
+  3: 'Somewhat uneven',
+  4: '',
+  5: 'Very even',
+};
+
+export const CMO_CONFIDENCE_CARD_LABELS: Partial<
+  Record<FivePointValue, string>
+> = {
+  1: 'Guess / low evidence',
+  2: '',
+  3: 'Moderate',
+  4: '',
+  5: 'Very confident',
+};
+
+export function cmoComplexityComplete(
+  factors: readonly string[],
+  other: string,
+): boolean {
+  return factors.length > 0 || other.trim().length > 0;
+}
 
 /** CMO assessed rating: 1 highest, 10 lowest. */
 export const CMO_ASSESSED_RATING_MIN = 1;
@@ -187,7 +281,8 @@ export const CMO_ASSESSED_RATING_MAX = 10;
 export function parseAssessedRating(raw: string): number | undefined {
   const trimmed = raw.trim();
   if (!trimmed) return undefined;
-  const n = Number(trimmed);
+  const level = trimmed.match(/^level\s+(\d{1,2})\b/i);
+  const n = level ? Number(level[1]) : Number(trimmed);
   if (
     !Number.isInteger(n) ||
     n < CMO_ASSESSED_RATING_MIN ||
@@ -198,12 +293,71 @@ export function parseAssessedRating(raw: string): number | undefined {
   return n;
 }
 
+/** Google Form CMO scale: 1–5, or 0 / N/A. */
+export function parseCmoFormScale(raw: unknown): FivePointChoice | null {
+  if (raw === 0 || raw === '0') return SCALE_NA;
+  return parseFivePointChoice(raw);
+}
+
+export interface ParsedLegacyTeams {
+  homeTeamName: string;
+  awayTeamName: string;
+  homeScore?: number;
+  awayScore?: number;
+}
+
+/** Parse "Home (12) vs Away (7)" style team lines from last year’s form. */
+export function parseLegacyTeamsText(teamsText: string): ParsedLegacyTeams {
+  const trimmed = teamsText.trim();
+  const vs = trimmed.match(
+    /^(.+?)(?:\s*\((\d+)\))?\s+vs\.?\s+(.+?)(?:\s*\((\d+)\))?$/i,
+  );
+  if (!vs) {
+    return { homeTeamName: trimmed || 'Home', awayTeamName: 'Away' };
+  }
+  const homeScore = vs[2] != null ? Number(vs[2]) : undefined;
+  const awayScore = vs[4] != null ? Number(vs[4]) : undefined;
+  return {
+    homeTeamName: vs[1].trim() || 'Home',
+    awayTeamName: vs[3].trim() || 'Away',
+    ...(homeScore != null && Number.isFinite(homeScore) ? { homeScore } : {}),
+    ...(awayScore != null && Number.isFinite(awayScore) ? { awayScore } : {}),
+  };
+}
+
+export function inferMatchGenderFromLevel(
+  matchLevel: string | undefined,
+): MatchGender {
+  const t = (matchLevel ?? '').toLowerCase();
+  if (/\b(women|woman|womens|girls?)\b/.test(t)) return 'women';
+  return 'men';
+}
+
 export interface CmoReportPayload {
   scales: Partial<Record<CmoScaleKey, FivePointChoice>>;
   comments: Partial<Record<CmoScaleKey, string>>;
+  /** What level the match felt like (may differ from the listed fixture level). */
+  playedLike?: string;
+  /** League / Friendly / Play-off / Championship (last year’s Match Type). */
+  matchKind?: CmoMatchKind;
+  /** Emotional/physical intensity 1–5 (not the MO’s performance). */
+  gameTemperature?: number;
+  /** How even the teams were 1–5 (score does not dictate balance). */
+  contestBalance?: number;
+  complexityFactors?: CmoComplexityFactor[];
+  complexityOther?: string;
+  penaltyCount?: string;
+  attendedInPerson?: 'yes' | 'no';
+  videoLink?: string;
+  keep?: string;
+  start?: string;
+  stop?: string;
   overallComment?: string;
   /** CMO’s assessed rating of the Match Official (1 highest, 10 lowest). */
   assessedRating?: number;
+  /** Confidence in the assessed grade, 1–5. */
+  gradingConfidence?: number;
+  gradingRationale?: string;
 }
 
 export function validateCmoScales(
@@ -232,6 +386,19 @@ export function cardReportDocId(matchId: string, officialId: string): string {
   return `${matchId}_${officialId}`.replace(/[^a-zA-Z0-9_-]/g, '_').slice(0, 120);
 }
 
+export const MATCH_REPORT_SOURCE_LEGACY_FORM = 'legacy_form' as const;
+export type MatchReportSource = typeof MATCH_REPORT_SOURCE_LEGACY_FORM;
+
+/** Display-only fixture facts when the report is not tied to a live schedule match. */
+export interface LegacyCmoFixture {
+  teamsText: string;
+  matchLevel?: string;
+  homeTeamName: string;
+  awayTeamName: string;
+  homeScore?: number;
+  awayScore?: number;
+}
+
 export interface MatchReport {
   id: string;
   matchId: string;
@@ -250,6 +417,120 @@ export interface MatchReport {
   moPayload?: MoReportPayload;
   arPayload?: ArReportPayload;
   cmoPayload?: CmoReportPayload;
+  /** One-shot archive import — never treated as due work. */
+  source?: MatchReportSource;
+  legacyFixture?: LegacyCmoFixture;
+}
+
+export function parseLegacyCmoFixture(raw: unknown): LegacyCmoFixture | undefined {
+  if (!raw || typeof raw !== 'object') return undefined;
+  const o = raw as Record<string, unknown>;
+  const teamsText = typeof o.teamsText === 'string' ? o.teamsText : '';
+  const homeTeamName =
+    typeof o.homeTeamName === 'string' ? o.homeTeamName.trim() : '';
+  const awayTeamName =
+    typeof o.awayTeamName === 'string' ? o.awayTeamName.trim() : '';
+  if (!teamsText && !homeTeamName) return undefined;
+  const parsed = parseLegacyTeamsText(teamsText);
+  const homeScore =
+    typeof o.homeScore === 'number' && Number.isFinite(o.homeScore)
+      ? o.homeScore
+      : parsed.homeScore;
+  const awayScore =
+    typeof o.awayScore === 'number' && Number.isFinite(o.awayScore)
+      ? o.awayScore
+      : parsed.awayScore;
+  return {
+    teamsText: teamsText || `${homeTeamName} vs ${awayTeamName}`.trim(),
+    matchLevel: typeof o.matchLevel === 'string' ? o.matchLevel : undefined,
+    homeTeamName: homeTeamName || parsed.homeTeamName,
+    awayTeamName: awayTeamName || parsed.awayTeamName,
+    ...(homeScore != null ? { homeScore } : {}),
+    ...(awayScore != null ? { awayScore } : {}),
+  };
+}
+
+/** Live match if present; otherwise a display-only row from archive fixture facts. */
+export function displayMatchForCmoReport(
+  report: MatchReport,
+  matches: Match[],
+): Match | undefined {
+  const live = matches.find((m) => m.id === report.matchId);
+  if (live) return live;
+  if (report.source !== MATCH_REPORT_SOURCE_LEGACY_FORM && !report.legacyFixture) {
+    return undefined;
+  }
+  const teams = report.legacyFixture ?? {
+    teamsText: '',
+    homeTeamName: 'Home',
+    awayTeamName: 'Away',
+  };
+  const moUserId =
+    report.slot === 'mo' ? report.officialId : report.subjectOfficialId;
+  return {
+    id: report.matchId,
+    sheetRowKey: report.matchId,
+    status: 'locked_confirmed',
+    kickoffAt: report.kickoffAt,
+    venueName: '',
+    venueAddress: '',
+    homeTeamId: '',
+    awayTeamId: '',
+    homeTeamName: teams.homeTeamName,
+    awayTeamName: teams.awayTeamName,
+    competition: teams.matchLevel,
+    level: teams.matchLevel?.trim() || 'Archive',
+    gender: inferMatchGenderFromLevel(teams.matchLevel),
+    matchType: '2025 archive',
+    flightProvided: false,
+    housingProvided: false,
+    crew: {
+      ...emptyCrew(),
+      mo: moUserId
+        ? [
+            {
+              id: `${report.id}_mo`,
+              slot: 'mo',
+              userId: moUserId,
+              status: 'confirmed',
+              history: [],
+            },
+          ]
+        : emptyCrew().mo,
+    },
+    ...(teams.homeScore != null ? { homeScore: teams.homeScore } : {}),
+    ...(teams.awayScore != null ? { awayScore: teams.awayScore } : {}),
+  };
+}
+
+/** @alias displayMatchForCmoReport */
+export const displayMatchForArchivedReport = displayMatchForCmoReport;
+
+/** Submitted CMO forms about this user as Match Official. */
+export function submittedCmoReportsAboutOfficial(
+  reports: MatchReport[],
+  matches: Match[],
+  userId: string,
+): MatchReport[] {
+  const moMatchIds = new Set(
+    matches
+      .filter((m) =>
+        crewPeople(m.crew.mo).some((a) => a.userId === userId),
+      )
+      .map((m) => m.id),
+  );
+  return reports
+    .filter(
+      (r) =>
+        r.slot === 'cmo' &&
+        r.status === 'submitted' &&
+        (r.subjectOfficialId === userId ||
+          (!r.subjectOfficialId && moMatchIds.has(r.matchId))),
+    )
+    .sort(
+      (a, b) =>
+        new Date(b.kickoffAt).getTime() - new Date(a.kickoffAt).getTime(),
+    );
 }
 
 export interface CardReport {

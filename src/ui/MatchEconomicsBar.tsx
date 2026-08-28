@@ -26,8 +26,8 @@ export function MatchEconomicsBar({
         </span>
       )}
       {match.housingProvided && (
-        <span className="rs-perk-icon" title="Housing provided">
-          Housing
+        <span className="rs-perk-icon" title="Lodging provided">
+          Lodging
         </span>
       )}
     </div>

@@ -204,9 +204,11 @@ export function MatchListRow({
             </span>
           ) : null}
         </div>
-        <p className="rs-list-row__venue">
-          {match.venueAddress?.trim() || match.venueName}
-        </p>
+        {(match.venueAddress?.trim() || match.venueName?.trim()) ? (
+          <p className="rs-list-row__venue">
+            {match.venueAddress?.trim() || match.venueName}
+          </p>
+        ) : null}
         {teams}
         {showTime && (
           <p className="rs-list-row__time">

@@ -3,21 +3,25 @@ import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { Button, Title } from '@patternfly/react-core';
 import { useApp } from '@/app/AppContext';
 import {
+  AR_COMFORT_QUESTION,
+  CMO_SCALE_KEYS,
   CMO_SCALE_LABELS,
   COMPETITION_UNION_LABELS,
-  type CmoScaleKey,
+  MATCH_FEEDBACK_LABEL,
+  displayMatchForArchivedReport,
+  displayMatchForCmoReport,
 } from '@/domain/reports';
 import { formatFivePointChoice } from '@/domain/fivePointScale';
 import { crewPeople, REQUESTABLE_SLOT_SHORT } from '@/domain/types';
+import { cmoSubjectName } from '@/features/insights/insightsDisplay';
 import { moDisplayNames } from '@/features/referee/appointments/crewLines';
 import {
-  MATCH_REPORTS_BACK,
   matchReportViewPath,
   resolveSubmittedMatchReport,
   submittedMatchReportsForMatch,
 } from '@/features/referee/reports/reportLinks';
+import { SubmittedPerformanceReportView } from '@/features/referee/reports/SubmittedPerformanceReportView';
 import { MatchListRow } from '@/ui/MatchListRow';
-import { backState } from '@/nav/backNav';
 
 function Field({
   label,
@@ -41,14 +45,32 @@ export function MatchReportViewPage() {
   const { currentUser, state, isAssignerView } = useApp();
   const navigate = useNavigate();
 
-  const match = state.matches.find((m) => m.id === matchId);
-  const siblings = submittedMatchReportsForMatch(state.matchReports, matchId);
   const report = resolveSubmittedMatchReport(state.matchReports, matchId, {
     officialId: params.get('officialId') ?? undefined,
     slot: params.get('slot') ?? undefined,
   });
+  const match =
+    state.matches.find((m) => m.id === matchId) ??
+    (report ? displayMatchForArchivedReport(report, state.matches) : undefined);
+  const siblings = submittedMatchReportsForMatch(state.matchReports, matchId);
 
   if (!currentUser) return null;
+
+  if (!report) {
+    return (
+      <div className="rs-stack">
+        <Title headingLevel="h2" size="lg">
+          No submitted match report
+        </Title>
+        <Button
+          variant="secondary"
+          onClick={() => navigate('/referee/reports/match')}
+        >
+          Back to Match Reports
+        </Button>
+      </div>
+    );
+  }
 
   if (!match) {
     return (
@@ -58,32 +80,6 @@ export function MatchReportViewPage() {
         </Title>
         <Button variant="link" onClick={() => navigate('/referee/reports/match')}>
           Back to Match Reports
-        </Button>
-      </div>
-    );
-  }
-
-  if (!report) {
-    return (
-      <div className="rs-stack">
-        <button
-          type="button"
-          className="rs-detail__back"
-          onClick={() => navigate(`/matches/${matchId}`, { state: backState(MATCH_REPORTS_BACK) })}
-        >
-          ← Match
-        </button>
-        <Title headingLevel="h2" size="lg">
-          No submitted match report
-        </Title>
-        <p className="rs-match-card__meta">
-          {match.homeTeamName} vs {match.awayTeamName}
-        </p>
-        <Button
-          variant="secondary"
-          onClick={() => navigate(`/matches/${matchId}`)}
-        >
-          Back to match
         </Button>
       </div>
     );
@@ -112,9 +108,13 @@ export function MatchReportViewPage() {
       <Title headingLevel="h2" size="lg">
         Match report ({kindLabel})
       </Title>
-      <MatchListRow match={match} showTime />
+      <MatchListRow
+        match={match}
+        showTime={report.source !== 'legacy_form'}
+      />
       <p className="rs-match-card__meta">
         {REQUESTABLE_SLOT_SHORT[report.slot]} · Submitted
+        {report.source === 'legacy_form' ? ' · Imported' : ''}
         {report.submittedAt
           ? ` · ${new Date(report.submittedAt).toLocaleString()}`
           : ''}
@@ -142,12 +142,10 @@ export function MatchReportViewPage() {
         </div>
       )}
 
-      {mo && (
+      {mo && report.formKind === 'mo_performance' ? (
+        <SubmittedPerformanceReportView mo={mo} match={match} />
+      ) : mo ? (
         <>
-          <Field label="Referee">{mo.refereeName}</Field>
-          <Field label="Match date">{mo.matchDate}</Field>
-          <Field label="Format">{mo.format}</Field>
-          <Field label="Division">{mo.division}</Field>
           <Field label="Score">
             {mo.homeTeamName ?? match.homeTeamName} {mo.homePoints} –{' '}
             {mo.awayPoints} {mo.awayTeamName ?? match.awayTeamName}
@@ -176,31 +174,44 @@ export function MatchReportViewPage() {
               {mo.crewIssuesNote || '—'}
             </Field>
           )}
-          <Field label="Light feedback">{mo.lightFeedback}</Field>
-          <Field label="Game temperature">{mo.gameTemperature}</Field>
-          <Field label="Control & flow">{mo.controlAndFlow}</Field>
-          <Field label="Today I performed">{mo.todayIPerformed}</Field>
-          <Field label="Key moment / decision">
-            {mo.decidedAndWhy ?? mo.typeOfMoment}
-          </Field>
-          <Field label="Breakdown rewards">
-            {mo.breakdownRewards?.length
-              ? mo.breakdownRewards.join(', ')
-              : null}
-          </Field>
-          <Field label="Set piece challenge">{mo.setPieceChallenge}</Field>
-          <Field label="Advantage use">{mo.advantageUse}</Field>
-          <Field label="Non-card problems">{mo.nonCardProblems}</Field>
-          <Field label="Other comments / link">{mo.otherCommentsOrLink}</Field>
+          <Field label={MATCH_FEEDBACK_LABEL}>{mo.lightFeedback}</Field>
+          <Field label="What went well">{mo.whatWentWell}</Field>
+          <Field label="What to improve">{mo.whatToImprove}</Field>
+          <Field label="Key decisions">{mo.keyDecisions}</Field>
+          <Field label="Fitness / positioning">{mo.fitnessPositioning}</Field>
+          <Field label="Other notes">{mo.otherNotes}</Field>
         </>
-      )}
+      ) : null}
 
       {ar && (
         <>
-          <Field label="Still comfortable at this level?">
-            {ar.stillComfortable || '—'}
+          <Field label={AR_COMFORT_QUESTION}>
+            {ar.stillComfortable === 'yes'
+              ? 'Yes'
+              : ar.stillComfortable === 'no'
+                ? 'No'
+                : '—'}
           </Field>
+          {ar.crewAttendance && ar.crewAttendance.length > 0 && (
+            <Field label="Crew attendance">
+              <ul className="rs-crew-attend">
+                {ar.crewAttendance.map((c) => (
+                  <li key={`${c.slot}-${c.userId}`}>
+                    {REQUESTABLE_SLOT_SHORT[c.slot]} · {c.userName}
+                    {c.attended ? '' : ' — absent'}
+                  </li>
+                ))}
+              </ul>
+            </Field>
+          )}
+          <Field label="Absence note">{ar.crewAbsenceNote}</Field>
+          {isAssignerView && (
+            <Field label="Referee team issues (Scheduler only)">
+              {ar.crewIssuesNote || '—'}
+            </Field>
+          )}
           <Field label="Key incidents">{ar.keyIncidents}</Field>
+          <Field label={MATCH_FEEDBACK_LABEL}>{ar.matchFeedback}</Field>
           <Field label="Note">{ar.note}</Field>
         </>
       )}
@@ -217,15 +228,26 @@ export function CmoReportViewPage() {
   const { currentUser, state } = useApp();
   const navigate = useNavigate();
 
-  const match = state.matches.find((m) => m.id === matchId);
-  const report = state.matchReports.find(
-    (r) =>
-      r.matchId === matchId &&
-      r.slot === 'cmo' &&
-      r.status === 'submitted',
-  );
-
   if (!currentUser) return null;
+
+  const report =
+    state.matchReports.find(
+      (r) =>
+        r.matchId === matchId &&
+        r.slot === 'cmo' &&
+        r.status === 'submitted' &&
+        r.officialId === currentUser.uid,
+    ) ??
+    state.matchReports.find(
+      (r) =>
+        r.matchId === matchId &&
+        r.slot === 'cmo' &&
+        r.status === 'submitted',
+    );
+
+  const match = report
+    ? displayMatchForCmoReport(report, state.matches)
+    : state.matches.find((m) => m.id === matchId);
 
   if (!match || !report) {
     return (
@@ -236,9 +258,7 @@ export function CmoReportViewPage() {
         <Button
           variant="secondary"
           onClick={() =>
-            navigate(
-              match ? `/matches/${match.id}` : '/referee/reports/coaching',
-            )
+            navigate('/referee/reports/coaching')
           }
         >
           Back
@@ -248,15 +268,15 @@ export function CmoReportViewPage() {
   }
 
   const p = report.cmoPayload;
-  const scaleKeys = Object.keys(CMO_SCALE_LABELS) as CmoScaleKey[];
   const youFiled = report.officialId === currentUser.uid;
   const aboutYou =
-    crewPeople(match.crew.mo).some((a) => a.userId === currentUser.uid) &&
-    !youFiled;
+    !youFiled &&
+    (report.subjectOfficialId === currentUser.uid ||
+      crewPeople(match.crew.mo).some((a) => a.userId === currentUser.uid));
   const author =
     state.users.find((u) => u.uid === report.officialId)?.displayName ??
     'CMO';
-  const moName = moDisplayNames(match);
+  const moName = cmoSubjectName(report, match, state.users, moDisplayNames(match));
 
   return (
     <div className="rs-stack rs-report-view">
@@ -281,7 +301,7 @@ export function CmoReportViewPage() {
             ? `Filed by ${author} as CMO · about you (Match Official)`
             : `Filed by ${author} as CMO · about ${moName} (Match Official)`}
       </p>
-      <MatchListRow match={match} showTime />
+      <MatchListRow match={match} showTime={report.source !== 'legacy_form'} />
       <p className="rs-match-card__meta">
         Submitted
         {report.submittedAt
@@ -290,7 +310,39 @@ export function CmoReportViewPage() {
       </p>
       {p ? (
         <>
-          {scaleKeys.map((key) => (
+          <Title headingLevel="h3" size="md">
+            Match context
+          </Title>
+          <Field label="Attended in person">
+            {p.attendedInPerson === 'yes'
+              ? 'Yes'
+              : p.attendedInPerson === 'no'
+                ? 'No'
+                : null}
+          </Field>
+          <Field label="Video link">{p.videoLink}</Field>
+          <Field label="This game played like">{p.playedLike}</Field>
+          <Field label="Match type">{p.matchKind}</Field>
+          <Field label="Game temperature">
+            {p.gameTemperature != null ? `${p.gameTemperature}/5` : null}
+          </Field>
+          <Field label="Contest balance">
+            {p.contestBalance != null ? `${p.contestBalance}/5` : null}
+          </Field>
+          <Field label="Complexity factors">
+            {[
+              ...(p.complexityFactors ?? []),
+              p.complexityOther ? `Other: ${p.complexityOther}` : '',
+            ]
+              .filter(Boolean)
+              .join(', ') || null}
+          </Field>
+          <Field label="Penalty count">{p.penaltyCount}</Field>
+
+          <Title headingLevel="h3" size="md">
+            Scales
+          </Title>
+          {CMO_SCALE_KEYS.map((key) => (
             <Field key={key} label={CMO_SCALE_LABELS[key]}>
               {p.scales[key] != null ? (
                 <>
@@ -300,12 +352,27 @@ export function CmoReportViewPage() {
               ) : null}
             </Field>
           ))}
-          <Field label="Overall comment">{p.overallComment}</Field>
+
+          <Title headingLevel="h3" size="md">
+            Coaching next steps
+          </Title>
+          <Field label="Keep">{p.keep}</Field>
+          <Field label="Start">{p.start}</Field>
+          <Field label="Stop">{p.stop}</Field>
+          <Field label="Coach open comments">{p.overallComment}</Field>
+
+          <Title headingLevel="h3" size="md">
+            Referee snapshot
+          </Title>
           <Field label="Assessed rating">
             {p.assessedRating != null
               ? `${p.assessedRating} (1 highest, 10 lowest)`
               : null}
           </Field>
+          <Field label="Confidence in estimate">
+            {p.gradingConfidence != null ? `${p.gradingConfidence}/5` : null}
+          </Field>
+          <Field label="Rationale on grading">{p.gradingRationale}</Field>
         </>
       ) : (
         <p className="rs-match-card__meta">Report on file (no payload detail).</p>

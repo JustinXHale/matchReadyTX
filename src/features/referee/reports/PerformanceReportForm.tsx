@@ -1,10 +1,8 @@
 import { useMemo, useState } from 'react';
 import {
   Button,
-  Checkbox,
   Form,
   FormGroup,
-  Radio,
   TextArea,
   TextInput,
   Title,
@@ -12,6 +10,7 @@ import {
 import {
   BREAKDOWN_REWARD_OPTIONS,
   crewForAttendance,
+  MATCH_FEEDBACK_LABEL,
   type BreakdownReward,
   type CrewAttendanceEntry,
   type MatchFormat,
@@ -23,7 +22,11 @@ import {
   type UserProfile,
 } from '@/domain/types';
 import { CrewAttendanceFields, formatCrewAttendanceNote } from '@/features/referee/reports/CrewAttendanceFields';
+import { useScrollReportToTopOnChange } from '@/features/referee/reports/scrollReportToTop';
 import { IconDateInput } from '@/ui/IconDateInput';
+import { MultiSelectCards } from '@/ui/MultiSelectCards';
+import { ScaleRatingCards } from '@/ui/ScaleRatingCards';
+import type { FivePointValue } from '@/domain/fivePointScale';
 
 const SECTION_COUNT = 4;
 const SECTION_TITLES = [
@@ -33,45 +36,8 @@ const SECTION_TITLES = [
   'Closing',
 ] as const;
 
-function ScaleField({
-  id,
-  label,
-  description,
-  lowLabel,
-  highLabel,
-  value,
-  onChange,
-}: {
-  id: string;
-  label: string;
-  description: string;
-  lowLabel: string;
-  highLabel: string;
-  value: number | '';
-  onChange: (n: number) => void;
-}) {
-  return (
-    <div className="rs-scale-field">
-      <FormGroup label={`${label} (1–5)`} isRequired fieldId={id}>
-        <p className="rs-scale-field__criteria">{description}</p>
-        <div className="rs-scale-row" role="radiogroup" aria-label={label}>
-          <span className="rs-scale-row__anchor">{lowLabel}</span>
-          {[1, 2, 3, 4, 5].map((n) => (
-            <Radio
-              key={n}
-              id={`${id}-${n}`}
-              name={id}
-              label={String(n)}
-              isChecked={value === n}
-              onChange={() => onChange(n)}
-            />
-          ))}
-          <span className="rs-scale-row__anchor">{highLabel}</span>
-        </div>
-      </FormGroup>
-    </div>
-  );
-}
+const SNAPSHOT_SCALE_LEGEND =
+  '1 Poor · 2 Below Average · 3 Average · 4 Above Average · 5 Excellent';
 
 function TeamScoreCard({
   teamName,
@@ -146,6 +112,7 @@ export function PerformanceReportForm({
   onSubmit: (payload: MoReportPayload) => void;
 }) {
   const [section, setSection] = useState(0);
+  const reportTopRef = useScrollReportToTopOnChange(section);
   const [error, setError] = useState<string | null>(null);
 
   const [crewAttendance, setCrewAttendance] = useState<CrewAttendanceEntry[]>(
@@ -185,12 +152,7 @@ export function PerformanceReportForm({
 
   const [nonCardProblems, setNonCardProblems] = useState('');
   const [otherCommentsOrLink, setOtherCommentsOrLink] = useState('');
-
-  const toggleReward = (opt: BreakdownReward, checked: boolean) => {
-    setBreakdownRewards((prev) =>
-      checked ? [...prev, opt] : prev.filter((x) => x !== opt),
-    );
-  };
+  const [matchFeedback, setMatchFeedback] = useState('');
 
   const sectionErrors = (idx: number): string | null => {
     if (idx === 0) {
@@ -303,6 +265,7 @@ export function PerformanceReportForm({
       advantageUse: advantageUse as number,
       nonCardProblems: nonCardProblems.trim() || undefined,
       otherCommentsOrLink: otherCommentsOrLink.trim() || undefined,
+      lightFeedback: matchFeedback.trim() || undefined,
       cmoDidNotAttend: cmoDidNotAttend || undefined,
     };
     onSubmit(payload);
@@ -317,7 +280,11 @@ export function PerformanceReportForm({
         Performance Report
       </Title>
 
-      <nav className="rs-report-stepper" aria-label="Report sections">
+      <nav
+        ref={reportTopRef}
+        className="rs-report-stepper"
+        aria-label="Report sections"
+      >
         {SECTION_TITLES.map((title, idx) => (
           <button
             key={title}
@@ -424,25 +391,62 @@ export function PerformanceReportForm({
         )}
 
         {section === 1 && (
-          <>
-            <ScaleField
-              id="perf-temp"
-              label="Game temperature"
-              description="How emotional/physical the game felt overall. 1 = friendly/social vibe. 3 = competitive but manageable. 5 = very hot. (Match environment, not your performance.)"
-              lowLabel="Calm"
-              highLabel="Hot"
-              value={gameTemperature}
-              onChange={setGameTemperature}
-            />
-            <ScaleField
-              id="perf-control"
-              label="Control & flow"
-              description="How well you set standards and kept the game moving. 1 = reactive. 3 = mixed. 5 = proactive: clear standards early, effective prevention."
-              lowLabel="Reactive"
-              highLabel="Proactive"
-              value={controlAndFlow}
-              onChange={setControlAndFlow}
-            />
+          <section className="rs-detail-card rs-coach-fb-ratings">
+            <p className="rs-match-card__meta rs-coach-fb-scale-legend">
+              {SNAPSHOT_SCALE_LEGEND}
+            </p>
+            <div className="rs-coach-fb-criterion">
+              <div className="rs-coach-fb-criterion__head">
+                <span className="rs-coach-fb-criterion__title">
+                  Game temperature (1–5)
+                </span>
+                <p className="rs-coach-fb-criterion__hint">
+                  How emotional/physical the game felt overall. 1 = friendly/social
+                  vibe. 3 = competitive but manageable. 5 = very hot. (Match
+                  environment, not your performance.)
+                </p>
+              </div>
+              <ScaleRatingCards
+                name="perf-temp"
+                value={
+                  gameTemperature === ''
+                    ? undefined
+                    : (gameTemperature as FivePointValue)
+                }
+                onChange={(v) => {
+                  if (typeof v === 'number') setGameTemperature(v);
+                }}
+                includeNa={false}
+                ariaLabel="Game temperature"
+                labels={{ 1: 'Calm', 5: 'Hot' }}
+              />
+            </div>
+            <div className="rs-coach-fb-criterion">
+              <div className="rs-coach-fb-criterion__head">
+                <span className="rs-coach-fb-criterion__title">
+                  Control &amp; flow (1–5)
+                </span>
+                <p className="rs-coach-fb-criterion__hint">
+                  How well you set standards and kept the game moving. 1 =
+                  reactive. 3 = mixed. 5 = proactive: clear standards early,
+                  effective prevention.
+                </p>
+              </div>
+              <ScaleRatingCards
+                name="perf-control"
+                value={
+                  controlAndFlow === ''
+                    ? undefined
+                    : (controlAndFlow as FivePointValue)
+                }
+                onChange={(v) => {
+                  if (typeof v === 'number') setControlAndFlow(v);
+                }}
+                includeNa={false}
+                ariaLabel="Control and flow"
+                labels={{ 1: 'Reactive', 5: 'Proactive' }}
+              />
+            </div>
             <FormGroup
               label="Today I performed…"
               isRequired
@@ -458,7 +462,7 @@ export function PerformanceReportForm({
                 rows={4}
               />
             </FormGroup>
-          </>
+          </section>
         )}
 
         {section === 2 && (
@@ -487,18 +491,16 @@ export function PerformanceReportForm({
               isRequired
             >
               <p className="rs-scale-field__criteria">
-                Tick the things you consistently rewarded that shaped the
+                Select everything you consistently rewarded that shaped the
                 contest.
               </p>
-              {BREAKDOWN_REWARD_OPTIONS.map((opt) => (
-                <Checkbox
-                  key={opt}
-                  id={`perf-bd-${opt}`}
-                  label={opt}
-                  isChecked={breakdownRewards.includes(opt)}
-                  onChange={(_e, checked) => toggleReward(opt, checked)}
-                />
-              ))}
+              <MultiSelectCards
+                name="perf-bd"
+                options={BREAKDOWN_REWARD_OPTIONS}
+                selected={breakdownRewards}
+                onChange={setBreakdownRewards}
+                ariaLabel="Breakdown rewards"
+              />
             </FormGroup>
             <FormGroup
               label="Set piece: Biggest challenge today"
@@ -516,15 +518,31 @@ export function PerformanceReportForm({
                 rows={3}
               />
             </FormGroup>
-            <ScaleField
-              id="perf-adv"
-              label="Advantage use"
-              description="How purposeful and outcome-focused your advantage was. 1 = rarely/unclearly played. 3 = sometimes played but outcomes unclear. 5 = clear signals, real gain, brought back promptly when no benefit."
-              lowLabel="Rarely"
-              highLabel="Clear"
-              value={advantageUse}
-              onChange={setAdvantageUse}
-            />
+            <div className="rs-coach-fb-criterion">
+              <div className="rs-coach-fb-criterion__head">
+                <span className="rs-coach-fb-criterion__title">
+                  Advantage use (1–5)
+                </span>
+                <p className="rs-coach-fb-criterion__hint">
+                  How purposeful and outcome-focused your advantage was. 1 =
+                  rarely/unclearly played. 3 = sometimes played but outcomes
+                  unclear. 5 = clear signals, real gain, brought back promptly
+                  when no benefit.
+                </p>
+              </div>
+              <ScaleRatingCards
+                name="perf-adv"
+                value={
+                  advantageUse === '' ? undefined : (advantageUse as FivePointValue)
+                }
+                onChange={(v) => {
+                  if (typeof v === 'number') setAdvantageUse(v);
+                }}
+                includeNa={false}
+                ariaLabel="Advantage use"
+                labels={{ 1: 'Rarely', 5: 'Clear' }}
+              />
+            </div>
           </>
         )}
 
@@ -549,6 +567,14 @@ export function PerformanceReportForm({
                 id="perf-other"
                 value={otherCommentsOrLink}
                 onChange={(_e, v) => setOtherCommentsOrLink(v)}
+                rows={3}
+              />
+            </FormGroup>
+            <FormGroup label={MATCH_FEEDBACK_LABEL} fieldId="perf-feedback">
+              <TextArea
+                id="perf-feedback"
+                value={matchFeedback}
+                onChange={(_e, v) => setMatchFeedback(v)}
                 rows={3}
               />
             </FormGroup>

@@ -1695,18 +1695,114 @@ describe('parseAssessedRating', () => {
     expect(parseAssessedRating('0')).toBeUndefined();
     expect(parseAssessedRating('11')).toBeUndefined();
     expect(parseAssessedRating('8.5')).toBeUndefined();
+    expect(parseAssessedRating('Level 8 - C2')).toBe(8);
+    expect(parseAssessedRating('Level 10 - New Referee')).toBe(10);
+    expect(parseAssessedRating('level 7')).toBe(7);
+  });
+
+  it('maps Google Form scale 0 to N/A', async () => {
+    const { parseCmoFormScale } = await import('@/domain/reports');
+    const { SCALE_NA } = await import('@/domain/fivePointScale');
+    expect(parseCmoFormScale(0)).toBe(SCALE_NA);
+    expect(parseCmoFormScale('0')).toBe(SCALE_NA);
+    expect(parseCmoFormScale('4')).toBe(4);
+    expect(parseCmoFormScale(3)).toBe(3);
+  });
+
+  it('parses Home (12) vs Away (7) team lines', async () => {
+    const { parseLegacyTeamsText } = await import('@/domain/reports');
+    expect(parseLegacyTeamsText("UT II's (19) vs OU II's (43)")).toEqual({
+      homeTeamName: "UT II's",
+      awayTeamName: "OU II's",
+      homeScore: 19,
+      awayScore: 43,
+    });
+    expect(parseLegacyTeamsText('Plano vs Austin')).toEqual({
+      homeTeamName: 'Plano',
+      awayTeamName: 'Austin',
+    });
+  });
+
+  it('shows archive CMO reports without a live fixture', async () => {
+    const {
+      displayMatchForCmoReport,
+      submittedCmoReportsAboutOfficial,
+    } = await import('@/domain/reports');
+    const report = {
+      id: 'legacy_cmo_abc_cmo1_cmo',
+      matchId: 'legacy_cmo_abc',
+      officialId: 'cmo1',
+      subjectOfficialId: 'ref1',
+      slot: 'cmo' as const,
+      status: 'submitted' as const,
+      formKind: 'cmo' as const,
+      source: 'legacy_form' as const,
+      dueAt: '2025-10-05T17:00:00.000Z',
+      kickoffAt: '2025-10-05T17:00:00.000Z',
+      submittedAt: '2025-10-06T19:00:00.000Z',
+      legacyFixture: {
+        teamsText: 'Plano (12) vs Austin (52)',
+        matchLevel: 'High School Varsity',
+        homeTeamName: 'Plano',
+        awayTeamName: 'Austin',
+        homeScore: 12,
+        awayScore: 52,
+      },
+    };
+    expect(submittedCmoReportsAboutOfficial([report], [], 'ref1')).toEqual([
+      report,
+    ]);
+    expect(submittedCmoReportsAboutOfficial([report], [], 'other')).toEqual([]);
+    const display = displayMatchForCmoReport(report, []);
+    expect(display?.homeTeamName).toBe('Plano');
+    expect(display?.awayTeamName).toBe('Austin');
+    expect(display?.homeScore).toBe(12);
+    expect(display?.matchType).toBe('2025 archive');
+    expect(displayMatchForCmoReport({ ...report, source: undefined, legacyFixture: undefined }, [])).toBeUndefined();
+  });
+
+  it('shows archive MO reports without a live fixture', async () => {
+    const { displayMatchForArchivedReport } = await import('@/domain/reports');
+    const report = {
+      id: 'legacy_mo_abc_ref1_mo',
+      matchId: 'legacy_mo_abc',
+      officialId: 'ref1',
+      slot: 'mo' as const,
+      status: 'submitted' as const,
+      formKind: 'mo_performance' as const,
+      source: 'legacy_form' as const,
+      dueAt: '2025-10-05T17:00:00.000Z',
+      kickoffAt: '2025-10-05T17:00:00.000Z',
+      submittedAt: '2025-10-06T19:00:00.000Z',
+      legacyFixture: {
+        teamsText: 'SMU (52) vs UT Dallas (13)',
+        matchLevel: "Men's D3",
+        homeTeamName: 'SMU',
+        awayTeamName: 'UT Dallas',
+        homeScore: 52,
+        awayScore: 13,
+      },
+    };
+    const display = displayMatchForArchivedReport(report, []);
+    expect(display?.homeTeamName).toBe('SMU');
+    expect(display?.awayTeamName).toBe('UT Dallas');
+    expect(display?.crew.mo[0]?.userId).toBe('ref1');
   });
 
   it('treats N/A as a complete CMO scale rating', async () => {
-    const { validateCmoScales, CMO_SCALE_LABELS } = await import(
+    const { validateCmoScales, CMO_SCALE_KEYS } = await import(
       '@/domain/reports'
     );
-    const keys = Object.keys(CMO_SCALE_LABELS) as Array<
-      keyof typeof CMO_SCALE_LABELS
-    >;
-    const allNa = Object.fromEntries(keys.map((k) => [k, 'na' as const]));
-    expect(validateCmoScales(allNa, keys)).toBe(true);
-    expect(validateCmoScales({ scrum: 4 }, keys)).toBe(false);
+    const allNa = Object.fromEntries(CMO_SCALE_KEYS.map((k) => [k, 'na' as const]));
+    expect(validateCmoScales(allNa, CMO_SCALE_KEYS)).toBe(true);
+    expect(validateCmoScales({ scrum: 4 }, CMO_SCALE_KEYS)).toBe(false);
+  });
+
+  it('requires a complexity factor or Other text', async () => {
+    const { cmoComplexityComplete } = await import('@/domain/reports');
+    expect(cmoComplexityComplete([], '')).toBe(false);
+    expect(cmoComplexityComplete(['rivalry/high stakes'], '')).toBe(true);
+    expect(cmoComplexityComplete([], 'uncontested scrums')).toBe(true);
   });
 });
 

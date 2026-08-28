@@ -58,12 +58,37 @@
   gap: 6px;
 }
 
+.rs-report-view__section {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.rs-team-score-card--readonly {
+  padding: 12px;
+  border: 1px solid var(--rs-color-border);
+  border-radius: var(--rs-radius-card);
+  background: var(--rs-color-surface);
+}
+
+.rs-cmo-select-cards--readonly .rs-cmo-select-cards__card {
+  cursor: default;
+  pointer-events: none;
+}
+
+.rs-perf-report--readonly .rs-cmo-select-cards__card:not(
+    .rs-cmo-select-cards__card--selected
+  ) {
+  opacity: 0.45;
+}
+
 .rs-report-stepper {
   display: flex;
   gap: 6px;
   overflow-x: auto;
   padding-bottom: 2px;
   -webkit-overflow-scrolling: touch;
+  scroll-margin-top: 8px;
 }
 
 .rs-report-stepper__step {
@@ -117,6 +142,43 @@
 }
 
 .rs-perf-report__title.pf-v6-c-title,
-.rs-perf-report__title {
+.rs-perf-report__title,
+.rs-cmo-report__title.pf-v6-c-title,
+.rs-cmo-report__title {
   color: color-mix(in srgb, var(--rs-color-warn) 75%, var(--rs-color-tint-contrast)) !important;
+}
+
+.rs-cmo-report__other {
+  margin-top: 8px;
+}
+
+.rs-coach-fb-radio--labeled {
+  max-width: 7.25rem;
+  min-width: 4.5rem;
+  padding: 8px 6px;
+}
+
+.rs-cmo-select-cards {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.rs-cmo-select-cards__card {
+  min-height: 3.25rem;
+  padding: 10px 8px;
+  border: 1px solid var(--rs-color-border);
+  border-radius: var(--rs-radius-card);
+  background: var(--rs-color-surface);
+  color: var(--rs-color-ink);
+  font: var(--rs-font-meta);
+  text-align: center;
+  cursor: pointer;
+  line-height: 1.25;
+}
+
+.rs-cmo-select-cards__card--selected {
+  border-color: var(--rs-color-ink);
+  background: color-mix(in srgb, var(--rs-color-ink) 6%, var(--rs-color-surface));
+  font-weight: 600;
 }

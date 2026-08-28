@@ -13,6 +13,10 @@ functions/.env*
 .firebase
 functions/lib
 functions/node_modules
+# Last-year CMO import sources (emails + coaching text)
+docs/2025CMOreports
+docs/2025CmoMatchPreview.csv
+docs/2025RefereeEmails.csv
 .DS_Store
 *.tsbuildinfo
 keys/*

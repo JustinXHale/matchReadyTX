@@ -10,7 +10,8 @@ import {
 } from '@patternfly/react-core';
 import { useApp, useAppHref } from '@/app/AppContext';
 import { submittedCmoReports, cmoReportStats } from '@/domain/insights';
-import { crewPeople } from '@/domain/types';
+import { displayMatchForCmoReport, type MatchReport } from '@/domain/reports';
+import { crewPeople, type Match } from '@/domain/types';
 import {
   cmoFilerName,
   cmoSubjectName,
@@ -51,18 +52,28 @@ export function InsightsCmoReportsPage() {
       .filter((r) => (cmoFilter ? r.officialId === cmoFilter : true))
       .map((r) => ({
         report: r,
-        match: state.matches.find((m) => m.id === r.matchId),
+        match: displayMatchForCmoReport(r, state.matches),
       }))
+      .filter(
+        (row): row is { report: MatchReport; match: Match } => row.match != null,
+      )
       .filter(({ report, match }) => {
         if (!q) return true;
         const subject = cmoSubjectName(
           report,
           match,
           state.users,
-          match ? moDisplayNames(match) : undefined,
+          moDisplayNames(match),
         );
         const filer = cmoFilerName(report, state.users);
-        const haystack = [subject, filer, match?.homeTeamName, match?.awayTeamName]
+        const haystack = [
+          subject,
+          filer,
+          match.homeTeamName,
+          match.awayTeamName,
+          report.legacyFixture?.teamsText,
+          report.legacyFixture?.matchLevel,
+        ]
           .filter(Boolean)
           .join(' ')
           .toLowerCase();
@@ -139,7 +150,6 @@ export function InsightsCmoReportsPage() {
       ) : (
         <div className="rs-stack">
           {rows.map(({ report: r, match }) => {
-            if (!match) return null;
             const rating = r.cmoPayload?.assessedRating;
             const subject = cmoSubjectName(
               r,
@@ -151,7 +161,7 @@ export function InsightsCmoReportsPage() {
               r.subjectOfficialId ??
               crewPeople(match.crew.mo).find((a) => a.userId)?.userId;
             const filer = cmoFilerName(r, state.users);
-            const viewHref = cmoReportViewPath(match.id);
+            const viewHref = cmoReportViewPath(r.matchId);
             const trailing = (
               <InsightsReportTrailing
                 score={rating != null ? String(rating) : '—'}

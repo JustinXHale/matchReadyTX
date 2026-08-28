@@ -10,7 +10,9 @@
     "lint": "eslint .",
     "test": "vitest run",
     "test:watch": "vitest",
-    "audit:css": "node scripts/audit-css-layout.mjs"
+    "audit:css": "node scripts/audit-css-layout.mjs",
+    "import:2025-mo": "python3 scripts/import-2025-match-reports.py",
+    "import:2025-mo:write": "python3 scripts/import-2025-match-reports.py --write"
   },
   "dependencies": {
     "@fortawesome/fontawesome-svg-core": "^7.3.1",

@@ -322,7 +322,7 @@ export function RequestFixturePage() {
       />
       <Checkbox
         id="fr-housing"
-        label="Housing provided"
+        label="Lodging provided"
         isChecked={housingProvided}
         onChange={(_e, checked) => setHousingProvided(checked)}
       />

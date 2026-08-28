@@ -57,7 +57,7 @@ export function FixtureRequestQueue({
                   {r.level}
                   {r.competition ? ` · ${r.competition}` : ''} · {r.gender}
                   {r.flightProvided ? ' · Flight' : ''}
-                  {r.housingProvided ? ' · Housing' : ''}
+                  {r.housingProvided ? ' · Lodging' : ''}
                 </p>
                 <p className="rs-match-card__meta">
                   Requested by {r.requesterName} (
