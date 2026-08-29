@@ -264,6 +264,131 @@ function assignedOfficialIds(match: Match): string[] {
   return [...ids];
 }
 
+const DOUBLE_BOOKING_EXCLUDED_STATUSES = new Set<Match['status']>([
+  'cancelled',
+  'postponed',
+  'draft',
+]);
+
+function matchEligibleForDoubleBookingCheck(match: Match): boolean {
+  return !DOUBLE_BOOKING_EXCLUDED_STATUSES.has(match.status);
+}
+
+export type OfficialDayDoubleBooking = {
+  userId: string;
+  dayKey: string;
+  matches: Match[];
+};
+
+/** Other assignments for an official on the same local calendar day. */
+export function otherAssignmentsOnSameDay(
+  matches: Match[],
+  userId: string,
+  kickoffAt: string,
+  timeZone: string,
+  opts?: { excludeMatchId?: string; nowMs?: number; upcomingOnly?: boolean },
+): Match[] {
+  const dayKey = dayKeyInZone(kickoffAt, timeZone);
+  const nowMs = opts?.nowMs ?? Date.now();
+  const upcomingOnly = opts?.upcomingOnly !== false;
+  return matches
+    .filter((m) => {
+      if (opts?.excludeMatchId && m.id === opts.excludeMatchId) return false;
+      if (!matchEligibleForDoubleBookingCheck(m)) return false;
+      if (dayKeyInZone(m.kickoffAt, timeZone) !== dayKey) return false;
+      if (assignmentForUser(m, userId) == null) return false;
+      const kickoffMs = new Date(m.kickoffAt).getTime();
+      if (Number.isNaN(kickoffMs)) return false;
+      if (upcomingOnly && kickoffMs < nowMs) return false;
+      return true;
+    })
+    .sort(
+      (a, b) =>
+        new Date(a.kickoffAt).getTime() - new Date(b.kickoffAt).getTime(),
+    );
+}
+
+/** Officials on this match who also have another assignment that day. */
+export function doubleBookedOfficialIdsForMatch(
+  matches: Match[],
+  match: Match,
+  timeZone: string,
+  opts?: { nowMs?: number; upcomingOnly?: boolean },
+): string[] {
+  if (!matchEligibleForDoubleBookingCheck(match)) return [];
+  return assignedOfficialIds(match).filter(
+    (uid) =>
+      otherAssignmentsOnSameDay(matches, uid, match.kickoffAt, timeZone, {
+        excludeMatchId: match.id,
+        ...opts,
+      }).length > 0,
+  );
+}
+
+/** Every official assigned to two or more matches on the same local day. */
+export function officialDoubleBookings(
+  matches: Match[],
+  timeZone: string,
+  opts?: { nowMs?: number; upcomingOnly?: boolean },
+): OfficialDayDoubleBooking[] {
+  const nowMs = opts?.nowMs ?? Date.now();
+  const upcomingOnly = opts?.upcomingOnly !== false;
+  const byUserDay = new Map<string, Map<string, Match[]>>();
+
+  for (const match of matches) {
+    if (!matchEligibleForDoubleBookingCheck(match)) continue;
+    const kickoffMs = new Date(match.kickoffAt).getTime();
+    if (Number.isNaN(kickoffMs)) continue;
+    if (upcomingOnly && kickoffMs < nowMs) continue;
+
+    const dayKey = dayKeyInZone(match.kickoffAt, timeZone);
+    for (const uid of assignedOfficialIds(match)) {
+      let days = byUserDay.get(uid);
+      if (!days) {
+        days = new Map();
+        byUserDay.set(uid, days);
+      }
+      const list = days.get(dayKey) ?? [];
+      list.push(match);
+      days.set(dayKey, list);
+    }
+  }
+
+  const out: OfficialDayDoubleBooking[] = [];
+  for (const [userId, days] of byUserDay) {
+    for (const [dayKey, matchList] of days) {
+      if (matchList.length < 2) continue;
+      out.push({
+        userId,
+        dayKey,
+        matches: [...matchList].sort(
+          (a, b) =>
+            new Date(a.kickoffAt).getTime() - new Date(b.kickoffAt).getTime(),
+        ),
+      });
+    }
+  }
+
+  return out.sort((a, b) => {
+    const dayCmp = a.dayKey.localeCompare(b.dayKey);
+    if (dayCmp !== 0) return dayCmp;
+    return a.userId.localeCompare(b.userId);
+  });
+}
+
+/** Match ids where at least one assigned official is double-booked that day. */
+export function matchIdsWithDoubleBookings(
+  matches: Match[],
+  timeZone: string,
+  opts?: { nowMs?: number; upcomingOnly?: boolean },
+): Set<string> {
+  const ids = new Set<string>();
+  for (const row of officialDoubleBookings(matches, timeZone, opts)) {
+    for (const match of row.matches) ids.add(match.id);
+  }
+  return ids;
+}
+
 /** Upcoming and in-range assignment counts per official (one count per match). */
 export function assignmentGameCountsByOfficial(
   matches: Match[],

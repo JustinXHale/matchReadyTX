@@ -8,19 +8,18 @@ import { formatDueBadge } from '@/features/referee/reports/dueCounts';
 /** Top tabs for Scheduler (assigner) lens — shell only. */
 export function SchedulerLayout() {
   const { hasAssignerRole, isAssignerView, roleView, state } = useApp();
-  const queuesHref = useAppHref('/scheduler/queues');
   const scheduleHref = useAppHref('/scheduler/schedule');
   const feedbackHref = useAppHref('/scheduler/feedback');
   const uploadHref = useAppHref('/scheduler/upload');
   const roleHome = useAppHref(ROLE_HOME[roleView]);
 
-  const queueTotal = useMemo(
-    () => countSchedulerQueues(state).totalActionable,
-    [state],
-  );
-  const assignmentCount = useMemo(() => {
+  const scheduleActionCount = useMemo(() => {
     const counts = countSchedulerQueues(state);
-    return counts.needsOfficials + counts.needsReassignment;
+    return (
+      counts.needsOfficials +
+      counts.needsReassignment +
+      counts.totalActionable
+    );
   }, [state]);
 
   if (!hasAssignerRole) {
@@ -47,33 +46,15 @@ export function SchedulerLayout() {
             `rs-nav-with-badge${isActive ? ' active' : ''}`
           }
           aria-label={
-            assignmentCount > 0
-              ? `Schedule, ${assignmentCount} needing assignment`
+            scheduleActionCount > 0
+              ? `Schedule, ${scheduleActionCount} needing action`
               : 'Schedule'
           }
         >
           Schedule
-          {assignmentCount > 0 && (
+          {scheduleActionCount > 0 && (
             <span className="rs-nav-badge rs-nav-badge--inline" aria-hidden>
-              {formatDueBadge(assignmentCount)}
-            </span>
-          )}
-        </NavLink>
-        <NavLink
-          to={queuesHref}
-          className={({ isActive }) =>
-            `rs-nav-with-badge${isActive ? ' active' : ''}`
-          }
-          aria-label={
-            queueTotal > 0
-              ? `Queues, ${queueTotal} needing action`
-              : 'Queues'
-          }
-        >
-          Queues
-          {queueTotal > 0 && (
-            <span className="rs-nav-badge rs-nav-badge--inline" aria-hidden>
-              {formatDueBadge(queueTotal)}
+              {formatDueBadge(scheduleActionCount)}
             </span>
           )}
         </NavLink>

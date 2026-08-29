@@ -19,7 +19,7 @@ function formatPreferredSlots(request: GameRequest): string {
 }
 
 const QUEUES_BACK = {
-  to: '/scheduler/queues/requests/raise-hand',
+  to: '/scheduler/schedule/requests/raise-hand',
   label: 'Raise-hand',
 } as const;
 

@@ -7,9 +7,9 @@ import { countSchedulerQueues } from '@/features/scheduler/queues/selectors';
 /** Raise-hand | Fixtures | Team links under Requests. */
 export function RequestsQueuesSubNav() {
   const { state } = useApp();
-  const raiseHandHref = useAppHref('/scheduler/queues/requests/raise-hand');
-  const fixturesHref = useAppHref('/scheduler/queues/requests/fixtures');
-  const teamLinksHref = useAppHref('/scheduler/queues/requests/team-links');
+  const raiseHandHref = useAppHref('/scheduler/schedule/requests/raise-hand');
+  const fixturesHref = useAppHref('/scheduler/schedule/requests/fixtures');
+  const teamLinksHref = useAppHref('/scheduler/schedule/requests/team-links');
 
   const counts = useMemo(() => countSchedulerQueues(state), [state]);
 

@@ -50,8 +50,10 @@ import {
   isMatchRequestable,
   isPendingRequestActive,
   matchNeedsCrewCoverage,
+  MATCH_ASSIGNMENT_FULFILLED_DECLINE_REASON,
   normalizeRequestableSlots,
   openCrewAssignTargets,
+  raiseHandsToFulfillOnAssignmentConfirm,
 } from '@/domain/requests';
 import { matchesNeedingOfficials } from '@/features/scheduler/queues/selectors';
 import { parseScheduleCsv } from '@/domain/csvImport';
@@ -84,10 +86,12 @@ import {
   officialMatchesLevelCap,
   rugbySeasonDayRange,
   assignmentGameCountsByOfficial,
+  doubleBookedOfficialIdsForMatch,
   formatMemberJoinedAt,
   memberListName,
   memberMatchesTab,
   membersForTab,
+  officialDoubleBookings,
   rolePillsForMember,
 } from '@/domain/members';
 import { defaultRoleView, lensesForUser } from '@/app/AppContext';
@@ -811,6 +815,48 @@ describe('game requests', () => {
     m = assignOfficial(m, 'ar1', { uid: 'r2', displayName: 'AR1' });
     m = assignOfficial(m, 'ar2', { uid: 'r3', displayName: 'AR2' });
     expect(isPendingRequestActive(m, request)).toBe(false);
+  });
+
+  it('raiseHandsToFulfillOnAssignmentConfirm approves confirmer and declines stale MO requests', () => {
+    let m = releaseMatch(baseMatch());
+    m = withCrewRoleAdded(m, 'ar1');
+    m = assignOfficial(m, 'mo', { uid: 'r1', displayName: 'MO' });
+    const requests = [
+      {
+        id: 'gr_confirmer',
+        matchId: m.id,
+        userId: 'r1',
+        userName: 'MO',
+        preferredSlots: ['mo'] as RequestableSlot[],
+        status: 'pending' as const,
+        createdAt: new Date().toISOString(),
+      },
+      {
+        id: 'gr_other_mo',
+        matchId: m.id,
+        userId: 'r2',
+        userName: 'Other',
+        preferredSlots: ['mo'] as RequestableSlot[],
+        status: 'pending' as const,
+        createdAt: new Date().toISOString(),
+      },
+      {
+        id: 'gr_other_ar',
+        matchId: m.id,
+        userId: 'r3',
+        userName: 'AR volunteer',
+        preferredSlots: ['ar1'] as RequestableSlot[],
+        status: 'pending' as const,
+        createdAt: new Date().toISOString(),
+      },
+    ];
+    m = confirmOfficialSlot(m, 'mo');
+    const actions = raiseHandsToFulfillOnAssignmentConfirm(m, requests, 'r1');
+    expect(actions.approveIds).toEqual(['gr_confirmer']);
+    expect(actions.declineIds).toEqual(['gr_other_mo']);
+    expect(MATCH_ASSIGNMENT_FULFILLED_DECLINE_REASON).toBe(
+      'Match assignment has been fulfilled',
+    );
   });
 });
 
@@ -1570,6 +1616,35 @@ describe('member directory helpers', () => {
       },
     );
     expect(counts.get('u1')).toEqual({ upcoming: 1, total: 2 });
+  });
+
+  it('officialDoubleBookings detects same-day assignments', () => {
+    const tz = 'America/Chicago';
+    const nowMs = new Date('2026-09-01T12:00:00.000Z').getTime();
+    let m1 = releaseMatch({ ...baseMatch(), id: 'm1', kickoffAt: '2026-09-15T18:00:00.000Z' });
+    let m2 = releaseMatch({
+      ...baseMatch(),
+      id: 'm2',
+      kickoffAt: '2026-09-15T22:00:00.000Z',
+      homeTeamName: 'Bears',
+      awayTeamName: 'Wolves',
+    });
+    let m3 = releaseMatch({
+      ...baseMatch(),
+      id: 'm3',
+      kickoffAt: '2026-09-16T18:00:00.000Z',
+    });
+    m1 = assignOfficial(m1, 'mo', { uid: 'u1', displayName: 'Riley' });
+    m2 = assignOfficial(m2, 'ar1', { uid: 'u1', displayName: 'Riley' });
+    m3 = assignOfficial(m3, 'mo', { uid: 'u1', displayName: 'Riley' });
+    const conflicts = officialDoubleBookings([m1, m2, m3], tz, { nowMs });
+    expect(conflicts).toHaveLength(1);
+    expect(conflicts[0]?.userId).toBe('u1');
+    expect(conflicts[0]?.dayKey).toBe('2026-09-15');
+    expect(conflicts[0]?.matches.map((m) => m.id)).toEqual(['m1', 'm2']);
+    expect(doubleBookedOfficialIdsForMatch([m1, m2, m3], m1, tz, { nowMs })).toEqual([
+      'u1',
+    ]);
   });
 
   it('membersForTab hides incomplete unless includeIncomplete', () => {

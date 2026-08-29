@@ -28,6 +28,8 @@ import {
   releaseMatch,
 } from '@/domain/matchTransitions';
 import {
+  MATCH_ASSIGNMENT_FULFILLED_DECLINE_REASON,
+  raiseHandsToFulfillOnAssignmentConfirm,
   resolveRaiseHandApprovalSlot,
 } from '@/domain/requests';
 import {
@@ -3954,6 +3956,67 @@ class DemoStore {
       });
       return { ...s, matches };
     });
+  }
+
+  /**
+   * After an official confirms their slot, close stale raise-hands for that match.
+   * Approve the confirmer's own pending request; decline others no longer active.
+   */
+  fulfillRaiseHandsOnAssignmentConfirm(
+    matchId: string,
+    confirmedUserId: string,
+  ): void {
+    const match = this.state.matches.find((m) => m.id === matchId);
+    if (!match) return;
+    const { approveIds, declineIds } = raiseHandsToFulfillOnAssignmentConfirm(
+      match,
+      this.state.requests,
+      confirmedUserId,
+    );
+    if (approveIds.length === 0 && declineIds.length === 0) return;
+
+    const declineIdSet = new Set(declineIds);
+    const approveIdSet = new Set(approveIds);
+    const toNotify = this.state.requests.filter((r) => declineIdSet.has(r.id));
+
+    for (const req of toNotify) {
+      this.registerLiveSnapshotGuard(`request:${req.id}`, {
+        expect: 'request_declined',
+      });
+    }
+    for (const reqId of approveIds) {
+      this.registerLiveSnapshotGuard(`request:${reqId}`, {
+        expect: 'request_approved',
+      });
+    }
+
+    this.set((s) => ({
+      ...s,
+      requests: s.requests.map((r) => {
+        if (approveIdSet.has(r.id)) {
+          return { ...r, status: 'approved' as const };
+        }
+        if (declineIdSet.has(r.id)) {
+          return {
+            ...r,
+            status: 'declined' as const,
+            declineReason: MATCH_ASSIGNMENT_FULFILLED_DECLINE_REASON,
+          };
+        }
+        return r;
+      }),
+    }));
+
+    for (const req of toNotify) {
+      queueMicrotask(() =>
+        this.notify(
+          'game_request_declined',
+          req.userId,
+          'Game request declined',
+          MATCH_ASSIGNMENT_FULFILLED_DECLINE_REASON,
+        ),
+      );
+    }
   }
 
   officialUnavailable(

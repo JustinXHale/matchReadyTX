@@ -70,7 +70,7 @@ export function MatchQueueList({
           const openSlots = assignOpenSlots ? openCrewAssignTargets(m) : [];
           const raiseHand =
             showRaiseHandRequests && onApproveRaiseHand && onDeclineRaiseHand
-              ? pendingRaiseHandRequestsForMatch(state.requests, m.id)
+              ? pendingRaiseHandRequestsForMatch(state.requests, m.id, m)
               : [];
           return (
             <li

@@ -179,19 +179,21 @@ const SchedulerIndexRedirect = lazy(() =>
     default: m.SchedulerIndexRedirect,
   })),
 );
+const SchedulerScheduleLayout = lazy(() =>
+  import('@/features/scheduler/schedule/SchedulerScheduleLayout').then((m) => ({
+    default: m.SchedulerScheduleLayout,
+  })),
+);
+const SchedulerQueuesLegacyRedirect = lazy(() =>
+  import('@/features/scheduler/schedule/SchedulerQueuesLegacyRedirect').then(
+    (m) => ({
+      default: m.SchedulerQueuesLegacyRedirect,
+    }),
+  ),
+);
 const SchedulerCrewDefaultsPage = lazy(() =>
   import('@/features/scheduler/queues/SchedulerCrewDefaultsPage').then((m) => ({
     default: m.SchedulerCrewDefaultsPage,
-  })),
-);
-const SchedulerQueuesLayout = lazy(() =>
-  import('@/features/scheduler/queues/SchedulerQueuesLayout').then((m) => ({
-    default: m.SchedulerQueuesLayout,
-  })),
-);
-const SchedulerQueuesWorkLayout = lazy(() =>
-  import('@/features/scheduler/queues/SchedulerQueuesWorkLayout').then((m) => ({
-    default: m.SchedulerQueuesWorkLayout,
   })),
 );
 const SchedulerQueuesCoveragePage = lazy(() =>
@@ -636,25 +638,20 @@ function FeatureRoutes() {
       <Route path="coach" element={<AppNavigate to="/team-admin" replace />} />
       <Route path="scheduler" element={<SchedulerLayout />}>
         <Route index element={<SchedulerIndexRedirect />} />
-        <Route path="queues" element={<SchedulerQueuesLayout />}>
+        <Route path="schedule" element={<SchedulerScheduleLayout />}>
+          <Route index element={<SchedulerSchedulePage />} />
+          <Route path="coverage" element={<SchedulerQueuesCoveragePage />} />
+          <Route path="changes" element={<SchedulerQueuesChangesPage />} />
           <Route
-            index
-            element={<AppNavigate to="/scheduler/queues/changes" replace />}
+            path="notifications"
+            element={<SchedulerQueuesNotificationsPage />}
           />
-          <Route element={<SchedulerQueuesWorkLayout />}>
-            <Route path="coverage" element={<SchedulerQueuesCoveragePage />} />
-            <Route path="changes" element={<SchedulerQueuesChangesPage />} />
-            <Route
-              path="notifications"
-              element={<SchedulerQueuesNotificationsPage />}
-            />
-          </Route>
           <Route path="requests" element={<SchedulerQueuesRequestsLayout />}>
             <Route
               index
               element={
                 <AppNavigate
-                  to="/scheduler/queues/requests/raise-hand"
+                  to="/scheduler/schedule/requests/raise-hand"
                   replace
                 />
               }
@@ -674,7 +671,7 @@ function FeatureRoutes() {
           </Route>
           <Route path="crew" element={<SchedulerCrewDefaultsPage />} />
         </Route>
-        <Route path="schedule" element={<SchedulerSchedulePage />} />
+        <Route path="queues/*" element={<SchedulerQueuesLegacyRedirect />} />
         <Route path="feedback" element={<SchedulerFeedbackPage />} />
         <Route
           path="feedback/:feedbackId"
@@ -693,7 +690,7 @@ function FeatureRoutes() {
       />
       <Route
         path="requests"
-        element={<AppNavigate to="/scheduler/queues/requests/raise-hand" replace />}
+        element={<AppNavigate to="/scheduler/schedule/requests/raise-hand" replace />}
       />
       <Route path="matches" element={<RoleHomeRedirect />} />
       <Route path="settings" element={<AppNavigate to="/profile" replace />} />

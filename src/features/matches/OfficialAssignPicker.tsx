@@ -21,6 +21,7 @@ import {
   officialEffectiveLevel,
   officialGradeLabel,
   officialMatchesLevelCap,
+  otherAssignmentsOnSameDay,
   rugbySeasonDayRange,
 } from '@/domain/members';
 import { formatMatchKickoff } from '@/domain/matchTime';
@@ -350,6 +351,21 @@ export function OfficialAssignPicker({
       ) : (
         <ul className="rs-official-picker">
           {rows.map(({ official: o, location, availStatus, games, request }) => {
+            const sameDayAssignments = matchId
+              ? otherAssignmentsOnSameDay(
+                  matches,
+                  o.uid,
+                  kickoffAt,
+                  timeZone,
+                  { excludeMatchId: matchId },
+                )
+              : [];
+            const sameDayWarning =
+              sameDayAssignments.length > 0
+                ? `${sameDayAssignments.length} other game${
+                    sameDayAssignments.length === 1 ? '' : 's'
+                  } this day`
+                : null;
             const isCurrent = currentUserId === o.uid;
             const availLabel = isCurrent
               ? 'Current'
@@ -399,6 +415,11 @@ export function OfficialAssignPicker({
                         <span className="rs-official-picker__status">
                           {statusLine}
                         </span>
+                        {sameDayWarning ? (
+                          <span className="rs-assign-overlap rs-assign-overlap--warn">
+                            {sameDayWarning}
+                          </span>
+                        ) : null}
                       </span>
                     </span>
                     <span className="rs-official-picker__assign-label">

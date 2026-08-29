@@ -80,6 +80,7 @@ import {
   matchDetailHeaderReportLinks,
   matchDetailReportActions,
 } from '@/features/referee/reports/reportLinks';
+import { fulfillRaiseHandsOnAssignmentConfirm } from '@/features/scheduler/queues/raiseHandActions';
 import { OfficialAssignPicker } from '@/features/matches/OfficialAssignPicker';
 import {
   formatMatchKickoff,
@@ -909,15 +910,23 @@ export function MatchDetailPage() {
   };
 
   const acceptAppointment = async () => {
-    if (!mySlot || !match || selfServiceBusy) return;
+    if (!mySlot || !match || selfServiceBusy || !currentUser) return;
     setSelfServiceBusy(true);
     store.confirmCrewSlot(match.id, mySlot, myAssignment?.id);
-    await persistSelfServiceIfLive({
+    const ok = await persistSelfServiceIfLive({
       matchId: match.id,
       action: 'confirm',
       slot: mySlot,
       assignmentId: myAssignment?.id,
     });
+    if (ok) {
+      await fulfillRaiseHandsOnAssignmentConfirm({
+        store,
+        dataMode,
+        matchId: match.id,
+        confirmedUserId: currentUser.uid,
+      });
+    }
     setSelfServiceBusy(false);
   };
 

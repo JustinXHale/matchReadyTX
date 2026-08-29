@@ -1,6 +1,7 @@
 import { HttpsError } from 'firebase-functions/v2/https';
 import type { Firestore } from 'firebase-admin/firestore';
 import { logger } from 'firebase-functions';
+import { fulfillRaiseHandsOnAssignmentConfirm } from './raiseHandFulfillment';
 
 const CREW_SLOTS = ['mo', 'ar1', 'ar2', 'no4'] as const;
 type CrewSlot = (typeof CREW_SLOTS)[number];
@@ -259,6 +260,17 @@ export async function runMatchSelfService(opts: {
   patch.crew = crew;
   patch.status = status;
   await matchRef.set(patch, { merge: true });
+
+  if (action === 'confirm') {
+    await fulfillRaiseHandsOnAssignmentConfirm({
+      db,
+      orgId,
+      matchId,
+      confirmedUserId: uid,
+      matchData: { ...data, crew, status },
+    });
+  }
+
   logger.info('matchSelfService official', { orgId, matchId, uid, action });
   return { ok: true, status };
 }

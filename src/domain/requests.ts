@@ -140,14 +140,52 @@ export function pendingRequestForUser(
   );
 }
 
+/** Standard decline reason when a raise-hand is closed after someone accepts. */
+export const MATCH_ASSIGNMENT_FULFILLED_DECLINE_REASON =
+  'Match assignment has been fulfilled';
+
 /** Pending raise-hand rows for one match (coverage assign hub). */
 export function pendingRaiseHandRequestsForMatch(
   requests: GameRequest[],
   matchId: string,
+  match?: Match,
 ): GameRequest[] {
-  return requests.filter(
+  const pending = requests.filter(
     (r) => r.matchId === matchId && r.status === 'pending',
   );
+  if (!match) return pending;
+  return pending.filter((r) => isPendingRequestActive(match, r));
+}
+
+export type RaiseHandFulfillmentActions = {
+  approveIds: string[];
+  declineIds: string[];
+};
+
+/**
+ * After an official confirms their crew slot, approve their own pending
+ * raise-hand (if any) and decline others that are no longer active.
+ */
+export function raiseHandsToFulfillOnAssignmentConfirm(
+  match: Match,
+  requests: GameRequest[],
+  confirmedUserId: string,
+): RaiseHandFulfillmentActions {
+  const pending = requests.filter(
+    (r) => r.matchId === match.id && r.status === 'pending',
+  );
+  const approveIds: string[] = [];
+  const declineIds: string[] = [];
+  for (const req of pending) {
+    if (req.userId === confirmedUserId) {
+      approveIds.push(req.id);
+      continue;
+    }
+    if (!isPendingRequestActive(match, req)) {
+      declineIds.push(req.id);
+    }
+  }
+  return { approveIds, declineIds };
 }
 
 function preferredSlotIsFilled(match: Match, slot: RequestableSlot): boolean {

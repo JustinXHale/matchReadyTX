@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import {
   Button,
@@ -24,6 +24,10 @@ import {
   type MatchGender,
   type MatchStatus,
 } from '@/domain/types';
+import {
+  doubleBookedOfficialIdsForMatch,
+  memberListName,
+} from '@/domain/members';
 import { GlobalDivisionFilters } from '@/features/global/GlobalDivisionFilters';
 import {
   AssignOfficialModal,
@@ -156,13 +160,16 @@ export function SchedulerSchedulePage() {
     [state.matches, competitionFilter],
   );
 
-  const matchesStatus = (m: Match) =>
-    matchesScheduleStatus(
-      m,
-      statusFilter,
-      needsOfficialsPool,
-      needsReassignmentPool,
-    );
+  const matchesStatus = useCallback(
+    (m: Match) =>
+      matchesScheduleStatus(
+        m,
+        statusFilter,
+        needsOfficialsPool,
+        needsReassignmentPool,
+      ),
+    [statusFilter, needsOfficialsPool, needsReassignmentPool],
+  );
 
   const availableDates = useMemo(
     () =>
@@ -240,27 +247,12 @@ export function SchedulerSchedulePage() {
   return (
     <div className="rs-stack">
       <Title headingLevel="h1" size="lg">
-        Schedule
+        Games
       </Title>
       <p className="rs-match-card__meta">
         Browse the calendar, filter by status, and tap an open position (MO,
         AR1, …) to assign. Raise-hand volunteers appear under each match.
       </p>
-      {assignmentCount > 0 && statusFilter !== 'needs_assignment' ? (
-        <div className="rs-schedule-coverage-callout">
-          <p>
-            {assignmentCount} match{assignmentCount === 1 ? '' : 'es'} need
-            assignment.{' '}
-            <button
-              type="button"
-              className="rs-link-button"
-              onClick={() => selectStatusFilter('needs_assignment')}
-            >
-              Show needs assignment
-            </button>
-          </p>
-        </div>
-      ) : null}
       <Link to="/scheduler/upload">
         <Button variant="secondary" isBlock>
           Sync Sheet &amp; release drafts
@@ -323,8 +315,20 @@ export function SchedulerSchedulePage() {
                 const raiseHand = pendingRaiseHandRequestsForMatch(
                   state.requests,
                   m.id,
+                  m,
                 );
                 const urgent = needsReassignmentPool.some((x) => x.id === m.id);
+                const doubleBookedIds = doubleBookedOfficialIdsForMatch(
+                  state.matches,
+                  m,
+                  timeZone,
+                );
+                const doubleBookedNames = doubleBookedIds
+                  .map((uid) => {
+                    const user = state.users.find((u) => u.uid === uid);
+                    return user ? memberListName(user) : null;
+                  })
+                  .filter((name): name is string => Boolean(name));
                 return (
                   <li
                     key={m.id}
@@ -340,7 +344,14 @@ export function SchedulerSchedulePage() {
                       urgent={urgent}
                       back={SCHEDULER_SCHEDULE_BACK}
                       meta={
-                        <span className="rs-pill">{statusLabel(m.status)}</span>
+                        <>
+                          <span className="rs-pill">{statusLabel(m.status)}</span>
+                          {doubleBookedNames.length > 0 ? (
+                            <span className="rs-pill rs-pill--warn">
+                              Double-booked
+                            </span>
+                          ) : null}
+                        </>
                       }
                       trailing={
                         <SchedulerAssignTrailing
@@ -353,6 +364,12 @@ export function SchedulerSchedulePage() {
                         />
                       }
                     />
+                    {doubleBookedNames.length > 0 ? (
+                      <p className="rs-assign-overlap rs-assign-overlap--warn">
+                        {doubleBookedNames.join(', ')} assigned to another game
+                        this day.
+                      </p>
+                    ) : null}
                     {raiseHand.length > 0 ? (
                       <CoverageMatchRequesters
                         match={m}

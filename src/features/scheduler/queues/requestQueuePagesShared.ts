@@ -32,7 +32,7 @@ import {
 import type { AppState } from '@/services/demoStore';
 
 export const REQUESTS_QUEUES_BACK = {
-  to: '/scheduler/queues/requests/fixtures',
+  to: '/scheduler/schedule/requests/raise-hand',
   label: 'Requests',
 } as const;
 

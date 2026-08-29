@@ -220,37 +220,6 @@
   padding-block: 0 !important;
 }
 
-.rs-schedule-coverage-callout {
-  padding: 10px 12px;
-  border: 1px solid var(--rs-color-border);
-  border-radius: 8px;
-  background: var(--rs-color-surface-muted, #f8f8f8);
-}
-
-.rs-schedule-coverage-callout p {
-  margin: 0;
-  font-size: 0.9rem;
-  line-height: 1.4;
-}
-
-.rs-link-button {
-  margin: 0;
-  padding: 0;
-  border: none;
-  background: transparent;
-  font: inherit;
-  font-weight: 600;
-  color: var(--rs-color-ink);
-  text-decoration: underline;
-  cursor: pointer;
-}
-
-.rs-link-button:hover,
-.rs-link-button:focus-visible {
-  color: var(--rs-color-ink);
-  outline: none;
-}
-
 .rs-queue-decision {
   display: flex;
   flex-direction: column;
