@@ -1,5 +1,5 @@
-import { useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { useEffect, useMemo, useState } from 'react';
+import { Link, useSearchParams } from 'react-router-dom';
 import {
   Button,
   EmptyState,
@@ -15,6 +15,7 @@ import {
   matchOnCalendarDate,
   uniqueMatchCalendarDates,
 } from '@/domain/divisionFilters';
+import { pendingRaiseHandRequestsForMatch } from '@/domain/requests';
 import {
   crewPeople,
   rolesNeededForMatch,
@@ -24,13 +25,19 @@ import {
   type MatchStatus,
 } from '@/domain/types';
 import { GlobalDivisionFilters } from '@/features/global/GlobalDivisionFilters';
-import { MatchCrewTrailing } from '@/ui/MatchCrewTrailing';
-import type { BackNav } from '@/nav/backNav';
-import { MatchListRow } from '@/ui/MatchListRow';
+import {
+  AssignOfficialModal,
+  type CrewPickTarget,
+} from '@/features/matches/AssignOfficialModal';
+import { CoverageMatchRequesters } from '@/features/scheduler/queues/CoverageMatchRequesters';
+import { useSchedulerRequestActions } from '@/features/scheduler/queues/requestQueuePagesShared';
 import {
   matchesNeedingOfficials,
   matchesNeedingReassignment,
 } from '@/features/scheduler/queues/selectors';
+import { SchedulerAssignTrailing } from '@/features/scheduler/schedule/SchedulerAssignTrailing';
+import type { BackNav } from '@/nav/backNav';
+import { MatchListRow } from '@/ui/MatchListRow';
 import {
   formatMatchMonthLabel,
   matchMonthKey,
@@ -42,16 +49,20 @@ const SCHEDULER_SCHEDULE_BACK: BackNav = {
   label: 'Schedule',
 };
 
-const STATUS_FILTERS: {
-  id: MatchStatus | 'open_slots' | 'all';
-  label: string;
-}[] = [
+type StatusFilter =
+  | MatchStatus
+  | 'open_slots'
+  | 'needs_assignment'
+  | 'all';
+
+const STATUS_FILTERS: { id: StatusFilter; label: string }[] = [
   { id: 'all', label: 'All' },
+  { id: 'needs_assignment', label: 'Needs assignment' },
+  { id: 'open_slots', label: 'Open slots' },
+  { id: 'needs_reassignment', label: 'Reassign' },
   { id: 'draft', label: 'Draft' },
   { id: 'pending_team_review', label: 'Team review' },
   { id: 'crew_pending', label: 'Crew pending' },
-  { id: 'needs_reassignment', label: 'Reassign' },
-  { id: 'open_slots', label: 'Open slots' },
   { id: 'locked_confirmed', label: 'Locked' },
 ];
 
@@ -66,7 +77,6 @@ function hasOpenCrewSlot(m: Match): boolean {
   });
 }
 
-/** Named officials who have not accepted yet (crew column shows "MO Pending", etc.). */
 function hasCrewAcceptancePending(m: Match): boolean {
   return namedOfficialsNeedingAvailability(m).length > 0;
 }
@@ -75,24 +85,84 @@ function matchesCrewPendingFilter(m: Match): boolean {
   return m.status === 'crew_pending' || hasCrewAcceptancePending(m);
 }
 
-/** Assigner schedule browse — all org matches, not only released. */
+function matchNeedsAssignment(
+  m: Match,
+  needsOfficials: Match[],
+  needsReassignment: Match[],
+): boolean {
+  return (
+    needsOfficials.some((x) => x.id === m.id) ||
+    needsReassignment.some((x) => x.id === m.id)
+  );
+}
+
+function matchesScheduleStatus(
+  m: Match,
+  statusFilter: StatusFilter,
+  needsOfficialsPool: Match[],
+  needsReassignmentPool: Match[],
+): boolean {
+  if (statusFilter === 'open_slots') return hasOpenCrewSlot(m);
+  if (statusFilter === 'crew_pending') return matchesCrewPendingFilter(m);
+  if (statusFilter === 'needs_assignment') {
+    return matchNeedsAssignment(m, needsOfficialsPool, needsReassignmentPool);
+  }
+  if (statusFilter !== 'all' && m.status !== statusFilter) return false;
+  return true;
+}
+
+/** Assigner schedule — browse, filter, and assign crew from one list. */
 export function SchedulerSchedulePage() {
   const { currentUser, state } = useApp();
+  const { onApproveRaiseHand, onDeclineRaiseHand } =
+    useSchedulerRequestActions();
+  const [searchParams, setSearchParams] = useSearchParams();
   const timeZone = orgTimeZone(state.org.timezone);
   const [genderFilter, setGenderFilter] = useState<MatchGender | null>(null);
   const [levelFilter, setLevelFilter] = useState<string | null>(null);
   const [competitionFilter, setCompetitionFilter] = useState<string | null>(
     null,
   );
-  const [statusFilter, setStatusFilter] = useState<
-    MatchStatus | 'open_slots' | 'all'
-  >('all');
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>(() => {
+    const needs = searchParams.get('needs');
+    return needs === '1' || needs === 'assignment'
+      ? 'needs_assignment'
+      : 'all';
+  });
   const [dateFilter, setDateFilter] = useState<string | null>(null);
+  const [pick, setPick] = useState<{
+    match: Match;
+    target: CrewPickTarget;
+  } | null>(null);
+
+  const needsOfficialsPool = useMemo(
+    () => matchesNeedingOfficials(state.matches),
+    [state.matches],
+  );
+  const needsReassignmentPool = useMemo(
+    () => matchesNeedingReassignment(state.matches),
+    [state.matches],
+  );
+
+  useEffect(() => {
+    const needs = searchParams.get('needs');
+    if (needs === '1' || needs === 'assignment') {
+      setStatusFilter('needs_assignment');
+    }
+  }, [searchParams]);
 
   const filterOptions = useMemo(
     () => divisionFilterOptionsFromMatches(state.matches, competitionFilter),
     [state.matches, competitionFilter],
   );
+
+  const matchesStatus = (m: Match) =>
+    matchesScheduleStatus(
+      m,
+      statusFilter,
+      needsOfficialsPool,
+      needsReassignmentPool,
+    );
 
   const availableDates = useMemo(
     () =>
@@ -103,10 +173,7 @@ export function SchedulerSchedulePage() {
           if (competitionFilter && m.competition !== competitionFilter) {
             return false;
           }
-          if (statusFilter === 'open_slots') return hasOpenCrewSlot(m);
-          if (statusFilter === 'crew_pending') return matchesCrewPendingFilter(m);
-          if (statusFilter !== 'all' && m.status !== statusFilter) return false;
-          return true;
+          return matchesStatus(m);
         }),
       ),
     [
@@ -114,7 +181,7 @@ export function SchedulerSchedulePage() {
       genderFilter,
       levelFilter,
       competitionFilter,
-      statusFilter,
+      matchesStatus,
     ],
   );
 
@@ -127,10 +194,7 @@ export function SchedulerSchedulePage() {
           return false;
         }
         if (!matchOnCalendarDate(m, dateFilter)) return false;
-        if (statusFilter === 'open_slots') return hasOpenCrewSlot(m);
-        if (statusFilter === 'crew_pending') return matchesCrewPendingFilter(m);
-        if (statusFilter !== 'all' && m.status !== statusFilter) return false;
-        return true;
+        return matchesStatus(m);
       })
       .sort(compareKickoffAsc);
   }, [
@@ -140,6 +204,8 @@ export function SchedulerSchedulePage() {
     competitionFilter,
     statusFilter,
     dateFilter,
+    needsOfficialsPool,
+    needsReassignmentPool,
   ]);
 
   const byMonth = useMemo(() => {
@@ -159,12 +225,17 @@ export function SchedulerSchedulePage() {
     return groups;
   }, [list, timeZone]);
 
-  const coverageCount = useMemo(
-    () =>
-      matchesNeedingOfficials(state.matches).length +
-      matchesNeedingReassignment(state.matches).length,
-    [state.matches],
-  );
+  const assignmentCount =
+    needsOfficialsPool.length + needsReassignmentPool.length;
+
+  const selectStatusFilter = (id: StatusFilter) => {
+    setStatusFilter(id);
+    if (id === 'needs_assignment') {
+      setSearchParams({ needs: '1' }, { replace: true });
+    } else if (searchParams.has('needs')) {
+      setSearchParams({}, { replace: true });
+    }
+  };
 
   return (
     <div className="rs-stack">
@@ -172,16 +243,21 @@ export function SchedulerSchedulePage() {
         Schedule
       </Title>
       <p className="rs-match-card__meta">
-        Browse the full society calendar. Use Coverage to assign open slots and
-        review raise-hand requests in context.
+        Browse the calendar, filter by status, and tap an open position (MO,
+        AR1, …) to assign. Raise-hand volunteers appear under each match.
       </p>
-      {coverageCount > 0 ? (
+      {assignmentCount > 0 && statusFilter !== 'needs_assignment' ? (
         <div className="rs-schedule-coverage-callout">
           <p>
-            {coverageCount} match{coverageCount === 1 ? '' : 'es'} need
+            {assignmentCount} match{assignmentCount === 1 ? '' : 'es'} need
             assignment.{' '}
-            <Link to="/scheduler/queues/coverage">Open Coverage</Link> to assign
-            crew and approve raise-hand volunteers.
+            <button
+              type="button"
+              className="rs-link-button"
+              onClick={() => selectStatusFilter('needs_assignment')}
+            >
+              Show needs assignment
+            </button>
           </p>
         </div>
       ) : null}
@@ -214,9 +290,12 @@ export function SchedulerSchedulePage() {
             className={`rs-filter-chip${
               statusFilter === f.id ? ' rs-filter-chip--selected' : ''
             }`}
-            onClick={() => setStatusFilter(f.id)}
+            onClick={() => selectStatusFilter(f.id)}
           >
             {f.label}
+            {f.id === 'needs_assignment' && assignmentCount > 0
+              ? ` (${assignmentCount})`
+              : ''}
           </button>
         ))}
       </div>
@@ -240,31 +319,62 @@ export function SchedulerSchedulePage() {
               {group.label}
             </Title>
             <ul className="rs-list">
-              {group.matches.map((m) => (
-                <li key={m.id}>
-                  <MatchListRow
-                    match={m}
-                    to={`/matches/${m.id}`}
-                    showTime
-                    split="action"
-                    back={SCHEDULER_SCHEDULE_BACK}
-                    meta={
-                      <span className="rs-pill">{statusLabel(m.status)}</span>
+              {group.matches.map((m) => {
+                const raiseHand = pendingRaiseHandRequestsForMatch(
+                  state.requests,
+                  m.id,
+                );
+                const urgent = needsReassignmentPool.some((x) => x.id === m.id);
+                return (
+                  <li
+                    key={m.id}
+                    className={
+                      raiseHand.length > 0 ? 'rs-coverage-match' : undefined
                     }
-                    trailing={
-                      <MatchCrewTrailing
+                  >
+                    <MatchListRow
+                      match={m}
+                      to={`/matches/${m.id}`}
+                      showTime
+                      split="action"
+                      urgent={urgent}
+                      back={SCHEDULER_SCHEDULE_BACK}
+                      meta={
+                        <span className="rs-pill">{statusLabel(m.status)}</span>
+                      }
+                      trailing={
+                        <SchedulerAssignTrailing
+                          match={m}
+                          back={SCHEDULER_SCHEDULE_BACK}
+                          highlightUserId={currentUser?.uid}
+                          onPick={(target) =>
+                            setPick({ match: m, target })
+                          }
+                        />
+                      }
+                    />
+                    {raiseHand.length > 0 ? (
+                      <CoverageMatchRequesters
                         match={m}
-                        highlightUserId={currentUser?.uid}
-                        back={SCHEDULER_SCHEDULE_BACK}
+                        requests={raiseHand}
+                        matchBack={SCHEDULER_SCHEDULE_BACK}
+                        onApprove={onApproveRaiseHand}
+                        onDecline={onDeclineRaiseHand}
                       />
-                    }
-                  />
-                </li>
-              ))}
+                    ) : null}
+                  </li>
+                );
+              })}
             </ul>
           </section>
         ))
       )}
+
+      <AssignOfficialModal
+        match={pick?.match ?? null}
+        pickTarget={pick?.target ?? null}
+        onClose={() => setPick(null)}
+      />
     </div>
   );
 }

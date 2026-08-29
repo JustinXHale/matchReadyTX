@@ -28,7 +28,7 @@ describe('cmoFilterOptionsFromOfficialIds', () => {
       cmoReport('uid-b'),
       cmoReport('uid-c', 'Jon Savage'),
     ];
-    const users: UserProfile[] = [
+    const users = [
       {
         uid: 'uid-a',
         displayName: 'Blair McClure',
@@ -36,7 +36,7 @@ describe('cmoFilterOptionsFromOfficialIds', () => {
         lastName: 'McClure',
         roles: ['cmo'],
         teamIds: [],
-      } as UserProfile,
+      },
       {
         uid: 'uid-b',
         displayName: 'Blair McClure',
@@ -44,8 +44,8 @@ describe('cmoFilterOptionsFromOfficialIds', () => {
         lastName: 'McClure',
         roles: ['cmo'],
         teamIds: [],
-      } as UserProfile,
-    ];
+      },
+    ] as unknown as UserProfile[];
 
     const options = cmoFilterOptionsFromOfficialIds(
       ['uid-a', 'uid-b', 'uid-c'],

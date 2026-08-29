@@ -44,7 +44,7 @@ export function SchedulerQueuesRaiseHandRequestsPage() {
     <>
       <p className="rs-match-card__meta">
         Referees volunteering for open slots on released matches. You can also
-        approve or decline from Coverage when assigning that game.
+        approve or decline from Schedule when viewing that game.
       </p>
       <GlobalDivisionFilters
         options={filterOptions}

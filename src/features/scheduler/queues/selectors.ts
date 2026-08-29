@@ -168,8 +168,7 @@ export function countSchedulerQueues(state: AppState): SchedulerQueueCounts {
   ).length;
   const t72 = matchesT72Due(state.matches).length;
   const notifications = state.notifications.length;
-  const workActionable =
-    needsOfficials + needsReassignment + proposals;
+  const workActionable = proposals;
   return {
     fixtureRequests,
     teamLinkRequests,

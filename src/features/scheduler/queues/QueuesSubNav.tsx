@@ -9,7 +9,6 @@ function useWorkQueuesActive(baseHref: string) {
   return useMemo(() => {
     if (pathname === baseHref || pathname === `${baseHref}/`) return true;
     return (
-      pathname.startsWith(`${baseHref}/coverage`) ||
       pathname.startsWith(`${baseHref}/changes`) ||
       pathname.startsWith(`${baseHref}/notifications`)
     );
@@ -31,7 +30,7 @@ function useRequestsQueuesActive(requestsBaseHref: string) {
 
 export function QueuesSubNav() {
   const { state } = useApp();
-  const workHref = useAppHref('/scheduler/queues/coverage');
+  const workHref = useAppHref('/scheduler/queues/changes');
   const queuesBaseHref = useAppHref('/scheduler/queues');
   const requestsHref = useAppHref('/scheduler/queues/requests/raise-hand');
   const requestsBaseHref = useAppHref('/scheduler/queues/requests');

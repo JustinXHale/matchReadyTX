@@ -639,7 +639,7 @@ function FeatureRoutes() {
         <Route path="queues" element={<SchedulerQueuesLayout />}>
           <Route
             index
-            element={<AppNavigate to="/scheduler/queues/coverage" replace />}
+            element={<AppNavigate to="/scheduler/queues/changes" replace />}
           />
           <Route element={<SchedulerQueuesWorkLayout />}>
             <Route path="coverage" element={<SchedulerQueuesCoveragePage />} />

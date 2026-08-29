@@ -18,6 +18,10 @@ export function SchedulerLayout() {
     () => countSchedulerQueues(state).totalActionable,
     [state],
   );
+  const assignmentCount = useMemo(() => {
+    const counts = countSchedulerQueues(state);
+    return counts.needsOfficials + counts.needsReassignment;
+  }, [state]);
 
   if (!hasAssignerRole) {
     return (
@@ -38,6 +42,24 @@ export function SchedulerLayout() {
     <div className="rs-stack">
       <nav className="rs-top-tabs" aria-label="Scheduler">
         <NavLink
+          to={scheduleHref}
+          className={({ isActive }) =>
+            `rs-nav-with-badge${isActive ? ' active' : ''}`
+          }
+          aria-label={
+            assignmentCount > 0
+              ? `Schedule, ${assignmentCount} needing assignment`
+              : 'Schedule'
+          }
+        >
+          Schedule
+          {assignmentCount > 0 && (
+            <span className="rs-nav-badge rs-nav-badge--inline" aria-hidden>
+              {formatDueBadge(assignmentCount)}
+            </span>
+          )}
+        </NavLink>
+        <NavLink
           to={queuesHref}
           className={({ isActive }) =>
             `rs-nav-with-badge${isActive ? ' active' : ''}`
@@ -54,12 +76,6 @@ export function SchedulerLayout() {
               {formatDueBadge(queueTotal)}
             </span>
           )}
-        </NavLink>
-        <NavLink
-          to={scheduleHref}
-          className={({ isActive }) => (isActive ? 'active' : '')}
-        >
-          Schedule
         </NavLink>
         <NavLink
           to={feedbackHref}
@@ -80,6 +96,6 @@ export function SchedulerLayout() {
 }
 
 export function SchedulerIndexRedirect() {
-  const coverageHref = useAppHref('/scheduler/queues/coverage');
-  return <Navigate to={coverageHref} replace />;
+  const scheduleHref = useAppHref('/scheduler/schedule');
+  return <Navigate to={scheduleHref} replace />;
 }

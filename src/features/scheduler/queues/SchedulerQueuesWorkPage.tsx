@@ -3,6 +3,6 @@ import { useAppHref } from '@/app/AppContext';
 
 /** @deprecated Use SchedulerQueuesCoveragePage — shim for stale imports / HMR. */
 export function SchedulerQueuesWorkPage() {
-  const coverageHref = useAppHref('/scheduler/queues/coverage');
-  return <Navigate to={coverageHref} replace />;
+  const changesHref = useAppHref('/scheduler/queues/changes');
+  return <Navigate to={changesHref} replace />;
 }

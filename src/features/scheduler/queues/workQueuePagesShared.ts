@@ -10,8 +10,8 @@ import type { Match, MatchGender } from '@/domain/types';
 import type { AppState } from '@/services/demoStore';
 
 export const WORK_QUEUES_BACK = {
-  to: '/scheduler/queues/coverage',
-  label: 'Queues',
+  to: '/scheduler/schedule',
+  label: 'Schedule',
 } as const;
 
 export function useWorkDivisionFilters(state: AppState) {

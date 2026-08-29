@@ -4,39 +4,19 @@ import { useApp, useAppHref } from '@/app/AppContext';
 import { formatDueBadge } from '@/features/referee/reports/dueCounts';
 import { countSchedulerQueues } from '@/features/scheduler/queues/selectors';
 
-/** Coverage | Changes | Notifications under Work queues. */
+/** Changes | Notifications under Work queues (assignment lives on Schedule). */
 export function WorkQueuesSubNav() {
   const { state } = useApp();
-  const coverageHref = useAppHref('/scheduler/queues/coverage');
   const changesHref = useAppHref('/scheduler/queues/changes');
   const notificationsHref = useAppHref('/scheduler/queues/notifications');
 
   const counts = useMemo(() => countSchedulerQueues(state), [state]);
-  const coverageTotal = counts.needsOfficials + counts.needsReassignment;
 
   return (
     <nav
       className="rs-sub-tabs rs-sub-tabs--tertiary"
       aria-label="Work queue type"
     >
-      <NavLink
-        to={coverageHref}
-        className={({ isActive }) =>
-          `rs-nav-with-badge${isActive ? ' active' : ''}`
-        }
-        aria-label={
-          coverageTotal > 0
-            ? `Coverage, ${coverageTotal} needing action`
-            : 'Coverage'
-        }
-      >
-        Coverage
-        {coverageTotal > 0 && (
-          <span className="rs-nav-badge rs-nav-badge--inline" aria-hidden>
-            {formatDueBadge(coverageTotal)}
-          </span>
-        )}
-      </NavLink>
       <NavLink
         to={changesHref}
         className={({ isActive }) =>
