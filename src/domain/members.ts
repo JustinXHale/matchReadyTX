@@ -416,9 +416,10 @@ export function formatMemberScheduleHint(
   timeZone?: string | null,
 ): string {
   if (!match) return 'No upcoming games';
-  return formatMatchKickoff(match.kickoffAt, timeZone, {
+  const when = formatMatchKickoff(match.kickoffAt, timeZone, {
     weekday: 'short',
   });
+  return `Next Match: ${when}`;
 }
 
 export function availabilityForUser(

@@ -15,6 +15,10 @@ import {
   officialInsightRows,
 } from '@/domain/insights';
 import { formatInsightsAvg } from '@/features/insights/insightsFormat';
+import {
+  cmoFilterOptionsFromOfficialIds,
+  rowMatchesCmoFilter,
+} from '@/features/insights/insightsDisplay';
 import { backState } from '@/nav/backNav';
 import { UserAvatar } from '@/ui/UserAvatar';
 
@@ -132,22 +136,18 @@ export function InsightsOfficialsPage() {
     for (const row of allRows) {
       for (const id of row.cmoFilerIds) ids.add(id);
     }
-    return [...ids]
-      .map((id) => {
-        const u = state.users.find((user) => user.uid === id);
-        const name = u
-          ? u.displayName || `${u.firstName} ${u.lastName}`.trim()
-          : id;
-        return { id, name };
-      })
-      .sort((a, b) => a.name.localeCompare(b.name));
-  }, [allRows, state.users]);
+    return cmoFilterOptionsFromOfficialIds(
+      ids,
+      state.matchReports,
+      state.users,
+    );
+  }, [allRows, state.matchReports, state.users]);
 
   const rows = useMemo(() => {
     return allRows.filter((row) => {
       if (noCmoOnly && row.cmoReportCount > 0) return false;
       if (hasCmoOnly && row.cmoReportCount === 0) return false;
-      if (cmoFiler && !noCmoOnly && !row.cmoFilerIds.includes(cmoFiler)) {
+      if (cmoFiler && !noCmoOnly && !rowMatchesCmoFilter(row.cmoFilerIds, cmoFiler)) {
         return false;
       }
       return true;
@@ -315,8 +315,8 @@ export function InsightsOfficialsPage() {
             <FormSelectOption value="" label="All CMOs" />
             {cmoFilers.map((filer) => (
               <FormSelectOption
-                key={filer.id}
-                value={filer.id}
+                key={filer.value}
+                value={filer.value}
                 label={filer.name}
               />
             ))}

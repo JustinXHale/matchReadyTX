@@ -14,7 +14,9 @@ import { displayMatchForCmoReport, type MatchReport } from '@/domain/reports';
 import { crewPeople, type Match } from '@/domain/types';
 import {
   cmoFilerName,
+  cmoFilterOptionsFromOfficialIds,
   cmoSubjectName,
+  reportMatchesCmoFilter,
 } from '@/features/insights/insightsDisplay';
 import { formatInsightsAvg } from '@/features/insights/insightsFormat';
 import { InsightsReportTrailing } from '@/features/insights/InsightsReportTrailing';
@@ -30,26 +32,22 @@ export function InsightsCmoReportsPage() {
   const [query, setQuery] = useState('');
   const [cmoFilter, setCmoFilter] = useState(ALL_CMOS);
 
-  const cmoOptions = useMemo(() => {
-    const reports = submittedCmoReports(state.matchReports);
-    const ids = [...new Set(reports.map((r) => r.officialId))];
-    return ids
-      .map((id) => ({
-        id,
-        name: cmoFilerName(
-          reports.find((r) => r.officialId === id)!,
-          state.users,
-        ),
-      }))
-      .sort((a, b) => a.name.localeCompare(b.name));
-  }, [state.matchReports, state.users]);
+  const cmoOptions = useMemo(
+    () =>
+      cmoFilterOptionsFromOfficialIds(
+        submittedCmoReports(state.matchReports).map((r) => r.officialId),
+        state.matchReports,
+        state.users,
+      ),
+    [state.matchReports, state.users],
+  );
 
   const stats = cmoReportStats(state.matchReports);
 
   const rows = useMemo(() => {
     const q = query.trim().toLowerCase();
     return submittedCmoReports(state.matchReports)
-      .filter((r) => (cmoFilter ? r.officialId === cmoFilter : true))
+      .filter((r) => reportMatchesCmoFilter(r, cmoFilter))
       .map((r) => ({
         report: r,
         match: displayMatchForCmoReport(r, state.matches),
@@ -130,8 +128,8 @@ export function InsightsCmoReportsPage() {
             <FormSelectOption value="" label="All CMOs" />
             {cmoOptions.map((opt) => (
               <FormSelectOption
-                key={opt.id}
-                value={opt.id}
+                key={opt.value}
+                value={opt.value}
                 label={opt.name}
               />
             ))}
