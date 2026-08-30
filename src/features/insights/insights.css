@@ -38,6 +38,12 @@
   gap: var(--rs-space-sm);
 }
 
+@media (min-width: 720px) {
+  .rs-insights-stat-grid--5 {
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+  }
+}
+
 .rs-insights-stat-card {
   display: flex;
   flex-direction: column;

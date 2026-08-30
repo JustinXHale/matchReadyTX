@@ -8,20 +8,27 @@ export function InsightsStatCard({
   count,
   avg,
   avgLabel,
+  meta,
 }: {
   to: string;
   title: string;
   count: number;
-  avg: number | null;
-  avgLabel: string;
+  avg?: number | null;
+  avgLabel?: string;
+  meta?: string;
 }) {
   return (
     <Link to={to} className="rs-insights-stat-card">
       <span className="rs-insights-stat-card__title">{title}</span>
       <span className="rs-insights-stat-card__count">{count}</span>
-      <span className="rs-insights-stat-card__avg">
-        {avgLabel}: {formatInsightsAvg(avg)}
-      </span>
+      {avgLabel != null && (
+        <span className="rs-insights-stat-card__avg">
+          {avgLabel}: {formatInsightsAvg(avg ?? null)}
+        </span>
+      )}
+      {meta && (
+        <span className="rs-insights-stat-card__avg">{meta}</span>
+      )}
     </Link>
   );
 }

@@ -74,12 +74,13 @@ Assigners currently manage schedules, contacts, and referee assignments across s
 | **Assistant Referee (AR1 / AR2)** | Optional but supported in v1 | Same availability / request / confirm / T-72 flows when assigned |
 | **Number 4** | Optional fourth official | Same when assigned |
 | **CMO (optional)** | Coaching Match Official on a fixture | Selectable profile role + crew/contact slot; **Coaching Reports** under the shared **Referee/CMO** lens — not a separate masthead role |
+| **Judicial** | Discipline officer | Review card reports, comment with other officers, record red-card rulings, conference discipline dashboard + printable one-pager. **Not** self-selected — Scheduler or an existing Judicial member grants the role. |
 | **Fan** | Spectator / society follower | Browse released schedule, standings, and teams; see official **names** only after MO confirmation (same as teams). Light onboarding (name + email); optional favorite clubs |
 | **Org / Tenant** | Society using an open-source deploy | Owns schedules, teams, officials, settings |
 
 **v1 assumption:** Assigner and Org Admin are often the same person. Model capabilities separately for other societies later.
 
-**UI lenses (masthead / bottom nav):** **Referee/CMO | Team Admin | Scheduler | Fan**. Scheduler = Assigner **control center** (Queues · Schedule · Feedback · Upload). Fan home = Global schedule. Referee and CMO share one lens (**Q-R6** locked). Team Admin tabs: Schedule · Referee Feedback (optional MO feedback; not visible to officials; home and away each may submit; Save draft / Submit / Decline).
+**UI lenses (masthead / bottom nav):** **Referee/CMO | Team Admin | Scheduler | Judicial | Fan**. Scheduler = Assigner **control center**. Judicial = discipline dashboard + cases. Fan home = Global schedule. Referee and CMO share one lens (**Q-R6** locked). Team Admin tabs: Schedule · Referee Feedback. Judicial tabs: Dashboard · Cases.
 
 ### Role open items (non-blocking)
 
@@ -102,7 +103,7 @@ Assigners currently manage schedules, contacts, and referee assignments across s
 6. **Teams see officials only after Match Official confirmation** (not merely after assignment).
 7. **Crew model:** role types MO / AR1 / AR2 / No.4 / CMO; **multiple blocks per type** (empty or filled); at least one MO block required. Teams see crew when **any** assigned MO has confirmed. Official Accept/Decline only in Referee lens.
 8. **72-hour dual reconfirm** (teams first, then each assigned official).
-9. **Email for everyone** (account/workflow alerts). **Email is required for all; phone is required for Referee / Team Admin / CMO / Scheduler** (not Fan-only).
+9. **Email for everyone** (account/workflow alerts). **Email is required for all; phone is required for Referee / Team Admin / CMO / Scheduler / Judicial** (not Fan-only).
 10. **Officials see match fee** and rare **flight / housing** perks when provided; **Where** opens Maps directions. Distance / mileage estimates stay in domain until driving distance is reliable. **Fees stay in-app**, never on the shared Sheet. Fans and teams do not see official fees.
 11. **Lean stack:** Vite + React + PatternFly + Firebase.
 12. **Multi-tenant later** — don’t hard-code a single society into the schema.
@@ -647,7 +648,7 @@ Profile onboarding is incomplete until required fields for the chosen role path 
 
 | Area | Target |
 |------|--------|
-| Security | RBAC; teams cannot read official PII until MO-confirmed visibility gate |
+| Security | RBAC; teams cannot read official PII until MO-confirmed visibility gate. Judicial cases, comments, and dashboard settings are assigner/judicial only. |
 | Audit | Who confirmed what / when (esp. T-72 and declines) |
 | Privacy | No secrets in repo; per-deploy credentials |
 | Accessibility | Mobile-first; PatternFly a11y defaults |

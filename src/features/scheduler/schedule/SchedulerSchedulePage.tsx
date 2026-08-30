@@ -15,6 +15,7 @@ import {
   matchOnCalendarDate,
   uniqueMatchCalendarDates,
 } from '@/domain/divisionFilters';
+import { matchInCompetition } from '@/domain/competitions';
 import { pendingRaiseHandRequestsForMatch } from '@/domain/requests';
 import {
   crewPeople,
@@ -177,7 +178,7 @@ export function SchedulerSchedulePage() {
         state.matches.filter((m) => {
           if (genderFilter && m.gender !== genderFilter) return false;
           if (levelFilter && m.level !== levelFilter) return false;
-          if (competitionFilter && m.competition !== competitionFilter) {
+          if (!matchInCompetition(m, competitionFilter)) {
             return false;
           }
           return matchesStatus(m);
@@ -197,7 +198,7 @@ export function SchedulerSchedulePage() {
       .filter((m) => {
         if (genderFilter && m.gender !== genderFilter) return false;
         if (levelFilter && m.level !== levelFilter) return false;
-        if (competitionFilter && m.competition !== competitionFilter) {
+        if (!matchInCompetition(m, competitionFilter)) {
           return false;
         }
         if (!matchOnCalendarDate(m, dateFilter)) return false;

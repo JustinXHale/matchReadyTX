@@ -61,7 +61,8 @@ export function hasWorkingSocietyRole(roles: Role[]): boolean {
     roles.includes('official') ||
     roles.includes('teamAdmin') ||
     roles.includes('cmo') ||
-    roles.includes('assigner')
+    roles.includes('assigner') ||
+    roles.includes('judicial')
   );
 }
 
@@ -152,7 +153,11 @@ export function isProfileComplete(user: Pick<
     !user.firstName?.trim() ||
     !user.lastName?.trim() ||
     !user.email?.trim() ||
-    !hasSelfSelectableRole(user.roles)
+    !(
+      hasSelfSelectableRole(user.roles) ||
+      user.roles.includes('judicial') ||
+      user.roles.includes('reportAnalytics')
+    )
   ) {
     return false;
   }

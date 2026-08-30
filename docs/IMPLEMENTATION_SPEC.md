@@ -43,7 +43,7 @@ orgs/{orgId}
   sheetId?, sheetSyncedAt?
 
 orgs/{orgId}/members/{uid}
-  roles: ('assigner'|'teamAdmin'|'official'|'cmo'|'fan')[]
+  roles: ('assigner'|'teamAdmin'|'official'|'cmo'|'fan'|'reportAnalytics'|'judicial')[]
   teamIds?: string[]
   fanTeamIds?: string[]   // Fan favorite club id (0–1); empty + no fanTeamOther = general
   fanTeamOther?: string  // Free-text when fan picks “Other”
@@ -107,10 +107,24 @@ orgs/{orgId}/matchReports/{reportId}   // id = matchReportDocId(matchId, officia
   // Pending rows lazy-created when filer opens flow; not bulk-synced.
 
 orgs/{orgId}/cardReports/{reportId}   // id = cardReportDocId(matchId, officialId)
-  matchId, officialId, cards[], competitionUnion,
+  matchId, officialId, cards[], competitionUnion, conference?,
+  matchFilmed?, homeScore?, awayScore?,
   official contact fields, additionalInfoPrivate?,
-  status: pending|submitted, submittedAt?, orgId, createdAt, updatedAt
+  status: draft|submitted, submittedAt?, orgId, createdAt, updatedAt
   // MO card incidents — created on submit (no pending doc).
+
+orgs/{orgId}/judicialCases/{incidentId}
+  reportId, matchId, conference, color, player snapshot, lawIds,
+  status: recorded|pending|upheld|dismissed|reduced|summary_judgment,
+  sanctionMatches?, sanctionNote?, ruledAt?, ruledByUid?,
+  orgId, createdAt, updatedAt
+  // One case per card (second offense = second case). Client-created on submit.
+
+orgs/{orgId}/judicialCases/{incidentId}/comments/{commentId}
+  authorUid, authorName, body, createdAt  // append-only; judicial + assigner
+
+orgs/{orgId}/judicialSettings/dashboard
+  recommendations[], updatedAt, updatedByUid?
 
 users/{uid}
   firstName, lastName, displayName (derived), email, phone,
@@ -119,7 +133,7 @@ users/{uid}
   homeAddress (composed), homeLat?, homeLng?,
   birthday?, refereeLevel?, assessedLevel?, refereeingSince?,
   jerseySize?, shortsSize?, photoUrl?,
-  profileComplete, roles: assigner|teamAdmin|official|cmo|fan|reportAnalytics,
+  profileComplete, roles: assigner|teamAdmin|official|cmo|fan|reportAnalytics|judicial,
   fanTeamIds?: string[],
   fanTeamOther?: string
 
@@ -150,8 +164,9 @@ mail/{mailId}   // outbound queue — Admin SDK only; see docs/EMAIL.md
 - Assigner: full org read/write for scheduling.
 - **Coach feedback** (`coachFeedback`): assigner and `reportAnalytics` read all; Team Admins read/update when `reportingTeamId` is in their `teamIds` (club-owned, one doc per match×side). Org members may read a **submitted** report only when the Scheduler has set `publicOnProfile == true` (shown on the official’s profile; submitter phone/email stay off that view). Create/update binds match facts via `get(matches/…)` (home/away, kickoff, crew-visible status) and requires doc id `matchId_reportingTeamId`. Team Admin writes must not change `publicOnProfile`. Assigners may update only `publicOnProfile` + `updatedAt` on a submitted report.
 - **Match reports** (`matchReports`): filer (`officialId`) read/write own; assigner and `reportAnalytics` read all; MO may read CMO reports where `subjectOfficialId == auth.uid`. Any org member may read **submitted CMO** reports (`slot == 'cmo'`, `status == 'submitted'`) for public profile write-ups. Pending MO/AR/CMO and all card reports stay private. Pending create + submit with shape validation; assigner delete.
-- **Card reports** (`cardReports`): filer MO read/write own after kickoff; assigner and `reportAnalytics` read all; assigner delete.
+- **Card reports** (`cardReports`): filer MO read/write own after kickoff; assigner, `reportAnalytics`, and `judicial` read all; assigner delete.
 - **`reportAnalytics` role:** Scheduler grants on member profile only (not self-assignable, not in onboarding). Enables Insights bottom-nav tab and global read of coach feedback + reports.
+- **`judicial` role:** Scheduler or existing Judicial grants (Members checkbox for assigner; `setJudicialRole` callable for Judicial-only). Not self-assignable. Unlocks Judicial lens: dashboard, cases, comments, rulings. Phone required. Cases and comments are assigner/judicial only — not visible to the filing referee, teams, or Insights. Filing MOs may **create** `judicialCases` for their own submitted card report (recorded/pending only); rulings are assigner/judicial updates.
 
 ---
 
@@ -186,9 +201,14 @@ mail/{mailId}   // outbound queue — Admin SDK only; see docs/EMAIL.md
 | `/insights/coach-feedback/:id` | Feedback detail (read-only) |
 | `/insights/cmo-reports` | Submitted CMO coaching reports |
 | `/scheduler/org` | Sheet link/sync, CSV, release, fees |
+| `/judicial` | Executive discipline dashboard + print one-pager |
+| `/judicial/cases` | Card caseload |
+| `/judicial/cases/:incidentId` | Case detail, comments, ruling |
 | `/matches/:id` | Canonical match detail |
 
-**Bottom nav (by lens):** About · (Referee/CMO \| Team Admin \| Scheduler home) · Members · Global · **Insights** (when `reportAnalytics`) · Profile  
+**Bottom nav (by lens):** About · (Referee/CMO \| Team Admin \| Scheduler \| Judicial home) · Global (except Judicial lens) · **Insights** (when assigner/`reportAnalytics`) · Profile — Members lives under Info sub-nav for all lenses.  
+
+**Judicial top tabs:** Dashboard · Cases.  
 
 **Referee/CMO top tabs:** Availability · Appointments · Request · Reports.  
 
@@ -242,6 +262,7 @@ See also [`SHEET_SYNC.md`](./SHEET_SYNC.md).
 | `approveFixtureRequest` | Assigner tooling |
 | `matchSelfService` | Callable — official confirm/decline + T-72 (Admin SDK crew write) |
 | `deleteOrgMemberAccount` | Assigner |
+| `setJudicialRole` | Assigner or Judicial — grant/revoke `judicial` |
 
 ---
 

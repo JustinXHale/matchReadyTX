@@ -11,8 +11,10 @@ import {
   ensurePendingMatchReportInFirestore,
   moOfficialIdOnMatch,
   saveCardReportInFirestore,
+  saveJudicialCasesInFirestore,
   saveMatchReportInFirestore,
 } from '@/services/orgData';
+import { casesFromCardReport } from '@/domain/judicial';
 
 export async function ensureMatchReportReady(
   matchId: string,
@@ -72,4 +74,8 @@ export async function persistSubmittedCardReport(
   const report = demoStore.submitCardReport(input);
   demoStore.upsertCardReportLocal(report);
   await saveCardReportInFirestore(defaultOrgId(), report);
+  const cases = casesFromCardReport(report);
+  if (cases.length > 0) {
+    await saveJudicialCasesInFirestore(defaultOrgId(), cases);
+  }
 }

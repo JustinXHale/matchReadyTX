@@ -300,6 +300,10 @@ export function OnboardingPage() {
     if (roleCmo) roles.push('cmo');
     if (roleFan) roles.push('fan');
     if (currentUser.roles.includes('assigner')) roles.push('assigner');
+    if (currentUser.roles.includes('reportAnalytics')) {
+      roles.push('reportAnalytics');
+    }
+    if (currentUser.roles.includes('judicial')) roles.push('judicial');
 
     const favorite = fanFavoritePayload();
 

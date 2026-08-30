@@ -34,6 +34,7 @@ import { releaseMatch } from '@/domain/matchTransitions';
 import {
   type CardReport,
   type CardIncident,
+  type CardConference,
   type CmoReportPayload,
   type CompetitionUnion,
   type MatchReport,
@@ -42,10 +43,22 @@ import {
   type ArReportPayload,
   type ReportAssigneeSlot,
   type ReportFormKind,
+  type SecondOffense,
   matchReportDocId,
   parseLegacyCmoFixture,
   buildPendingReport,
 } from '@/domain/reports';
+import {
+  isCardLawId,
+  isPlayerPosition,
+  type CardLawId,
+} from '@/domain/cardLaws';
+import type {
+  JudicialCase,
+  JudicialCaseStatus,
+  JudicialComment,
+  JudicialDashboardSettings,
+} from '@/domain/judicial';
 import {
   emptyCrew,
   ensureDefaultMoBlock,
@@ -1771,6 +1784,28 @@ function parseMatchReportStatus(raw: unknown): MatchReportStatus {
   return raw === 'submitted' ? 'submitted' : 'pending';
 }
 
+function parseLawIds(raw: unknown): CardLawId[] {
+  if (!Array.isArray(raw)) return [];
+  return raw.filter((v): v is CardLawId => typeof v === 'string' && isCardLawId(v));
+}
+
+function parseSecondOffense(raw: unknown): SecondOffense | undefined {
+  if (!raw || typeof raw !== 'object') return undefined;
+  const rec = raw as Record<string, unknown>;
+  const color =
+    rec.color === 'second_yellow_red' || rec.color === 'red'
+      ? rec.color
+      : null;
+  if (!color) return undefined;
+  return {
+    color,
+    approximateTime:
+      typeof rec.approximateTime === 'string' ? rec.approximateTime : '',
+    lawIds: parseLawIds(rec.lawIds),
+    summary: typeof rec.summary === 'string' ? rec.summary : '',
+  };
+}
+
 function parseCardIncidents(raw: unknown): CardIncident[] {
   if (!Array.isArray(raw)) return [];
   const out: CardIncident[] = [];
@@ -1778,19 +1813,41 @@ function parseCardIncidents(raw: unknown): CardIncident[] {
     if (!item || typeof item !== 'object') continue;
     const rec = item as Record<string, unknown>;
     const color = rec.color === 'yellow' || rec.color === 'red' ? rec.color : null;
-    const playerName = typeof rec.playerName === 'string' ? rec.playerName : '';
+    const playerFirstName =
+      typeof rec.playerFirstName === 'string' ? rec.playerFirstName : '';
+    const playerLastName =
+      typeof rec.playerLastName === 'string' ? rec.playerLastName : '';
+    const playerName =
+      typeof rec.playerName === 'string' && rec.playerName.trim()
+        ? rec.playerName
+        : `${playerFirstName} ${playerLastName}`.trim();
     const teamId = typeof rec.teamId === 'string' ? rec.teamId : '';
     const teamName = typeof rec.teamName === 'string' ? rec.teamName : '';
     const reason = typeof rec.reason === 'string' ? rec.reason : '';
     if (!color || !playerName || !teamId) continue;
+    const positionRaw =
+      typeof rec.playerPosition === 'string' ? rec.playerPosition : '';
     out.push({
       id: typeof rec.id === 'string' ? rec.id : `card_${out.length}`,
       color,
       playerName,
+      playerFirstName: playerFirstName || undefined,
+      playerLastName: playerLastName || undefined,
+      playerJersey:
+        typeof rec.playerJersey === 'string' ? rec.playerJersey : undefined,
+      playerPosition: isPlayerPosition(positionRaw) ? positionRaw : '',
       teamId,
       teamName,
       reason,
       minute: typeof rec.minute === 'string' ? rec.minute : undefined,
+      lawIds: parseLawIds(rec.lawIds),
+      offenseSummary:
+        typeof rec.offenseSummary === 'string' ? rec.offenseSummary : undefined,
+      receivedAnotherCard:
+        typeof rec.receivedAnotherCard === 'boolean'
+          ? rec.receivedAnotherCard
+          : undefined,
+      secondOffense: parseSecondOffense(rec.secondOffense),
       additionalInfoPrivate:
         typeof rec.additionalInfoPrivate === 'string'
           ? rec.additionalInfoPrivate
@@ -1868,16 +1925,28 @@ export function cardReportFromFirestore(
     data.status === 'draft' || data.status === 'submitted' ? data.status : 'submitted';
   const createdAt = typeof data.createdAt === 'string' ? data.createdAt : '';
   if (!createdAt) return null;
+  const conferenceRaw = data.conference;
+  const conference: CardConference | '' =
+    conferenceRaw === 'lonestar_men' || conferenceRaw === 'lonestar_women'
+      ? conferenceRaw
+      : '';
   return {
     id,
     matchId,
     officialId,
     status,
     competitionUnion,
+    conference,
     officialName: String(data.officialName ?? ''),
     officialEmail: String(data.officialEmail ?? ''),
     officialPhone: String(data.officialPhone ?? ''),
     matchDate: String(data.matchDate ?? ''),
+    matchFilmed:
+      typeof data.matchFilmed === 'boolean' ? data.matchFilmed : undefined,
+    homeScore:
+      typeof data.homeScore === 'number' ? data.homeScore : undefined,
+    awayScore:
+      typeof data.awayScore === 'number' ? data.awayScore : undefined,
     cards: parseCardIncidents(data.cards),
     additionalInfoPrivate:
       typeof data.additionalInfoPrivate === 'string'
@@ -1931,6 +2000,10 @@ function cardReportToFirestore(
     officialEmail: report.officialEmail,
     officialPhone: report.officialPhone,
     matchDate: report.matchDate,
+    conference: report.conference || null,
+    matchFilmed: report.matchFilmed ?? null,
+    homeScore: report.homeScore ?? null,
+    awayScore: report.awayScore ?? null,
     cards: report.cards,
     additionalInfoPrivate: report.additionalInfoPrivate ?? null,
     submittedAt: report.submittedAt ?? null,
@@ -2128,4 +2201,274 @@ export async function deleteMeetingResourceInFirestore(
 ): Promise<void> {
   await deleteDoc(doc(requireDb(), 'orgs', orgId, 'resources', resourceId));
 }
+
+const CASE_STATUSES: JudicialCaseStatus[] = [
+  'recorded',
+  'pending',
+  'upheld',
+  'dismissed',
+  'reduced',
+  'summary_judgment',
+];
+
+function parseJudicialCase(
+  id: string,
+  data: Record<string, unknown>,
+): JudicialCase | null {
+  const reportId = typeof data.reportId === 'string' ? data.reportId : '';
+  const incidentId = typeof data.incidentId === 'string' ? data.incidentId : '';
+  const matchId = typeof data.matchId === 'string' ? data.matchId : '';
+  const createdAt = typeof data.createdAt === 'string' ? data.createdAt : '';
+  if (!reportId || !incidentId || !matchId || !createdAt) return null;
+  const status = CASE_STATUSES.includes(data.status as JudicialCaseStatus)
+    ? (data.status as JudicialCaseStatus)
+    : 'pending';
+  const color =
+    data.color === 'yellow' ||
+    data.color === 'red' ||
+    data.color === 'second_yellow_red'
+      ? data.color
+      : 'yellow';
+  const conference: CardConference | '' =
+    data.conference === 'lonestar_men' || data.conference === 'lonestar_women'
+      ? data.conference
+      : '';
+  return {
+    id,
+    reportId,
+    incidentId,
+    matchId,
+    conference,
+    color,
+    playerFirstName: String(data.playerFirstName ?? ''),
+    playerLastName: String(data.playerLastName ?? ''),
+    playerName: String(data.playerName ?? ''),
+    playerJersey:
+      typeof data.playerJersey === 'string' && data.playerJersey.trim()
+        ? data.playerJersey.trim()
+        : undefined,
+    teamId: String(data.teamId ?? ''),
+    teamName: String(data.teamName ?? ''),
+    lawIds: parseLawIds(data.lawIds),
+    offenseSummary: String(data.offenseSummary ?? ''),
+    matchDate: typeof data.matchDate === 'string' ? data.matchDate : undefined,
+    officialId: typeof data.officialId === 'string' ? data.officialId : undefined,
+    officialName:
+      typeof data.officialName === 'string' ? data.officialName : undefined,
+    status,
+    sanctionMatches:
+      typeof data.sanctionMatches === 'number'
+        ? data.sanctionMatches
+        : undefined,
+    sanctionNote:
+      typeof data.sanctionNote === 'string' ? data.sanctionNote : undefined,
+    ruledAt: typeof data.ruledAt === 'string' ? data.ruledAt : undefined,
+    ruledByUid: typeof data.ruledByUid === 'string' ? data.ruledByUid : undefined,
+    ruledByName:
+      typeof data.ruledByName === 'string' ? data.ruledByName : undefined,
+    createdAt,
+    updatedAt: typeof data.updatedAt === 'string' ? data.updatedAt : createdAt,
+  };
+}
+
+function judicialCaseToFirestore(
+  orgId: string,
+  c: JudicialCase,
+): Record<string, unknown> {
+  return stripUndefined({
+    orgId,
+    id: c.id,
+    reportId: c.reportId,
+    incidentId: c.incidentId,
+    matchId: c.matchId,
+    conference: c.conference || null,
+    color: c.color,
+    playerFirstName: c.playerFirstName,
+    playerLastName: c.playerLastName,
+    playerName: c.playerName,
+    playerJersey: c.playerJersey ?? null,
+    teamId: c.teamId,
+    teamName: c.teamName,
+    lawIds: c.lawIds,
+    offenseSummary: c.offenseSummary,
+    matchDate: c.matchDate ?? null,
+    officialId: c.officialId ?? null,
+    officialName: c.officialName ?? null,
+    status: c.status,
+    sanctionMatches: c.sanctionMatches ?? null,
+    sanctionNote: c.sanctionNote ?? null,
+    ruledAt: c.ruledAt ?? null,
+    ruledByUid: c.ruledByUid ?? null,
+    ruledByName: c.ruledByName ?? null,
+    createdAt: c.createdAt,
+    updatedAt: c.updatedAt,
+  });
+}
+
+export function subscribeJudicialCases(
+  orgId: string,
+  onData: (cases: JudicialCase[]) => void,
+  onError?: (err: Error) => void,
+): Unsubscribe {
+  const col = collection(requireDb(), 'orgs', orgId, 'judicialCases');
+  return onSnapshot(
+    col,
+    (snap) => {
+      const cases = snap.docs
+        .map((d) =>
+          parseJudicialCase(d.id, d.data() as Record<string, unknown>),
+        )
+        .filter((c): c is JudicialCase => c != null);
+      onData(cases);
+    },
+    (err) => onError?.(err),
+  );
+}
+
+export function subscribeJudicialComments(
+  orgId: string,
+  caseId: string,
+  onData: (comments: JudicialComment[]) => void,
+  onError?: (err: Error) => void,
+): Unsubscribe {
+  const col = collection(
+    requireDb(),
+    'orgs',
+    orgId,
+    'judicialCases',
+    caseId,
+    'comments',
+  );
+  return onSnapshot(
+    col,
+    (snap) => {
+      const comments = snap.docs
+        .map((d) => {
+          const data = d.data() as Record<string, unknown>;
+          const authorUid =
+            typeof data.authorUid === 'string' ? data.authorUid : '';
+          const body = typeof data.body === 'string' ? data.body : '';
+          const createdAt =
+            typeof data.createdAt === 'string' ? data.createdAt : '';
+          if (!authorUid || !body || !createdAt) return null;
+          return {
+            id: d.id,
+            authorUid,
+            authorName: String(data.authorName ?? ''),
+            body,
+            createdAt,
+          } satisfies JudicialComment;
+        })
+        .filter((c): c is JudicialComment => c != null)
+        .sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+      onData(comments);
+    },
+    (err) => onError?.(err),
+  );
+}
+
+export function subscribeJudicialSettings(
+  orgId: string,
+  onData: (settings: JudicialDashboardSettings | null) => void,
+  onError?: (err: Error) => void,
+): Unsubscribe {
+  const ref = doc(requireDb(), 'orgs', orgId, 'judicialSettings', 'dashboard');
+  return onSnapshot(
+    ref,
+    (snap) => {
+      if (!snap.exists()) {
+        onData(null);
+        return;
+      }
+      const data = snap.data() as Record<string, unknown>;
+      const recs = Array.isArray(data.recommendations)
+        ? data.recommendations.filter((r): r is string => typeof r === 'string')
+        : [];
+      onData({
+        recommendations: recs,
+        updatedAt:
+          typeof data.updatedAt === 'string'
+            ? data.updatedAt
+            : new Date().toISOString(),
+        updatedByUid:
+          typeof data.updatedByUid === 'string' ? data.updatedByUid : undefined,
+        updatedByName:
+          typeof data.updatedByName === 'string'
+            ? data.updatedByName
+            : undefined,
+      });
+    },
+    (err) => onError?.(err),
+  );
+}
+
+export async function saveJudicialCaseInFirestore(
+  orgId: string,
+  c: JudicialCase,
+): Promise<void> {
+  await setDoc(
+    doc(requireDb(), 'orgs', orgId, 'judicialCases', c.id),
+    judicialCaseToFirestore(orgId, c),
+  );
+}
+
+export async function saveJudicialCasesInFirestore(
+  orgId: string,
+  cases: JudicialCase[],
+): Promise<void> {
+  const database = requireDb();
+  const batch = writeBatch(database);
+  for (const c of cases) {
+    batch.set(
+      doc(database, 'orgs', orgId, 'judicialCases', c.id),
+      judicialCaseToFirestore(orgId, c),
+    );
+  }
+  await batch.commit();
+}
+
+export async function addJudicialCommentInFirestore(
+  orgId: string,
+  caseId: string,
+  comment: JudicialComment,
+): Promise<void> {
+  await setDoc(
+    doc(requireDb(), 'orgs', orgId, 'judicialCases', caseId, 'comments', comment.id),
+    {
+      orgId,
+      authorUid: comment.authorUid,
+      authorName: comment.authorName,
+      body: comment.body,
+      createdAt: comment.createdAt,
+    },
+  );
+}
+
+export async function saveJudicialSettingsInFirestore(
+  orgId: string,
+  settings: JudicialDashboardSettings,
+): Promise<void> {
+  await setDoc(
+    doc(requireDb(), 'orgs', orgId, 'judicialSettings', 'dashboard'),
+    {
+      orgId,
+      recommendations: settings.recommendations.slice(0, 8),
+      updatedAt: settings.updatedAt,
+      updatedByUid: settings.updatedByUid ?? null,
+      updatedByName: settings.updatedByName ?? null,
+    },
+  );
+}
+
+export async function setJudicialRoleCallable(
+  uid: string,
+  grant: boolean,
+): Promise<void> {
+  const fn = httpsCallable<
+    { uid: string; grant: boolean; orgId?: string },
+    { ok: boolean }
+  >(requireFunctions(), 'setJudicialRole');
+  await fn({ uid, grant, orgId: defaultOrgId() });
+}
+
 

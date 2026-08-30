@@ -129,7 +129,7 @@ const org: OrgSettings = {
   mileageMinMiles: 10,
   defaultFees: defaultFees(),
   matchLevels: ['D1', 'D2', 'D3', 'Exhibition'],
-  competitions: ['Lonestar Men', 'Lonestar Women'],
+  competitions: ['Lone Star Men', 'Lone Star Women'],
 };
 
 describe('match transitions', () => {
@@ -2085,8 +2085,8 @@ describe('conferenceTeamOptions', () => {
       't_uh_lonestar_men',
       't_uh_lonestar_women',
     ]);
-    expect(options[0]?.conference).toBe('Lonestar Men');
-    expect(options[1]?.conference).toBe('Lonestar Women');
+    expect(options[0]?.conference).toBe('Lone Star Men');
+    expect(options[1]?.conference).toBe('Lone Star Women');
   });
 
   it('excludes VENUE-only Locations rows from team pickers', () => {

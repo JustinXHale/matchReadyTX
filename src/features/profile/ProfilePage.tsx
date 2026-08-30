@@ -223,6 +223,10 @@ export function ProfilePage() {
     if (roleCmo) roles.push('cmo');
     if (roleFan) roles.push('fan');
     if (currentUser.roles.includes('assigner')) roles.push('assigner');
+    if (currentUser.roles.includes('reportAnalytics')) {
+      roles.push('reportAnalytics');
+    }
+    if (currentUser.roles.includes('judicial')) roles.push('judicial');
 
     let nextFanTeamIds: string[] = [];
     let nextFanTeamOther: string | undefined;
@@ -631,6 +635,17 @@ export function ProfilePage() {
                 <HelperTextItem>
                   Scheduler access is granted by your org and cannot be removed
                   here.
+                </HelperTextItem>
+              </HelperText>
+            </FormHelperText>
+          )}
+          {(currentUser.roles.includes('judicial') ||
+            currentUser.roles.includes('reportAnalytics')) && (
+            <FormHelperText>
+              <HelperText>
+                <HelperTextItem>
+                  Judicial and Insights access are granted by Scheduler or
+                  Judicial officers and cannot be changed here.
                 </HelperTextItem>
               </HelperText>
             </FormHelperText>

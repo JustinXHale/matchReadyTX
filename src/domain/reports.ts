@@ -15,6 +15,7 @@ import {
   type FivePointChoice,
   type FivePointValue,
 } from '@/domain/fivePointScale';
+import type { CardLawId, PlayerPosition } from '@/domain/cardLaws';
 
 /** Minutes after kickoff when MO/AR/CMO report notices open. */
 export const REPORT_DUE_AFTER_MS = 90 * 60 * 1000;
@@ -39,21 +40,48 @@ export type CompetitionUnion =
 
 export const COMPETITION_UNION_LABELS: Record<CompetitionUnion, string> = {
   rugby_texas_youth: 'Rugby Texas Youth Rugby (HS Boys, HS Girls, Youth)',
-  ncr_lonestar_college: 'NCR Lonestar College Rugby (Men’s/Women’s)',
+  ncr_lonestar_college: 'Lone Star College Rugby (Men’s/Women’s)',
   texas_rugby_union_club:
     'Texas Rugby Union Club Rugby (Men’s/Women’s D1–D4, Senior)',
 };
 
 export type CardColor = 'yellow' | 'red';
 
+export type CardConference = 'lonestar_men' | 'lonestar_women';
+
+export const CARD_CONFERENCE_LABELS: Record<CardConference, string> = {
+  lonestar_men: 'Lone Star Men',
+  lonestar_women: 'Lone Star Women',
+};
+
+export type SecondOffenseColor = 'second_yellow_red' | 'red';
+
+export interface SecondOffense {
+  color: SecondOffenseColor;
+  approximateTime: string;
+  lawIds: CardLawId[];
+  summary: string;
+}
+
 export interface CardIncident {
   id: string;
   color: CardColor;
+  /** Display name — derived from first/last when those are set. */
   playerName: string;
+  playerFirstName?: string;
+  playerLastName?: string;
+  playerJersey?: string;
+  playerPosition?: PlayerPosition | '';
   teamId: string;
   teamName: string;
+  /** Approximate time of the infraction (minute or relative, e.g. early second half). */
   minute?: string;
+  /** Legacy free-text law/reason. New reports use lawIds + offenseSummary. */
   reason: string;
+  lawIds?: CardLawId[];
+  offenseSummary?: string;
+  receivedAnotherCard?: boolean;
+  secondOffense?: SecondOffense;
   /** Scheduler-only notes for this card. */
   additionalInfoPrivate?: string;
 }
@@ -576,10 +604,14 @@ export interface CardReport {
   officialId: string;
   status: 'draft' | 'submitted';
   competitionUnion: CompetitionUnion | '';
+  conference?: CardConference | '';
   officialName: string;
   officialEmail: string;
   officialPhone: string;
   matchDate: string;
+  matchFilmed?: boolean;
+  homeScore?: number;
+  awayScore?: number;
   cards: CardIncident[];
   /**
    * Optional free-text for the Scheduler only — hidden from public / other lenses.
@@ -854,12 +886,115 @@ export function defaultCompetitionUnion(
   match: Match,
 ): CompetitionUnion | '' {
   const c = (match.competition ?? '').toLowerCase();
-  if (c.includes('college') || c.includes('ncr')) return 'ncr_lonestar_college';
+  if (
+    c.includes('college') ||
+    c.includes('ncr') ||
+    c.includes('lone star') ||
+    c.includes('lonestar')
+  ) {
+    return 'ncr_lonestar_college';
+  }
   if (c.includes('youth') || c.includes('hs')) return 'rugby_texas_youth';
   if (c.includes('club') || c.includes('d1') || c.includes('d2')) {
     return 'texas_rugby_union_club';
   }
-  return 'texas_rugby_union_club';
+  return 'ncr_lonestar_college';
+}
+
+export function defaultCardConference(match: Match): CardConference | '' {
+  if (match.gender === 'women') return 'lonestar_women';
+  if (match.gender === 'men') return 'lonestar_men';
+  const c = (match.competition ?? '').toLowerCase();
+  if (c.includes('women')) return 'lonestar_women';
+  if (c.includes('men')) return 'lonestar_men';
+  return '';
+}
+
+export function displayPlayerName(card: CardIncident): string {
+  const first = card.playerFirstName?.trim() ?? '';
+  const last = card.playerLastName?.trim() ?? '';
+  const joined = `${first} ${last}`.trim();
+  if (joined) return joined;
+  const legacy = card.playerName.trim();
+  if (legacy) return legacy;
+  const jersey = card.playerJersey?.trim();
+  if (jersey) return `#${jersey}`;
+  return '';
+}
+
+export function validateCardReportIdentity(input: {
+  officialName: string;
+  officialEmail: string;
+  officialPhone: string;
+  competitionUnion: CompetitionUnion | '';
+  conference: CardConference | '';
+  matchDate: string;
+}): string | null {
+  if (
+    !input.officialName.trim() ||
+    !input.officialEmail.trim() ||
+    !input.officialPhone.trim()
+  ) {
+    return 'Name, email, and phone are required.';
+  }
+  if (!input.competitionUnion) return 'Select a competition union.';
+  if (input.competitionUnion === 'ncr_lonestar_college' && !input.conference) {
+    return 'Select Lone Star Men or Lone Star Women.';
+  }
+  if (!input.matchDate) return 'Match date is required.';
+  return null;
+}
+
+export function isCompleteCardIncident(card: CardIncident): boolean {
+  const name = displayPlayerName(card);
+  const jersey = card.playerJersey?.trim();
+  const summary = (card.offenseSummary ?? card.reason).trim();
+  const laws = card.lawIds ?? [];
+  return Boolean(
+    card.teamId &&
+      card.color &&
+      summary &&
+      laws.length > 0 &&
+      (name || jersey),
+  );
+}
+
+export function validateCardReportIncidents(
+  cards: CardIncident[],
+  matchFilmed: boolean | null,
+): string | null {
+  if (matchFilmed == null) {
+    return 'Indicate whether the match was filmed.';
+  }
+  const valid = cards.filter(isCompleteCardIncident);
+  if (valid.length === 0) {
+    return 'Add at least one card with team, law(s), summary, and a player name or jersey number.';
+  }
+  for (const c of valid) {
+    if (c.receivedAnotherCard) {
+      const second = c.secondOffense;
+      if (!second?.summary.trim() || (second.lawIds?.length ?? 0) === 0) {
+        return 'Second offense needs a summary and at least one law.';
+      }
+    }
+  }
+  return null;
+}
+
+/** Shape written on submit — drops incomplete cards and unused second-offense blocks. */
+export function cardIncidentsForSubmit(cards: CardIncident[]): CardIncident[] {
+  return cards.filter(isCompleteCardIncident).map((c) => ({
+    ...c,
+    playerFirstName: c.playerFirstName?.trim() || undefined,
+    playerLastName: c.playerLastName?.trim() || undefined,
+    playerName: displayPlayerName(c),
+    playerJersey: c.playerJersey?.trim() || undefined,
+    offenseSummary: c.offenseSummary?.trim() || undefined,
+    reason: (c.offenseSummary ?? c.reason).trim(),
+    minute: c.minute?.trim() || undefined,
+    additionalInfoPrivate: c.additionalInfoPrivate?.trim() || undefined,
+    secondOffense: c.receivedAnotherCard ? c.secondOffense : undefined,
+  }));
 }
 
 export function crewNamesForMatch(match: Match): string {

@@ -20,6 +20,10 @@ service cloud.firestore {
       return isMember(orgId)
         && 'reportAnalytics' in get(/databases/$(database)/documents/orgs/$(orgId)/members/$(request.auth.uid)).data.roles;
     }
+    function isJudicial(orgId) {
+      return isMember(orgId)
+        && 'judicial' in get(/databases/$(database)/documents/orgs/$(orgId)/members/$(request.auth.uid)).data.roles;
+    }
     function isAssigner(orgId) {
       return onboardingComplete()
         && exists(/databases/$(database)/documents/orgs/$(orgId)/members/$(request.auth.uid))
@@ -64,7 +68,8 @@ service cloud.firestore {
         ])
         && request.resource.data.roles is list
         && ('assigner' in resource.data.roles) == ('assigner' in request.resource.data.roles)
-        && ('reportAnalytics' in resource.data.roles) == ('reportAnalytics' in request.resource.data.roles);
+        && ('reportAnalytics' in resource.data.roles) == ('reportAnalytics' in request.resource.data.roles)
+        && ('judicial' in resource.data.roles) == ('judicial' in request.resource.data.roles);
     }
     function requestHasWorkingSocietyRole() {
       return request.resource.data.roles is list
@@ -73,6 +78,7 @@ service cloud.firestore {
           || 'teamAdmin' in request.resource.data.roles
           || 'cmo' in request.resource.data.roles
           || 'assigner' in request.resource.data.roles
+          || 'judicial' in request.resource.data.roles
         );
     }
     function requestHasRefereeLensRole() {
@@ -201,6 +207,7 @@ service cloud.firestore {
             && request.resource.data.teamIds is list
             && !('assigner' in request.resource.data.roles)
             && !('reportAnalytics' in request.resource.data.roles)
+            && !('judicial' in request.resource.data.roles)
           )
         );
         // Assigner manages anyone; members may update own roles / favorites but not grant or revoke assigner.
@@ -213,6 +220,7 @@ service cloud.firestore {
           && request.resource.data.teamIds is list
           && ('assigner' in resource.data.roles) == ('assigner' in request.resource.data.roles)
           && ('reportAnalytics' in resource.data.roles) == ('reportAnalytics' in request.resource.data.roles)
+          && ('judicial' in resource.data.roles) == ('judicial' in request.resource.data.roles)
         );
         allow delete: if isAssigner(orgId);
       }
@@ -537,6 +545,7 @@ service cloud.firestore {
           && (
             isAssigner(orgId)
             || isReportAnalytics(orgId)
+            || isJudicial(orgId)
             || resource.data.officialId == request.auth.uid
           );
         allow create, update: if signedIn()
@@ -548,6 +557,50 @@ service cloud.firestore {
           && request.resource.data.cards is list
           && reportId == request.resource.data.id;
         allow delete: if isAssigner(orgId);
+      }
+      match /judicialCases/{caseId} {
+        allow read: if isAssigner(orgId) || isJudicial(orgId);
+        allow create: if signedIn()
+          && isMember(orgId)
+          && request.resource.data.orgId == orgId
+          && request.resource.data.id == caseId
+          && request.resource.data.reportId is string
+          && request.resource.data.incidentId is string
+          && request.resource.data.matchId is string
+          && request.resource.data.status in ['recorded', 'pending']
+          && exists(/databases/$(database)/documents/orgs/$(orgId)/cardReports/$(request.resource.data.reportId))
+          && (
+            isAssigner(orgId)
+            || isJudicial(orgId)
+            || get(/databases/$(database)/documents/orgs/$(orgId)/cardReports/$(request.resource.data.reportId)).data.officialId == request.auth.uid
+          );
+        allow update: if (isAssigner(orgId) || isJudicial(orgId))
+          && request.resource.data.orgId == orgId
+          && request.resource.data.id == caseId
+          && request.resource.data.reportId == resource.data.reportId
+          && request.resource.data.incidentId == resource.data.incidentId
+          && request.resource.data.matchId == resource.data.matchId;
+        allow delete: if isAssigner(orgId);
+        match /comments/{commentId} {
+          allow read: if isAssigner(orgId) || isJudicial(orgId);
+          allow create: if (isAssigner(orgId) || isJudicial(orgId))
+            && request.resource.data.authorUid == request.auth.uid
+            && request.resource.data.body is string
+            && request.resource.data.body.size() > 0
+            && request.resource.data.body.size() < 4000
+            && request.resource.data.createdAt is string;
+          allow update, delete: if false;
+        }
+      }
+      match /judicialSettings/{docId} {
+        allow read: if isAssigner(orgId) || isJudicial(orgId);
+        allow create, update: if (isAssigner(orgId) || isJudicial(orgId))
+          && docId == 'dashboard'
+          && request.resource.data.orgId == orgId;
+        allow delete: if isAssigner(orgId);
+      }
+      match /adminRateLimits/{limitId} {
+        allow read, write: if false;
       }
       /** Team Admin club-link requests — create/review via Admin SDK callables. */
       match /teamLinkRequests/{requestId} {

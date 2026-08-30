@@ -17,6 +17,7 @@ import {
   faClipboardList,
   faChartLine,
   faEarthAmericas,
+  faGavel,
   faUser,
   faUsers,
 } from '@fortawesome/free-solid-svg-icons';
@@ -119,11 +120,21 @@ function navForRole(
     const leagueIdx = items.findIndex((i) =>
       stripDemoPrefix(i.to).startsWith('/global'),
     );
-    if (leagueIdx < 0) return [...items, insights];
+    if (leagueIdx >= 0) {
+      return [
+        ...items.slice(0, leagueIdx + 1),
+        insights,
+        ...items.slice(leagueIdx + 1),
+      ];
+    }
+    const profileIdx = items.findIndex((i) =>
+      stripDemoPrefix(i.to).startsWith('/profile'),
+    );
+    if (profileIdx < 0) return [...items, insights];
     return [
-      ...items.slice(0, leagueIdx + 1),
+      ...items.slice(0, profileIdx),
       insights,
-      ...items.slice(leagueIdx + 1),
+      ...items.slice(profileIdx),
     ];
   };
 
@@ -143,6 +154,25 @@ function navForRole(
         isActive: active('/scheduler'),
       },
       global,
+      profile,
+    ]);
+  }
+
+  if (roleView === 'judicial') {
+    return withInsights([
+      about,
+      {
+        to: prefix('/judicial'),
+        label: 'Judicial',
+        icon: (
+          <FontAwesomeIcon
+            icon={faGavel}
+            className={navIconClass}
+            aria-hidden
+          />
+        ),
+        isActive: active('/judicial'),
+      },
       profile,
     ]);
   }

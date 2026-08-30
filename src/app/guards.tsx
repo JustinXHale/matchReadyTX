@@ -49,6 +49,16 @@ export function RequireInsightsAccess() {
   return <Outlet />;
 }
 
+/** Judicial lens — granted judicial role only. */
+export function RequireJudicialAccess() {
+  const { hasJudicialRole, dataMode } = useApp();
+  if (!hasJudicialRole) {
+    const home = dataMode === 'demo' ? withDemoPrefix('/about') : '/about';
+    return <Navigate to={home} replace />;
+  }
+  return <Outlet />;
+}
+
 /** Directory and team lists are for working roles. Individual member profiles are allowed. */
 export function RequireMembersAccess() {
   const { isFanView, dataMode } = useApp();

@@ -1,5 +1,10 @@
 import type { Match, Team, TeamContactPerson, UserProfile } from '@/domain/types';
-import { isVenueOnlyCompetition } from '@/domain/competitions';
+import {
+  competitionForGender,
+  competitionsEqual,
+  displayCompetitionLabel,
+  isVenueOnlyCompetition,
+} from '@/domain/competitions';
 import { memberListName } from '@/domain/members';
 import { mapsDirectionsUrl } from '@/services/maps';
 
@@ -23,8 +28,9 @@ export type ConferenceTeamOption = {
 };
 
 function competitionFromGender(gender: string): string | null {
-  if (gender === 'women') return 'Lonestar Women';
-  if (gender === 'men') return 'Lonestar Men';
+  if (gender === 'women' || gender === 'men') {
+    return competitionForGender(gender);
+  }
   return null;
 }
 
@@ -82,14 +88,18 @@ export function scheduleTeamEntries(
       s.matchCount += 1;
       s.genders.add(m.gender);
       s.levels.add(m.level);
-      if (m.competition?.trim()) s.competitions.add(m.competition.trim());
+      if (m.competition?.trim()) {
+        s.competitions.add(displayCompetitionLabel(m.competition.trim()));
+      }
     }
   }
 
   const entries = allTeams.map((team) => {
     const s = stats.get(team.id);
     const competitions = new Set<string>();
-    if (team.competition?.trim()) competitions.add(team.competition.trim());
+    if (team.competition?.trim()) {
+      competitions.add(displayCompetitionLabel(team.competition.trim()));
+    }
     if (s) {
       for (const c of s.competitions) competitions.add(c);
       // Backfill conference when legacy matches have gender but no competition.
@@ -230,19 +240,23 @@ export function primaryTeamConference(
   competitionsFromMatches: string[],
 ): string {
   const fromTeam = team.competition?.trim();
-  if (fromTeam) return fromTeam;
+  if (fromTeam) return displayCompetitionLabel(fromTeam);
   const unique = [
     ...new Set(
       competitionsFromMatches.map((c) => c.trim()).filter(Boolean),
     ),
   ];
-  if (unique.length === 1) return unique[0]!;
+  if (unique.length === 1) return displayCompetitionLabel(unique[0]!);
   if (team.gender) {
     const fromGender = competitionFromGender(team.gender);
-    if (fromGender && unique.includes(fromGender)) return fromGender;
+    if (fromGender && unique.some((c) => competitionsEqual(c, fromGender))) {
+      return displayCompetitionLabel(fromGender);
+    }
   }
   if (unique.length > 0) {
-    return [...unique].sort((a, b) => a.localeCompare(b))[0]!;
+    return displayCompetitionLabel(
+      [...unique].sort((a, b) => a.localeCompare(b))[0]!,
+    );
   }
   return 'Conference unknown';
 }
@@ -254,8 +268,12 @@ export function teamConferenceLabel(
 ): string {
   if (team) return primaryTeamConference(team, competitions);
   if (competitions.length === 0) return 'Conference unknown';
-  if (competitions.length === 1) return competitions[0]!;
-  return [...competitions].sort((a, b) => a.localeCompare(b))[0]!;
+  if (competitions.length === 1) {
+    return displayCompetitionLabel(competitions[0]!);
+  }
+  return displayCompetitionLabel(
+    [...competitions].sort((a, b) => a.localeCompare(b))[0]!,
+  );
 }
 
 /**
@@ -276,7 +294,7 @@ export function conferenceTeamOptions(
     .map((team) => ({
       id: team.id,
       name: team.name,
-      conference: team.competition!.trim(),
+      conference: displayCompetitionLabel(team.competition!.trim()),
     }))
     .sort((a, b) =>
       a.conference === b.conference

@@ -18,6 +18,7 @@ import {
   matchOnCalendarDate,
   uniqueMatchCalendarDates,
 } from '@/domain/divisionFilters';
+import { matchInCompetition } from '@/domain/competitions';
 import { GlobalDivisionFilters } from '@/features/global/GlobalDivisionFilters';
 import { MatchListRow } from '@/ui/MatchListRow';
 import type { GameRequest, Match, MatchGender } from '@/domain/types';
@@ -152,7 +153,7 @@ export function PendingRequestsPage() {
           .filter(({ match }) => {
             if (genderFilter && match.gender !== genderFilter) return false;
             if (levelFilter && match.level !== levelFilter) return false;
-            if (competitionFilter && match.competition !== competitionFilter) {
+            if (!matchInCompetition(match, competitionFilter)) {
               return false;
             }
             return true;
@@ -167,7 +168,7 @@ export function PendingRequestsPage() {
       pool.filter(({ match }) => {
         if (genderFilter && match.gender !== genderFilter) return false;
         if (levelFilter && match.level !== levelFilter) return false;
-        if (competitionFilter && match.competition !== competitionFilter) {
+        if (!matchInCompetition(match, competitionFilter)) {
           return false;
         }
         return matchOnCalendarDate(match, dateFilter);

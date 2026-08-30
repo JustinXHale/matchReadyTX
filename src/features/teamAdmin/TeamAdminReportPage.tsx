@@ -23,6 +23,7 @@ import {
   matchOnCalendarDate,
   uniqueMatchCalendarDates,
 } from '@/domain/divisionFilters';
+import { matchInCompetition } from '@/domain/competitions';
 import { isFirebaseConfigured } from '@/services/firebase';
 import { defaultOrgId, saveCoachFeedbackInFirestore } from '@/services/orgData';
 import { MatchListRow } from '@/ui/MatchListRow';
@@ -97,7 +98,7 @@ export function TeamAdminReportPage() {
             if (teamFilter && reportingTeamId !== teamFilter) return false;
             if (genderFilter && match.gender !== genderFilter) return false;
             if (levelFilter && match.level !== levelFilter) return false;
-            if (competitionFilter && match.competition !== competitionFilter) {
+            if (!matchInCompetition(match, competitionFilter)) {
               return false;
             }
             return true;
@@ -112,7 +113,7 @@ export function TeamAdminReportPage() {
       if (teamFilter && reportingTeamId !== teamFilter) return false;
       if (genderFilter && match.gender !== genderFilter) return false;
       if (levelFilter && match.level !== levelFilter) return false;
-      if (competitionFilter && match.competition !== competitionFilter) {
+      if (!matchInCompetition(match, competitionFilter)) {
         return false;
       }
       if (!matchOnCalendarDate(match, dateFilter)) return false;

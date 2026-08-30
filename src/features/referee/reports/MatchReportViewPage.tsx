@@ -4,13 +4,16 @@ import { Button, Title } from '@patternfly/react-core';
 import { useApp } from '@/app/AppContext';
 import {
   AR_COMFORT_QUESTION,
+  CARD_CONFERENCE_LABELS,
   CMO_SCALE_KEYS,
   CMO_SCALE_LABELS,
   COMPETITION_UNION_LABELS,
   MATCH_FEEDBACK_LABEL,
   displayMatchForArchivedReport,
   displayMatchForCmoReport,
+  displayPlayerName,
 } from '@/domain/reports';
+import { CARD_LAW_LABELS, isCardLawId } from '@/domain/cardLaws';
 import { formatFivePointChoice } from '@/domain/fivePointScale';
 import { crewPeople, REQUESTABLE_SLOT_SHORT } from '@/domain/types';
 import { cmoSubjectName } from '@/features/insights/insightsDisplay';
@@ -411,15 +414,48 @@ export function CardReportViewBody({
           ? COMPETITION_UNION_LABELS[report.competitionUnion]
           : '—'}
       </Field>
+      {report.conference ? (
+        <Field label="Conference">
+          {CARD_CONFERENCE_LABELS[report.conference]}
+        </Field>
+      ) : null}
+      {report.matchFilmed != null && (
+        <Field label="Match filmed">{report.matchFilmed ? 'Yes' : 'No'}</Field>
+      )}
+      {(report.homeScore != null || report.awayScore != null) && (
+        <Field label="Score">
+          {report.homeScore ?? '—'}–{report.awayScore ?? '—'}
+        </Field>
+      )}
       {report.cards.map((c, i) => (
         <div key={c.id} className="rs-team-score-card">
           <strong>
             Card {i + 1} · {c.color === 'yellow' ? 'Yellow' : 'Red'}
           </strong>
-          <Field label="Player">{c.playerName}</Field>
+          <Field label="Player">{displayPlayerName(c)}</Field>
+          {c.playerJersey && <Field label="Jersey">{c.playerJersey}</Field>}
+          {c.playerPosition && (
+            <Field label="Position">{c.playerPosition}</Field>
+          )}
           <Field label="Team">{c.teamName}</Field>
-          <Field label="Minute">{c.minute}</Field>
-          <Field label="Reason">{c.reason}</Field>
+          <Field label="Time">{c.minute}</Field>
+          <Field label="Summary">{c.offenseSummary || c.reason}</Field>
+          {(c.lawIds ?? []).length > 0 && (
+            <Field label="Laws">
+              {(c.lawIds ?? [])
+                .filter(isCardLawId)
+                .map((id) => CARD_LAW_LABELS[id])
+                .join('; ')}
+            </Field>
+          )}
+          {c.receivedAnotherCard && c.secondOffense && (
+            <Field label="Second card">
+              {c.secondOffense.color === 'second_yellow_red'
+                ? '2nd Yellow - Red'
+                : 'Red'}{' '}
+              · {c.secondOffense.approximateTime} · {c.secondOffense.summary}
+            </Field>
+          )}
           {isAssignerView && (
             <Field label="Additional information (Scheduler only)">
               {c.additionalInfoPrivate}

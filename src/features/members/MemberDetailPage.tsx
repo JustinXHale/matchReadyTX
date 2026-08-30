@@ -56,6 +56,7 @@ import {
 import {
   subscribePublishedCoachFeedbackForOfficial,
   subscribeSubmittedCmoForOfficial,
+  setJudicialRoleCallable,
 } from '@/services/orgData';
 import { useAppBack, type BackNav } from '@/nav/backNav';
 import { MatchListRow } from '@/ui/MatchListRow';
@@ -101,6 +102,7 @@ type EditDraft = {
   roleCmo: boolean;
   roleAssigner: boolean;
   roleReportAnalytics: boolean;
+  roleJudicial: boolean;
   roleFan: boolean;
   refereeLevel: string;
   levelUnknown: boolean;
@@ -150,6 +152,7 @@ function validateMemberEditDraft(
     draft.roleCmo ||
     draft.roleAssigner ||
     draft.roleReportAnalytics ||
+    draft.roleJudicial ||
     draft.roleFan;
   if (!hasRole) {
     return { message: 'Pick at least one role.', fields: ['roles'] };
@@ -161,7 +164,8 @@ function validateMemberEditDraft(
     !draft.roleTeamAdmin &&
     !draft.roleCmo &&
     !draft.roleAssigner &&
-    !draft.roleReportAnalytics;
+    !draft.roleReportAnalytics &&
+    !draft.roleJudicial;
 
   if (!fanOnly && !draft.phone.trim()) push('phone');
 
@@ -238,6 +242,7 @@ function draftFromUser(user: UserProfile): EditDraft {
     roleCmo: user.roles.includes('cmo'),
     roleAssigner: user.roles.includes('assigner'),
     roleReportAnalytics: user.roles.includes('reportAnalytics'),
+    roleJudicial: user.roles.includes('judicial'),
     roleFan: user.roles.includes('fan'),
     refereeLevel: user.refereeLevel != null ? String(user.refereeLevel) : '',
     levelUnknown:
@@ -262,7 +267,7 @@ export function MemberDetailPage() {
   const { userId } = useParams();
   const navigate = useNavigate();
   const location = useLocation();
-  const { state, hasAssignerRole, isAssignerView, hasInsightsAccess, dataMode, store, currentUser } =
+  const { state, hasAssignerRole, isAssignerView, hasInsightsAccess, hasJudicialRole, isJudicialView, dataMode, store, currentUser } =
     useApp();
   const memberHref = useAppHref(`/about/members/${userId ?? ''}`);
   const timeZone = state.org.timezone || 'America/Chicago';
@@ -365,6 +370,7 @@ export function MemberDetailPage() {
   const [editError, setEditError] = useState<string | null>(null);
   const [editFieldErrors, setEditFieldErrors] = useState<EditFieldKey[]>([]);
   const [editErrorToast, setEditErrorToast] = useState(false);
+  const [judicialBusy, setJudicialBusy] = useState(false);
   const [availYear, setAvailYear] = useState(availNow.getFullYear());
   const [availMonth, setAvailMonth] = useState(availNow.getMonth() + 1);
   const [officialTab, setOfficialTab] = useState<'profile' | 'insights'>('profile');
@@ -486,13 +492,16 @@ export function MemberDetailPage() {
   const fanFavorite = isFan ? fanFavoriteLabel(user, state.teams) : null;
   const isSelf = currentUser?.uid === user.uid;
   const canDelete = canManage && !isSelf;
+  const canGrantJudicialOnly =
+    hasJudicialRole && isJudicialView && !canManage && !isSelf;
   const memberFanOnly =
     isFan &&
     !user.roles.includes('official') &&
     !user.roles.includes('teamAdmin') &&
     !user.roles.includes('cmo') &&
     !user.roles.includes('assigner') &&
-    !user.roles.includes('reportAnalytics');
+    !user.roles.includes('reportAnalytics') &&
+    !user.roles.includes('judicial');
   const birthdayLabel = formatBirthdayLabel(user.birthday);
 
   const editFanOnly =
@@ -502,7 +511,8 @@ export function MemberDetailPage() {
     !editDraft!.roleTeamAdmin &&
     !editDraft!.roleCmo &&
     !editDraft!.roleAssigner &&
-    !editDraft!.roleReportAnalytics;
+    !editDraft!.roleReportAnalytics &&
+    !editDraft!.roleJudicial;
 
   const onApproveRequestedLevel = () => {
     const requested = user.requestedAssessedLevel;
@@ -619,6 +629,7 @@ export function MemberDetailPage() {
     if (editDraft.roleCmo) roles.push('cmo');
     if (editDraft.roleAssigner) roles.push('assigner');
     if (editDraft.roleReportAnalytics) roles.push('reportAnalytics');
+    if (editDraft.roleJudicial) roles.push('judicial');
     if (editDraft.roleFan) roles.push('fan');
 
     const fanOnly =
@@ -627,7 +638,8 @@ export function MemberDetailPage() {
       !editDraft.roleTeamAdmin &&
       !editDraft.roleCmo &&
       !editDraft.roleAssigner &&
-      !editDraft.roleReportAnalytics;
+      !editDraft.roleReportAnalytics &&
+      !editDraft.roleJudicial;
 
     const needsRef = editDraft.roleOfficial || editDraft.roleCmo;
     let refereeLevel: number | undefined;
@@ -876,6 +888,47 @@ export function MemberDetailPage() {
                 {editError}
               </p>
             )}
+            {canGrantJudicialOnly && (
+              <div className="rs-stack">
+                <p className="rs-match-card__meta">
+                  {user.roles.includes('judicial')
+                    ? 'This member has Judicial access.'
+                    : 'Grant Judicial access so they can review card reports.'}
+                </p>
+                <Button
+                  variant={
+                    user.roles.includes('judicial') ? 'secondary' : 'primary'
+                  }
+                  isDisabled={judicialBusy}
+                  onClick={async () => {
+                    const grant = !user.roles.includes('judicial');
+                    setJudicialBusy(true);
+                    setEditError(null);
+                    try {
+                      if (dataMode === 'live') {
+                        await setJudicialRoleCallable(user.uid, grant);
+                      }
+                      const roles = grant
+                        ? [...new Set([...user.roles, 'judicial' as const])]
+                        : user.roles.filter((r) => r !== 'judicial');
+                      store.updateProfile(user.uid, { roles });
+                    } catch (err) {
+                      setEditError(
+                        err instanceof Error
+                          ? err.message
+                          : 'Could not update Judicial access.',
+                      );
+                    } finally {
+                      setJudicialBusy(false);
+                    }
+                  }}
+                >
+                  {user.roles.includes('judicial')
+                    ? 'Revoke Judicial'
+                    : 'Grant Judicial'}
+                </Button>
+              </div>
+            )}
           </>
         ) : editDraft ? (
           <div className="rs-stack rs-member-edit">
@@ -967,6 +1020,12 @@ export function MemberDetailPage() {
                   onChange={(_, v) =>
                     patchDraft({ roleReportAnalytics: v })
                   }
+                />
+                <Checkbox
+                  id="member-role-judicial"
+                  label="Judicial"
+                  isChecked={editDraft.roleJudicial}
+                  onChange={(_, v) => patchDraft({ roleJudicial: v })}
                 />
               </div>
             </FormGroup>

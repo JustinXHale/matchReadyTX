@@ -14,7 +14,7 @@ import {
   useApp,
 } from '@/app/AppContext';
 import { MobileShell } from '@/app/MobileShell';
-import { RequireAuth, RequireProfileIncomplete, RequireMembersAccess, RequireInsightsAccess } from '@/app/guards';
+import { RequireAuth, RequireProfileIncomplete, RequireMembersAccess, RequireInsightsAccess, RequireJudicialAccess } from '@/app/guards';
 import {
   isDemoPath,
   stripDemoPrefix,
@@ -331,6 +331,26 @@ const SchedulerTeamDetailPage = lazy(() =>
     default: m.SchedulerTeamDetailPage,
   })),
 );
+const JudicialLayout = lazy(() =>
+  import('@/features/judicial/JudicialLayout').then((m) => ({
+    default: m.JudicialLayout,
+  })),
+);
+const JudicialDashboardPage = lazy(() =>
+  import('@/features/judicial/JudicialDashboardPage').then((m) => ({
+    default: m.JudicialDashboardPage,
+  })),
+);
+const JudicialCasesPage = lazy(() =>
+  import('@/features/judicial/JudicialCasesPage').then((m) => ({
+    default: m.JudicialCasesPage,
+  })),
+);
+const JudicialCaseDetailPage = lazy(() =>
+  import('@/features/judicial/JudicialCaseDetailPage').then((m) => ({
+    default: m.JudicialCaseDetailPage,
+  })),
+);
 
 /** Demo-aware absolute redirect (prefixes `/demo` while in the showcase). */
 function AppNavigate({
@@ -628,6 +648,13 @@ function FeatureRoutes() {
         path="availability"
         element={<AppNavigate to="/referee/availability" replace />}
       />
+      <Route element={<RequireJudicialAccess />}>
+        <Route path="judicial" element={<JudicialLayout />}>
+          <Route index element={<JudicialDashboardPage />} />
+          <Route path="cases" element={<JudicialCasesPage />} />
+          <Route path="cases/:incidentId" element={<JudicialCaseDetailPage />} />
+        </Route>
+      </Route>
       <Route path="profile" element={<ProfilePage />} />
       <Route path="team-admin" element={<TeamAdminLayout />}>
         <Route index element={<TeamAdminHomePage />} />

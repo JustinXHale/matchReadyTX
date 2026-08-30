@@ -53,6 +53,13 @@ import {
   cardReportDocId,
   syncPendingMatchReports,
 } from '@/domain/reports';
+import {
+  casesFromCardReport,
+  type JudicialCase,
+  type JudicialComment,
+  type JudicialDashboardSettings,
+} from '@/domain/judicial';
+import { seedDemoJudicialSeason } from '@/services/demoJudicialSeason';
 import { matchFromFixtureRequest, newAppMatchId } from '@/domain/fixtureRequests';
 import {
   coachFeedbackDocId,
@@ -349,7 +356,7 @@ function seedUsers(): UserProfile[] {
       homeLng: -97.7431,
       // One demo persona covers Scheduler, Referee/CMO, and Team Admin lenses
       // with multiple club sides (1sts + 2nds).
-      roles: ['assigner', 'official', 'teamAdmin', 'reportAnalytics'],
+      roles: ['assigner', 'official', 'teamAdmin', 'reportAnalytics', 'judicial'],
       teamIds: ['team_austin', 'team_austin_2nds'],
       profileComplete: true,
       birthday: '1988-04-12',
@@ -1414,6 +1421,9 @@ export interface AppState {
   officialAlerts: OfficialAlert[];
   matchReports: MatchReport[];
   cardReports: CardReport[];
+  judicialCases: JudicialCase[];
+  judicialComments: Record<string, JudicialComment[]>;
+  judicialSettings: JudicialDashboardSettings | null;
   /** Society coaching file notes (not CMO post-match forms). */
   coachingReports: CoachingReportStub[];
   currentUserId: string | null;
@@ -1517,7 +1527,7 @@ function seedFixtureRequests(): FixtureRequest[] {
       kickoffAt: kick.toISOString(),
       venueName: 'Austin Rugby Complex',
       venueAddress: '1001 Academy Dr, Austin, TX',
-      competition: 'Lonestar Men',
+      competition: 'Lone Star Men',
       level: 'D1',
       gender: 'men',
       notes: 'Friendly — demo fixture request',
@@ -2194,49 +2204,12 @@ function seedMatchReports(matches: Match[]): MatchReport[] {
   return syncPendingMatchReports(matches, existing, Date.now(), () => id('mr'));
 }
 
-function seedCardReports(matches: Match[]): CardReport[] {
-  const alexMo = matches.find(
-    (m) => m.id === 'm_res01' && crewPeople(m.crew.mo).some((a) => a.userId === 'u_assigner'),
-  );
-  if (!alexMo) return [];
-  const nowIso = new Date().toISOString();
-  return [
-    {
-      id: 'card_seed_alex',
-      matchId: alexMo.id,
-      officialId: 'u_assigner',
-      status: 'submitted',
-      competitionUnion: 'texas_rugby_union_club',
-      officialName: 'Alex Assigner',
-      officialEmail: 'assigner@example.com',
-      officialPhone: '+15551110001',
-      matchDate: alexMo.kickoffAt.slice(0, 10),
-      cards: [
-        {
-          id: 'ci_seed_1',
-          color: 'yellow',
-          playerName: 'Jordan Hale',
-          teamId: alexMo.homeTeamId,
-          teamName: alexMo.homeTeamName,
-          minute: '34',
-          reason: 'Repeated offside at the breakdown.',
-        },
-        {
-          id: 'ci_seed_2',
-          color: 'yellow',
-          playerName: 'Sam Ortiz',
-          teamId: alexMo.awayTeamId,
-          teamName: alexMo.awayTeamName,
-          minute: '61',
-          reason: 'High tackle — reckless but not dangerous.',
-        },
-      ],
-      additionalInfoPrivate:
-        'Away captain disputed the second yellow briefly; no further action needed. (Scheduler only)',
-      submittedAt: nowIso,
-      createdAt: nowIso,
-    },
-  ];
+function seedCardReports(_matches: Match[]): CardReport[] {
+  return seedDemoJudicialSeason().reports;
+}
+
+function seedJudicialCases(_reports: CardReport[]): JudicialCase[] {
+  return seedDemoJudicialSeason().cases;
 }
 
 function seedCoachingReports(): CoachingReportStub[] {
@@ -2359,6 +2332,9 @@ function emptyLiveQueueState(): Pick<
   | 'officialAlerts'
   | 'matchReports'
   | 'cardReports'
+  | 'judicialCases'
+  | 'judicialComments'
+  | 'judicialSettings'
   | 'coachingReports'
 > {
   return {
@@ -2375,6 +2351,9 @@ function emptyLiveQueueState(): Pick<
     officialAlerts: [],
     matchReports: [],
     cardReports: [],
+    judicialCases: [],
+    judicialComments: {},
+    judicialSettings: null,
     coachingReports: [],
   };
 }
@@ -2409,6 +2388,18 @@ function createInitialState(opts?: { seedDemoQueue?: boolean }): AppState {
         officialAlerts: seedOfficialAlerts(),
         matchReports: seedMatchReports(seeded.matches),
         cardReports: seedCardReports(seeded.matches),
+        judicialCases: seedJudicialCases(seedCardReports(seeded.matches)),
+        judicialComments: {},
+        judicialSettings: {
+          recommendations: [
+            'Player welfare education on tackle height and head contact.',
+            'Team discipline: address repeat offenders with club leadership.',
+            'Keep referee management of foul play consistent across the conference.',
+            'Track annual trends against this season’s baseline.',
+            'Maintain an independent disciplinary hearing process.',
+          ],
+          updatedAt: new Date().toISOString(),
+        },
         coachingReports: seedCoachingReports(),
       };
   return {
@@ -2654,26 +2645,79 @@ class DemoStore {
       officialEmail: input.officialEmail,
       officialPhone: input.officialPhone,
       matchDate: input.matchDate,
+      conference: input.conference,
+      matchFilmed: input.matchFilmed,
+      homeScore: input.homeScore,
+      awayScore: input.awayScore,
       cards: input.cards,
       additionalInfoPrivate: input.additionalInfoPrivate,
       submittedAt: nowIso,
       createdAt: nowIso,
     };
+    this.set((s) => {
+      const nextCases = casesFromCardReport(report, nowIso);
+      const ids = new Set(nextCases.map((c) => c.id));
+      return {
+        ...s,
+        cardReports: [
+          ...s.cardReports.filter(
+            (c) =>
+              !(
+                c.matchId === report.matchId &&
+                c.officialId === report.officialId &&
+                c.status === 'draft'
+              ),
+          ),
+          report,
+        ],
+        judicialCases: [
+          ...s.judicialCases.filter((c) => !ids.has(c.id)),
+          ...nextCases,
+        ],
+      };
+    });
+    return report;
+  }
+
+  applyLiveJudicialCases(judicialCases: JudicialCase[]): void {
+    this.set((s) => ({ ...s, judicialCases }));
+  }
+
+  applyLiveJudicialSettings(
+    judicialSettings: JudicialDashboardSettings | null,
+  ): void {
+    this.set((s) => ({ ...s, judicialSettings }));
+  }
+
+  upsertJudicialCase(next: JudicialCase): void {
     this.set((s) => ({
       ...s,
-      cardReports: [
-        ...s.cardReports.filter(
-          (c) =>
-            !(
-              c.matchId === report.matchId &&
-              c.officialId === report.officialId &&
-              c.status === 'draft'
-            ),
-        ),
-        report,
+      judicialCases: [
+        ...s.judicialCases.filter((c) => c.id !== next.id),
+        next,
       ],
     }));
-    return report;
+  }
+
+  addJudicialComment(caseId: string, comment: JudicialComment): void {
+    this.set((s) => ({
+      ...s,
+      judicialComments: {
+        ...s.judicialComments,
+        [caseId]: [...(s.judicialComments[caseId] ?? []), comment],
+      },
+    }));
+  }
+
+  setJudicialComments(caseId: string, comments: JudicialComment[]): void {
+    this.set((s) => ({
+      ...s,
+      judicialComments: { ...s.judicialComments, [caseId]: comments },
+    }));
+  }
+
+  saveJudicialSettings(settings: JudicialDashboardSettings): void {
+    this.set((s) => ({ ...s, judicialSettings: settings }));
   }
 
   private notify(
@@ -2847,6 +2891,9 @@ class DemoStore {
         coachFeedback: s.coachFeedback,
         matchReports: s.matchReports,
         cardReports: s.cardReports,
+        judicialCases: s.judicialCases,
+        judicialComments: s.judicialComments,
+        judicialSettings: s.judicialSettings,
         coachingReports: s.coachingReports,
         officialAlerts: [],
         notifications: [],

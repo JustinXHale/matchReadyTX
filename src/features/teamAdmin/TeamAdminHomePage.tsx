@@ -14,6 +14,7 @@ import {
 } from '@/domain/types';
 import { GlobalDivisionFilters } from '@/features/global/GlobalDivisionFilters';
 import { divisionFilterOptionsFromMatches, matchOnCalendarDate, uniqueMatchCalendarDates } from '@/domain/divisionFilters';
+import { matchInCompetition } from '@/domain/competitions';
 import { formatMatchKickoff, formatMatchMonthLabel, matchMonthKey, orgTimeZone } from '@/domain/matchTime';
 import { TeamLinkRequestQueue } from '@/features/scheduler/queues/TeamLinkRequestQueue';
 import { TeamAdminMatchRow } from '@/features/teamAdmin/TeamAdminMatchRow';
@@ -134,7 +135,7 @@ export function TeamAdminHomePage() {
         }
         if (genderFilter && match.gender !== genderFilter) continue;
         if (levelFilter && match.level !== levelFilter) continue;
-        if (competitionFilter && match.competition !== competitionFilter) {
+        if (!matchInCompetition(match, competitionFilter)) {
           continue;
         }
         if (!matchOnCalendarDate(match, dateFilter)) continue;
@@ -184,7 +185,7 @@ export function TeamAdminHomePage() {
         }
         if (genderFilter && match.gender !== genderFilter) continue;
         if (levelFilter && match.level !== levelFilter) continue;
-        if (competitionFilter && match.competition !== competitionFilter) {
+        if (!matchInCompetition(match, competitionFilter)) {
           continue;
         }
         const hasPendingProposal = Boolean(pendingByMatch.get(match.id));

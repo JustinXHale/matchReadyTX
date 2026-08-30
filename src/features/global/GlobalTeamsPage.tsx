@@ -4,6 +4,7 @@ import { Link } from 'react-router-dom';
 import { useApp } from '@/app/AppContext';
 import { releasedMatches } from '@/domain/visibility';
 import { divisionFilterOptionsFromMatches } from '@/domain/divisionFilters';
+import { competitionsEqual, displayCompetitionLabel } from '@/domain/competitions';
 import { formatTeamAddress } from '@/domain/teams';
 import {
   genderLabel,
@@ -63,8 +64,11 @@ export function GlobalTeamsPage() {
         }
         entry.matchCount += 1;
         if (!entry.genders.includes(m.gender)) entry.genders.push(m.gender);
-        if (m.competition && !entry.competitions.includes(m.competition)) {
-          entry.competitions.push(m.competition);
+        if (m.competition) {
+          const label = displayCompetitionLabel(m.competition);
+          if (label && !entry.competitions.some((c) => competitionsEqual(c, label))) {
+            entry.competitions.push(label);
+          }
         }
       }
     }
@@ -73,7 +77,7 @@ export function GlobalTeamsPage() {
       .filter((item) => {
         if (
           competitionFilter &&
-          !item.competitions.includes(competitionFilter)
+          !item.competitions.some((c) => competitionsEqual(c, competitionFilter))
         ) {
           return false;
         }

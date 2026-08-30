@@ -10,6 +10,7 @@ import {
   TextArea,
 } from '@patternfly/react-core';
 import type { FixtureRequest } from '@/domain/types';
+import { displayCompetitionLabel } from '@/domain/competitions';
 import { useApp } from '@/app/AppContext';
 import { formatMatchKickoff, orgTimeZone } from '@/domain/matchTime';
 
@@ -55,7 +56,10 @@ export function FixtureRequestQueue({
                 <p className="rs-match-card__meta">{r.venueAddress}</p>
                 <p className="rs-match-card__meta">
                   {r.level}
-                  {r.competition ? ` · ${r.competition}` : ''} · {r.gender}
+                  {r.competition
+                    ? ` · ${displayCompetitionLabel(r.competition)}`
+                    : ''}{' '}
+                  · {r.gender}
                   {r.flightProvided ? ' · Flight' : ''}
                   {r.housingProvided ? ' · Lodging' : ''}
                 </p>

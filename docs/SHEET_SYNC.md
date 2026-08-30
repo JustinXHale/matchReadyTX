@@ -108,7 +108,7 @@ Proposal write-back finds the row by `match_id` / `sheetRowKey` and updates date
 
 Optional tabs:
 
-- **Contacts** — `team_name`, `conference`, `name`, `email`, `phone`. Rows **without an email are skipped** (phone-only people are left out). `name` is the person (or club inbox label); `conference` helps attach contacts to the right club when names split (e.g. Lonestar Men vs Women). Tab aliases: `Contacts`, `contacts`, `teamContacts`
+- **Contacts** — `team_name`, `conference`, `name`, `email`, `phone`. Rows **without an email are skipped** (phone-only people are left out). `name` is the person (or club inbox label); `conference` helps attach contacts to the right club when names split (e.g. Lone Star Men vs Women; Sheet may still say Lonestar). Tab aliases: `Contacts`, `contacts`, `teamContacts`
 - **Locations** — `abbreviation` (+ `Name` / full team name, `Competition` / conference, optional `gender`, `address` or `Full Address`, `city`, `state`, `ZIP`). Joined on Schedule `location` + match competition (or gender) so split clubs keep distinct fields (e.g. UNT men vs women). Tab aliases: `Locations`, `locations`. Hidden Gender is fine — the API still reads the column, and gender can be inferred from Competition (`Lonestar Women` → women). Rows with `Competition` = **VENUE** are **venue-only** (secondary fields, e.g. Huns Rugby Ranch): they resolve Schedule `location` addresses but do **not** create teams in the app.
 
 Timezone for kickoff: America/Chicago (−06:00) for v1.

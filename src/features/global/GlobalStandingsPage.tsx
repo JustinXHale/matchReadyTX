@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { useApp } from '@/app/AppContext';
 import { standingsByDivision } from '@/domain/standings';
 import { divisionFilterOptionsFromMatches } from '@/domain/divisionFilters';
+import { matchInCompetition } from '@/domain/competitions';
 import type { MatchGender } from '@/domain/types';
 import { GlobalDivisionFilters } from '@/features/global/GlobalDivisionFilters';
 import { backState } from '@/nav/backNav';
@@ -36,7 +37,7 @@ export function GlobalStandingsPage() {
           (m) =>
             m.level === g.level &&
             m.gender === g.gender &&
-            m.competition === competitionFilter &&
+            matchInCompetition(m, competitionFilter) &&
             typeof m.homeScore === 'number' &&
             typeof m.awayScore === 'number',
         );

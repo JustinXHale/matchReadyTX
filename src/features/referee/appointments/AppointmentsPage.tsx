@@ -7,6 +7,7 @@ import {
   matchOnCalendarDate,
   uniqueMatchCalendarDates,
 } from '@/domain/divisionFilters';
+import { matchInCompetition } from '@/domain/competitions';
 import { applyMatchScope } from '@/domain/visibility';
 import {
   formatMatchMonthLabel,
@@ -87,7 +88,7 @@ export function AppointmentsPage() {
         pool.filter((m) => {
           if (genderFilter && m.gender !== genderFilter) return false;
           if (levelFilter && m.level !== levelFilter) return false;
-          if (competitionFilter && m.competition !== competitionFilter) {
+          if (!matchInCompetition(m, competitionFilter)) {
             return false;
           }
           return true;
@@ -101,7 +102,7 @@ export function AppointmentsPage() {
       pool.filter((m) => {
         if (genderFilter && m.gender !== genderFilter) return false;
         if (levelFilter && m.level !== levelFilter) return false;
-        if (competitionFilter && m.competition !== competitionFilter) {
+        if (!matchInCompetition(m, competitionFilter)) {
           return false;
         }
         return matchOnCalendarDate(m, dateFilter);

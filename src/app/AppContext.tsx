@@ -18,6 +18,8 @@ import {
   defaultOrgId,
   subscribeCoachFeedback,
   subscribeCardReports,
+  subscribeJudicialCases,
+  subscribeJudicialSettings,
   subscribeLiveOrg,
   subscribeLiveTeams,
   subscribeMatchReports,
@@ -36,20 +38,27 @@ import { withDemoPrefix } from '@/app/demoPaths';
 import type { BackNav } from '@/nav/backNav';
 
 /** Header role switcher — Referee/CMO combined (Q-R6 locked). Team Admin = club lens. */
-export type RoleView = 'referee' | 'teamAdmin' | 'scheduler' | 'fan';
+export type RoleView = 'referee' | 'teamAdmin' | 'scheduler' | 'fan' | 'judicial';
 
 /** Seed showcase vs Firebase + Firestore. Independent of Auth when on `/demo`. */
 export type DataMode = 'demo' | 'live';
 
 const ROLE_VIEW_KEY = 'rs-role-view';
 const DATA_MODE_KEY = 'rs-data-mode';
-const ROLE_VIEWS: RoleView[] = ['referee', 'teamAdmin', 'scheduler', 'fan'];
+const ROLE_VIEWS: RoleView[] = [
+  'referee',
+  'teamAdmin',
+  'scheduler',
+  'fan',
+  'judicial',
+];
 
 export const ROLE_VIEW_LABELS: Record<RoleView, string> = {
   referee: 'Referee/CMO',
   teamAdmin: 'Team Admin',
   scheduler: 'Scheduler',
   fan: 'Fan',
+  judicial: 'Judicial',
 };
 
 /** Lenses the user may enter from their domain roles. Scheduler = assigner only. */
@@ -59,6 +68,7 @@ export function lensesForUser(user: UserProfile | null): RoleView[] {
   if (hasRefereeLensRole(user.roles)) out.push('referee');
   if (shouldShowTeamAdminLens(user)) out.push('teamAdmin');
   if (user.roles.includes('assigner')) out.push('scheduler');
+  if (user.roles.includes('judicial')) out.push('judicial');
   if (user.roles.includes('fan') || shouldShowPendingFanBrowse(user)) {
     out.push('fan');
   }
@@ -96,6 +106,7 @@ interface AppContextValue {
   store: typeof demoStore;
   hasAssignerRole: boolean;
   hasReportAnalyticsRole: boolean;
+  hasJudicialRole: boolean;
   /** Insights tab + routes — Scheduler (assigner) or delegated reportAnalytics. */
   hasInsightsAccess: boolean;
   hasOfficialRole: boolean;
@@ -119,6 +130,7 @@ interface AppContextValue {
   isOfficialView: boolean;
   /** Fan browse lens (League schedule). */
   isFanView: boolean;
+  isJudicialView: boolean;
   /** Firebase Auth first callback finished (avoid login bounce on refresh). */
   authReady: boolean;
 }
@@ -189,6 +201,7 @@ export function defaultRoleView(user: UserProfile | null): RoleView {
   if (hasRefereeLensRole(user.roles)) return 'referee';
   if (shouldShowTeamAdminLens(user)) return 'teamAdmin';
   if (user.roles.includes('assigner')) return 'scheduler';
+  if (user.roles.includes('judicial')) return 'judicial';
   if (user.roles.includes('fan') || shouldShowPendingFanBrowse(user)) {
     return 'fan';
   }
@@ -201,6 +214,7 @@ export const ROLE_HOME: Record<RoleView, string> = {
   teamAdmin: '/team-admin',
   scheduler: '/scheduler',
   fan: '/global/schedule/upcoming',
+  judicial: '/judicial',
 };
 
 /** Labeled back target for the active role home (detail-screen fallback). */
@@ -483,7 +497,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
     const me = state.users.find((u) => u.uid === uid);
     if (!me) return;
     const isGlobal =
-      me.roles.includes('assigner') || me.roles.includes('reportAnalytics');
+      me.roles.includes('assigner') ||
+      me.roles.includes('reportAnalytics') ||
+      me.roles.includes('judicial');
     const canRead =
       isGlobal ||
       hasRefereeLensRole(me.roles) ||
@@ -514,6 +530,46 @@ export function AppProvider({ children }: { children: ReactNode }) {
     return () => {
       unsubMatch();
       unsubCard();
+    };
+  }, [
+    dataMode,
+    state.currentUserId,
+    state.users.find((u) => u.uid === state.currentUserId)?.roles.join(','),
+  ]);
+
+  /** Judicial cases + dashboard settings — assigner or judicial. */
+  useEffect(() => {
+    if (!isFirebaseConfigured) return;
+    if (dataMode !== 'live') return;
+    const uid = state.currentUserId;
+    if (!uid || uid.startsWith('u_')) return;
+    const me = state.users.find((u) => u.uid === uid);
+    if (!me) return;
+    if (!me.roles.includes('assigner') && !me.roles.includes('judicial')) {
+      return;
+    }
+    const orgId = defaultOrgId();
+    const unsubCases = subscribeJudicialCases(
+      orgId,
+      (cases) => {
+        if (dataModeRef.current !== 'live') return;
+        demoStore.applyLiveJudicialCases(cases);
+        setState(demoStore.getState());
+      },
+      (err) => console.error('Judicial cases subscription failed', err),
+    );
+    const unsubSettings = subscribeJudicialSettings(
+      orgId,
+      (settings) => {
+        if (dataModeRef.current !== 'live') return;
+        demoStore.applyLiveJudicialSettings(settings);
+        setState(demoStore.getState());
+      },
+      (err) => console.error('Judicial settings subscription failed', err),
+    );
+    return () => {
+      unsubCases();
+      unsubSettings();
     };
   }, [
     dataMode,
@@ -602,6 +658,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const hasReportAnalyticsRole = Boolean(
     currentUser?.roles.includes('reportAnalytics'),
   );
+  const hasJudicialRole = Boolean(currentUser?.roles.includes('judicial'));
   const hasInsightsAccess = hasAssignerRole || hasReportAnalyticsRole;
   const hasOfficialRole = Boolean(
     currentUser && hasRefereeLensRole(currentUser.roles),
@@ -636,6 +693,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const isAssignerView = isSchedulerView;
   const isOfficialView = isRefereeView;
   const isFanView = roleView === 'fan';
+  const isJudicialView = roleView === 'judicial';
 
   const value = useMemo(
     () => ({
@@ -657,6 +715,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       store: demoStore,
       hasAssignerRole,
       hasReportAnalyticsRole,
+      hasJudicialRole,
       hasInsightsAccess,
       hasOfficialRole,
       hasTeamAdminRole,
@@ -671,6 +730,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       isAssignerView,
       isOfficialView,
       isFanView,
+      isJudicialView,
       authReady,
     }),
     [
@@ -690,6 +750,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       signOut,
       hasAssignerRole,
       hasReportAnalyticsRole,
+      hasJudicialRole,
       hasInsightsAccess,
       hasOfficialRole,
       hasTeamAdminRole,
@@ -704,6 +765,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       isAssignerView,
       isOfficialView,
       isFanView,
+      isJudicialView,
       authReady,
     ],
   );

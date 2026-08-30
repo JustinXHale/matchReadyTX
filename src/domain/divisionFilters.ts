@@ -1,4 +1,8 @@
 import type { FixtureRequest, Match, MatchGender } from './types';
+import {
+  matchInCompetition,
+  uniqueDisplayedCompetitions,
+} from './competitions';
 
 export type DivisionFilterOptions = {
   genders: MatchGender[];
@@ -40,7 +44,7 @@ function optionsFromMatches(matches: Match[]): DivisionFilterOptions {
   return {
     genders: (['men', 'women'] as MatchGender[]).filter((g) => genders.has(g)),
     levels: sortedUnique(levels),
-    competitions: sortedUnique(competitions),
+    competitions: uniqueDisplayedCompetitions(competitions),
   };
 }
 
@@ -52,7 +56,7 @@ export function divisionFilterOptionsFromMatches(
   const all = optionsFromMatches(matches);
   if (!competitionFilter) return all;
   const scoped = optionsFromMatches(
-    matches.filter((m) => m.competition === competitionFilter),
+    matches.filter((m) => matchInCompetition(m, competitionFilter)),
   );
   return {
     competitions: all.competitions,
@@ -169,7 +173,7 @@ function genderFromCompetitionName(name: string): MatchGender | null {
   return null;
 }
 
-/** Competitions like Lonestar Women / Lonestar Men encode gender in the name. */
+/** Competitions like Lone Star Women / Lone Star Men encode gender in the name. */
 export function competitionsEncodeGender(competitions: string[]): boolean {
   if (competitions.length === 0) return false;
   return competitions.every((c) => genderFromCompetitionName(c) != null);
@@ -183,7 +187,7 @@ export function matchMatchesDivisionFilters(
 ): boolean {
   if (genderFilter && match.gender !== genderFilter) return false;
   if (levelFilter && match.level !== levelFilter) return false;
-  if (competitionFilter && match.competition !== competitionFilter) return false;
+  if (!matchInCompetition(match, competitionFilter)) return false;
   return true;
 }
 
@@ -195,6 +199,8 @@ export function fixtureMatchesDivisionFilters(
 ): boolean {
   if (genderFilter && req.gender !== genderFilter) return false;
   if (levelFilter && req.level !== levelFilter) return false;
-  if (competitionFilter && req.competition !== competitionFilter) return false;
+  if (!matchInCompetition({ competition: req.competition }, competitionFilter)) {
+    return false;
+  }
   return true;
 }

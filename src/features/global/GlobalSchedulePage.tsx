@@ -4,6 +4,7 @@ import { Navigate, useParams } from 'react-router-dom';
 import { useApp, useAppHref } from '@/app/AppContext';
 import { isKickoffUpcoming } from '@/domain/requests';
 import { divisionFilterOptionsFromMatches, matchOnCalendarDate, uniqueMatchCalendarDates } from '@/domain/divisionFilters';
+import { matchInCompetition } from '@/domain/competitions';
 import { isTeamMatch, releasedMatches } from '@/domain/visibility';
 import { MatchListRow } from '@/ui/MatchListRow';
 import { MatchCrewTrailing } from '@/ui/MatchCrewTrailing';
@@ -76,7 +77,7 @@ export function GlobalSchedulePage() {
       .filter((m) => {
         if (genderFilter && m.gender !== genderFilter) return false;
         if (levelFilter && m.level !== levelFilter) return false;
-        if (competitionFilter && m.competition !== competitionFilter) {
+        if (!matchInCompetition(m, competitionFilter)) {
           return false;
         }
         if (!matchOnCalendarDate(m, dateFilter)) return false;
@@ -108,7 +109,7 @@ export function GlobalSchedulePage() {
         paneMatches.filter((m) => {
           if (genderFilter && m.gender !== genderFilter) return false;
           if (levelFilter && m.level !== levelFilter) return false;
-          if (competitionFilter && m.competition !== competitionFilter) {
+          if (!matchInCompetition(m, competitionFilter)) {
             return false;
           }
           if (myTeamsOnly && fanFavorites && fanFavorites.length > 0) {

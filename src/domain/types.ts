@@ -6,7 +6,8 @@ export type Role =
   | 'official'
   | 'cmo'
   | 'fan'
-  | 'reportAnalytics';
+  | 'reportAnalytics'
+  | 'judicial';
 
 /** Society assessed grade range (scheduler-set; members may request within same range). */
 export const ASSESSED_LEVEL_MIN = 1;
@@ -154,8 +155,8 @@ export const DEFAULT_MATCH_LEVELS = [
 ] as const;
 
 export const DEFAULT_COMPETITIONS = [
-  'Lonestar Women',
-  'Lonestar Men',
+  'Lone Star Women',
+  'Lone Star Men',
 ] as const;
 
 export interface ChangeProposal {
@@ -370,7 +371,7 @@ export interface OrgSettings {
   matchLevels: string[];
   /** Default crew roles per competition level (Scheduler → Queues → Crew). */
   defaultCrewByLevel?: Record<string, { roles: RequestableSlot[] }>;
-  /** Admin-managed competition list (e.g. Lonestar Women / Lonestar Men). */
+  /** Admin-managed competition list (e.g. Lone Star Women / Lone Star Men). */
   competitions: string[];
   sheetId?: string;
   sheetSyncedAt?: string;
@@ -387,7 +388,7 @@ export type TeamContactPerson = {
 export interface Team {
   id: string;
   name: string;
-  /** Optional conference/competition label from sync (e.g. Lonestar Men). */
+  /** Optional conference/competition label from sync (e.g. Lone Star Men). */
   competition?: string;
   /** Schedule / Locations abbreviation (e.g. UNT). */
   abbreviation?: string;

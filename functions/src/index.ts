@@ -18,6 +18,7 @@ import {
   runReviewTeamLinkRequest,
   runSubmitTeamLinkRequests,
 } from './teamLinkRequests';
+import { setJudicialRole } from './setJudicialRole';
 import {
   MATCH_SELF_SERVICE_ACTIONS,
   runMatchSelfService,
@@ -680,6 +681,8 @@ export const sendTestEmail = onCall(async (request) => {
   });
   return { ok: true, mailId, to: email };
 });
+
+export { setJudicialRole };
 
 /**
  * Assigner-only: remove a member from the org and delete their Firebase Auth
