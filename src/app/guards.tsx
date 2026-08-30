@@ -39,7 +39,7 @@ export function RequireProfileIncomplete() {
   return <Outlet />;
 }
 
-/** Insights tab — Scheduler (assigner) or delegated reportAnalytics role. */
+/** Insights tab — Scheduler, CMO, or delegated reportAnalytics role. */
 export function RequireInsightsAccess() {
   const { hasInsightsAccess, dataMode } = useApp();
   if (!hasInsightsAccess) {

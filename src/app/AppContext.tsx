@@ -29,7 +29,11 @@ import {
   defaultOrgId as availOrgId,
   subscribeUsersAvailability,
 } from '@/services/availability';
-import { hasRefereeLensRole, type UserProfile } from '@/domain/types';
+import {
+  hasInsightsAccessRole,
+  hasRefereeLensRole,
+  type UserProfile,
+} from '@/domain/types';
 import {
   shouldShowPendingFanBrowse,
   shouldShowTeamAdminLens,
@@ -107,7 +111,7 @@ interface AppContextValue {
   hasAssignerRole: boolean;
   hasReportAnalyticsRole: boolean;
   hasJudicialRole: boolean;
-  /** Insights tab + routes — Scheduler (assigner) or delegated reportAnalytics. */
+  /** Insights tab + routes — Scheduler, CMO, or delegated reportAnalytics. */
   hasInsightsAccess: boolean;
   hasOfficialRole: boolean;
   hasTeamAdminRole: boolean;
@@ -453,7 +457,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }
   }, [liveProfile?.uid]);
 
-  /** Coach feedback — assigner sees all; Team Admins see club-owned reports. */
+  /** Coach feedback — Insights readers see all; Team Admins see club-owned reports. */
   useEffect(() => {
     if (!isFirebaseConfigured) return;
     if (dataMode !== 'live') return;
@@ -461,9 +465,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     if (!uid || uid.startsWith('u_')) return;
     const me = state.users.find((u) => u.uid === uid);
     if (!me) return;
-    const isAssigner = me.roles.includes('assigner');
-    const isGlobal =
-      isAssigner || me.roles.includes('reportAnalytics');
+    const isGlobal = hasInsightsAccessRole(me.roles);
     const canRead =
       isGlobal || me.roles.includes('teamAdmin');
     if (!canRead) return;
@@ -496,20 +498,22 @@ export function AppProvider({ children }: { children: ReactNode }) {
     if (!uid || uid.startsWith('u_')) return;
     const me = state.users.find((u) => u.uid === uid);
     if (!me) return;
-    const isGlobal =
+    const isMatchReportsGlobal =
+      hasInsightsAccessRole(me.roles) || me.roles.includes('judicial');
+    const isCardReportsGlobal =
       me.roles.includes('assigner') ||
       me.roles.includes('reportAnalytics') ||
       me.roles.includes('judicial');
     const canRead =
-      isGlobal ||
-      hasRefereeLensRole(me.roles) ||
-      me.roles.includes('cmo');
+      isMatchReportsGlobal ||
+      isCardReportsGlobal ||
+      hasRefereeLensRole(me.roles);
     if (!canRead) return;
 
     const orgId = defaultOrgId();
     const unsubMatch = subscribeMatchReports(
       orgId,
-      { isGlobal, uid },
+      { isGlobal: isMatchReportsGlobal, uid },
       (reports) => {
         if (dataModeRef.current !== 'live') return;
         demoStore.applyLiveMatchReports(reports);
@@ -519,7 +523,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     );
     const unsubCard = subscribeCardReports(
       orgId,
-      { isGlobal, uid },
+      { isGlobal: isCardReportsGlobal, uid },
       (reports) => {
         if (dataModeRef.current !== 'live') return;
         demoStore.applyLiveCardReports(reports);
@@ -659,7 +663,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     currentUser?.roles.includes('reportAnalytics'),
   );
   const hasJudicialRole = Boolean(currentUser?.roles.includes('judicial'));
-  const hasInsightsAccess = hasAssignerRole || hasReportAnalyticsRole;
+  const hasInsightsAccess = hasInsightsAccessRole(currentUser?.roles ?? []);
   const hasOfficialRole = Boolean(
     currentUser && hasRefereeLensRole(currentUser.roles),
   );

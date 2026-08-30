@@ -1,5 +1,9 @@
 import type { Role, UserProfile } from './types';
-import { displayNameFromParts, hasRefereeLensRole } from './types';
+import {
+  displayNameFromParts,
+  hasInsightsAccessRole,
+  hasRefereeLensRole,
+} from './types';
 
 const PHOTO_MAX_BYTES = 5 * 1024 * 1024;
 const PHOTO_MIME = new Set(['image/jpeg', 'image/png', 'image/webp']);
@@ -233,4 +237,4 @@ export function readFileAsDataUrl(file: File): Promise<string> {
   });
 }
 
-export { displayNameFromParts, hasRefereeLensRole };
+export { displayNameFromParts, hasInsightsAccessRole, hasRefereeLensRole };

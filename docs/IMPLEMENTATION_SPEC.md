@@ -162,10 +162,11 @@ mail/{mailId}   // outbound queue — Admin SDK only; see docs/EMAIL.md
 - Team admins: read matches for their teams; write confirmations/proposals for those matches; **cannot** read crew `userId`/PII until match status ≥ `mo_confirmed` (or field `crewVisibleToTeams`).
 - Officials: read own assignments + open requestable matches (facts + economics); write own confirm/availability/requests.
 - Assigner: full org read/write for scheduling.
-- **Coach feedback** (`coachFeedback`): assigner and `reportAnalytics` read all; Team Admins read/update when `reportingTeamId` is in their `teamIds` (club-owned, one doc per match×side). Org members may read a **submitted** report only when the Scheduler has set `publicOnProfile == true` (shown on the official’s profile; submitter phone/email stay off that view). Create/update binds match facts via `get(matches/…)` (home/away, kickoff, crew-visible status) and requires doc id `matchId_reportingTeamId`. Team Admin writes must not change `publicOnProfile`. Assigners may update only `publicOnProfile` + `updatedAt` on a submitted report.
-- **Match reports** (`matchReports`): filer (`officialId`) read/write own; assigner and `reportAnalytics` read all; MO may read CMO reports where `subjectOfficialId == auth.uid`. Any org member may read **submitted CMO** reports (`slot == 'cmo'`, `status == 'submitted'`) for public profile write-ups. Pending MO/AR/CMO and all card reports stay private. Pending create + submit with shape validation; assigner delete.
-- **Card reports** (`cardReports`): filer MO read/write own after kickoff; assigner, `reportAnalytics`, and `judicial` read all; assigner delete.
-- **`reportAnalytics` role:** Scheduler grants on member profile only (not self-assignable, not in onboarding). Enables Insights bottom-nav tab and global read of coach feedback + reports.
+- **Coach feedback** (`coachFeedback`): assigner, CMO, and `reportAnalytics` read all; Team Admins read/update when `reportingTeamId` is in their `teamIds` (club-owned, one doc per match×side). Org members may read a **submitted** report only when the Scheduler has set `publicOnProfile == true` (shown on the official’s profile; submitter phone/email stay off that view). Create/update binds match facts via `get(matches/…)` (home/away, kickoff, crew-visible status) and requires doc id `matchId_reportingTeamId`. Team Admin writes must not change `publicOnProfile`. Assigners may update only `publicOnProfile` + `updatedAt` on a submitted report.
+- **Match reports** (`matchReports`): filer (`officialId`) read/write own; assigner, CMO, and `reportAnalytics` read all; MO may read CMO reports where `subjectOfficialId == auth.uid`. Any org member may read **submitted CMO** reports (`slot == 'cmo'`, `status == 'submitted'`) for public profile write-ups. Pending MO/AR/CMO and all card reports stay private to non-Insights readers. Pending create + submit with shape validation; assigner delete.
+- **Card reports** (`cardReports`): filer MO read/write own after kickoff; assigner, `reportAnalytics`, and `judicial` read all; assigner delete. CMO does not get global card-report read.
+- **`reportAnalytics` role:** Scheduler grants on member profile only (not self-assignable, not in onboarding). Enables Insights for people who are not CMOs. CMO is self-selectable on profile/onboarding and also enables Insights + global read of coach feedback + match reports.
+- **`cmo` role:** Self-selectable on profile and onboarding. Unlocks Referee/CMO lens tools and the Insights tab.
 - **`judicial` role:** Scheduler or existing Judicial grants (Members checkbox for assigner; `setJudicialRole` callable for Judicial-only). Not self-assignable. Unlocks Judicial lens: dashboard, cases, comments, rulings. Phone required. Cases and comments are assigner/judicial only — not visible to the filing referee, teams, or Insights. Filing MOs may **create** `judicialCases` for their own submitted card report (recorded/pending only); rulings are assigner/judicial updates.
 
 ---
@@ -196,7 +197,7 @@ mail/{mailId}   // outbound queue — Admin SDK only; see docs/EMAIL.md
 | `/scheduler/schedule` | All-org match browse |
 | `/scheduler/feedback` | Coach feedback inbox (assigner-only) |
 | `/scheduler/feedback/:id` | Feedback detail |
-| `/insights` | Insights overview (reportAnalytics) — pyramid + global stats |
+| `/insights` | Insights overview (assigner / CMO / reportAnalytics) — pyramid + global stats |
 | `/insights/coach-feedback` | All submitted coach feedback |
 | `/insights/coach-feedback/:id` | Feedback detail (read-only) |
 | `/insights/cmo-reports` | Submitted CMO coaching reports |
@@ -206,7 +207,7 @@ mail/{mailId}   // outbound queue — Admin SDK only; see docs/EMAIL.md
 | `/judicial/cases/:incidentId` | Case detail, comments, ruling |
 | `/matches/:id` | Canonical match detail |
 
-**Bottom nav (by lens):** About · (Referee/CMO \| Team Admin \| Scheduler \| Judicial home) · Global (except Judicial lens) · **Insights** (when assigner/`reportAnalytics`) · Profile — Members lives under Info sub-nav for all lenses.  
+**Bottom nav (by lens):** About · (Referee/CMO \| Team Admin \| Scheduler \| Judicial home) · Global (except Judicial lens) · **Insights** (when assigner / CMO / `reportAnalytics`) · Profile — Members lives under Info sub-nav for all lenses.  
 
 **Judicial top tabs:** Dashboard · Cases.  
 

@@ -33,7 +33,7 @@ import {
   releaseMatch,
 } from '@/domain/matchTransitions';
 import { assignOfficial, confirmOfficialSlot, markUnavailableAndRelease } from '@/domain/crew';
-import { emptyCrew, crewBlocks, crewPeople, emptyCrewBlocks, emptyAssignment, isCrewVisibleToTeams, type Match, type OrgSettings, type Team, type UserProfile, type RequestableSlot } from '@/domain/types';
+import { emptyCrew, crewBlocks, crewPeople, emptyCrewBlocks, emptyAssignment, hasInsightsAccessRole, isCrewVisibleToTeams, type Match, type OrgSettings, type Team, type UserProfile, type RequestableSlot } from '@/domain/types';
 import {
   matchFromFixtureRequest,
   newAppMatchId,
@@ -675,6 +675,18 @@ describe('profile helpers', () => {
         true,
       ).roleFan,
     ).toBe(false);
+  });
+});
+
+describe('hasInsightsAccessRole', () => {
+  it('grants Insights to assigner, CMO, and delegated reportAnalytics', () => {
+    expect(hasInsightsAccessRole(['cmo'])).toBe(true);
+    expect(hasInsightsAccessRole(['official', 'cmo'])).toBe(true);
+    expect(hasInsightsAccessRole(['assigner'])).toBe(true);
+    expect(hasInsightsAccessRole(['reportAnalytics'])).toBe(true);
+    expect(hasInsightsAccessRole(['official'])).toBe(false);
+    expect(hasInsightsAccessRole(['teamAdmin'])).toBe(false);
+    expect(hasInsightsAccessRole(['fan'])).toBe(false);
   });
 });
 

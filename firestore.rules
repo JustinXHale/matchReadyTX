@@ -20,6 +20,10 @@ service cloud.firestore {
       return isMember(orgId)
         && 'reportAnalytics' in get(/databases/$(database)/documents/orgs/$(orgId)/members/$(request.auth.uid)).data.roles;
     }
+    function isCmo(orgId) {
+      return isMember(orgId)
+        && 'cmo' in get(/databases/$(database)/documents/orgs/$(orgId)/members/$(request.auth.uid)).data.roles;
+    }
     function isJudicial(orgId) {
       return isMember(orgId)
         && 'judicial' in get(/databases/$(database)/documents/orgs/$(orgId)/members/$(request.auth.uid)).data.roles;
@@ -28,6 +32,10 @@ service cloud.firestore {
       return onboardingComplete()
         && exists(/databases/$(database)/documents/orgs/$(orgId)/members/$(request.auth.uid))
         && 'assigner' in get(/databases/$(database)/documents/orgs/$(orgId)/members/$(request.auth.uid)).data.roles;
+    }
+    /** Insights tab readers: assigner, delegated reportAnalytics, or self-listed CMO. */
+    function canReadInsights(orgId) {
+      return isAssigner(orgId) || isReportAnalytics(orgId) || isCmo(orgId);
     }
     function isOrgMember(orgId, uid) {
       return exists(/databases/$(database)/documents/orgs/$(orgId)/members/$(uid));
@@ -459,8 +467,7 @@ service cloud.firestore {
             || request.resource.data.publicOnProfile == false
           );
         }
-        allow read: if isAssigner(orgId)
-          || isReportAnalytics(orgId)
+        allow read: if canReadInsights(orgId)
           || canReadClubFeedback()
           || canReadPublishedFeedback();
         allow create: if signedIn()
@@ -501,8 +508,7 @@ service cloud.firestore {
         function canReadMatchReport() {
           return isMember(orgId)
             && (
-              isAssigner(orgId)
-              || isReportAnalytics(orgId)
+              canReadInsights(orgId)
               || resource.data.officialId == request.auth.uid
               || resource.data.get('subjectOfficialId', '') == request.auth.uid
               || (

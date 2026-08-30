@@ -625,7 +625,7 @@ export function ProfilePage() {
             <HelperText>
               <HelperTextItem>
                 Fan is browse-only and cannot be combined with Referee, Team
-                Admin, or CMO.
+                Admin, or CMO. Checking CMO also unlocks the Insights tab.
               </HelperTextItem>
             </HelperText>
           </FormHelperText>

@@ -57,7 +57,7 @@ const ROLE_OPTIONS = [
   {
     id: 'cmo' as const,
     label: 'CMO',
-    description: 'Coaching Match Official',
+    description: 'Coaching Match Official — includes Insights',
   },
   {
     id: 'fan' as const,

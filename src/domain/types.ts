@@ -339,6 +339,18 @@ export function hasRefereeLensRole(roles: Role[]): boolean {
   return roles.includes('official') || roles.includes('cmo');
 }
 
+/**
+ * Insights tab + society-wide coaching/coach-feedback reads.
+ * CMO is self-selectable on profile/onboarding; reportAnalytics is Scheduler-granted.
+ */
+export function hasInsightsAccessRole(roles: Role[]): boolean {
+  return (
+    roles.includes('assigner') ||
+    roles.includes('reportAnalytics') ||
+    roles.includes('cmo')
+  );
+}
+
 export function displayNameFromParts(
   firstName: string,
   lastName: string,

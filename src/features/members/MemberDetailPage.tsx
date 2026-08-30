@@ -997,7 +997,7 @@ export function MemberDetailPage() {
                 />
                 <Checkbox
                   id="member-role-cmo"
-                  label="CMO"
+                  label="CMO (includes Insights)"
                   isChecked={editDraft.roleCmo}
                   onChange={(_, v) => patchDraft({ roleCmo: v })}
                 />
@@ -1028,6 +1028,10 @@ export function MemberDetailPage() {
                   onChange={(_, v) => patchDraft({ roleJudicial: v })}
                 />
               </div>
+              <p className="rs-match-card__meta">
+                CMO includes Insights. Use Insights access for people who are
+                not CMOs.
+              </p>
             </FormGroup>
             {editDraft.roleTeamAdmin && (
               <FormGroup

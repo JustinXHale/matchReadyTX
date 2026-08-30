@@ -2012,7 +2012,7 @@ function cardReportToFirestore(
   });
 }
 
-/** Subscribe to match reports (filer + CMO-about-me, or global for assigner/analytics). */
+/** Subscribe to match reports (filer + CMO-about-me, or global for Insights / judicial). */
 export function subscribeMatchReports(
   orgId: string,
   opts: { isGlobal: boolean; uid: string },
