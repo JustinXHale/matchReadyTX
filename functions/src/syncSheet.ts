@@ -84,26 +84,6 @@ async function readFirstTab(
   return [];
 }
 
-function sheetFactsChanged(
-  existing: DocumentData | undefined,
-  next: {
-    kickoffAt: string;
-    venueName: string;
-    venueAddress: string;
-    homeTeamName: string;
-    awayTeamName: string;
-  },
-): boolean {
-  if (!existing) return false;
-  return (
-    existing.kickoffAt !== next.kickoffAt ||
-    existing.venueName !== next.venueName ||
-    existing.venueAddress !== next.venueAddress ||
-    existing.homeTeamName !== next.homeTeamName ||
-    existing.awayTeamName !== next.awayTeamName
-  );
-}
-
 /** Firestore rejects `undefined` — omit those keys. */
 function stripUndefined<T extends Record<string, unknown>>(obj: T): T {
   const out = { ...obj };
@@ -349,7 +329,7 @@ function findTeamForContact(
 /**
  * Pull Schedule (+ optional Contacts / Locations) into Firestore.
  * Preserves workflow fields (status, crew, confirmations) on existing matches;
- * updates Sheet facts and marks needs_reconfirmation when facts change post-draft.
+ * updates Sheet facts in place (scheduler-owned — no reconfirm reset).
  */
 export async function runSheetSync(opts: {
   db: Firestore;
@@ -680,16 +660,6 @@ export async function runSheetSync(opts: {
         patch.status = 'cancelled';
         patch.cancelledAt = new Date().toISOString();
         cancelled += 1;
-      } else if (
-        !sheetCancelled &&
-        sheetFactsChanged(existing, facts) &&
-        existing?.status &&
-        existing.status !== 'draft' &&
-        existing.status !== 'cancelled'
-      ) {
-        patch.status = 'needs_reconfirmation';
-        patch.homeConfirmedAt = FieldValue.delete();
-        patch.awayConfirmedAt = FieldValue.delete();
       }
 
       setDoc(ref, patch, true);

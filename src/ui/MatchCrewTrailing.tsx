@@ -1,7 +1,7 @@
-import { Link } from 'react-router-dom';
 import type { Match } from '@/domain/types';
 import { crewColumnLines } from '@/features/referee/appointments/crewLines';
-import { backState, type BackNav } from '@/nav/backNav';
+import { CrewColumnContent } from '@/ui/CrewColumnContent';
+import type { BackNav } from '@/nav/backNav';
 
 /** Referee assignment column — used on Appointments and League Schedule. */
 export function MatchCrewTrailing({
@@ -20,25 +20,10 @@ export function MatchCrewTrailing({
   const lines = crewColumnLines(match, { highlightUserId, redactNames });
 
   return (
-    <Link
-      to={`/matches/${match.id}`}
-      state={back ? backState(back) : undefined}
-      className="rs-appt-crew rs-appt-crew-hit"
-      aria-label="Open match crew"
-      onClick={(e) => e.stopPropagation()}
-    >
-      {lines.map((line) =>
-        line.isMine ? (
-          <span key={line.id} className="rs-pill rs-appt-crew__mine">
-            {line.slotLabel} {line.value}
-          </span>
-        ) : (
-          <p key={line.id} className="rs-appt-crew__line">
-            <span className="rs-appt-crew__slot">{line.slotLabel}</span>{' '}
-            {line.value}
-          </p>
-        ),
-      )}
-    </Link>
+    <CrewColumnContent
+      lines={lines}
+      matchTo={`/matches/${match.id}`}
+      back={back}
+    />
   );
 }

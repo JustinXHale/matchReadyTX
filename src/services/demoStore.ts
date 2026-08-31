@@ -21,6 +21,7 @@ import {
   applyT72Team,
   beginChangeProposed,
   cancelMatch,
+  markNeedsReconfirmation,
   setTeamDetailsConfirmed as applyTeamDetailsConfirmed,
   enterT72,
   postponeMatch,
@@ -3662,11 +3663,13 @@ class DemoStore {
       ),
       matches: s.matches.map((m) => {
         if (m.id !== p.matchId) return m;
-        appliedMatch = applySheetFacts(m, {
-          kickoffAt: p.kickoffAt,
-          venueName: p.venueName,
-          venueAddress: p.venueAddress,
-        });
+        appliedMatch = markNeedsReconfirmation(
+          applySheetFacts(m, {
+            kickoffAt: p.kickoffAt,
+            venueName: p.venueName,
+            venueAddress: p.venueAddress,
+          }),
+        );
         return appliedMatch!;
       }),
       org: {
@@ -3774,11 +3777,13 @@ class DemoStore {
     this.set((s) => {
       const matches = s.matches.map((m) => {
         if (m.id !== p.matchId) return m;
-        return applySheetFacts(m, {
-          kickoffAt: p.kickoffAt,
-          venueName: p.venueName,
-          venueAddress: p.venueAddress,
-        });
+        return markNeedsReconfirmation(
+          applySheetFacts(m, {
+            kickoffAt: p.kickoffAt,
+            venueName: p.venueName,
+            venueAddress: p.venueAddress,
+          }),
+        );
       });
       return {
         ...s,

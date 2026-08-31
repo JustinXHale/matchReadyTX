@@ -715,6 +715,46 @@
   color: var(--rs-color-muted);
 }
 
+.rs-appt-crew__assign {
+  margin: 0;
+  width: 100%;
+  border: 0;
+  background: transparent;
+  font: inherit;
+  font-size: 11px;
+  line-height: 1.25;
+  color: var(--rs-color-charcoal);
+  text-align: center;
+  cursor: pointer;
+  padding: 1px 0;
+}
+
+.rs-appt-crew__assign:hover,
+.rs-appt-crew__assign:focus-visible {
+  background: var(--rs-color-surface-muted);
+  outline: none;
+}
+
+.rs-appt-crew a.rs-appt-crew__line {
+  display: block;
+  margin: 0;
+  width: 100%;
+  font-size: 11px;
+  line-height: 1.25;
+  color: var(--rs-color-charcoal);
+  text-align: center;
+  text-decoration: none;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.rs-appt-crew a.rs-appt-crew__line:hover,
+.rs-appt-crew a.rs-appt-crew__line:focus-visible {
+  background: var(--rs-color-surface-muted);
+  outline: none;
+}
+
 .rs-coach-feedback-trailing {
   display: flex;
   flex-direction: column;

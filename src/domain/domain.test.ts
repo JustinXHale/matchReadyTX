@@ -26,6 +26,7 @@ import {
   shouldShowTeamAdminLens,
 } from '@/domain/teamLinkRequests';
 import {
+  applySheetFacts,
   cancelMatch,
   confirmTeam,
   postponeMatch,
@@ -160,6 +161,24 @@ describe('match transitions', () => {
     const back = reactivateMatch(m);
     expect(back.status).toBe('needs_reconfirmation');
     expect(back.postponedAt).toBeUndefined();
+  });
+
+  it('applySheetFacts updates facts without clearing confirmations', () => {
+    let m = releaseMatch(baseMatch());
+    m = confirmTeam(confirmTeam(m, 'home'), 'away');
+    m = assignOfficial(m, 'mo', { uid: 'r1', displayName: 'Ref' });
+    m = confirmOfficialSlot(m, 'mo');
+    const beforeStatus = m.status;
+    const next = applySheetFacts(m, {
+      kickoffAt: '2026-09-06T14:00:00.000Z',
+      venueName: 'New Field',
+    });
+    expect(next.kickoffAt).toBe('2026-09-06T14:00:00.000Z');
+    expect(next.venueName).toBe('New Field');
+    expect(next.status).toBe(beforeStatus);
+    expect(next.homeConfirmedAt).toBe(m.homeConfirmedAt);
+    expect(next.awayConfirmedAt).toBe(m.awayConfirmedAt);
+    expect(crewPeople(next.crew.mo)[0]?.status).toBe('confirmed');
   });
 });
 
@@ -2155,6 +2174,37 @@ describe('crewColumnLines', () => {
     expect(lines.some((l) => l.slotLabel === '(2) MO' && l.value === 'Open')).toBe(
       true,
     );
+  });
+
+  it('assignableOpen keeps pending lines and marks open slots for assign', () => {
+    const m = baseMatch();
+    const pending = {
+      ...emptyAssignment('mo'),
+      userId: 'u1',
+      userName: 'Pat Ref',
+      status: 'official' as const,
+    };
+    const openMo = emptyAssignment('mo');
+    m.crew = {
+      ...emptyCrew(),
+      mo: [pending, openMo],
+      ar1: [emptyAssignment('ar1')],
+    };
+    m.rolesNeeded = ['mo', 'ar1'];
+    const lines = crewColumnLines(m, { assignableOpen: true });
+    expect(lines.some((l) => l.slotLabel === 'MO' && l.value === 'Pending')).toBe(
+      true,
+    );
+    expect(lines.some((l) => l.slotLabel === 'MO' && l.value === 'Open')).toBe(
+      true,
+    );
+    expect(lines.some((l) => l.slotLabel === 'AR1' && l.assignTarget)).toBe(
+      true,
+    );
+    const openMoLine = lines.find(
+      (l) => l.slotLabel === 'MO' && l.value === 'Open',
+    );
+    expect(openMoLine?.assignTarget?.assignmentId).toBe(openMo.id);
   });
 });
 

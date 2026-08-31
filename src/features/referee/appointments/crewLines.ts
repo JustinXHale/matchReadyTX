@@ -2,10 +2,12 @@ import {
   assignmentForUser,
   crewBlocks,
   crewPeople,
+  emptyCrewBlocks,
   rolesNeededForMatch,
   type CrewAssignment,
   type CrewSlot,
   type Match,
+  type RequestableSlot,
 } from '@/domain/types';
 
 /** Fixed display order for appointment crew column. */
@@ -102,11 +104,19 @@ export function crewValueForKey(
   return crewRoleLineLabel(match.crew[key]);
 }
 
+export type CrewColumnAssignTarget = {
+  slot: RequestableSlot;
+  assignmentId?: string;
+  cmoId?: string;
+};
+
 export type CrewColumnLine = {
   id: string;
   slotLabel: string;
   value: string;
   isMine: boolean;
+  /** Set on open lines when scheduler assign buttons are enabled. */
+  assignTarget?: CrewColumnAssignTarget;
 };
 
 /**
@@ -115,20 +125,32 @@ export type CrewColumnLine = {
  */
 export function crewColumnLines(
   match: Match,
-  opts?: { highlightUserId?: string; redactNames?: boolean },
+  opts?: {
+    highlightUserId?: string;
+    redactNames?: boolean;
+    /** Attach tap targets on open lines (scheduler schedule column). */
+    assignableOpen?: boolean;
+  },
 ): CrewColumnLine[] {
   const highlightUserId = opts?.highlightUserId;
   const redactNames = Boolean(opts?.redactNames);
+  const assignableOpen = Boolean(opts?.assignableOpen);
   const needed = new Set(rolesNeededForMatch(match));
   const lines: CrewColumnLine[] = [];
 
-  const pushOpen = (id: string, label: string, count: number) => {
+  const pushOpen = (
+    id: string,
+    label: string,
+    count: number,
+    assignTarget?: CrewColumnAssignTarget,
+  ) => {
     if (count <= 0) return;
     lines.push({
       id,
       slotLabel: count > 1 ? `(${count}) ${label}` : label,
       value: 'Open',
       isMine: false,
+      assignTarget: assignableOpen ? assignTarget : undefined,
     });
   };
 
@@ -149,8 +171,14 @@ export function crewColumnLines(
           isMine,
         });
       }
-      if (openN > 0) pushOpen('cmo-open', 'CMO', openN);
-      else if (named.length === 0) pushOpen('cmo-open', 'CMO', 1);
+      const firstOpenCmo = list.find((c) => !c.userId);
+      const cmoTarget: CrewColumnAssignTarget | undefined = firstOpenCmo
+        ? { slot: 'cmo', cmoId: firstOpenCmo.id }
+        : { slot: 'cmo' };
+      if (openN > 0) pushOpen('cmo-open', 'CMO', openN, cmoTarget);
+      else if (named.length === 0) {
+        pushOpen('cmo-open', 'CMO', 1, cmoTarget);
+      }
       continue;
     }
 
@@ -158,9 +186,14 @@ export function crewColumnLines(
     const label = crewKeyShortLabel(key);
     const blocks = crewBlocks(match.crew[key]);
     const people = blocks.filter((a) => Boolean(a.userId));
-    const openN = blocks.filter(
+    const openBlocks = blocks.filter(
       (a) => !a.userId && a.status === 'empty',
-    ).length;
+    );
+    const openN = openBlocks.length;
+    const feeTarget: CrewColumnAssignTarget | undefined =
+      openBlocks[0] != null
+        ? { slot: key, assignmentId: openBlocks[0].id }
+        : { slot: key };
 
     for (const a of people) {
       const isMine = Boolean(highlightUserId && a.userId === highlightUserId);
@@ -177,8 +210,14 @@ export function crewColumnLines(
         isMine,
       });
     }
-    if (openN > 0) pushOpen(`${key}-open`, label, openN);
-    else if (people.length === 0) pushOpen(`${key}-open`, label, 1);
+    if (openN > 0) pushOpen(`${key}-open`, label, openN, feeTarget);
+    else if (people.length === 0) {
+      const fallback = emptyCrewBlocks(match.crew[key])[0];
+      pushOpen(`${key}-open`, label, 1, {
+        slot: key,
+        assignmentId: fallback?.id,
+      });
+    }
   }
 
   return lines;

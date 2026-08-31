@@ -128,24 +128,17 @@ export function beginChangeProposed(match: Match): Match {
   };
 }
 
+/** Apply scheduler-owned Sheet facts — confirmations and crew are left as-is. */
 export function applySheetFacts(
   match: Match,
   facts: { kickoffAt?: string; venueName?: string; venueAddress?: string },
 ): Match {
-  const changed =
-    (facts.kickoffAt && facts.kickoffAt !== match.kickoffAt) ||
-    (facts.venueName && facts.venueName !== match.venueName) ||
-    (facts.venueAddress && facts.venueAddress !== match.venueAddress);
-
-  const updated = {
+  return {
     ...match,
     kickoffAt: facts.kickoffAt ?? match.kickoffAt,
     venueName: facts.venueName ?? match.venueName,
     venueAddress: facts.venueAddress ?? match.venueAddress,
   };
-
-  if (!changed || match.status === 'draft') return updated;
-  return markNeedsReconfirmation(updated);
 }
 
 export function cancelMatch(match: Match, at = new Date().toISOString()): Match {
