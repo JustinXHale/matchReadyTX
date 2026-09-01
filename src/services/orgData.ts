@@ -199,6 +199,10 @@ export function matchFromFirestore(
     level: String(data.level ?? 'Tier 1'),
     gender: data.gender === 'women' ? 'women' : 'men',
     notes: typeof data.notes === 'string' ? data.notes : undefined,
+    scheduleUrl:
+      typeof data.scheduleUrl === 'string' && data.scheduleUrl.trim()
+        ? data.scheduleUrl.trim()
+        : undefined,
     cmo: normalizeCmo(data.cmo),
     rolesNeeded: Array.isArray(data.rolesNeeded)
       ? (data.rolesNeeded as Match['rolesNeeded'])
@@ -1308,6 +1312,22 @@ function cmoForFirestore(cmo: Match['cmo']): unknown {
       userId: c.userId ?? null,
       userName: c.userName ?? null,
     }),
+  );
+}
+
+/** Persist optional tournament schedule link (assigner; live mode). */
+export async function saveMatchScheduleUrlInFirestore(
+  orgId: string,
+  matchId: string,
+  scheduleUrl?: string,
+): Promise<void> {
+  await setDoc(
+    doc(requireDb(), 'orgs', orgId, 'matches', matchId),
+    stripUndefined({
+      scheduleUrl: scheduleUrl ?? null,
+      updatedAt: new Date().toISOString(),
+    }),
+    { merge: true },
   );
 }
 

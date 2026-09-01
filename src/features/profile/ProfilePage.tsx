@@ -162,10 +162,10 @@ export function ProfilePage() {
   const requestableTeamOptions = useMemo(
     () =>
       conferenceTeamOptions(
-        state.teams,
+        sortedTeams,
         new Set(requestableTeams.map((team) => team.id)),
       ),
-    [requestableTeams, state.matches, state.teams],
+    [requestableTeams, sortedTeams],
   );
   const levelOk =
     levelUnknown ||

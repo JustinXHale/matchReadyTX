@@ -38,6 +38,7 @@ import {
   type Role,
   type UserProfile,
 } from '@/domain/types';
+import { dedupeTeamsForPicker } from '@/domain/teamList';
 import {
   conferenceTeamOptions,
   scheduleTeamEntries,
@@ -462,8 +463,8 @@ export function MemberDetailPage() {
     : undefined;
 
   const teamPickerOptions = useMemo(
-    () => conferenceTeamOptions(state.teams),
-    [state.matches, state.teams],
+    () => conferenceTeamOptions(dedupeTeamsForPicker(state.teams)),
+    [state.teams],
   );
 
   if (!user) {

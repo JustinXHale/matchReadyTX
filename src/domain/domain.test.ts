@@ -98,6 +98,7 @@ import {
 import { defaultRoleView, lensesForUser } from '@/app/AppContext';
 import { standingsByDivision } from '@/domain/standings';
 import { scheduleTeamEntries, teamContactPeople, conferenceTeamOptions } from '@/domain/teams';
+import { dedupeTeamsForPicker } from '@/domain/teamList';
 import { crewColumnLines } from '@/features/referee/appointments/crewLines';
 
 function baseMatch(): Match {
@@ -363,6 +364,29 @@ describe('crew visibility gate', () => {
       crew: {},
     });
     expect(m.matchType).toBe('2nd Side');
+  });
+
+  it('reads optional tournament schedule URL from Firestore', () => {
+    const url =
+      'https://drive.google.com/file/d/10FoWp82ciP3yyXMdnhky3BI4JQ6-wgvC/view?usp=drive_link';
+    const m = matchFromFirestore('T3090502', {
+      sheetRowKey: 'T3090502',
+      status: 'crew_pending',
+      kickoffAt: new Date().toISOString(),
+      venueName: 'Field',
+      venueAddress: 'Austin',
+      homeTeamId: 'h',
+      awayTeamId: 'a',
+      homeTeamName: 'Home',
+      awayTeamName: 'Away',
+      scheduleUrl: `  ${url}  `,
+      level: 'Tourney',
+      gender: 'men',
+      flightProvided: false,
+      housingProvided: false,
+      crew: {},
+    });
+    expect(m.scheduleUrl).toBe(url);
   });
 
   it('filters matches by local calendar date', () => {
@@ -2088,6 +2112,46 @@ describe('scheduleTeamEntries', () => {
     ];
     const ids = scheduleTeamEntries([], teams).map((e) => e.team.id);
     expect(ids).toContain('new-club');
+  });
+});
+
+describe('dedupeTeamsForPicker', () => {
+  it('collapses Lonestar / Lone Star competition aliases for the same club', () => {
+    const teams = [
+      {
+        id: 't_letu_lonestar_men',
+        name: 'LeTourneau University',
+        abbreviation: 'LETU',
+        competition: 'Lonestar Men',
+      },
+      {
+        id: 't_letu_lone_star_men',
+        name: 'LeTourneau University',
+        abbreviation: 'LETU',
+        competition: 'Lone Star Men',
+      },
+    ];
+    const out = dedupeTeamsForPicker(teams);
+    expect(out).toHaveLength(1);
+    expect(out[0]?.id).toBe('t_letu_lonestar_men');
+  });
+
+  it('keeps men and women sides separate', () => {
+    const teams = [
+      {
+        id: 't_uh_lonestar_men',
+        name: 'University of Houston',
+        abbreviation: 'UH',
+        competition: 'Lonestar Men',
+      },
+      {
+        id: 't_uh_lonestar_women',
+        name: 'University of Houston',
+        abbreviation: 'UH',
+        competition: 'Lonestar Women',
+      },
+    ];
+    expect(dedupeTeamsForPicker(teams)).toHaveLength(2);
   });
 });
 

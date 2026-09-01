@@ -1392,12 +1392,18 @@ function seedMatches(): Match[] {
     m_res02: 'Conference final',
   };
 
+  const demoScheduleUrls: Record<string, string> = {
+    m_a08:
+      'https://drive.google.com/file/d/10FoWp82ciP3yyXMdnhky3BI4JQ6-wgvC/view?usp=drive_link',
+  };
+
   return all.map((m) => ({
     ...m,
     competition: competitionForGender(m.gender),
     title: demoTitles[m.id],
     level:
       m.id === 'm_a08' || m.id === 'm_res03' ? 'Tourney' : m.level,
+    scheduleUrl: demoScheduleUrls[m.id],
   }));
 }
 
@@ -4141,6 +4147,7 @@ class DemoStore {
         | 'level'
         | 'gender'
         | 'notes'
+        | 'scheduleUrl'
         | 'cmo'
       >
     >,

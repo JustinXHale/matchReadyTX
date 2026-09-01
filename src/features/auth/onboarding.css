@@ -305,3 +305,7 @@
   color: var(--rs-color-muted);
   text-align: right;
 }
+
+.rs-onboard__team-picker {
+  margin-top: 4px;
+}

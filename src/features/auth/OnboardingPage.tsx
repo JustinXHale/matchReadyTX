@@ -19,7 +19,9 @@ import {
   validateProfilePhoto,
 } from '@/domain/profile';
 import { normalizeEmail } from '@/domain/contacts';
+import { conferenceTeamOptions } from '@/domain/teams';
 import { dedupeTeamsForPicker } from '@/domain/teamList';
+import { ConferenceTeamPicker } from '@/ui/ConferenceTeamPicker';
 import { APPAREL_SIZES, type Role } from '@/domain/types';
 import { isFirebaseConfigured } from '@/services/firebase';
 import {
@@ -188,6 +190,11 @@ export function OnboardingPage() {
         ),
       ),
     [state.teams],
+  );
+
+  const teamPickerOptions = useMemo(
+    () => conferenceTeamOptions(sortedTeams),
+    [sortedTeams],
   );
 
   const autoSelectedTeamsRef = useRef(false);
@@ -631,52 +638,19 @@ export function OnboardingPage() {
             </div>
           )}
           {step === 'teams' && (
-            <div className="rs-onboard__choices" role="group" aria-label="Teams">
-              {sortedTeams.length === 0 ? (
+            <div className="rs-onboard__team-picker">
+              {teamPickerOptions.length === 0 ? (
                 <p className="rs-onboard__hint">
                   No clubs are in the schedule yet. Ask your Scheduler to sync
                   the Sheet, then return to finish linking.
                 </p>
               ) : (
-                sortedTeams.map((t) => {
-                  const checked = selectedTeamIds.includes(t.id);
-                  return (
-                    <button
-                      key={t.id}
-                      type="button"
-                      className={`rs-onboard__choice rs-onboard__choice--multi${
-                        checked ? ' rs-onboard__choice--selected' : ''
-                      }`}
-                      aria-pressed={checked}
-                      onClick={() => {
-                        setSelectedTeamIds((prev) =>
-                          checked
-                            ? prev.filter((id) => id !== t.id)
-                            : [...prev, t.id],
-                        );
-                      }}
-                    >
-                      <span
-                        className={`rs-onboard__check${
-                          checked ? ' rs-onboard__check--on' : ''
-                        }`}
-                        aria-hidden
-                      >
-                        {checked ? (
-                          <svg viewBox="0 0 20 20" width="14" height="14">
-                            <path
-                              fill="currentColor"
-                              d="M7.6 13.2 4.4 10l-1.2 1.2 4.4 4.4L17 6.2 15.8 5z"
-                            />
-                          </svg>
-                        ) : null}
-                      </span>
-                      <span className="rs-onboard__choice-text">
-                        <strong>{t.name}</strong>
-                      </span>
-                    </button>
-                  );
-                })
+                <ConferenceTeamPicker
+                  options={teamPickerOptions}
+                  selectedIds={selectedTeamIds}
+                  onChange={setSelectedTeamIds}
+                  ariaLabel="Select clubs by conference"
+                />
               )}
             </div>
           )}
@@ -957,7 +931,7 @@ function stepCopy(
     case 'teams':
       return {
         title: 'Which clubs do you manage?',
-        hint: 'Select each side separately (e.g. Men D1 and Women are different teams). If your email is already on Contacts, you’re approved automatically; otherwise your Scheduler or a current Team Admin reviews each request.',
+        hint: 'Pick under Lone Star Men and/or Lone Star Women — each side is separate. If your email is already on Contacts, you’re approved automatically; otherwise your Scheduler or a current Team Admin reviews each request.',
       };
     case 'firstName':
       return { title: 'What’s your first name?' };

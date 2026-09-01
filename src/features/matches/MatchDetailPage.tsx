@@ -6,6 +6,7 @@ import {
   Title,
   TextArea,
   FormGroup,
+  FormHelperText,
   FormSelect,
   FormSelectOption,
   TextInput,
@@ -73,8 +74,11 @@ import {
 } from '@/domain/requests';
 import { openGroupMailto, uniqueEmails } from '@/services/mailto';
 import { persistCrewAssignmentAndEmail, persistCrewUnassignmentAndEmail, resendCrewAssignmentEmail } from '@/services/liveAssignment';
-import { defaultOrgId, createGameRequestInFirestore, patchGameRequestContentInFirestore, saveMatchCrewAssignment, callMatchSelfService } from '@/services/orgData';
+import { defaultOrgId, createGameRequestInFirestore, patchGameRequestContentInFirestore, saveMatchCrewAssignment, saveMatchScheduleUrlInFirestore, callMatchSelfService } from '@/services/orgData';
 import { isFirebaseConfigured } from '@/services/firebase';
+import {
+  validateScheduleUrlInput,
+} from '@/domain/matchScheduleUrl';
 import { backState, useAppBack } from '@/nav/backNav';
 import {
   matchDetailHeaderReportLinks,
@@ -264,12 +268,49 @@ export function MatchDetailPage() {
   const [requestEditing, setRequestEditing] = useState(true);
   const [requestToast, setRequestToast] = useState(false);
   const [selfServiceBusy, setSelfServiceBusy] = useState(false);
+  const [scheduleUrlDraft, setScheduleUrlDraft] = useState('');
+  const [scheduleUrlError, setScheduleUrlError] = useState('');
   const requestSectionRef = useRef<HTMLElement | null>(null);
   const titleRowRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     setFeeDrafts({});
   }, [id]);
+
+  useEffect(() => {
+    setScheduleUrlDraft(match?.scheduleUrl ?? '');
+    setScheduleUrlError('');
+  }, [id, match?.scheduleUrl]);
+
+  const persistScheduleUrl = useCallback(
+    (raw: string) => {
+      if (!match || !isAssignerView) return;
+      const validated = validateScheduleUrlInput(raw);
+      if (!validated.ok) {
+        setScheduleUrlError(validated.error);
+        return;
+      }
+      setScheduleUrlError('');
+      const next = validated.value;
+      if ((match.scheduleUrl ?? '') === (next ?? '')) return;
+      store.setMatchFlags(match.id, { scheduleUrl: next });
+      if (dataMode === 'live' && isFirebaseConfigured) {
+        void saveMatchScheduleUrlInFirestore(
+          defaultOrgId(),
+          match.id,
+          next,
+        ).catch((err) => {
+          console.error('saveMatchScheduleUrlInFirestore failed', err);
+          window.alert(
+            err instanceof Error
+              ? `Schedule link saved locally, but Firestore update failed: ${err.message}`
+              : 'Schedule link saved locally, but Firestore update failed.',
+          );
+        });
+      }
+    },
+    [dataMode, isAssignerView, match, store],
+  );
 
   const persistSelfServiceIfLive = useCallback(
     async (input: Parameters<typeof callMatchSelfService>[0]) => {
@@ -1663,9 +1704,23 @@ export function MatchDetailPage() {
         )}
 
       <section className="rs-detail-card" aria-labelledby="event-info-heading">
-        <h3 id="event-info-heading" className="rs-detail-section__label">
-          Event information
-        </h3>
+        <div className="rs-detail-card__head">
+          <h3 id="event-info-heading" className="rs-detail-section__label">
+            Event information
+          </h3>
+          {match.scheduleUrl ? (
+            <Button
+              variant="link"
+              isInline
+              className="rs-detail-card__action"
+              onClick={() =>
+                window.open(match.scheduleUrl, '_blank', 'noopener,noreferrer')
+              }
+            >
+              View schedule
+            </Button>
+          ) : null}
+        </div>
         <div className="rs-detail-meta">
           <div className="rs-detail-meta__row">
             <span className="rs-detail-meta__label">When</span>
@@ -1852,6 +1907,54 @@ export function MatchDetailPage() {
             <p className="rs-detail-additional__empty">None</p>
           )}
         </div>
+
+        {(isAssigner || match.scheduleUrl) && (
+          <div className="rs-detail-additional">
+            <h4 className="rs-detail-section__sublabel">Tournament schedule</h4>
+            {isAssigner ? (
+              <FormGroup fieldId="match-schedule-url">
+                <TextInput
+                  id="match-schedule-url"
+                  type="url"
+                  value={scheduleUrlDraft}
+                  onChange={(_e, v) => {
+                    setScheduleUrlDraft(v);
+                    if (scheduleUrlError) setScheduleUrlError('');
+                  }}
+                  onBlur={() => persistScheduleUrl(scheduleUrlDraft)}
+                  placeholder="https://drive.google.com/file/d/…/view"
+                  aria-label="Tournament schedule link"
+                  validated={scheduleUrlError ? 'error' : 'default'}
+                />
+                <FormHelperText>
+                  Google Drive PDF or image — share as anyone with the link can
+                  view.
+                </FormHelperText>
+                {scheduleUrlError ? (
+                  <p className="rs-signin__note" role="alert">
+                    {scheduleUrlError}
+                  </p>
+                ) : null}
+              </FormGroup>
+            ) : (
+              <p className="rs-detail-additional__body">
+                <button
+                  type="button"
+                  className="rs-detail-meta__maps"
+                  onClick={() =>
+                    window.open(
+                      match.scheduleUrl,
+                      '_blank',
+                      'noopener,noreferrer',
+                    )
+                  }
+                >
+                  Open tournament schedule
+                </button>
+              </p>
+            )}
+          </div>
+        )}
       </section>
 
       <section className="rs-detail-card" aria-labelledby="teams-heading">

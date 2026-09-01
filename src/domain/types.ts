@@ -120,6 +120,8 @@ export interface Match {
   /** Side / gender division */
   gender: MatchGender;
   notes?: string;
+  /** Google Drive (or https) link to tournament bracket / schedule PDF or image. */
+  scheduleUrl?: string;
   /** Coaching Match Officials — contact/presence; not fee crew slots. */
   cmo?: CmoContact[];
   /**
