@@ -99,6 +99,7 @@ import {
 import {
   emailMatchesTeamContacts,
   rolesAfterTeamLinkDenial,
+  validateTeamLinkRequestBatch,
 } from '@/domain/teamLinkRequests';
 import { isFirebaseConfigured } from '@/services/firebase';
 import {
@@ -4148,6 +4149,7 @@ class DemoStore {
         | 'gender'
         | 'notes'
         | 'scheduleUrl'
+        | 'playedForfeit'
         | 'cmo'
       >
     >,
@@ -4560,9 +4562,13 @@ class DemoStore {
     userId: string,
     teamIds: string[],
   ): { autoApproved: string[]; pending: string[] } {
+    const validated = validateTeamLinkRequestBatch(teamIds);
+    if (!validated.ok) {
+      throw new Error(validated.error);
+    }
     const user = this.state.users.find((u) => u.uid === userId);
     if (!user) return { autoApproved: [], pending: [] };
-    const unique = [...new Set(teamIds.filter(Boolean))];
+    const unique = validated.value;
     const autoApproved: string[] = [];
     const pending: string[] = [];
     const now = new Date().toISOString();

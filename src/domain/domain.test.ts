@@ -24,6 +24,7 @@ import {
   rolesAfterTeamLinkDenial,
   shouldShowPendingFanBrowse,
   shouldShowTeamAdminLens,
+  validateTeamLinkRequestBatch,
 } from '@/domain/teamLinkRequests';
 import {
   applySheetFacts,
@@ -1446,6 +1447,33 @@ describe('standings', () => {
     expect(beta).toMatchObject({ w: 0, l: 1, t: 1, pf: 25, pa: 35, pd: -10 });
     expect(groups[0].rows[0].teamId).toBe('team_a');
   });
+
+  it('excludes played-forfeit matches from standings', () => {
+    const counted = {
+      ...baseMatch(),
+      id: 'r1',
+      status: 'locked_confirmed' as const,
+      level: 'D1',
+      gender: 'men' as const,
+      homeTeamId: 'team_a',
+      homeTeamName: 'Alpha',
+      awayTeamId: 'team_b',
+      awayTeamName: 'Beta',
+      homeScore: 20,
+      awayScore: 10,
+    };
+    const scrimmage = {
+      ...counted,
+      id: 'r2',
+      playedForfeit: true,
+      homeScore: 30,
+      awayScore: 0,
+    };
+    const groups = standingsByDivision([counted, scrimmage]);
+    expect(groups).toHaveLength(1);
+    const alpha = groups[0].rows.find((r) => r.teamId === 'team_a')!;
+    expect(alpha).toMatchObject({ played: 1, w: 1, pf: 20, pa: 10 });
+  });
 });
 
 describe('fixtureRequests', () => {
@@ -1754,6 +1782,21 @@ describe('teamLinkRequests', () => {
   it('emailMatchesTeamContacts is case-insensitive', () => {
     expect(emailMatchesTeamContacts('Coach@Austin.edu', team)).toBe(true);
     expect(emailMatchesTeamContacts('other@x.com', team)).toBe(false);
+  });
+
+  it('validateTeamLinkRequestBatch caps batch size and rejects conference ids', () => {
+    expect(validateTeamLinkRequestBatch(['team_a', 'team_b'])).toEqual({
+      ok: true,
+      value: ['team_a', 'team_b'],
+    });
+    expect(validateTeamLinkRequestBatch(['team_a', 'team_b', 'team_c'])).toEqual({
+      ok: false,
+      error: 'Select at most 2 clubs at a time.',
+    });
+    expect(validateTeamLinkRequestBatch(['conf:Lone Star Men'])).toEqual({
+      ok: false,
+      error: 'Select individual clubs, not a whole conference.',
+    });
   });
 
   it('rolesAfterTeamLinkDenial strips TA only; Fan when no working roles', () => {

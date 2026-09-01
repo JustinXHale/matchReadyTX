@@ -235,6 +235,7 @@ export function matchFromFirestore(
       typeof data.cancelledAt === 'string' ? data.cancelledAt : undefined,
     postponedAt:
       typeof data.postponedAt === 'string' ? data.postponedAt : undefined,
+    playedForfeit: Boolean(data.playedForfeit),
     crew: normalizeCrew(data.crew),
     homeScore: typeof data.homeScore === 'number' ? data.homeScore : undefined,
     awayScore: typeof data.awayScore === 'number' ? data.awayScore : undefined,
@@ -1325,6 +1326,22 @@ export async function saveMatchScheduleUrlInFirestore(
     doc(requireDb(), 'orgs', orgId, 'matches', matchId),
     stripUndefined({
       scheduleUrl: scheduleUrl ?? null,
+      updatedAt: new Date().toISOString(),
+    }),
+    { merge: true },
+  );
+}
+
+/** Persist played-forfeit designation (assigner; live mode). */
+export async function saveMatchPlayedForfeitInFirestore(
+  orgId: string,
+  matchId: string,
+  playedForfeit: boolean,
+): Promise<void> {
+  await setDoc(
+    doc(requireDb(), 'orgs', orgId, 'matches', matchId),
+    stripUndefined({
+      playedForfeit,
       updatedAt: new Date().toISOString(),
     }),
     { merge: true },

@@ -12,6 +12,8 @@ export type AssignerMenuAction =
   | 'alert_coverage'
   | 'cancel'
   | 'postpone'
+  | 'played_forfeit'
+  | 'clear_played_forfeit'
   | 'reactivate';
 
 type Props = {
@@ -75,6 +77,15 @@ export function MatchAssignerMenu({
           </DropdownItem>
         ) : (
           <>
+            {match.playedForfeit ? (
+              <DropdownItem onClick={() => closeAnd('clear_played_forfeit')}>
+                Clear played forfeit
+              </DropdownItem>
+            ) : (
+              <DropdownItem onClick={() => closeAnd('played_forfeit')}>
+                Played forfeit
+              </DropdownItem>
+            )}
             <DropdownItem onClick={() => closeAnd('postpone')}>
               Postpone match
             </DropdownItem>

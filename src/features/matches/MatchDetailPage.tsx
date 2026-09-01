@@ -74,7 +74,7 @@ import {
 } from '@/domain/requests';
 import { openGroupMailto, uniqueEmails } from '@/services/mailto';
 import { persistCrewAssignmentAndEmail, persistCrewUnassignmentAndEmail, resendCrewAssignmentEmail } from '@/services/liveAssignment';
-import { defaultOrgId, createGameRequestInFirestore, patchGameRequestContentInFirestore, saveMatchCrewAssignment, saveMatchScheduleUrlInFirestore, callMatchSelfService } from '@/services/orgData';
+import { defaultOrgId, createGameRequestInFirestore, patchGameRequestContentInFirestore, saveMatchCrewAssignment, saveMatchPlayedForfeitInFirestore, saveMatchScheduleUrlInFirestore, callMatchSelfService } from '@/services/orgData';
 import { isFirebaseConfigured } from '@/services/firebase';
 import {
   validateScheduleUrlInput,
@@ -1047,6 +1047,42 @@ export function MatchDetailPage() {
       case 'postpone':
         store.cancelOrPostpone(match.id, 'postpone');
         break;
+      case 'played_forfeit': {
+        store.setMatchFlags(match.id, { playedForfeit: true });
+        if (dataMode === 'live' && isFirebaseConfigured) {
+          void saveMatchPlayedForfeitInFirestore(
+            defaultOrgId(),
+            match.id,
+            true,
+          ).catch((err) => {
+            console.error('saveMatchPlayedForfeitInFirestore failed', err);
+            window.alert(
+              err instanceof Error
+                ? `Updated locally, but save failed: ${err.message}`
+                : 'Updated locally, but save failed.',
+            );
+          });
+        }
+        break;
+      }
+      case 'clear_played_forfeit': {
+        store.setMatchFlags(match.id, { playedForfeit: false });
+        if (dataMode === 'live' && isFirebaseConfigured) {
+          void saveMatchPlayedForfeitInFirestore(
+            defaultOrgId(),
+            match.id,
+            false,
+          ).catch((err) => {
+            console.error('saveMatchPlayedForfeitInFirestore failed', err);
+            window.alert(
+              err instanceof Error
+                ? `Updated locally, but save failed: ${err.message}`
+                : 'Updated locally, but save failed.',
+            );
+          });
+        }
+        break;
+      }
       case 'reactivate':
         store.reactivateMatch(match.id);
         break;
@@ -1326,6 +1362,9 @@ export function MatchDetailPage() {
             )}
           </span>
         )}
+        {match.playedForfeit ? (
+          <span className="rs-pill rs-pill--quiet">Played forfeit</span>
+        ) : null}
         {shouldShowCrewStatusChips(match) &&
           crewStatusChipsForMatch(match).map((chip) => (
             <span
@@ -3046,7 +3085,11 @@ export function MatchDetailPage() {
                 ? 'Cancel this match?'
                 : assignerConfirm === 'postpone'
                   ? 'Postpone this match?'
-                  : 'Reactivate this match?'}
+                  : assignerConfirm === 'played_forfeit'
+                    ? 'Mark as played forfeit?'
+                    : assignerConfirm === 'clear_played_forfeit'
+                      ? 'Clear played forfeit?'
+                      : 'Reactivate this match?'}
           </Title>
         </ModalHeader>
         <ModalBody>
@@ -3057,9 +3100,13 @@ export function MatchDetailPage() {
                 ? 'The match will be marked cancelled. You can reactivate it later from the match menu if this was a mistake.'
                 : assignerConfirm === 'postpone'
                   ? 'The match will be marked postponed. Team confirmations are cleared and assigned officials are held until teams reconfirm.'
-                  : match.status === 'postponed'
-                    ? 'The match returns to the schedule as needs reconfirmation. Teams and officials must confirm again.'
-                    : 'The match returns to the schedule at the appropriate workflow step based on current confirmations and crew.'}
+                  : assignerConfirm === 'played_forfeit'
+                    ? 'The match was played, but the result will not count in league standings (like a scrimmage). Officials should still enter the score and file match reports.'
+                    : assignerConfirm === 'clear_played_forfeit'
+                      ? 'The match will count in league standings again when a score is recorded.'
+                      : match.status === 'postponed'
+                        ? 'The match returns to the schedule as needs reconfirmation. Teams and officials must confirm again.'
+                        : 'The match returns to the schedule at the appropriate workflow step based on current confirmations and crew.'}
           </p>
         </ModalBody>
         <ModalFooter>
@@ -3080,7 +3127,11 @@ export function MatchDetailPage() {
                 ? 'Cancel match'
                 : assignerConfirm === 'postpone'
                   ? 'Postpone match'
-                  : 'Reactivate match'}
+                  : assignerConfirm === 'played_forfeit'
+                    ? 'Mark played forfeit'
+                    : assignerConfirm === 'clear_played_forfeit'
+                      ? 'Clear played forfeit'
+                      : 'Reactivate match'}
           </Button>
         </ModalFooter>
       </Modal>

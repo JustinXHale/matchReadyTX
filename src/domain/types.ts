@@ -139,6 +139,11 @@ export interface Match {
   releasedAt?: string;
   cancelledAt?: string;
   postponedAt?: string;
+  /**
+   * Played scrimmage / forfeit-style result — score and reports apply,
+   * but the match is excluded from league standings.
+   */
+  playedForfeit?: boolean;
   /** 0..N people per role (tournaments may assign several MOs, ARs, etc.). */
   crew: Record<CrewSlot, CrewAssignment[]>;
   /** Final score when reported (from match report). */

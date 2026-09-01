@@ -32,7 +32,8 @@ function isScored(match: Match): match is Match & {
     Number.isFinite(match.awayScore) &&
     match.status !== 'cancelled' &&
     match.status !== 'postponed' &&
-    match.status !== 'draft'
+    match.status !== 'draft' &&
+    !match.playedForfeit
   );
 }
 

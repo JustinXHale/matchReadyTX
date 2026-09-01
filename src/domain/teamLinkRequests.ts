@@ -1,6 +1,35 @@
 import type { Role, Team, TeamLinkRequest, UserProfile } from './types';
 import { normalizeEmail } from './contacts';
 
+/** Max clubs someone can request in one onboarding/profile submit. */
+export const MAX_TEAM_ADMIN_CLUB_REQUEST_BATCH = 2;
+
+export function isConferencePickerNodeId(id: string): boolean {
+  return id.startsWith('conf:');
+}
+
+export function validateTeamLinkRequestBatch(
+  teamIds: string[],
+): { ok: true; value: string[] } | { ok: false; error: string } {
+  const unique = [...new Set(teamIds.map((t) => t.trim()).filter(Boolean))];
+  if (unique.length === 0) {
+    return { ok: false, error: 'Select at least one club.' };
+  }
+  if (unique.some(isConferencePickerNodeId)) {
+    return {
+      ok: false,
+      error: 'Select individual clubs, not a whole conference.',
+    };
+  }
+  if (unique.length > MAX_TEAM_ADMIN_CLUB_REQUEST_BATCH) {
+    return {
+      ok: false,
+      error: `Select at most ${MAX_TEAM_ADMIN_CLUB_REQUEST_BATCH} clubs at a time.`,
+    };
+  }
+  return { ok: true, value: unique };
+}
+
 /** True when email is listed on the team's Contacts. */
 export function emailMatchesTeamContacts(
   email: string,

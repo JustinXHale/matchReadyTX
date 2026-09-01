@@ -27,6 +27,10 @@ import {
   hasRefereeLensRole,
   type Role,
 } from '@/domain/types';
+import {
+  MAX_TEAM_ADMIN_CLUB_REQUEST_BATCH,
+  validateTeamLinkRequestBatch,
+} from '@/domain/teamLinkRequests';
 import { conferenceTeamOptions } from '@/domain/teams';
 import { dedupeTeamsForPicker } from '@/domain/teamList';
 import { OfficialInsightsPanel } from '@/features/scheduler/OfficialInsightsPanel';
@@ -341,13 +345,18 @@ export function ProfilePage() {
 
   const submitClubLinks = async () => {
     if (!roleTeamAdmin || requestTeamIds.length === 0) return;
+    const validated = validateTeamLinkRequestBatch(requestTeamIds);
+    if (!validated.ok) {
+      setLinkNote(validated.error);
+      return;
+    }
     setLinkBusy(true);
     setLinkNote(null);
     try {
       if (isFirebaseConfigured && !currentUser.uid.startsWith('u_')) {
         const result = await callSubmitTeamLinkRequests({
           orgId: defaultOrgId(),
-          teamIds: requestTeamIds,
+          teamIds: validated.value,
         });
         setLinkNote(
           [
@@ -364,7 +373,7 @@ export function ProfilePage() {
       } else {
         const result = store.submitTeamLinkRequests(
           currentUser.uid,
-          requestTeamIds,
+          validated.value,
         );
         setLinkNote(
           [
@@ -685,6 +694,11 @@ export function ProfilePage() {
                   selectedIds={requestTeamIds}
                   onChange={setRequestTeamIds}
                   ariaLabel="Request clubs by conference"
+                  limitMessage={
+                    requestTeamIds.length >= MAX_TEAM_ADMIN_CLUB_REQUEST_BATCH
+                      ? `You can request up to ${MAX_TEAM_ADMIN_CLUB_REQUEST_BATCH} clubs at a time. Deselect one to choose another.`
+                      : null
+                  }
                 />
                 <Button
                   variant="secondary"

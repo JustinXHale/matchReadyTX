@@ -9,6 +9,10 @@ import {
   TreeView,
   type TreeViewDataItem,
 } from '@patternfly/react-core';
+import {
+  isConferencePickerNodeId,
+  MAX_TEAM_ADMIN_CLUB_REQUEST_BATCH,
+} from '@/domain/teamLinkRequests';
 
 export type ConferenceTeamOption = {
   id: string;
@@ -50,11 +54,15 @@ export function ConferenceTeamPicker({
   selectedIds,
   onChange,
   ariaLabel = 'Select teams',
+  maxSelection = MAX_TEAM_ADMIN_CLUB_REQUEST_BATCH,
+  limitMessage,
 }: {
   options: ConferenceTeamOption[];
   selectedIds: string[];
   onChange: (next: string[]) => void;
   ariaLabel?: string;
+  maxSelection?: number;
+  limitMessage?: string | null;
 }) {
   const [isOpen, setIsOpen] = useState(false);
   const toggleRef = useRef<HTMLButtonElement>(null);
@@ -77,7 +85,7 @@ export function ConferenceTeamPicker({
         name: conference,
         defaultExpanded: false,
         customBadgeContent: teams.length,
-        checkProps: { checked: false },
+        checkProps: { checked: false, disabled: true },
         children: teams
           .sort((a, b) => a.name.localeCompare(b.name))
           .map((team) => ({
@@ -124,14 +132,25 @@ export function ConferenceTeamPicker({
       : 'Select teams';
 
   const onCheck = (event: ChangeEvent, item: TreeViewDataItem) => {
+    if (typeof item.id !== 'string' || isConferencePickerNodeId(item.id)) {
+      return;
+    }
     const checked = (event.target as HTMLInputElement).checked;
     const branch = cloneTree(treeData).filter((root) => filterTreeById(root, item));
     const leafIds = flattenTree(branch)
-      .filter((node) => !node.children || node.children.length === 0)
+      .filter(
+        (node) =>
+          typeof node.id === 'string' &&
+          !isConferencePickerNodeId(node.id) &&
+          (!node.children || node.children.length === 0),
+      )
       .map((node) => String(node.id));
     const next = new Set(selectedIds);
     if (checked) {
-      for (const id of leafIds) next.add(id);
+      for (const id of leafIds) {
+        if (maxSelection > 0 && next.size >= maxSelection) break;
+        next.add(id);
+      }
     } else {
       for (const id of leafIds) next.delete(id);
     }
@@ -160,22 +179,29 @@ export function ConferenceTeamPicker({
   );
 
   return (
-    <MenuContainer
-      isOpen={isOpen}
-      onOpenChange={(open) => setIsOpen(open)}
-      onOpenChangeKeys={['Escape']}
-      menu={menu}
-      menuRef={menuRef}
-      toggle={
-        <MenuToggle
-          ref={toggleRef}
-          onClick={() => setIsOpen((v) => !v)}
-          isExpanded={isOpen}
-        >
-          {toggleLabel}
-        </MenuToggle>
-      }
-      toggleRef={toggleRef}
-    />
+    <>
+      <MenuContainer
+        isOpen={isOpen}
+        onOpenChange={(open) => setIsOpen(open)}
+        onOpenChangeKeys={['Escape']}
+        menu={menu}
+        menuRef={menuRef}
+        toggle={
+          <MenuToggle
+            ref={toggleRef}
+            onClick={() => setIsOpen((v) => !v)}
+            isExpanded={isOpen}
+          >
+            {toggleLabel}
+          </MenuToggle>
+        }
+        toggleRef={toggleRef}
+      />
+      {limitMessage ? (
+        <p className="rs-signin__note" role="status">
+          {limitMessage}
+        </p>
+      ) : null}
+    </>
   );
 }

@@ -203,6 +203,11 @@ export function MatchListRow({
               {match.matchType.trim()}
             </span>
           ) : null}
+          {match.playedForfeit ? (
+            <span className="rs-pill rs-pill--quiet rs-list-row__chip">
+              Played forfeit
+            </span>
+          ) : null}
         </div>
         {(match.venueAddress?.trim() || match.venueName?.trim()) ? (
           <p className="rs-list-row__venue">

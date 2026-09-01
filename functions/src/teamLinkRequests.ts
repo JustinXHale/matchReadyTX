@@ -381,8 +381,21 @@ export async function runSubmitTeamLinkRequests(opts: {
 }> {
   const { db, orgId, uid, teamIds } = opts;
   const unique = [...new Set(teamIds.map((t) => t.trim()).filter(Boolean))];
+  const MAX_TEAM_ADMIN_CLUB_REQUEST_BATCH = 2;
   if (unique.length === 0) {
     throw new HttpsError('invalid-argument', 'Select at least one team.');
+  }
+  if (unique.some((id) => id.startsWith('conf:'))) {
+    throw new HttpsError(
+      'invalid-argument',
+      'Select individual clubs, not a whole conference.',
+    );
+  }
+  if (unique.length > MAX_TEAM_ADMIN_CLUB_REQUEST_BATCH) {
+    throw new HttpsError(
+      'invalid-argument',
+      `Select at most ${MAX_TEAM_ADMIN_CLUB_REQUEST_BATCH} clubs at a time.`,
+    );
   }
 
   const userSnap = await db.doc(`users/${uid}`).get();

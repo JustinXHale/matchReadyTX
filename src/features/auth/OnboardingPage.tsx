@@ -18,6 +18,10 @@ import {
   splitDisplayName,
   validateProfilePhoto,
 } from '@/domain/profile';
+import {
+  MAX_TEAM_ADMIN_CLUB_REQUEST_BATCH,
+  validateTeamLinkRequestBatch,
+} from '@/domain/teamLinkRequests';
 import { normalizeEmail } from '@/domain/contacts';
 import { conferenceTeamOptions } from '@/domain/teams';
 import { dedupeTeamsForPicker } from '@/domain/teamList';
@@ -276,7 +280,10 @@ export function OnboardingPage() {
       case 'roles':
         return rolesOk;
       case 'teams':
-        return selectedTeamIds.length > 0;
+        return (
+          selectedTeamIds.length > 0 &&
+          selectedTeamIds.length <= MAX_TEAM_ADMIN_CLUB_REQUEST_BATCH
+        );
       case 'birthday':
         return Boolean(birthday.trim());
       case 'refereeLevel':
@@ -371,9 +378,15 @@ export function OnboardingPage() {
             store.getState().users.find((u) => u.uid === currentUser.uid) ??
             saved;
           if (roleTeamAdmin && selectedTeamIds.length > 0) {
+            const validated = validateTeamLinkRequestBatch(selectedTeamIds);
+            if (!validated.ok) {
+              setSaveError(validated.error);
+              setSaving(false);
+              return;
+            }
             await callSubmitTeamLinkRequests({
               orgId: defaultOrgId(),
-              teamIds: selectedTeamIds,
+              teamIds: validated.value,
             });
           }
           await refreshLiveProfile();
@@ -388,7 +401,12 @@ export function OnboardingPage() {
         }
         setSaving(false);
       } else if (roleTeamAdmin && selectedTeamIds.length > 0) {
-        store.submitTeamLinkRequests(currentUser.uid, selectedTeamIds);
+        const validated = validateTeamLinkRequestBatch(selectedTeamIds);
+        if (!validated.ok) {
+          setSaveError(validated.error);
+          return;
+        }
+        store.submitTeamLinkRequests(currentUser.uid, validated.value);
       }
       updated =
         store.getState().users.find((u) => u.uid === currentUser.uid) ??
@@ -650,6 +668,11 @@ export function OnboardingPage() {
                   selectedIds={selectedTeamIds}
                   onChange={setSelectedTeamIds}
                   ariaLabel="Select clubs by conference"
+                  limitMessage={
+                    selectedTeamIds.length >= MAX_TEAM_ADMIN_CLUB_REQUEST_BATCH
+                      ? `You can request up to ${MAX_TEAM_ADMIN_CLUB_REQUEST_BATCH} clubs at a time. Deselect one to choose another.`
+                      : null
+                  }
                 />
               )}
             </div>
@@ -931,7 +954,7 @@ function stepCopy(
     case 'teams':
       return {
         title: 'Which clubs do you manage?',
-        hint: 'Pick under Lone Star Men and/or Lone Star Women — each side is separate. If your email is already on Contacts, you’re approved automatically; otherwise your Scheduler or a current Team Admin reviews each request.',
+        hint: `Pick up to ${MAX_TEAM_ADMIN_CLUB_REQUEST_BATCH} clubs — select each team individually (not the conference row). If your email is on Contacts, you’re approved automatically; otherwise your Scheduler or a current Team Admin reviews each request.`,
       };
     case 'firstName':
       return { title: 'What’s your first name?' };
