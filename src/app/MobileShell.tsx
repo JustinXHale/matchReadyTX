@@ -24,6 +24,7 @@ import {
 import { ROLE_HOME, ROLE_VIEW_LABELS, useApp, type RoleView } from '@/app/AppContext';
 import { appBuildLabel } from '@/app/appBuild';
 import { stripDemoPrefix, withDemoPrefix, isDemoPath } from '@/app/demoPaths';
+import { isPublicPath } from '@/features/public/publicPaths';
 import { WhistleIcon } from '@/ui/WhistleIcon';
 import { ThemeToggle } from '@/ui/ThemeToggle';
 import { BrandLogo } from '@/ui/BrandLogo';
@@ -241,8 +242,10 @@ export function MobileShell() {
     isDemoShowcase,
     hasInsightsAccess,
   );
-  const showChrome = Boolean(currentUser) && location.pathname !== '/login';
+  const showChrome =
+    Boolean(currentUser) && !isPublicPath(location.pathname);
   const inDemoTree = isDemoPath(location.pathname);
+  const isPublicDoc = location.pathname === '/privacy';
 
   useEffect(() => {
     const tick = () => setNow(new Date());
@@ -262,7 +265,13 @@ export function MobileShell() {
   return (
     <OfficialQuickLookProvider>
     <Page
-      className={!showChrome ? 'rs-page--auth' : undefined}
+      className={
+        !showChrome
+          ? isPublicDoc
+            ? 'rs-page--public-doc'
+            : 'rs-page--auth'
+          : undefined
+      }
       masthead={
         showChrome ? (
           <Masthead className="rs-masthead">
@@ -307,7 +316,7 @@ export function MobileShell() {
                 <Button
                   variant="link"
                   className="rs-demo-signin"
-                  onClick={() => navigate('/login')}
+                  onClick={() => navigate('/')}
                 >
                   Sign in
                 </Button>

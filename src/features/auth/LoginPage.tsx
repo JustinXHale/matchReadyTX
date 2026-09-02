@@ -13,6 +13,9 @@ import { appBuildLabel } from '@/app/appBuild';
 import { PwaInstallCard } from '@/ui/PwaInstallCard';
 import { ThemeToggle } from '@/ui/ThemeToggle';
 import { BrandLogo } from '@/ui/BrandLogo';
+import { PublicFooter } from '@/features/public/PublicFooter';
+import { PublicLandingAbout } from '@/features/public/PublicLandingAbout';
+import '@/features/public/public.css';
 
 function authErrorMessage(provider: 'Google' | 'Apple', err: unknown): string {
   const message =
@@ -35,6 +38,7 @@ function authErrorMessage(provider: 'Google' | 'Apple', err: unknown): string {
   return message;
 }
 
+/** Public home + sign-in — satisfies OAuth homepage requirements at `/`. */
 export function LoginPage() {
   const {
     enterLive,
@@ -98,7 +102,6 @@ export function LoginPage() {
     setAuthNote(null);
     try {
       const user = await signInWithGoogle();
-      // Redirect leaves the page; popup success keeps busy until Navigate.
       if (!user) setBusyProvider(null);
     } catch (err) {
       setAuthNote(authErrorMessage('Google', err));
@@ -125,16 +128,17 @@ export function LoginPage() {
   };
 
   return (
-    <div className="rs-signin">
-      <header className="rs-signin__hero">
+    <div className="rs-signin rs-public">
+      <header className="rs-signin__hero rs-public__hero">
         <BrandLogo
-          className="rs-signin__logo"
-          width={280}
-          height={280}
+          className="rs-signin__logo rs-public__logo"
+          width={160}
+          height={160}
           alt="MatchReadyTX"
         />
-        <p className="rs-signin__lede">
-          Sign in securely with your Google or Apple account
+        <h1 className="rs-public__lede">MatchReadyTX</h1>
+        <p className="rs-public__tagline">
+          Scheduling and match management for rugby referee organizations
         </p>
       </header>
 
@@ -167,7 +171,11 @@ export function LoginPage() {
         )}
       </section>
 
+      <PublicLandingAbout />
+
       <PwaInstallCard className="rs-signin__pwa" />
+
+      <PublicFooter className="rs-signin__footer" />
 
       <div className="rs-signin__build-row">
         <p className="rs-signin__build">{appBuildLabel()}</p>

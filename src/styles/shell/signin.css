@@ -234,3 +234,8 @@
   margin: 0;
   text-align: center;
 }
+
+.rs-signin__footer {
+  border-top: none;
+  padding-top: 0;
+}

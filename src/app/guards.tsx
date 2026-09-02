@@ -14,7 +14,7 @@ export function RequireAuth() {
   if (!currentUser) {
     const next = `${location.pathname}${location.search}${location.hash}`;
     const q = next && next !== '/' ? `?next=${encodeURIComponent(next)}` : '';
-    return <Navigate to={`/login${q}`} replace />;
+    return <Navigate to={`/${q}`} replace />;
   }
   if (!currentUser.profileComplete) {
     const onboarding =
@@ -26,7 +26,7 @@ export function RequireAuth() {
 
 export function RequireProfileIncomplete() {
   const { currentUser, dataMode } = useApp();
-  if (!currentUser) return <Navigate to="/login" replace />;
+  if (!currentUser) return <Navigate to="/" replace />;
   if (currentUser.profileComplete) {
     const home = ROLE_HOME[resolveRoleView(currentUser)];
     return (

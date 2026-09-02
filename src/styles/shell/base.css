@@ -77,6 +77,22 @@ body {
   max-width: 420px;
 }
 
+/* Privacy policy — readable doc width on desktop, same as in-app pages */
+.rs-page--public-doc.pf-v6-c-page {
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-areas: 'main';
+}
+
+.rs-page--public-doc .pf-v6-c-page__main-container {
+  grid-column: 1 / -1;
+  grid-area: main;
+}
+
+.rs-page--public-doc .rs-page-body {
+  padding-bottom: var(--pf-t--global--spacer--xl) !important;
+  max-width: 720px;
+}
+
 .rs-stack {
   display: flex;
   flex-direction: column;

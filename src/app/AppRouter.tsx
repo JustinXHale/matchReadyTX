@@ -20,9 +20,15 @@ import {
   stripDemoPrefix,
   withDemoPrefix,
 } from '@/app/demoPaths';
+import { isPublicPath } from '@/features/public/publicPaths';
 
 const LoginPage = lazy(() =>
   import('@/features/auth/LoginPage').then((m) => ({ default: m.LoginPage })),
+);
+const PrivacyPage = lazy(() =>
+  import('@/features/public/PrivacyPage').then((m) => ({
+    default: m.PrivacyPage,
+  })),
 );
 const OnboardingPage = lazy(() =>
   import('@/features/auth/OnboardingPage').then((m) => ({
@@ -457,7 +463,7 @@ function DemoPrefixSync({ children }: { children?: ReactNode }) {
     isDemoMode &&
     dataMode === 'demo' &&
     !isDemoPath(location.pathname) &&
-    location.pathname !== '/login'
+    !isPublicPath(location.pathname)
   ) {
     return (
       <Navigate
@@ -494,7 +500,9 @@ function RootRedirect() {
     return <Navigate to="/login" replace />;
   }
 
-  if (!currentUser) return <Navigate to="/login" replace />;
+  if (!currentUser) {
+    return <Navigate to="/login" replace />;
+  }
 
   if (!currentUser.profileComplete) {
     return <Navigate to="/onboarding" replace />;
@@ -738,7 +746,9 @@ export function AppRouter() {
                 </DemoPrefixSync>
               }
             >
+              <Route path="/" element={<LoginPage />} />
               <Route path="/login" element={<LoginPage />} />
+              <Route path="/privacy" element={<PrivacyPage />} />
               <Route element={<RequireProfileIncomplete />}>
                 <Route path="/onboarding" element={<OnboardingPage />} />
               </Route>
@@ -752,7 +762,6 @@ export function AppRouter() {
 
               <Route element={<RequireAuth />}>{FeatureRoutes()}</Route>
 
-              <Route path="/" element={<RootRedirect />} />
               <Route path="*" element={<RootRedirect />} />
             </Route>
           </Routes>
