@@ -119,10 +119,10 @@ export function JudicialDashboardPage() {
   const season = rugbySeasonLabel();
   const conferenceTitle =
     conference === 'all'
-      ? 'Lone Star Men’s & Women’s Conference'
+      ? 'Lonestar Men’s & Women’s Conference'
       : conference === 'lonestar_men'
-        ? 'Lone Star Men’s Conference'
-        : 'Lone Star Women’s Conference';
+        ? 'Lonestar Men’s Conference'
+        : 'Lonestar Women’s Conference';
 
   const visibleSchools = schoolsExpanded
     ? stats.bySchool

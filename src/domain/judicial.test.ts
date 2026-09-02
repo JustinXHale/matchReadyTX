@@ -173,9 +173,10 @@ describe('discipline trend labels', () => {
   });
 });
 
-describe('Lone Star copy', () => {
-  it('rewrites Lonestar for display and treats aliases as equal', () => {
-    expect(displayCompetitionLabel('Lonestar Men')).toBe('Lone Star Men');
+describe('Lonestar copy', () => {
+  it('rewrites Lone Star for display and treats aliases as equal', () => {
+    expect(displayCompetitionLabel('Lone Star Men')).toBe('Lonestar Men');
+    expect(displayCompetitionLabel('Lonestar Men')).toBe('Lonestar Men');
     expect(competitionsEqual('Lonestar Women', 'Lone Star Women')).toBe(true);
     expect(competitionsEqual('Lonestar Men', 'Lone Star Women')).toBe(false);
   });
@@ -218,9 +219,9 @@ describe('card report form validation', () => {
     matchDate: '2026-08-29',
   };
 
-  it('requires Lone Star Men or Women when the college union is selected', () => {
+  it('requires Lonestar Men or Women when the college union is selected', () => {
     expect(validateCardReportIdentity(identity)).toBe(
-      'Select Lone Star Men or Lone Star Women.',
+      'Select Lonestar Men or Lonestar Women.',
     );
     expect(
       validateCardReportIdentity({ ...identity, conference: 'lonestar_men' }),
@@ -346,7 +347,7 @@ describe('displayed conference aliases', () => {
   it('dedupes Lonestar / Lone Star in filter lists', () => {
     expect(
       uniqueDisplayedCompetitions(['Lonestar Men', 'Lone Star Men', 'Club']),
-    ).toEqual(['Club', 'Lone Star Men']);
+    ).toEqual(['Club', 'Lonestar Men']);
   });
 });
 

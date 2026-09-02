@@ -1535,7 +1535,7 @@ function seedFixtureRequests(): FixtureRequest[] {
       kickoffAt: kick.toISOString(),
       venueName: 'Austin Rugby Complex',
       venueAddress: '1001 Academy Dr, Austin, TX',
-      competition: 'Lone Star Men',
+      competition: 'Lonestar Men',
       level: 'D1',
       gender: 'men',
       notes: 'Friendly — demo fixture request',

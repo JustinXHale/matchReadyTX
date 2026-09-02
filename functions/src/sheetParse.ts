@@ -315,10 +315,10 @@ export function normalizeGender(raw?: string): 'men' | 'women' {
 }
 
 export function competitionForGender(gender: 'men' | 'women'): string {
-  return gender === 'women' ? 'Lone Star Women' : 'Lone Star Men';
+  return gender === 'women' ? 'Lonestar Women' : 'Lonestar Men';
 }
 
-/** Infer men/women from names like "Lone Star Women". */
+/** Infer men/women from names like "Lonestar Women". */
 export function genderFromCompetitionName(
   name?: string,
 ): 'men' | 'women' | null {

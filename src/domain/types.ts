@@ -162,8 +162,8 @@ export const DEFAULT_MATCH_LEVELS = [
 ] as const;
 
 export const DEFAULT_COMPETITIONS = [
-  'Lone Star Women',
-  'Lone Star Men',
+  'Lonestar Women',
+  'Lonestar Men',
 ] as const;
 
 export interface ChangeProposal {
@@ -390,7 +390,7 @@ export interface OrgSettings {
   matchLevels: string[];
   /** Default crew roles per competition level (Scheduler → Queues → Crew). */
   defaultCrewByLevel?: Record<string, { roles: RequestableSlot[] }>;
-  /** Admin-managed competition list (e.g. Lone Star Women / Lone Star Men). */
+  /** Admin-managed competition list (e.g. Lonestar Women / Lonestar Men). */
   competitions: string[];
   sheetId?: string;
   sheetSyncedAt?: string;
@@ -407,7 +407,7 @@ export type TeamContactPerson = {
 export interface Team {
   id: string;
   name: string;
-  /** Optional conference/competition label from sync (e.g. Lone Star Men). */
+  /** Optional conference/competition label from sync (e.g. Lonestar Men). */
   competition?: string;
   /** Schedule / Locations abbreviation (e.g. UNT). */
   abbreviation?: string;

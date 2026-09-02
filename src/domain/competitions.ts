@@ -25,9 +25,9 @@ function foldedCompetition(name: string): string {
     .replace(/\s+/g, ' ');
 }
 
-/** User-visible conference/union copy: Lone Star, never the one-word Lonestar. */
+/** User-visible conference/union copy: Lonestar (one word). */
 export function displayCompetitionLabel(name: string): string {
-  return name.replace(/Lonestar/gi, 'Lone Star');
+  return name.replace(/Lone\s+Star/gi, 'Lonestar');
 }
 
 export function isLoneStarMenCompetition(name: string): boolean {
@@ -45,7 +45,7 @@ export function competitionsEqual(a: string, b: string): boolean {
   return false;
 }
 
-/** Deduped user-facing conference names (Lonestar → Lone Star). */
+/** Deduped user-facing conference names (Lone Star → Lonestar). */
 export function uniqueDisplayedCompetitions(names: Iterable<string>): string[] {
   const out: string[] = [];
   for (const raw of names) {
@@ -91,7 +91,7 @@ export function filterMatchesByCompetition(
 export function competitionForGender(
   gender: 'men' | 'women',
 ): string {
-  return gender === 'women' ? 'Lone Star Women' : 'Lone Star Men';
+  return gender === 'women' ? 'Lonestar Women' : 'Lonestar Men';
 }
 
 /** Locations-tab rows with Competition = VENUE are fields only — not clubs. */

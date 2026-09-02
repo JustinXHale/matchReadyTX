@@ -50,8 +50,8 @@ export type CardColor = 'yellow' | 'red';
 export type CardConference = 'lonestar_men' | 'lonestar_women';
 
 export const CARD_CONFERENCE_LABELS: Record<CardConference, string> = {
-  lonestar_men: 'Lone Star Men',
-  lonestar_women: 'Lone Star Women',
+  lonestar_men: 'Lonestar Men',
+  lonestar_women: 'Lonestar Women',
 };
 
 export type SecondOffenseColor = 'second_yellow_red' | 'red';
@@ -939,7 +939,7 @@ export function validateCardReportIdentity(input: {
   }
   if (!input.competitionUnion) return 'Select a competition union.';
   if (input.competitionUnion === 'ncr_lonestar_college' && !input.conference) {
-    return 'Select Lone Star Men or Lone Star Women.';
+    return 'Select Lonestar Men or Lonestar Women.';
   }
   if (!input.matchDate) return 'Match date is required.';
   return null;

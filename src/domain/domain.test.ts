@@ -132,7 +132,7 @@ const org: OrgSettings = {
   mileageMinMiles: 10,
   defaultFees: defaultFees(),
   matchLevels: ['D1', 'D2', 'D3', 'Exhibition'],
-  competitions: ['Lone Star Men', 'Lone Star Women'],
+  competitions: ['Lonestar Men', 'Lonestar Women'],
 };
 
 describe('match transitions', () => {
@@ -1793,7 +1793,7 @@ describe('teamLinkRequests', () => {
       ok: false,
       error: 'Select at most 2 clubs at a time.',
     });
-    expect(validateTeamLinkRequestBatch(['conf:Lone Star Men'])).toEqual({
+    expect(validateTeamLinkRequestBatch(['conf:Lonestar Men'])).toEqual({
       ok: false,
       error: 'Select individual clubs, not a whole conference.',
     });
@@ -2223,8 +2223,8 @@ describe('conferenceTeamOptions', () => {
       't_uh_lonestar_men',
       't_uh_lonestar_women',
     ]);
-    expect(options[0]?.conference).toBe('Lone Star Men');
-    expect(options[1]?.conference).toBe('Lone Star Women');
+    expect(options[0]?.conference).toBe('Lonestar Men');
+    expect(options[1]?.conference).toBe('Lonestar Women');
   });
 
   it('excludes VENUE-only Locations rows from team pickers', () => {

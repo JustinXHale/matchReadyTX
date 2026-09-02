@@ -66,7 +66,7 @@ export function AboutPage() {
         <p>
           Part passion project, part working tool—built for real weekly use and
           open source so other referee organizations can adapt it. First testing
-          is with the Lone Star Group in Texas. The “TX” marks where the project
+          is with the Lonestar Group in Texas. The “TX” marks where the project
           began; another organization can use the same foundation and make it
           its own.
         </p>
