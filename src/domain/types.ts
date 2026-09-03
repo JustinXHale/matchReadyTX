@@ -144,6 +144,8 @@ export interface Match {
    * but the match is excluded from league standings.
    */
   playedForfeit?: boolean;
+  /** Team that forfeited; final score stored on homeScore / awayScore. */
+  forfeitTeamId?: string;
   /** 0..N people per role (tournaments may assign several MOs, ARs, etc.). */
   crew: Record<CrewSlot, CrewAssignment[]>;
   /** Final score when reported (from match report). */

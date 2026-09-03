@@ -4150,6 +4150,9 @@ class DemoStore {
         | 'notes'
         | 'scheduleUrl'
         | 'playedForfeit'
+        | 'forfeitTeamId'
+        | 'homeScore'
+        | 'awayScore'
         | 'cmo'
       >
     >,
@@ -4157,6 +4160,35 @@ class DemoStore {
     this.set((s) => ({
       ...s,
       matches: s.matches.map((m) => (m.id === matchId ? { ...m, ...flags } : m)),
+    }));
+  }
+
+  recordMatchForfeit(
+    matchId: string,
+    input: { forfeitTeamId: string; homeScore: number; awayScore: number },
+  ): void {
+    this.set((s) => ({
+      ...s,
+      matches: s.matches.map((m) =>
+        m.id === matchId
+          ? {
+              ...m,
+              forfeitTeamId: input.forfeitTeamId,
+              homeScore: input.homeScore,
+              awayScore: input.awayScore,
+              playedForfeit: false,
+            }
+          : m,
+      ),
+    }));
+  }
+
+  clearMatchForfeit(matchId: string): void {
+    this.set((s) => ({
+      ...s,
+      matches: s.matches.map((m) =>
+        m.id === matchId ? { ...m, forfeitTeamId: undefined } : m,
+      ),
     }));
   }
 

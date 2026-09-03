@@ -208,6 +208,11 @@ export function MatchListRow({
               Played forfeit
             </span>
           ) : null}
+          {match.forfeitTeamId ? (
+            <span className="rs-pill rs-pill--quiet rs-list-row__chip">
+              Forfeit
+            </span>
+          ) : null}
         </div>
         {(match.venueAddress?.trim() || match.venueName?.trim()) ? (
           <p className="rs-list-row__venue">

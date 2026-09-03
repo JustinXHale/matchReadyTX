@@ -74,7 +74,7 @@ import {
 } from '@/domain/requests';
 import { openGroupMailto, uniqueEmails } from '@/services/mailto';
 import { persistCrewAssignmentAndEmail, persistCrewUnassignmentAndEmail, resendCrewAssignmentEmail } from '@/services/liveAssignment';
-import { defaultOrgId, createGameRequestInFirestore, patchGameRequestContentInFirestore, saveMatchCrewAssignment, saveMatchPlayedForfeitInFirestore, saveMatchScheduleUrlInFirestore, callMatchSelfService } from '@/services/orgData';
+import { defaultOrgId, clearMatchForfeitInFirestore, createGameRequestInFirestore, patchGameRequestContentInFirestore, saveMatchCrewAssignment, saveMatchForfeitInFirestore, saveMatchPlayedForfeitInFirestore, saveMatchScheduleUrlInFirestore, callMatchSelfService } from '@/services/orgData';
 import { isFirebaseConfigured } from '@/services/firebase';
 import {
   validateScheduleUrlInput,
@@ -94,6 +94,7 @@ import {
   MatchAssignerMenu,
   type AssignerMenuAction,
 } from '@/features/matches/MatchAssignerMenu';
+import { MatchForfeitModal } from '@/features/matches/MatchForfeitModal';
 
 type CrewPickTarget = {
   slot: RequestableSlot;
@@ -257,6 +258,7 @@ export function MatchDetailPage() {
   const [coverageAlertSent, setCoverageAlertSent] = useState(false);
   const [assignerConfirm, setAssignerConfirm] =
     useState<AssignerMenuAction | null>(null);
+  const [showForfeitModal, setShowForfeitModal] = useState(false);
   /** In-progress fee edits — keeps empty/partial input from snapping to org default. */
   const [feeDrafts, setFeeDrafts] = useState<
     Partial<Record<RequestableSlot, string>>
@@ -1083,11 +1085,55 @@ export function MatchDetailPage() {
         }
         break;
       }
+      case 'clear_forfeit': {
+        store.clearMatchForfeit(match.id);
+        if (dataMode === 'live' && isFirebaseConfigured) {
+          void clearMatchForfeitInFirestore(defaultOrgId(), match.id).catch(
+            (err) => {
+              console.error('clearMatchForfeitInFirestore failed', err);
+              window.alert(
+                err instanceof Error
+                  ? `Updated locally, but save failed: ${err.message}`
+                  : 'Updated locally, but save failed.',
+              );
+            },
+          );
+        }
+        break;
+      }
       case 'reactivate':
         store.reactivateMatch(match.id);
         break;
     }
     setAssignerConfirm(null);
+  };
+
+  const onAssignerMenuAction = (action: AssignerMenuAction) => {
+    if (action === 'forfeit') {
+      setShowForfeitModal(true);
+      return;
+    }
+    setAssignerConfirm(action);
+  };
+
+  const saveMatchForfeit = (input: {
+    forfeitTeamId: string;
+    homeScore: number;
+    awayScore: number;
+  }) => {
+    store.recordMatchForfeit(match.id, input);
+    if (dataMode === 'live' && isFirebaseConfigured) {
+      void saveMatchForfeitInFirestore(defaultOrgId(), match.id, input).catch(
+        (err) => {
+          console.error('saveMatchForfeitInFirestore failed', err);
+          window.alert(
+            err instanceof Error
+              ? `Updated locally, but save failed: ${err.message}`
+              : 'Updated locally, but save failed.',
+          );
+        },
+      );
+    }
   };
 
   const stickyPrimary = (() => {
@@ -1276,7 +1322,7 @@ export function MatchDetailPage() {
                 coverageAlertLabel={
                   coverageAlertSent ? 'Resend alert' : 'Alert refs'
                 }
-                onAction={setAssignerConfirm}
+                onAction={onAssignerMenuAction}
               />
             )}
           </div>
@@ -1364,6 +1410,14 @@ export function MatchDetailPage() {
         )}
         {match.playedForfeit ? (
           <span className="rs-pill rs-pill--quiet">Played forfeit</span>
+        ) : null}
+        {match.forfeitTeamId ? (
+          <span className="rs-pill rs-pill--quiet">
+            Forfeit —{' '}
+            {match.forfeitTeamId === match.homeTeamId
+              ? match.homeTeamName
+              : match.awayTeamName}
+          </span>
         ) : null}
         {shouldShowCrewStatusChips(match) &&
           crewStatusChipsForMatch(match).map((chip) => (
@@ -3089,7 +3143,9 @@ export function MatchDetailPage() {
                     ? 'Mark as played forfeit?'
                     : assignerConfirm === 'clear_played_forfeit'
                       ? 'Clear played forfeit?'
-                      : 'Reactivate this match?'}
+                      : assignerConfirm === 'clear_forfeit'
+                        ? 'Clear forfeit?'
+                        : 'Reactivate this match?'}
           </Title>
         </ModalHeader>
         <ModalBody>
@@ -3104,7 +3160,9 @@ export function MatchDetailPage() {
                     ? 'The match was played, but the result will not count in league standings (like a scrimmage). Officials should still enter the score and file match reports.'
                     : assignerConfirm === 'clear_played_forfeit'
                       ? 'The match will count in league standings again when a score is recorded.'
-                      : match.status === 'postponed'
+                      : assignerConfirm === 'clear_forfeit'
+                        ? 'The forfeit label will be removed. Scores already entered will stay unless you change them.'
+                        : match.status === 'postponed'
                         ? 'The match returns to the schedule as needs reconfirmation. Teams and officials must confirm again.'
                         : 'The match returns to the schedule at the appropriate workflow step based on current confirmations and crew.'}
           </p>
@@ -3129,12 +3187,21 @@ export function MatchDetailPage() {
                   ? 'Postpone match'
                   : assignerConfirm === 'played_forfeit'
                     ? 'Mark played forfeit'
-                    : assignerConfirm === 'clear_played_forfeit'
-                      ? 'Clear played forfeit'
+                  : assignerConfirm === 'clear_played_forfeit'
+                    ? 'Clear played forfeit'
+                    : assignerConfirm === 'clear_forfeit'
+                      ? 'Clear forfeit'
                       : 'Reactivate match'}
           </Button>
         </ModalFooter>
       </Modal>
+
+      <MatchForfeitModal
+        match={match}
+        isOpen={showForfeitModal}
+        onClose={() => setShowForfeitModal(false)}
+        onSave={saveMatchForfeit}
+      />
 
       {requestToast && (
         <div className="rs-update-toast" role="status">

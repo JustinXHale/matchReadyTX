@@ -661,3 +661,25 @@ button.rs-detail-people__confirm:focus-visible {
   padding: var(--rs-space-md);
   background: color-mix(in srgb, var(--rs-color-surface) 42%, transparent);
 }
+
+.rs-forfeit-score {
+  display: flex;
+  align-items: flex-end;
+  gap: var(--pf-t--global--spacer--sm);
+}
+
+.rs-forfeit-score__field {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: var(--pf-t--global--spacer--xs);
+  min-width: 0;
+  font-size: 0.875rem;
+  color: var(--rs-color-muted);
+}
+
+.rs-forfeit-score__sep {
+  padding-bottom: 0.65rem;
+  color: var(--rs-color-muted);
+  font-weight: 600;
+}

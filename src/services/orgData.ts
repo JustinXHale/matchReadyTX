@@ -236,6 +236,10 @@ export function matchFromFirestore(
     postponedAt:
       typeof data.postponedAt === 'string' ? data.postponedAt : undefined,
     playedForfeit: Boolean(data.playedForfeit),
+    forfeitTeamId:
+      typeof data.forfeitTeamId === 'string' && data.forfeitTeamId.trim()
+        ? data.forfeitTeamId.trim()
+        : undefined,
     crew: normalizeCrew(data.crew),
     homeScore: typeof data.homeScore === 'number' ? data.homeScore : undefined,
     awayScore: typeof data.awayScore === 'number' ? data.awayScore : undefined,
@@ -1344,6 +1348,44 @@ export async function saveMatchPlayedForfeitInFirestore(
       playedForfeit,
       updatedAt: new Date().toISOString(),
     }),
+    { merge: true },
+  );
+}
+
+/** Persist forfeit team + final score (assigner; live mode). */
+export async function saveMatchForfeitInFirestore(
+  orgId: string,
+  matchId: string,
+  input: {
+    forfeitTeamId: string;
+    homeScore: number;
+    awayScore: number;
+  },
+): Promise<void> {
+  await setDoc(
+    doc(requireDb(), 'orgs', orgId, 'matches', matchId),
+    stripUndefined({
+      forfeitTeamId: input.forfeitTeamId,
+      homeScore: input.homeScore,
+      awayScore: input.awayScore,
+      playedForfeit: false,
+      updatedAt: new Date().toISOString(),
+    }),
+    { merge: true },
+  );
+}
+
+/** Clear forfeit designation (assigner; live mode). */
+export async function clearMatchForfeitInFirestore(
+  orgId: string,
+  matchId: string,
+): Promise<void> {
+  await setDoc(
+    doc(requireDb(), 'orgs', orgId, 'matches', matchId),
+    {
+      forfeitTeamId: null,
+      updatedAt: new Date().toISOString(),
+    },
     { merge: true },
   );
 }

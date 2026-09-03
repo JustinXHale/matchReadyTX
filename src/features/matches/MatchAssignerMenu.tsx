@@ -12,6 +12,8 @@ export type AssignerMenuAction =
   | 'alert_coverage'
   | 'cancel'
   | 'postpone'
+  | 'forfeit'
+  | 'clear_forfeit'
   | 'played_forfeit'
   | 'clear_played_forfeit'
   | 'reactivate';
@@ -89,6 +91,15 @@ export function MatchAssignerMenu({
             <DropdownItem onClick={() => closeAnd('postpone')}>
               Postpone match
             </DropdownItem>
+            {match.forfeitTeamId ? (
+              <DropdownItem onClick={() => closeAnd('clear_forfeit')}>
+                Clear forfeit
+              </DropdownItem>
+            ) : (
+              <DropdownItem onClick={() => closeAnd('forfeit')}>
+                Forfeit
+              </DropdownItem>
+            )}
             <DropdownItem
               className="rs-detail__assigner-menu-danger"
               onClick={() => closeAnd('cancel')}
