@@ -8,20 +8,49 @@ export type DivisionFilterOptions = {
   genders: MatchGender[];
   levels: string[];
   competitions: string[];
+  matchTypes: string[];
 };
 
 export type DivisionFilterState = {
   gender: MatchGender | null;
   level: string | null;
   competition: string | null;
+  matchType?: string | null;
+};
+
+export type MultiDivisionFilterState = {
+  genders: MatchGender[];
+  levels: string[];
+  competitions: string[];
+  matchTypes: string[];
 };
 
 export function divisionFiltersActive(filters: DivisionFilterState): boolean {
   return (
     filters.gender != null ||
     filters.level != null ||
-    filters.competition != null
+    filters.competition != null ||
+    filters.matchType != null
   );
+}
+
+export function multiDivisionFiltersActive(
+  filters: MultiDivisionFilterState,
+): boolean {
+  return (
+    filters.genders.length > 0 ||
+    filters.levels.length > 0 ||
+    filters.competitions.length > 0 ||
+    filters.matchTypes.length > 0
+  );
+}
+
+function normalizeCompetitionFilter(
+  competitionFilter?: string | null | string[],
+): string[] {
+  if (competitionFilter == null) return [];
+  if (Array.isArray(competitionFilter)) return competitionFilter;
+  return competitionFilter ? [competitionFilter] : [];
 }
 
 function sortedUnique(values: string[]): string[] {
@@ -34,34 +63,39 @@ function optionsFromMatches(matches: Match[]): DivisionFilterOptions {
   const genders = new Set<MatchGender>();
   const levels: string[] = [];
   const competitions: string[] = [];
+  const matchTypes: string[] = [];
 
   for (const m of matches) {
     genders.add(m.gender);
     if (m.level?.trim()) levels.push(m.level.trim());
     if (m.competition?.trim()) competitions.push(m.competition.trim());
+    if (m.matchType?.trim()) matchTypes.push(m.matchType.trim());
   }
 
   return {
     genders: (['men', 'women'] as MatchGender[]).filter((g) => genders.has(g)),
     levels: sortedUnique(levels),
     competitions: uniqueDisplayedCompetitions(competitions),
+    matchTypes: sortedUnique(matchTypes),
   };
 }
 
 /** Unique filter chips from match facts — only values that appear in the dataset. */
 export function divisionFilterOptionsFromMatches(
   matches: Match[],
-  competitionFilter?: string | null,
+  competitionFilter?: string | null | string[],
 ): DivisionFilterOptions {
   const all = optionsFromMatches(matches);
-  if (!competitionFilter) return all;
+  const comps = normalizeCompetitionFilter(competitionFilter);
+  if (comps.length === 0) return all;
   const scoped = optionsFromMatches(
-    matches.filter((m) => matchInCompetition(m, competitionFilter)),
+    matches.filter((m) => comps.some((c) => matchInCompetition(m, c))),
   );
   return {
     competitions: all.competitions,
     levels: scoped.levels,
     genders: scoped.genders,
+    matchTypes: scoped.matchTypes,
   };
 }
 
@@ -142,6 +176,7 @@ export function divisionFilterOptionsFromFixtureRequests(
     genders: (['men', 'women'] as MatchGender[]).filter((g) => genders.has(g)),
     levels: sortedUnique(levels),
     competitions: sortedUnique(competitions),
+    matchTypes: [],
   };
 }
 
@@ -152,17 +187,20 @@ export function mergeDivisionFilterOptions(
   const genders = new Set<MatchGender>();
   const levels: string[] = [];
   const competitions: string[] = [];
+  const matchTypes: string[] = [];
 
   for (const pool of pools) {
     for (const g of pool.genders) genders.add(g);
     levels.push(...pool.levels);
     competitions.push(...pool.competitions);
+    matchTypes.push(...pool.matchTypes);
   }
 
   return {
     genders: (['men', 'women'] as MatchGender[]).filter((g) => genders.has(g)),
     levels: sortedUnique(levels),
     competitions: sortedUnique(competitions),
+    matchTypes: sortedUnique(matchTypes),
   };
 }
 
@@ -184,10 +222,42 @@ export function matchMatchesDivisionFilters(
   genderFilter: MatchGender | null,
   levelFilter: string | null,
   competitionFilter: string | null = null,
+  matchTypeFilter: string | null = null,
 ): boolean {
   if (genderFilter && match.gender !== genderFilter) return false;
   if (levelFilter && match.level !== levelFilter) return false;
+  if (matchTypeFilter && (match.matchType?.trim() ?? '') !== matchTypeFilter) {
+    return false;
+  }
   if (!matchInCompetition(match, competitionFilter)) return false;
+  return true;
+}
+
+export function matchMatchesMultiDivisionFilters(
+  match: Match,
+  filters: MultiDivisionFilterState,
+): boolean {
+  if (
+    filters.genders.length > 0 &&
+    !filters.genders.includes(match.gender)
+  ) {
+    return false;
+  }
+  if (filters.levels.length > 0 && !filters.levels.includes(match.level)) {
+    return false;
+  }
+  if (
+    filters.matchTypes.length > 0 &&
+    !filters.matchTypes.includes(match.matchType?.trim() ?? '')
+  ) {
+    return false;
+  }
+  if (filters.competitions.length > 0) {
+    const comp = match.competition ?? '';
+    if (!filters.competitions.some((c) => matchInCompetition({ competition: comp }, c))) {
+      return false;
+    }
+  }
   return true;
 }
 

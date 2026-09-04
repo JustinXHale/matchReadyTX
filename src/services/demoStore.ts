@@ -2632,11 +2632,13 @@ class DemoStore {
         (formKind === 'mo_quick' || formKind === 'mo_performance')
       ) {
         const mo = payload as MoReportPayload;
-        matches = s.matches.map((m) =>
-          m.id === report.matchId
-            ? { ...m, homeScore: mo.homePoints, awayScore: mo.awayPoints }
-            : m,
-        );
+        if (!mo.tournamentMatch) {
+          matches = s.matches.map((m) =>
+            m.id === report.matchId
+              ? { ...m, homeScore: mo.homePoints, awayScore: mo.awayPoints }
+              : m,
+          );
+        }
       }
       return {
         ...s,

@@ -154,16 +154,26 @@ export function MatchReportViewPage() {
         <SubmittedPerformanceReportView mo={mo} match={match} />
       ) : mo ? (
         <>
-          <Field label="Score">
-            {mo.homeTeamName ?? match.homeTeamName} {mo.homePoints} –{' '}
-            {mo.awayPoints} {mo.awayTeamName ?? match.awayTeamName}
-          </Field>
-          <Field label="Cards">
-            Home YC {mo.homeYellowCards ?? '–'} / RC {mo.homeRedCards ?? '–'} ·
-            Away YC {mo.awayYellowCards ?? '–'} / RC {mo.awayRedCards ?? '–'}
-            {(mo.yellowCards != null || mo.redCards != null) &&
-              ` (totals Y${mo.yellowCards ?? 0} R${mo.redCards ?? 0})`}
-          </Field>
+          {mo.tournamentMatch ? (
+            <Field label="Tournament match">
+              Score and card counts were not recorded — multiple games in a
+              tournament day.
+            </Field>
+          ) : (
+            <>
+              <Field label="Score">
+                {mo.homeTeamName ?? match.homeTeamName} {mo.homePoints} –{' '}
+                {mo.awayPoints} {mo.awayTeamName ?? match.awayTeamName}
+              </Field>
+              <Field label="Cards">
+                Home YC {mo.homeYellowCards ?? '–'} / RC {mo.homeRedCards ?? '–'}{' '}
+                · Away YC {mo.awayYellowCards ?? '–'} / RC{' '}
+                {mo.awayRedCards ?? '–'}
+                {(mo.yellowCards != null || mo.redCards != null) &&
+                  ` (totals Y${mo.yellowCards ?? 0} R${mo.redCards ?? 0})`}
+              </Field>
+            </>
+          )}
           {mo.crewAttendance && mo.crewAttendance.length > 0 && (
             <Field label="Crew attendance">
               <ul className="rs-crew-attend">

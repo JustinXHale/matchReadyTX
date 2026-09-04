@@ -532,6 +532,17 @@ input.rs-filter-search {
   max-width: 100%;
 }
 
+.rs-filter-field--select {
+  flex: 1 1 7.5rem;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.rs-filter-field--competition.rs-filter-field--select {
+  flex: 0 1 auto;
+  width: max-content;
+}
+
 .rs-filter-field--date {
   flex: 1 1 10rem;
   min-width: 0;

@@ -89,22 +89,29 @@ export function SubmittedPerformanceReportView({
         <Field label="Match date">{mo.matchDate}</Field>
         <Field label="Format">{mo.format}</Field>
         <Field label="Division">{mo.division}</Field>
-        <div className="rs-form-grid-2">
-          <TeamScoreReadout
-            side="Home"
-            teamName={homeName}
-            points={mo.homePoints}
-            yellow={mo.homeYellowCards}
-            red={mo.homeRedCards}
-          />
-          <TeamScoreReadout
-            side="Away"
-            teamName={awayName}
-            points={mo.awayPoints}
-            yellow={mo.awayYellowCards}
-            red={mo.awayRedCards}
-          />
-        </div>
+        {mo.tournamentMatch ? (
+          <Field label="Tournament match">
+            Score and card counts were not recorded — multiple games in a
+            tournament day.
+          </Field>
+        ) : (
+          <div className="rs-form-grid-2">
+            <TeamScoreReadout
+              side="Home"
+              teamName={homeName}
+              points={mo.homePoints}
+              yellow={mo.homeYellowCards}
+              red={mo.homeRedCards}
+            />
+            <TeamScoreReadout
+              side="Away"
+              teamName={awayName}
+              points={mo.awayPoints}
+              yellow={mo.awayYellowCards}
+              red={mo.awayRedCards}
+            />
+          </div>
+        )}
         <Field label="Referee team">{mo.refereeTeamNote}</Field>
       </Section>
 

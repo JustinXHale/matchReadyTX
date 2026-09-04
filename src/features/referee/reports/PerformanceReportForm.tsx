@@ -21,7 +21,13 @@ import {
   type Match,
   type UserProfile,
 } from '@/domain/types';
+import { isTournamentMatchLevel } from '@/domain/matchScheduleUrl';
 import { CrewAttendanceFields, formatCrewAttendanceNote } from '@/features/referee/reports/CrewAttendanceFields';
+import {
+  TeamScoreCard,
+  TournamentMatchCheckbox,
+  tournamentMoScorePayload,
+} from '@/features/referee/reports/TeamScoreFields';
 import { useScrollReportToTopOnChange } from '@/features/referee/reports/scrollReportToTop';
 import { IconDateInput } from '@/ui/IconDateInput';
 import { MultiSelectCards } from '@/ui/MultiSelectCards';
@@ -38,65 +44,6 @@ const SECTION_TITLES = [
 
 const SNAPSHOT_SCALE_LEGEND =
   '1 Poor · 2 Below Average · 3 Average · 4 Above Average · 5 Excellent';
-
-function TeamScoreCard({
-  teamName,
-  side,
-  points,
-  yellow,
-  red,
-  onPoints,
-  onYellow,
-  onRed,
-}: {
-  teamName: string;
-  side: 'home' | 'away';
-  points: string;
-  yellow: string;
-  red: string;
-  onPoints: (v: string) => void;
-  onYellow: (v: string) => void;
-  onRed: (v: string) => void;
-}) {
-  return (
-    <div className="rs-team-score-card">
-      <div className="rs-team-score-card__head">
-        <span className="rs-pill rs-pill--ink">
-          {side === 'home' ? 'Home' : 'Away'}
-        </span>
-        <strong>{teamName}</strong>
-      </div>
-      <div className="rs-form-grid-3">
-        <FormGroup label="Points" isRequired fieldId={`${side}-pts`}>
-          <TextInput
-            id={`${side}-pts`}
-            type="number"
-            value={points}
-            onChange={(_e, v) => onPoints(v)}
-          />
-        </FormGroup>
-        <FormGroup label="YC" isRequired fieldId={`${side}-yc`}>
-          <TextInput
-            id={`${side}-yc`}
-            type="number"
-            min={0}
-            value={yellow}
-            onChange={(_e, v) => onYellow(v)}
-          />
-        </FormGroup>
-        <FormGroup label="RC" isRequired fieldId={`${side}-rc`}>
-          <TextInput
-            id={`${side}-rc`}
-            type="number"
-            min={0}
-            value={red}
-            onChange={(_e, v) => onRed(v)}
-          />
-        </FormGroup>
-      </div>
-    </div>
-  );
-}
 
 export function PerformanceReportForm({
   match,
@@ -138,6 +85,9 @@ export function PerformanceReportForm({
   const [homeRed, setHomeRed] = useState('0');
   const [awayYellow, setAwayYellow] = useState('0');
   const [awayRed, setAwayRed] = useState('0');
+  const [isTournament, setIsTournament] = useState(() =>
+    isTournamentMatchLevel(match.level),
+  );
 
   const [gameTemperature, setGameTemperature] = useState<number | ''>('');
   const [controlAndFlow, setControlAndFlow] = useState<number | ''>('');
@@ -160,20 +110,22 @@ export function PerformanceReportForm({
       if (!matchDate) return 'Match date is required.';
       if (!format) return 'Select match format (7s / 10s / 15s).';
       if (!division.trim()) return 'Division is required.';
-      const hp = Number(homePoints);
-      const ap = Number(awayPoints);
-      if (!Number.isFinite(hp) || !Number.isFinite(ap)) {
-        return 'Enter home and away points.';
-      }
-      for (const [label, v] of [
-        ['Home YC', homeYellow],
-        ['Home RC', homeRed],
-        ['Away YC', awayYellow],
-        ['Away RC', awayRed],
-      ] as const) {
-        const n = Number(v);
-        if (!Number.isFinite(n) || n < 0) {
-          return `${label} must be zero or greater.`;
+      if (!isTournament) {
+        const hp = Number(homePoints);
+        const ap = Number(awayPoints);
+        if (!Number.isFinite(hp) || !Number.isFinite(ap)) {
+          return 'Enter home and away points.';
+        }
+        for (const [label, v] of [
+          ['Home YC', homeYellow],
+          ['Home RC', homeRed],
+          ['Away YC', awayYellow],
+          ['Away RC', awayRed],
+        ] as const) {
+          const n = Number(v);
+          if (!Number.isFinite(n) || n < 0) {
+            return `${label} must be zero or greater.`;
+          }
         }
       }
       if (someoneAbsent && !crewAbsenceNote.trim()) {
@@ -234,15 +186,20 @@ export function PerformanceReportForm({
     const hr = Number(homeRed);
     const ay = Number(awayYellow);
     const ar = Number(awayRed);
+    const scorePayload = isTournament
+      ? tournamentMoScorePayload()
+      : {
+          homePoints: Number(homePoints),
+          awayPoints: Number(awayPoints),
+          homeYellowCards: hy,
+          homeRedCards: hr,
+          awayYellowCards: ay,
+          awayRedCards: ar,
+          yellowCards: hy + ay,
+          redCards: hr + ar,
+        };
     const payload: MoReportPayload = {
-      homePoints: Number(homePoints),
-      awayPoints: Number(awayPoints),
-      homeYellowCards: hy,
-      homeRedCards: hr,
-      awayYellowCards: ay,
-      awayRedCards: ar,
-      yellowCards: hy + ay,
-      redCards: hr + ar,
+      ...scorePayload,
       refereeName: refereeName.trim(),
       matchDate,
       format: format as MatchFormat,
@@ -267,6 +224,7 @@ export function PerformanceReportForm({
       otherCommentsOrLink: otherCommentsOrLink.trim() || undefined,
       lightFeedback: matchFeedback.trim() || undefined,
       cmoDidNotAttend: cmoDidNotAttend || undefined,
+      tournamentMatch: isTournament || undefined,
     };
     onSubmit(payload);
   };
@@ -358,6 +316,12 @@ export function PerformanceReportForm({
               </div>
             </FormGroup>
 
+            <TournamentMatchCheckbox
+              id="perf-tournament"
+              checked={isTournament}
+              onChange={setIsTournament}
+            />
+
             <TeamScoreCard
               teamName={match.homeTeamName}
               side="home"
@@ -367,6 +331,7 @@ export function PerformanceReportForm({
               onPoints={setHomePoints}
               onYellow={setHomeYellow}
               onRed={setHomeRed}
+              disabled={isTournament}
             />
             <TeamScoreCard
               teamName={match.awayTeamName}
@@ -377,6 +342,7 @@ export function PerformanceReportForm({
               onPoints={setAwayPoints}
               onYellow={setAwayYellow}
               onRed={setAwayRed}
+              disabled={isTournament}
             />
 
             <CrewAttendanceFields

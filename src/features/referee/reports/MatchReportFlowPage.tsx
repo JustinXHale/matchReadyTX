@@ -7,7 +7,6 @@ import {
   FormGroup,
   Radio,
   TextArea,
-  TextInput,
   Title,
 } from '@patternfly/react-core';
 import { useApp } from '@/app/AppContext';
@@ -24,6 +23,7 @@ import {
   type ReportFormKind,
 } from '@/domain/reports';
 import { backState, useAppBack } from '@/nav/backNav';
+import { isTournamentMatchLevel } from '@/domain/matchScheduleUrl';
 import {
   cardReportPath,
   MATCH_REPORTS_BACK,
@@ -35,6 +35,11 @@ import {
   CrewAttendanceFields,
   formatCrewAttendanceNote,
 } from '@/features/referee/reports/CrewAttendanceFields';
+import {
+  TeamScoreCard,
+  TournamentMatchCheckbox,
+  tournamentMoScorePayload,
+} from '@/features/referee/reports/TeamScoreFields';
 import {
   persistSubmittedMatchReport,
   ensureMatchReportReady,
@@ -101,6 +106,9 @@ export function MatchReportFlowPage() {
   const [homeRed, setHomeRed] = useState('0');
   const [awayYellow, setAwayYellow] = useState('0');
   const [awayRed, setAwayRed] = useState('0');
+  const [isTournament, setIsTournament] = useState(() =>
+    match ? isTournamentMatchLevel(match.level) : false,
+  );
   const [lightFeedback, setLightFeedback] = useState('');
   const [crewAttendance, setCrewAttendance] = useState<CrewAttendanceEntry[]>(
     () => (match ? crewForAttendance(match) : []),
@@ -118,6 +126,7 @@ export function MatchReportFlowPage() {
   useEffect(() => {
     if (!match) return;
     setCrewAttendance(crewForAttendance(match));
+    setIsTournament(isTournamentMatchLevel(match.level));
   }, [match?.id]);
 
   const [crewIssuesNote, setCrewIssuesNote] = useState('');
@@ -300,13 +309,15 @@ export function MatchReportFlowPage() {
       const hr = Number(homeRed);
       const ay = Number(awayYellow);
       const ar = Number(awayRed);
-      if (!Number.isFinite(home) || !Number.isFinite(away)) {
-        setError('Enter home and away points.');
-        return;
-      }
-      if ([hy, hr, ay, ar].some((n) => !Number.isFinite(n) || n < 0)) {
-        setError('Card counts must be zero or greater.');
-        return;
+      if (!isTournament) {
+        if (!Number.isFinite(home) || !Number.isFinite(away)) {
+          setError('Enter home and away points.');
+          return;
+        }
+        if ([hy, hr, ay, ar].some((n) => !Number.isFinite(n) || n < 0)) {
+          setError('Card counts must be zero or greater.');
+          return;
+        }
       }
       const someoneAbsent = crewAttendance.some((c) => !c.attended);
       if (someoneAbsent && !crewAbsenceNote.trim()) {
@@ -314,16 +325,22 @@ export function MatchReportFlowPage() {
         return;
       }
 
+      const scorePayload = isTournament
+        ? tournamentMoScorePayload()
+        : {
+            homePoints: home,
+            awayPoints: away,
+            homeYellowCards: hy,
+            homeRedCards: hr,
+            awayYellowCards: ay,
+            awayRedCards: ar,
+            yellowCards: hy + ay,
+            redCards: hr + ar,
+          };
+
       await submitMoPayload(
         {
-          homePoints: home,
-          awayPoints: away,
-          homeYellowCards: hy,
-          homeRedCards: hr,
-          awayYellowCards: ay,
-          awayRedCards: ar,
-          yellowCards: hy + ay,
-          redCards: hr + ar,
+          ...scorePayload,
           lightFeedback: lightFeedback.trim() || undefined,
           crewAttendance,
           crewAbsenceNote: someoneAbsent
@@ -332,6 +349,7 @@ export function MatchReportFlowPage() {
           crewIssuesNote: crewIssuesNote.trim() || undefined,
           refereeTeamNote: formatCrewAttendanceNote(crewAttendance) || undefined,
           cmoDidNotAttend: hasCmo && formKind === 'mo_quick' ? true : undefined,
+          tournamentMatch: isTournament || undefined,
         },
         'mo_quick',
       );
@@ -502,74 +520,35 @@ export function MatchReportFlowPage() {
       >
         {kind === 'mo_quick' && (
           <>
-            <div className="rs-team-score-card">
-              <div className="rs-team-score-card__head">
-                <span className="rs-pill rs-pill--ink">Home</span>
-                <strong>{match.homeTeamName}</strong>
-              </div>
-              <div className="rs-form-grid-3">
-                <FormGroup label="Points" isRequired fieldId="mo-home">
-                  <TextInput
-                    id="mo-home"
-                    type="number"
-                    value={homePoints}
-                    onChange={(_e, v) => setHomePoints(v)}
-                  />
-                </FormGroup>
-                <FormGroup label="YC" isRequired fieldId="mo-hy">
-                  <TextInput
-                    id="mo-hy"
-                    type="number"
-                    min={0}
-                    value={homeYellow}
-                    onChange={(_e, v) => setHomeYellow(v)}
-                  />
-                </FormGroup>
-                <FormGroup label="RC" isRequired fieldId="mo-hr">
-                  <TextInput
-                    id="mo-hr"
-                    type="number"
-                    min={0}
-                    value={homeRed}
-                    onChange={(_e, v) => setHomeRed(v)}
-                  />
-                </FormGroup>
-              </div>
-            </div>
-            <div className="rs-team-score-card">
-              <div className="rs-team-score-card__head">
-                <span className="rs-pill rs-pill--ink">Away</span>
-                <strong>{match.awayTeamName}</strong>
-              </div>
-              <div className="rs-form-grid-3">
-                <FormGroup label="Points" isRequired fieldId="mo-away">
-                  <TextInput
-                    id="mo-away"
-                    type="number"
-                    value={awayPoints}
-                    onChange={(_e, v) => setAwayPoints(v)}
-                  />
-                </FormGroup>
-                <FormGroup label="YC" isRequired fieldId="mo-ay">
-                  <TextInput
-                    id="mo-ay"
-                    type="number"
-                    min={0}
-                    value={awayYellow}
-                    onChange={(_e, v) => setAwayYellow(v)}
-                  />
-                </FormGroup>
-                <FormGroup label="RC" isRequired fieldId="mo-ar">
-                  <TextInput
-                    id="mo-ar"
-                    type="number"
-                    min={0}
-                    value={awayRed}
-                    onChange={(_e, v) => setAwayRed(v)}
-                  />
-                </FormGroup>
-              </div>
-            </div>
+            <TournamentMatchCheckbox
+              id="quick-tournament"
+              checked={isTournament}
+              onChange={setIsTournament}
+            />
+            <TeamScoreCard
+              teamName={match.homeTeamName}
+              side="home"
+              points={homePoints}
+              yellow={homeYellow}
+              red={homeRed}
+              onPoints={setHomePoints}
+              onYellow={setHomeYellow}
+              onRed={setHomeRed}
+              disabled={isTournament}
+              idPrefix="mo-home"
+            />
+            <TeamScoreCard
+              teamName={match.awayTeamName}
+              side="away"
+              points={awayPoints}
+              yellow={awayYellow}
+              red={awayRed}
+              onPoints={setAwayPoints}
+              onYellow={setAwayYellow}
+              onRed={setAwayRed}
+              disabled={isTournament}
+              idPrefix="mo-away"
+            />
             <CrewAttendanceFields
               crewAttendance={crewAttendance}
               onAttendanceChange={setCrewAttendance}

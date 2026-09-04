@@ -172,6 +172,8 @@ export interface MoReportPayload {
   lightFeedback?: string;
   /** When a CMO was assigned but did not show — unlocks Quick Report. */
   cmoDidNotAttend?: boolean;
+  /** Tournament day — score and card counts are not collected. */
+  tournamentMatch?: boolean;
   /** Section 2 — Snapshot self assessment */
   gameTemperature?: number;
   controlAndFlow?: number;
@@ -1038,7 +1040,7 @@ export function totalCardsFromMoPayload(p: MoReportPayload | undefined): {
   yellow: number;
   red: number;
 } {
-  if (!p) return { yellow: 0, red: 0 };
+  if (!p || p.tournamentMatch) return { yellow: 0, red: 0 };
   const yellow =
     p.homeYellowCards != null || p.awayYellowCards != null
       ? (p.homeYellowCards ?? 0) + (p.awayYellowCards ?? 0)

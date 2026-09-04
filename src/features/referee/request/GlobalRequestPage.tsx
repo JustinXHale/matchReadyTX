@@ -1,21 +1,23 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { EmptyState, EmptyStateBody, Title } from '@patternfly/react-core';
 import { useApp } from '@/app/AppContext';
 import {
+  AvailableMatchesFilters,
+  type AvailableMatchesFilterState,
+} from '@/features/referee/request/AvailableMatchesFilters';
+import {
   divisionFilterOptionsFromMatches,
-  divisionFiltersActive,
-  matchMatchesDivisionFilters,
+  matchMatchesMultiDivisionFilters,
   matchOnCalendarDate,
+  multiDivisionFiltersActive,
   uniqueMatchCalendarDates,
 } from '@/domain/divisionFilters';
-import { GlobalDivisionFilters } from '@/features/global/GlobalDivisionFilters';
 import { MatchListRow } from '@/ui/MatchListRow';
 import { canOfficialRequestMatch, openRequestSlots } from '@/domain/requests';
 import {
   REQUESTABLE_SLOT_SHORT,
   type Match,
-  type MatchGender,
   type RequestableSlot,
 } from '@/domain/types';
 import { backState, type BackNav } from '@/nav/backNav';
@@ -39,12 +41,26 @@ const ROLE_FILTERS: { id: RoleFilter; label: string }[] = [
   { id: 'no4', label: '#4 Only' },
 ];
 
+const EMPTY_FILTERS: AvailableMatchesFilterState = {
+  date: null,
+  competitions: [],
+  tiers: [],
+  genders: [],
+  matchTypes: [],
+  roles: [],
+};
+
 function matchHasOpenRole(match: Match, filter: RoleFilter): boolean {
   const open = openRequestSlots(match);
   if (filter === 'mo') return open.includes('mo');
   if (filter === 'ar') return open.includes('ar1') || open.includes('ar2');
   if (filter === 'cmo') return open.includes('cmo');
   return open.includes('no4');
+}
+
+function matchHasAnyOpenRole(match: Match, filters: RoleFilter[]): boolean {
+  if (filters.length === 0) return true;
+  return filters.some((filter) => matchHasOpenRole(match, filter));
 }
 
 function formatOpenSlots(slots: RequestableSlot[]): string {
@@ -81,13 +97,7 @@ function RaiseHandTrailing({ match }: { match: Match }) {
 export function GlobalRequestPage() {
   const { currentUser, state } = useApp();
   const timeZone = orgTimeZone(state.org.timezone);
-  const [roleFilter, setRoleFilter] = useState<RoleFilter | null>(null);
-  const [genderFilter, setGenderFilter] = useState<MatchGender | null>(null);
-  const [levelFilter, setLevelFilter] = useState<string | null>(null);
-  const [competitionFilter, setCompetitionFilter] = useState<string | null>(
-    null,
-  );
-  const [dateFilter, setDateFilter] = useState<string | null>(null);
+  const [filters, setFilters] = useState<AvailableMatchesFilterState>(EMPTY_FILTERS);
 
   const filterPool = useMemo(() => {
     if (!currentUser) return [] as Match[];
@@ -98,25 +108,46 @@ export function GlobalRequestPage() {
   }, [currentUser, state.matches, state.requests]);
 
   const filterOptions = useMemo(
-    () => divisionFilterOptionsFromMatches(filterPool, competitionFilter),
-    [filterPool, competitionFilter],
+    () =>
+      divisionFilterOptionsFromMatches(filterPool, filters.competitions),
+    [filterPool, filters.competitions],
   );
 
-  const divisionActive = divisionFiltersActive({
-    gender: genderFilter,
-    level: levelFilter,
-    competition: competitionFilter,
+  useEffect(() => {
+    setFilters((prev) => ({
+      ...prev,
+      competitions: prev.competitions.filter((value) =>
+        filterOptions.competitions.includes(value),
+      ),
+      tiers: prev.tiers.filter((value) => filterOptions.levels.includes(value)),
+      genders: prev.genders.filter((value) =>
+        filterOptions.genders.includes(value),
+      ),
+      matchTypes: prev.matchTypes.filter((value) =>
+        filterOptions.matchTypes.includes(value),
+      ),
+    }));
+  }, [filterOptions]);
+
+  const divisionActive = multiDivisionFiltersActive({
+    genders: filters.genders,
+    levels: filters.tiers,
+    competitions: filters.competitions,
+    matchTypes: filters.matchTypes,
   });
 
   const matchesDivision = (m: Match) =>
-    matchOnCalendarDate(m, dateFilter) &&
+    matchOnCalendarDate(m, filters.date) &&
     (!divisionActive ||
-      matchMatchesDivisionFilters(
-        m,
-        genderFilter,
-        levelFilter,
-        competitionFilter,
-      ));
+      matchMatchesMultiDivisionFilters(m, {
+        genders: filters.genders,
+        levels: filters.tiers,
+        competitions: filters.competitions,
+        matchTypes: filters.matchTypes,
+      }));
+
+  const matchesRole = (m: Match) =>
+    matchHasAnyOpenRole(m, filters.roles as RoleFilter[]);
 
   const availableDates = useMemo(
     () =>
@@ -124,28 +155,28 @@ export function GlobalRequestPage() {
         filterPool.filter((m) => {
           if (
             divisionActive &&
-            !matchMatchesDivisionFilters(
-              m,
-              genderFilter,
-              levelFilter,
-              competitionFilter,
-            )
+            !matchMatchesMultiDivisionFilters(m, {
+              genders: filters.genders,
+              levels: filters.tiers,
+              competitions: filters.competitions,
+              matchTypes: filters.matchTypes,
+            })
           ) {
             return false;
           }
-          if (roleFilter && !matchHasOpenRole(m, roleFilter)) return false;
+          if (!matchesRole(m)) return false;
           return true;
         }),
       ),
-    [
-      filterPool,
-      divisionActive,
-      genderFilter,
-      levelFilter,
-      competitionFilter,
-      roleFilter,
-    ],
+    [filterPool, divisionActive, filters.genders, filters.tiers, filters.competitions, filters.matchTypes, filters.roles],
   );
+
+  useEffect(() => {
+    if (!filters.date || availableDates == null) return;
+    if (!availableDates.includes(filters.date)) {
+      setFilters((prev) => ({ ...prev, date: null }));
+    }
+  }, [availableDates, filters.date]);
 
   const urgentMatches = useMemo(() => {
     if (!currentUser) return [] as Match[];
@@ -174,11 +205,8 @@ export function GlobalRequestPage() {
     state.officialAlerts,
     state.matches,
     state.requests,
+    filters,
     divisionActive,
-    genderFilter,
-    levelFilter,
-    competitionFilter,
-    dateFilter,
   ]);
 
   const urgentIds = useMemo(
@@ -205,27 +233,18 @@ export function GlobalRequestPage() {
     state.matches,
     state.requests,
     urgentIds,
+    filters,
     divisionActive,
-    genderFilter,
-    levelFilter,
-    competitionFilter,
-    dateFilter,
   ]);
 
   const filteredUrgent = useMemo(
-    () =>
-      roleFilter
-        ? urgentMatches.filter((m) => matchHasOpenRole(m, roleFilter))
-        : urgentMatches,
-    [urgentMatches, roleFilter],
+    () => urgentMatches.filter(matchesRole),
+    [urgentMatches, filters.roles],
   );
 
   const filteredOpen = useMemo(
-    () =>
-      roleFilter
-        ? openGames.filter((m) => matchHasOpenRole(m, roleFilter))
-        : openGames,
-    [openGames, roleFilter],
+    () => openGames.filter(matchesRole),
+    [openGames, filters.roles],
   );
 
   const byMonth = useMemo(() => {
@@ -252,42 +271,17 @@ export function GlobalRequestPage() {
 
   return (
     <div className="rs-stack">
-      <GlobalDivisionFilters
+      <AvailableMatchesFilters
         options={filterOptions}
-        genderFilter={genderFilter}
-        levelFilter={levelFilter}
-        competitionFilter={competitionFilter}
-        onGenderChange={setGenderFilter}
-        onLevelChange={setLevelFilter}
-        onCompetitionChange={setCompetitionFilter}
-        showDate
-        dateFilter={dateFilter}
-        onDateChange={setDateFilter}
+        filters={filters}
+        onFiltersChange={setFilters}
         availableDates={availableDates}
-        ariaLabel="Filter requestable games"
+        showRoles={hasBase}
+        roleOptions={ROLE_FILTERS.map((f) => ({
+          value: f.id,
+          label: f.label,
+        }))}
       />
-
-      {hasBase && (
-        <div
-          className="rs-filter-chips"
-          role="group"
-          aria-label="Filter by open position"
-        >
-          {ROLE_FILTERS.map((f) => (
-            <button
-              key={f.id}
-              type="button"
-              className={`rs-filter-chip${roleFilter === f.id ? ' rs-filter-chip--selected' : ''}`}
-              aria-pressed={roleFilter === f.id}
-              onClick={() =>
-                setRoleFilter((prev) => (prev === f.id ? null : f.id))
-              }
-            >
-              {f.label}
-            </button>
-          ))}
-        </div>
-      )}
 
       {!hasBase ? (
         <EmptyState titleText="No available matches" headingLevel="h3">
@@ -298,7 +292,8 @@ export function GlobalRequestPage() {
       ) : !hasAny ? (
         <EmptyState titleText="No matching games" headingLevel="h3">
           <EmptyStateBody>
-            No available matches match this filter. Tap a chip again to clear.
+            No available matches match these filters. Clear filters to see more
+            games.
           </EmptyStateBody>
         </EmptyState>
       ) : (
