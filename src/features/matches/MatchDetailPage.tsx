@@ -77,6 +77,7 @@ import { persistCrewAssignmentAndEmail, persistCrewUnassignmentAndEmail, resendC
 import { defaultOrgId, clearMatchForfeitInFirestore, createGameRequestInFirestore, patchGameRequestContentInFirestore, saveMatchCrewAssignment, saveMatchForfeitInFirestore, saveMatchPlayedForfeitInFirestore, saveMatchScheduleUrlInFirestore, callMatchSelfService } from '@/services/orgData';
 import { isFirebaseConfigured } from '@/services/firebase';
 import {
+  isTournamentMatchLevel,
   validateScheduleUrlInput,
 } from '@/domain/matchScheduleUrl';
 import { backState, useAppBack } from '@/nav/backNav';
@@ -472,6 +473,7 @@ export function MatchDetailPage() {
   }
 
   const isAssigner = isAssignerView;
+  const showTournamentSchedule = isTournamentMatchLevel(match.level);
   const showMatchEconomics = canSeeMatchFees({
     hasAssignerRole,
     isAssignerView,
@@ -1801,7 +1803,7 @@ export function MatchDetailPage() {
           <h3 id="event-info-heading" className="rs-detail-section__label">
             Event information
           </h3>
-          {match.scheduleUrl ? (
+          {showTournamentSchedule && match.scheduleUrl ? (
             <Button
               variant="link"
               isInline
@@ -2001,7 +2003,7 @@ export function MatchDetailPage() {
           )}
         </div>
 
-        {(isAssigner || match.scheduleUrl) && (
+        {showTournamentSchedule && (isAssigner || match.scheduleUrl) && (
           <div className="rs-detail-additional">
             <h4 className="rs-detail-section__sublabel">Tournament schedule</h4>
             {isAssigner ? (

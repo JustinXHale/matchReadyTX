@@ -2,6 +2,18 @@
 
 const MAX_SCHEDULE_URL_LENGTH = 500;
 
+/** Match level is tournament-style (Tourney chip, 7s, etc.). */
+export function isTournamentMatchLevel(level: string | undefined): boolean {
+  const l = (level ?? '').trim().toLowerCase();
+  if (!l) return false;
+  return (
+    l === 'tourney' ||
+    l === '7s' ||
+    l.includes('tournament') ||
+    l.includes('tourney')
+  );
+}
+
 export function normalizeScheduleUrl(raw?: string): string | undefined {
   const trimmed = raw?.trim();
   return trimmed ? trimmed : undefined;

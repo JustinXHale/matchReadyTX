@@ -1,11 +1,20 @@
 import { describe, expect, it } from 'vitest';
 import {
+  isTournamentMatchLevel,
   isValidScheduleUrl,
   normalizeScheduleUrl,
   validateScheduleUrlInput,
 } from './matchScheduleUrl';
 
 describe('matchScheduleUrl', () => {
+  it('detects tournament match levels', () => {
+    expect(isTournamentMatchLevel('Tourney')).toBe(true);
+    expect(isTournamentMatchLevel('7s')).toBe(true);
+    expect(isTournamentMatchLevel('Spring Tournament')).toBe(true);
+    expect(isTournamentMatchLevel('D1')).toBe(false);
+    expect(isTournamentMatchLevel(undefined)).toBe(false);
+  });
+
   it('normalizes empty input to undefined', () => {
     expect(normalizeScheduleUrl('')).toBeUndefined();
     expect(normalizeScheduleUrl('   ')).toBeUndefined();

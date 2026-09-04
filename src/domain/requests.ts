@@ -36,6 +36,12 @@ export function isKickoffUpcoming(match: Match, nowMs = Date.now()): boolean {
   return new Date(match.kickoffAt).getTime() > nowMs;
 }
 
+/** League schedule panes: upcoming until kickoff, unless ended early (forfeit). */
+export function isScheduleUpcoming(match: Match, nowMs = Date.now()): boolean {
+  if (match.forfeitTeamId) return false;
+  return isKickoffUpcoming(match, nowMs);
+}
+
 /** No raise-hand positions left (no empty capacity blocks). */
 export function isMatchFilled(match: Match): boolean {
   return openRequestSlots(match).length === 0;

@@ -343,6 +343,21 @@ function buildCrewFromRefs(
   };
 }
 
+function buildMultiMoCrew(
+  mos: { userId: string; userName: string }[],
+  confirmedAt: string,
+): CrewAssignment[] {
+  return mos.map((person) => ({
+    id: newAssignmentId(),
+    slot: 'mo' as const,
+    userId: person.userId,
+    userName: person.userName,
+    status: 'confirmed' as const,
+    confirmedAt,
+    history: [],
+  }));
+}
+
 function seedUsers(): UserProfile[] {
   return [
     {
@@ -1264,9 +1279,8 @@ function seedMatches(): Match[] {
       crew: { mo: 'riley', ar1: 'casey', ar2: 'none', no4: 'alex' },
     },
     {
-      // m_res07 — Alex MO + self as CMO edge (Performance)
+      // m_res07 — Alex MO (Performance when CMO assigned on another match)
       crew: { mo: 'alex', ar1: 'riley', ar2: 'casey' },
-      cmo: [{ userId: 'u_assigner', userName: 'Alex Assigner' }],
     },
     {
       // m_res08 — Alex AR1, Riley CMO
@@ -1369,6 +1383,43 @@ function seedMatches(): Match[] {
     });
   }
 
+  // Tournament day — two MOs on one event; Alex CMO files one report per official.
+  results.push({
+    id: 'm_res_tourney',
+    sheetRowKey: 'sheet-m_res_tourney',
+    status: 'locked_confirmed',
+    kickoffAt: kickAt(-5, 9),
+    venueName: 'Westlake Fields',
+    venueAddress: 'Austin, TX',
+    venueLat: austin.lat,
+    venueLng: austin.lng,
+    homeTeamId: 'team_austin',
+    awayTeamId: 'team_dallas',
+    homeTeamName: 'Austin RFC',
+    awayTeamName: 'Dallas RFC',
+    competition: 'Club',
+    level: 'Tourney',
+    gender: 'men',
+    flightProvided: false,
+    housingProvided: false,
+    homeConfirmedAt: released,
+    awayConfirmedAt: released,
+    releasedAt: released,
+    crew: {
+      mo: buildMultiMoCrew(
+        [
+          { userId: 'u_ref1', userName: 'Riley Official' },
+          { userId: 'u_ref2', userName: 'Casey Official' },
+        ],
+        released,
+      ),
+      ar1: [],
+      ar2: [],
+      no4: [],
+    },
+    cmo: [{ userId: 'u_assigner', userName: 'Alex Assigner' }],
+  });
+
   const all: Match[] = [
     ...extras,
     ...appointments,
@@ -1391,10 +1442,13 @@ function seedMatches(): Match[] {
     m_tc01: 'Team review',
     m_res01: 'Playoff',
     m_res02: 'Conference final',
+    m_res_tourney: '7s tournament day',
   };
 
   const demoScheduleUrls: Record<string, string> = {
     m_a08:
+      'https://drive.google.com/file/d/10FoWp82ciP3yyXMdnhky3BI4JQ6-wgvC/view?usp=drive_link',
+    m_res_tourney:
       'https://drive.google.com/file/d/10FoWp82ciP3yyXMdnhky3BI4JQ6-wgvC/view?usp=drive_link',
   };
 
@@ -2085,7 +2139,7 @@ function seedMatchReports(matches: Match[]): MatchReport[] {
     });
   }
 
-  // Riley CMO on Alex-as-MO match — Alex sees this under My Coaching Reports.
+  // Riley CMO on Alex-as-MO match — Alex sees this under Coaching on me.
   const aboutAlex = matches.find(
     (m) =>
       m.id === 'm_res02' &&

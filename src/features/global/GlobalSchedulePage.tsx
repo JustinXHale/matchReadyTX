@@ -2,9 +2,13 @@ import { Title, EmptyState, EmptyStateBody } from '@patternfly/react-core';
 import { useMemo, useState } from 'react';
 import { Navigate, useParams } from 'react-router-dom';
 import { useApp, useAppHref } from '@/app/AppContext';
-import { isKickoffUpcoming } from '@/domain/requests';
+import { isScheduleUpcoming } from '@/domain/requests';
 import { divisionFilterOptionsFromMatches, matchOnCalendarDate, uniqueMatchCalendarDates } from '@/domain/divisionFilters';
-import { matchInCompetition } from '@/domain/competitions';
+import {
+  competitionsForUser,
+  matchInCompetition,
+  uniqueDisplayedCompetitions,
+} from '@/domain/competitions';
 import { isTeamMatch, releasedMatches } from '@/domain/visibility';
 import { MatchListRow } from '@/ui/MatchListRow';
 import { MatchCrewTrailing } from '@/ui/MatchCrewTrailing';
@@ -47,20 +51,38 @@ export function GlobalSchedulePage() {
   const showMyTeamsChip =
     isFanView && Boolean(fanFavorites && fanFavorites.length > 0);
 
+  const allReleased = useMemo(
+    () => releasedMatches(state.matches),
+    [state.matches],
+  );
+
   const paneMatches = useMemo(() => {
     if (!pane) return [] as Match[];
-    return releasedMatches(state.matches).filter((m) => {
-      const upcoming = isKickoffUpcoming(m);
+    return allReleased.filter((m) => {
+      const upcoming = isScheduleUpcoming(m);
       if (pane === 'upcoming' && !upcoming) return false;
       if (pane === 'completed' && upcoming) return false;
       return true;
     });
-  }, [state.matches, pane]);
+  }, [allReleased, pane]);
 
-  const filterOptions = useMemo(
-    () => divisionFilterOptionsFromMatches(paneMatches, competitionFilter),
-    [paneMatches, competitionFilter],
-  );
+  const filterOptions = useMemo(() => {
+    const base = divisionFilterOptionsFromMatches(paneMatches, competitionFilter);
+    if (pane !== 'completed') return base;
+    const competitions = uniqueDisplayedCompetitions([
+      ...competitionsForUser(state.org, currentUser),
+      ...base.competitions,
+      ...divisionFilterOptionsFromMatches(allReleased).competitions,
+    ]);
+    return { ...base, competitions };
+  }, [
+    paneMatches,
+    pane,
+    allReleased,
+    competitionFilter,
+    state.org,
+    currentUser,
+  ]);
 
   const scheduleBack: BackNav = useMemo(
     () => ({
@@ -149,7 +171,7 @@ export function GlobalSchedulePage() {
     return <Navigate to={upcomingHref} replace />;
   }
 
-  const hasBase = releasedMatches(state.matches).length > 0;
+  const hasBase = allReleased.length > 0;
   const emptyTitle =
     pane === 'upcoming' ? 'No upcoming matches' : 'No completed matches';
   const emptyBody =

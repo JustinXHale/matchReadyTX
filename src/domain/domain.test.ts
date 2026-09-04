@@ -48,6 +48,7 @@ import {
 import {
   canOfficialRequestMatch,
   isKickoffUpcoming,
+  isScheduleUpcoming,
   isMatchFilled,
   isMatchRequestable,
   isPendingRequestActive,
@@ -764,6 +765,14 @@ describe('game requests', () => {
     };
     expect(isKickoffUpcoming(past)).toBe(false);
     expect(canOfficialRequestMatch(past, 'u1', [])).toBe(false);
+
+    const futureForfeit = {
+      ...released,
+      kickoffAt: new Date(Date.now() + 3_600_000).toISOString(),
+      forfeitTeamId: released.homeTeamId,
+    };
+    expect(isKickoffUpcoming(futureForfeit)).toBe(true);
+    expect(isScheduleUpcoming(futureForfeit)).toBe(false);
 
     const filled = {
       ...released,

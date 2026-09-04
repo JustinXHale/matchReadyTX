@@ -1,5 +1,6 @@
 import { NavLink } from 'react-router-dom';
 import { useAppHref } from '@/app/AppContext';
+import { COACHING_ON_ME_TAB_LABEL } from '@/features/referee/reports/reportLinks';
 
 /** Third-level tabs — only mount when the user has both CMO duty and received notes. */
 export function CoachingSubNav() {
@@ -21,7 +22,7 @@ export function CoachingSubNav() {
         to={mineHref}
         className={({ isActive }) => (isActive ? 'active' : '')}
       >
-        My Coaching Reports
+        {COACHING_ON_ME_TAB_LABEL}
       </NavLink>
     </nav>
   );

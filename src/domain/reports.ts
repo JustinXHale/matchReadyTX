@@ -421,6 +421,77 @@ export function matchReportDocId(
     .slice(0, 120);
 }
 
+/** MO user ids on a match (all MO blocks with a linked user). */
+export function moOfficialIdsOnMatch(match: Match): string[] {
+  return crewPeople(match.crew.mo)
+    .map((a) => a.userId)
+    .filter((id): id is string => Boolean(id));
+}
+
+/** First MO user id on a match — legacy helper for single-MO fixtures. */
+export function moOfficialIdOnMatch(match: Match): string | undefined {
+  return moOfficialIdsOnMatch(match)[0];
+}
+
+/**
+ * Firestore doc id for a CMO coaching report.
+ * Single-MO matches keep the legacy `matchId_cmoId_cmo` shape.
+ */
+export function cmoMatchReportDocId(
+  matchId: string,
+  cmoOfficialId: string,
+  subjectOfficialId: string,
+  multiMo: boolean,
+): string {
+  if (!multiMo) {
+    return matchReportDocId(matchId, cmoOfficialId, 'cmo');
+  }
+  return `${matchId}_${cmoOfficialId}_${subjectOfficialId}_cmo`
+    .replace(/[^a-zA-Z0-9_-]/g, '_')
+    .slice(0, 120);
+}
+
+/** In-memory key for merging CMO report rows during sync. */
+export function cmoReportStorageKey(
+  matchId: string,
+  cmoOfficialId: string,
+  subjectOfficialId?: string,
+): string {
+  return subjectOfficialId
+    ? `${matchId}:${cmoOfficialId}:cmo:${subjectOfficialId}`
+    : `${matchId}:${cmoOfficialId}:cmo`;
+}
+
+export function cmoReportStorageKeyFromReport(report: MatchReport): string {
+  if (report.slot !== 'cmo') {
+    return `${report.matchId}:${report.officialId}:${report.slot}`;
+  }
+  return cmoReportStorageKey(
+    report.matchId,
+    report.officialId,
+    report.subjectOfficialId,
+  );
+}
+
+export function defaultMatchReportDocIdForAssignee(
+  match: Match,
+  assignee: {
+    userId: string;
+    slot: ReportAssigneeSlot;
+    subjectOfficialId?: string;
+  },
+): string {
+  if (assignee.slot === 'cmo' && assignee.subjectOfficialId) {
+    return cmoMatchReportDocId(
+      match.id,
+      assignee.userId,
+      assignee.subjectOfficialId,
+      moOfficialIdsOnMatch(match).length > 1,
+    );
+  }
+  return matchReportDocId(match.id, assignee.userId, assignee.slot);
+}
+
 /** Stable Firestore doc id for a card report (one per MO per match). */
 export function cardReportDocId(matchId: string, officialId: string): string {
   return `${matchId}_${officialId}`.replace(/[^a-zA-Z0-9_-]/g, '_').slice(0, 120);
@@ -701,7 +772,11 @@ export function slotForUserOnMatch(
 
 export function buildPendingReport(
   match: Match,
-  assignee: { userId: string; slot: ReportAssigneeSlot },
+  assignee: {
+    userId: string;
+    slot: ReportAssigneeSlot;
+    subjectOfficialId?: string;
+  },
   idFactory: () => string,
 ): MatchReport {
   const dueAt = reportDueAt(match.kickoffAt);
@@ -719,6 +794,9 @@ export function buildPendingReport(
       ...base,
       formKind: 'cmo',
       deadlineAt: cmoDeadlineAt(match.kickoffAt),
+      ...(assignee.subjectOfficialId
+        ? { subjectOfficialId: assignee.subjectOfficialId }
+        : {}),
     };
   }
   if (assignee.slot === 'ar1' || assignee.slot === 'ar2') {
@@ -738,28 +816,134 @@ export function syncPendingMatchReports(
   now = Date.now(),
   idFactory: (
     match: Match,
-    assignee: { userId: string; slot: ReportAssigneeSlot },
-  ) => string = (match, assignee) =>
-    matchReportDocId(match.id, assignee.userId, assignee.slot),
+    assignee: {
+      userId: string;
+      slot: ReportAssigneeSlot;
+      subjectOfficialId?: string;
+    },
+  ) => string = defaultMatchReportDocIdForAssignee,
 ): MatchReport[] {
   const byKey = new Map<string, MatchReport>();
   for (const r of existing) {
-    byKey.set(`${r.matchId}:${r.officialId}:${r.slot}`, r);
+    if (r.slot === 'cmo') {
+      byKey.set(cmoReportStorageKeyFromReport(r), r);
+    } else {
+      byKey.set(`${r.matchId}:${r.officialId}:${r.slot}`, r);
+    }
   }
   for (const match of matches) {
     if (!isReportWindowOpen(match.kickoffAt, now)) continue;
     if (match.status === 'cancelled' || match.status === 'draft') continue;
+
+    const moIds = moOfficialIdsOnMatch(match);
+    const multiMo = moIds.length > 1;
+
     for (const a of reportAssignees(match)) {
-      const key = `${match.id}:${a.userId}:${a.slot}`;
-      if (!byKey.has(key)) {
+      if (a.slot !== 'cmo') {
+        const key = `${match.id}:${a.userId}:${a.slot}`;
+        if (!byKey.has(key)) {
+          byKey.set(
+            key,
+            buildPendingReport(match, a, () => idFactory(match, a)),
+          );
+        }
+        continue;
+      }
+
+      if (moIds.length === 0) {
+        const key = cmoReportStorageKey(match.id, a.userId);
+        if (!byKey.has(key)) {
+          byKey.set(
+            key,
+            buildPendingReport(match, a, () => idFactory(match, a)),
+          );
+        }
+        continue;
+      }
+
+      const legacyKey = cmoReportStorageKey(match.id, a.userId);
+      const legacy = byKey.get(legacyKey);
+      if (legacy && multiMo && !legacy.subjectOfficialId) {
+        const firstSubject = moIds[0]!;
+        byKey.delete(legacyKey);
+        byKey.set(
+          cmoReportStorageKey(match.id, a.userId, firstSubject),
+          { ...legacy, subjectOfficialId: firstSubject },
+        );
+      }
+
+      for (const subjectId of moIds) {
+        const key = multiMo
+          ? cmoReportStorageKey(match.id, a.userId, subjectId)
+          : cmoReportStorageKey(match.id, a.userId);
+        if (byKey.has(key)) {
+          const cur = byKey.get(key)!;
+          if (!cur.subjectOfficialId && moIds.length === 1) {
+            byKey.set(key, { ...cur, subjectOfficialId: subjectId });
+          }
+          continue;
+        }
+        const assignee = { ...a, subjectOfficialId: subjectId };
         byKey.set(
           key,
-          buildPendingReport(match, a, () => idFactory(match, a)),
+          buildPendingReport(match, assignee, () => idFactory(match, assignee)),
         );
       }
     }
   }
   return [...byKey.values()];
+}
+
+/** CMO report row for one subject MO (pending or submitted). */
+export function resolveCmoReportForUserOnMatch(
+  reports: MatchReport[],
+  match: Match,
+  cmoUserId: string,
+  subjectOfficialId?: string,
+): MatchReport | undefined {
+  const moIds = moOfficialIdsOnMatch(match);
+  const subject =
+    subjectOfficialId ?? (moIds.length === 1 ? moIds[0] : undefined);
+  if (subject) {
+    const keyed = reports.find(
+      (r) =>
+        r.matchId === match.id &&
+        r.officialId === cmoUserId &&
+        r.slot === 'cmo' &&
+        r.subjectOfficialId === subject,
+    );
+    if (keyed) return keyed;
+    if (moIds.length === 1) {
+      return reports.find(
+        (r) =>
+          r.matchId === match.id &&
+          r.officialId === cmoUserId &&
+          r.slot === 'cmo' &&
+          !r.subjectOfficialId,
+      );
+    }
+    return undefined;
+  }
+  return reports.find(
+    (r) =>
+      r.matchId === match.id &&
+      r.officialId === cmoUserId &&
+      r.slot === 'cmo',
+  );
+}
+
+export function submittedCmoReportsOnMatch(
+  reports: MatchReport[],
+  matchId: string,
+  opts?: { cmoOfficialId?: string },
+): MatchReport[] {
+  return reports.filter(
+    (r) =>
+      r.matchId === matchId &&
+      r.slot === 'cmo' &&
+      r.status === 'submitted' &&
+      (opts?.cmoOfficialId == null || r.officialId === opts.cmoOfficialId),
+  );
 }
 
 export function pendingReportsForUser(

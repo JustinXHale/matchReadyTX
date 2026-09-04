@@ -5,11 +5,11 @@ import type {
   MoReportPayload,
   ReportFormKind,
 } from '@/domain/reports';
+import { resolveCmoReportForUserOnMatch } from '@/domain/reports';
 import { demoStore } from '@/services/demoStore';
 import {
   defaultOrgId,
   ensurePendingMatchReportInFirestore,
-  moOfficialIdOnMatch,
   saveCardReportInFirestore,
   saveJudicialCasesInFirestore,
   saveMatchReportInFirestore,
@@ -38,6 +38,29 @@ export async function ensureMatchReportReady(
   demoStore.upsertMatchReportLocal(report);
 }
 
+export async function ensureCmoReportReady(
+  matchId: string,
+  cmoUserId: string,
+  subjectOfficialId: string,
+): Promise<void> {
+  const s = demoStore.getState();
+  const match = s.matches.find((m) => m.id === matchId);
+  if (!match) return;
+  const existing = resolveCmoReportForUserOnMatch(
+    s.matchReports,
+    match,
+    cmoUserId,
+    subjectOfficialId,
+  );
+  if (existing) return;
+  const report = await ensurePendingMatchReportInFirestore(
+    defaultOrgId(),
+    match,
+    { userId: cmoUserId, slot: 'cmo', subjectOfficialId },
+  );
+  demoStore.upsertMatchReportLocal(report);
+}
+
 export async function persistSubmittedMatchReport(
   reportId: string,
   formKind: ReportFormKind,
@@ -54,10 +77,8 @@ export async function persistSubmittedMatchReport(
 export async function persistSubmittedCmoReport(
   reportId: string,
   payload: CmoReportPayload,
-  matchId: string,
+  subjectOfficialId: string,
 ): Promise<void> {
-  const match = demoStore.getState().matches.find((m) => m.id === matchId);
-  const subjectOfficialId = match ? moOfficialIdOnMatch(match) : undefined;
   demoStore.submitCmoReport(reportId, payload, subjectOfficialId);
   const updated = demoStore
     .getState()

@@ -159,7 +159,9 @@ export function InsightsCmoReportsPage() {
               r.subjectOfficialId ??
               crewPeople(match.crew.mo).find((a) => a.userId)?.userId;
             const filer = cmoFilerName(r, state.users);
-            const viewHref = cmoReportViewPath(r.matchId);
+            const viewHref = cmoReportViewPath(r.matchId, r.subjectOfficialId, {
+              officialId: r.officialId,
+            });
             const trailing = (
               <InsightsReportTrailing
                 score={rating != null ? String(rating) : '—'}

@@ -121,7 +121,7 @@ export function CoachingReportsPage() {
 
   const pageTitle = showSubNav
     ? showingMine && !showingCmo
-      ? 'My Coaching Reports'
+      ? COACHING_MINE_BACK.label
       : 'CMO Reports'
     : 'Coaching Reports';
 
@@ -189,8 +189,8 @@ export function CoachingReportsPage() {
                 const moName = cmoSubjectName(r, match, state.users);
                 const to =
                   r.status === 'pending'
-                    ? cmoReportPath(r.matchId)
-                    : cmoReportViewPath(r.matchId);
+                    ? cmoReportPath(r.matchId, r.subjectOfficialId)
+                    : cmoReportViewPath(r.matchId, r.subjectOfficialId);
                 return (
                   <li key={r.id}>
                     <MatchListRow
@@ -245,7 +245,9 @@ export function CoachingReportsPage() {
                   <li key={r.id}>
                     <MatchListRow
                       match={match}
-                      to={cmoReportViewPath(r.matchId)}
+                      to={cmoReportViewPath(r.matchId, r.subjectOfficialId, {
+                        officialId: r.officialId,
+                      })}
                       back={listBack}
                       showTime={r.source !== 'legacy_form'}
                       meta={

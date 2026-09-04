@@ -44,9 +44,11 @@ import {
   type ReportAssigneeSlot,
   type ReportFormKind,
   type SecondOffense,
-  matchReportDocId,
   parseLegacyCmoFixture,
   buildPendingReport,
+  defaultMatchReportDocIdForAssignee,
+  moOfficialIdOnMatch,
+  moOfficialIdsOnMatch,
 } from '@/domain/reports';
 import {
   isCardLawId,
@@ -62,7 +64,6 @@ import type {
 import {
   emptyCrew,
   ensureDefaultMoBlock,
-  crewPeople,
   newAssignmentId,
   newCmoId,
   type ChangeProposal,
@@ -2219,9 +2220,27 @@ export async function saveCardReportInFirestore(
 export async function ensurePendingMatchReportInFirestore(
   orgId: string,
   match: Match,
-  assignee: { userId: string; slot: ReportAssigneeSlot },
+  assignee: {
+    userId: string;
+    slot: ReportAssigneeSlot;
+    subjectOfficialId?: string;
+  },
 ): Promise<MatchReport> {
-  const id = matchReportDocId(match.id, assignee.userId, assignee.slot);
+  const moIds = moOfficialIdsOnMatch(match);
+  const multiMo = moIds.length > 1;
+  const subjectOfficialId =
+    assignee.slot === 'cmo'
+      ? assignee.subjectOfficialId ??
+        (moIds.length === 1 ? moIds[0] : undefined)
+      : undefined;
+  if (assignee.slot === 'cmo' && multiMo && !subjectOfficialId) {
+    throw new Error('subjectOfficialId required for multi-MO CMO reports');
+  }
+  const resolvedAssignee =
+    subjectOfficialId != null
+      ? { ...assignee, subjectOfficialId }
+      : assignee;
+  const id = defaultMatchReportDocIdForAssignee(match, resolvedAssignee);
   const ref = doc(requireDb(), 'orgs', orgId, 'matchReports', id);
   const snap = await getDoc(ref);
   if (snap.exists()) {
@@ -2231,18 +2250,12 @@ export async function ensurePendingMatchReportInFirestore(
     );
     if (parsed) return parsed;
   }
-  const pending = buildPendingReport(match, assignee, () => id);
+  const pending = buildPendingReport(match, resolvedAssignee, () => id);
   await setDoc(ref, matchReportToFirestore(orgId, pending));
   return pending;
 }
 
-/** MO user id on a match (first MO block with a user). */
-export function moOfficialIdOnMatch(match: Match): string | undefined {
-  for (const a of crewPeople(match.crew.mo)) {
-    if (a.userId) return a.userId;
-  }
-  return undefined;
-}
+export { moOfficialIdOnMatch, moOfficialIdsOnMatch };
 
 export async function saveMeetingResourceInFirestore(
   orgId: string,

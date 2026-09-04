@@ -1,5 +1,5 @@
 import { google } from 'googleapis';
-import { FieldValue, type Firestore } from 'firebase-admin/firestore';
+import { FieldValue, type DocumentSnapshot, type Firestore } from 'firebase-admin/firestore';
 import { HttpsError } from 'firebase-functions/v2/https';
 import { logger } from 'firebase-functions';
 import {
@@ -96,6 +96,62 @@ function headerIndex(headers: string[], aliases: string[]): number {
   return -1;
 }
 
+export type SheetTeamRow = { abbreviation?: string; name?: string };
+
+/** Schedule tab uses Locations abbreviations — not full university names. */
+export function sheetTeamLabelForWrite(
+  team: SheetTeamRow | null | undefined,
+  fallbackName: string,
+): string {
+  const abbr = team?.abbreviation?.trim();
+  if (abbr) return abbr;
+  return fallbackName.trim();
+}
+
+/** Resolve Schedule `location` from venue text + Locations tab + home host abbr. */
+export function resolveScheduleLocationForWrite(opts: {
+  venueName: string;
+  homeTeamAbbr?: string;
+  locationsRows?: string[][];
+}): string {
+  const venue = opts.venueName.trim();
+  const homeAbbr = opts.homeTeamAbbr?.trim();
+  const rows = opts.locationsRows ?? [];
+
+  if (rows.length > 0) {
+    const headers = rows[0] ?? [];
+    const abbrIdx = headerIndex(headers, ['abbreviation', 'location']);
+    const venueNameIdx = headerIndex(headers, ['venue_name', 'subvenue', 'name']);
+    const normVenue = venue.toLowerCase();
+
+    if (abbrIdx >= 0) {
+      for (let i = 1; i < rows.length; i++) {
+        const row = rows[i] ?? [];
+        const abbr = String(row[abbrIdx] ?? '').trim();
+        if (!abbr) continue;
+        if (abbr.toLowerCase() === normVenue) return abbr;
+        if (venueNameIdx >= 0) {
+          const vn = String(row[venueNameIdx] ?? '').trim();
+          if (vn && vn.toLowerCase() === normVenue) return abbr;
+        }
+      }
+    }
+  }
+
+  if (homeAbbr) return homeAbbr;
+  return venue || 'TBD';
+}
+
+function teamFromSnap(snap: DocumentSnapshot): SheetTeamRow | null {
+  if (!snap.exists) return null;
+  const d = snap.data()!;
+  return {
+    name: typeof d.name === 'string' ? d.name : undefined,
+    abbreviation:
+      typeof d.abbreviation === 'string' ? d.abbreviation : undefined,
+  };
+}
+
 async function readTab(
   sheets: ReturnType<typeof sheetsClient>,
   spreadsheetId: string,
@@ -187,7 +243,8 @@ async function appendScheduleRow(
 async function upsertLocationsRow(
   sheets: ReturnType<typeof sheetsClient>,
   spreadsheetId: string,
-  venueName: string,
+  locationAbbr: string,
+  venueLabel: string,
   venueAddress: string,
   gender: string,
   competition?: string,
@@ -205,7 +262,7 @@ async function upsertLocationsRow(
       requestBody: {
         values: [
           ['abbreviation', 'competition', 'gender', 'venue_name', 'address'],
-          [venueName, resolvedComp, gender, venueName, venueAddress],
+          [locationAbbr, resolvedComp, gender, venueLabel, venueAddress],
         ],
       },
     });
@@ -230,7 +287,8 @@ async function upsertLocationsRow(
     return;
   }
 
-  const normAbbr = venueName.trim().toLowerCase();
+  const normAbbr = locationAbbr.trim().toLowerCase();
+  const normVenue = venueLabel.trim().toLowerCase();
   const wantComp = resolvedComp.trim().toLowerCase();
   const wantGender = normalizeGender(gender);
   let existingRow = -1;
@@ -238,7 +296,20 @@ async function upsertLocationsRow(
     const abbr = String(values[i]?.[abbrIdx] ?? '')
       .trim()
       .toLowerCase();
-    if (abbr !== normAbbr) continue;
+    const rowVenue =
+      venueNameIdx >= 0
+        ? String(values[i]?.[venueNameIdx] ?? '')
+            .trim()
+            .toLowerCase()
+        : '';
+    if (
+      abbr !== normAbbr &&
+      abbr !== normVenue &&
+      rowVenue !== normVenue &&
+      rowVenue !== normAbbr
+    ) {
+      continue;
+    }
     if (competitionIdx >= 0) {
       const rowComp = String(values[i]?.[competitionIdx] ?? '')
         .trim()
@@ -267,10 +338,10 @@ async function upsertLocationsRow(
     const prev = values[existingRow] ?? [];
     for (let i = 0; i < width; i++) line[i] = String(prev[i] ?? '');
   }
-  line[abbrIdx] = venueName;
+  line[abbrIdx] = locationAbbr;
   if (competitionIdx >= 0) line[competitionIdx] = resolvedComp;
   if (genderIdx >= 0) line[genderIdx] = gender;
-  if (venueNameIdx >= 0) line[venueNameIdx] = venueName;
+  if (venueNameIdx >= 0) line[venueNameIdx] = venueLabel;
   if (addrIdx >= 0) line[addrIdx] = venueAddress;
   if (fullAddrIdx >= 0) line[fullAddrIdx] = venueAddress;
 
@@ -339,6 +410,21 @@ export async function runApproveFixtureRequest(opts: {
   const sheets = sheetsClient(serviceAccountJson);
   const gender = req.gender === 'women' ? 'women' : 'men';
 
+  const [homeSnap, awaySnap] = await Promise.all([
+    db.doc(`orgs/${orgId}/teams/${req.homeTeamId}`).get(),
+    db.doc(`orgs/${orgId}/teams/${req.awayTeamId}`).get(),
+  ]);
+  const homeTeam = teamFromSnap(homeSnap);
+  const awayTeam = teamFromSnap(awaySnap);
+  const homeSheet = sheetTeamLabelForWrite(homeTeam, req.homeTeamName);
+  const awaySheet = sheetTeamLabelForWrite(awayTeam, req.awayTeamName);
+  const locationsRows = await readTab(sheets, sheetId, 'Locations');
+  const locationSheet = resolveScheduleLocationForWrite({
+    venueName: req.venueName,
+    homeTeamAbbr: homeTeam?.abbreviation,
+    locationsRows,
+  });
+
   const matchRef = db.doc(`orgs/${orgId}/matches/${matchId}`);
   const existingMatch = await matchRef.get();
   if (!existingMatch.exists) {
@@ -376,6 +462,7 @@ export async function runApproveFixtureRequest(opts: {
       await upsertLocationsRow(
         sheets,
         sheetId,
+        locationSheet,
         req.venueName,
         req.venueAddress,
         gender,
@@ -385,9 +472,9 @@ export async function runApproveFixtureRequest(opts: {
         matchId: sheetRowKey,
         date,
         time,
-        location: req.venueName,
-        homeTeam: req.homeTeamName,
-        awayTeam: req.awayTeamName,
+        location: locationSheet,
+        homeTeam: homeSheet,
+        awayTeam: awaySheet,
         competition: req.competition ?? undefined,
         level: req.level,
         gender,

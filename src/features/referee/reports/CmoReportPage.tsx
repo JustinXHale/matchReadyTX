@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import {
   Button,
   Form,
@@ -22,21 +22,24 @@ import {
   cmoComplexityComplete,
   parseAssessedRating,
   validateCmoScales,
+  moOfficialIdsOnMatch,
+  resolveCmoReportForUserOnMatch,
   type CmoComplexityFactor,
   type CmoMatchKind,
   type CmoReportPayload,
   type CmoScaleKey,
 } from '@/domain/reports';
 import { isFivePointValue, type FivePointChoice, type FivePointValue } from '@/domain/fivePointScale';
+import { crewPeople, type Match } from '@/domain/types';
 import { moDisplayNames } from '@/features/referee/appointments/crewLines';
 import {
-  pendingReportForUserOnMatch,
+  cmoReportPath,
   cmoReportViewPath,
 } from '@/features/referee/reports/reportLinks';
 import { RefereeLevelChart } from '@/ui/RefereeLevelChart';
 import { ScaleRatingCards } from '@/ui/ScaleRatingCards';
 import {
-  ensureMatchReportReady,
+  ensureCmoReportReady,
   persistSubmittedCmoReport,
 } from '@/services/reportsLive';
 import { useScrollReportToTopOnChange } from '@/features/referee/reports/scrollReportToTop';
@@ -83,21 +86,54 @@ function LinearScaleCards({
   );
 }
 
+function moNameForUser(
+  match: Match,
+  userId: string,
+  users: { uid: string; displayName?: string }[],
+): string {
+  const assignment = crewPeople(match.crew.mo).find((a) => a.userId === userId);
+  if (assignment?.userName) return assignment.userName;
+  return users.find((u) => u.uid === userId)?.displayName ?? 'Match Official';
+}
+
 export function CmoReportPage() {
   const { matchId = '' } = useParams();
+  const [searchParams] = useSearchParams();
+  const subjectFromQuery = searchParams.get('subjectOfficialId') ?? '';
   const { currentUser, state, store, dataMode } = useApp();
   const navigate = useNavigate();
 
   const match = state.matches.find((m) => m.id === matchId);
+  const moIds = useMemo(
+    () => (match ? moOfficialIdsOnMatch(match) : []),
+    [match],
+  );
+  const effectiveSubjectId =
+    subjectFromQuery || (moIds.length === 1 ? moIds[0]! : '');
+
   const report = useMemo(() => {
-    if (!currentUser || !matchId) return undefined;
-    return pendingReportForUserOnMatch(
+    if (!currentUser || !matchId || !match || !effectiveSubjectId) {
+      return undefined;
+    }
+    const hit = resolveCmoReportForUserOnMatch(
       state.matchReports,
-      matchId,
+      match,
       currentUser.uid,
-      'cmo',
+      effectiveSubjectId,
     );
-  }, [currentUser, matchId, state.matchReports]);
+    return hit?.status === 'pending' ? hit : undefined;
+  }, [
+    currentUser,
+    matchId,
+    match,
+    effectiveSubjectId,
+    state.matchReports,
+  ]);
+
+  const subjectMoName = useMemo(() => {
+    if (!match || !effectiveSubjectId) return moDisplayNames(match!);
+    return moNameForUser(match, effectiveSubjectId, state.users);
+  }, [match, effectiveSubjectId, state.users]);
 
   const [section, setSection] = useState(0);
   const reportTopRef = useScrollReportToTopOnChange(section);
@@ -131,11 +167,15 @@ export function CmoReportPage() {
   const [done, setDone] = useState(false);
 
   useEffect(() => {
-    if (dataMode !== 'live' || !currentUser || !matchId) return;
-    void ensureMatchReportReady(matchId, currentUser.uid).catch((err) =>
-      console.error('ensureMatchReportReady failed', err),
-    );
-  }, [dataMode, currentUser?.uid, matchId]);
+    if (dataMode !== 'live' || !currentUser || !matchId || !effectiveSubjectId) {
+      return;
+    }
+    void ensureCmoReportReady(
+      matchId,
+      currentUser.uid,
+      effectiveSubjectId,
+    ).catch((err) => console.error('ensureCmoReportReady failed', err));
+  }, [dataMode, currentUser?.uid, matchId, effectiveSubjectId]);
 
   const toggleComplexity = (opt: CmoComplexityFactor, checked: boolean) => {
     setComplexityFactors((prev) =>
@@ -236,9 +276,13 @@ export function CmoReportPage() {
     };
     try {
       if (dataMode === 'live') {
-        await persistSubmittedCmoReport(report!.id, payload, match.id);
+        await persistSubmittedCmoReport(
+          report!.id,
+          payload,
+          effectiveSubjectId,
+        );
       } else {
-        store.submitCmoReport(report!.id, payload);
+        store.submitCmoReport(report!.id, payload, effectiveSubjectId);
       }
       setDone(true);
     } catch (err) {
@@ -266,6 +310,58 @@ export function CmoReportPage() {
     );
   }
 
+  if (moIds.length > 1 && !subjectFromQuery) {
+    const myCmoReports = state.matchReports.filter(
+      (r) =>
+        r.matchId === matchId &&
+        r.officialId === currentUser.uid &&
+        r.slot === 'cmo',
+    );
+    return (
+      <div className="rs-stack">
+        <button
+          type="button"
+          className="rs-detail__back"
+          onClick={() => navigate('/referee/reports/coaching')}
+        >
+          ← Coaching Reports
+        </button>
+        <Title headingLevel="h2" size="lg">
+          Choose match official
+        </Title>
+        <p className="rs-match-card__meta">
+          {match.homeTeamName} vs {match.awayTeamName} has multiple match
+          officials. File a separate coaching report for each one you assessed.
+        </p>
+        <ul className="rs-list">
+          {moIds.map((moId) => {
+            const row = myCmoReports.find(
+              (r) =>
+                r.subjectOfficialId === moId ||
+                (!r.subjectOfficialId && moIds.length === 1),
+            );
+            const status = row?.status === 'submitted' ? 'Submitted' : 'Due';
+            const name = moNameForUser(match, moId, state.users);
+            return (
+              <li key={moId}>
+                <button
+                  type="button"
+                  className="rs-list-row rs-list-row--button"
+                  onClick={() =>
+                    navigate(cmoReportPath(matchId, moId))
+                  }
+                >
+                  <span className="rs-list-row__title">{name}</span>
+                  <span className="rs-pill">{status}</span>
+                </button>
+              </li>
+            );
+          })}
+        </ul>
+      </div>
+    );
+  }
+
   if (done) {
     return (
       <div className="rs-stack">
@@ -277,7 +373,9 @@ export function CmoReportPage() {
         </p>
         <Button
           variant="primary"
-          onClick={() => navigate(cmoReportViewPath(matchId))}
+          onClick={() =>
+            navigate(cmoReportViewPath(matchId, effectiveSubjectId))
+          }
         >
           View report
         </Button>
@@ -292,26 +390,29 @@ export function CmoReportPage() {
   }
 
   if (!report) {
-    const submitted = state.matchReports.find(
-      (r) =>
-        r.matchId === matchId &&
-        r.officialId === currentUser.uid &&
-        r.slot === 'cmo' &&
-        r.status === 'submitted',
+    const submitted = resolveCmoReportForUserOnMatch(
+      state.matchReports,
+      match,
+      currentUser.uid,
+      effectiveSubjectId,
     );
+    const alreadySubmitted = submitted?.status === 'submitted' ? submitted : undefined;
     return (
       <div className="rs-stack">
         <Title headingLevel="h2" size="lg">
-          {submitted ? 'CMO report already submitted' : 'No CMO report due'}
+          {alreadySubmitted ? 'CMO report already submitted' : 'No CMO report due'}
         </Title>
         <p className="rs-match-card__meta">
-          {match.homeTeamName} vs {match.awayTeamName}. Notices open at kickoff
-          + 90 minutes; complete within 48 hours of kickoff.
+          {match.homeTeamName} vs {match.awayTeamName}
+          {effectiveSubjectId ? ` · MO ${subjectMoName}` : ''}. Notices open at
+          kickoff + 90 minutes; complete within 48 hours of kickoff.
         </p>
-        {submitted && (
+        {alreadySubmitted && (
           <Button
             variant="primary"
-            onClick={() => navigate(cmoReportViewPath(matchId))}
+            onClick={() =>
+              navigate(cmoReportViewPath(matchId, effectiveSubjectId))
+            }
           >
             View report
           </Button>
@@ -339,7 +440,7 @@ export function CmoReportPage() {
         CMO report
       </Title>
       <p className="rs-match-card__meta">
-        {match.homeTeamName} vs {match.awayTeamName} · MO {moDisplayNames(match)}
+        {match.homeTeamName} vs {match.awayTeamName} · MO {subjectMoName}
       </p>
       {deadline && (
         <p className="rs-match-card__meta">

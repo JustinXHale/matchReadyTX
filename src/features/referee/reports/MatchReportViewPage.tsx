@@ -19,6 +19,7 @@ import { crewPeople, REQUESTABLE_SLOT_SHORT } from '@/domain/types';
 import { cmoSubjectName } from '@/features/insights/insightsDisplay';
 import { moDisplayNames } from '@/features/referee/appointments/crewLines';
 import {
+  cmoReportViewPath,
   matchReportViewPath,
   COACHING_CMO_BACK,
   MATCH_REPORTS_BACK,
@@ -232,26 +233,95 @@ export function MatchReportViewPage() {
 
 export function CmoReportViewPage() {
   const { matchId = '' } = useParams();
+  const [searchParams] = useSearchParams();
+  const subjectOfficialId = searchParams.get('subjectOfficialId') ?? undefined;
+  const filerOfficialId = searchParams.get('officialId') ?? undefined;
   const { currentUser, state } = useApp();
   const navigate = useNavigate();
   const { goBack, backLabel } = useAppBack(COACHING_CMO_BACK);
 
   if (!currentUser) return null;
 
-  const report =
-    state.matchReports.find(
-      (r) =>
-        r.matchId === matchId &&
-        r.slot === 'cmo' &&
-        r.status === 'submitted' &&
-        r.officialId === currentUser.uid,
-    ) ??
-    state.matchReports.find(
-      (r) =>
-        r.matchId === matchId &&
-        r.slot === 'cmo' &&
-        r.status === 'submitted',
+  const submittedOnMatch = state.matchReports.filter(
+    (r) =>
+      r.matchId === matchId &&
+      r.slot === 'cmo' &&
+      r.status === 'submitted',
+  );
+
+  const matchForChooser = state.matches.find((m) => m.id === matchId);
+
+  if (
+    matchForChooser &&
+    !subjectOfficialId &&
+    submittedOnMatch.length > 1 &&
+    submittedOnMatch.some((r) => r.officialId === currentUser.uid)
+  ) {
+    return (
+      <div className="rs-stack">
+        <button
+          type="button"
+          className="rs-detail__back"
+          onClick={goBack}
+        >
+          ← {backLabel}
+        </button>
+        <Title headingLevel="h2" size="lg">
+          Choose coaching report
+        </Title>
+        <p className="rs-match-card__meta">
+          {matchForChooser.homeTeamName} vs {matchForChooser.awayTeamName} —
+          select which match official&apos;s report to view.
+        </p>
+        <ul className="rs-list">
+          {submittedOnMatch
+            .filter((r) => r.officialId === currentUser.uid)
+            .map((r) => {
+              const match = displayMatchForCmoReport(r, state.matches);
+              if (!match) return null;
+              const moName = cmoSubjectName(
+                r,
+                match,
+                state.users,
+                moDisplayNames(match),
+              );
+              return (
+                <li key={r.id}>
+                  <Link
+                    className="rs-list-row"
+                    to={cmoReportViewPath(matchId, r.subjectOfficialId, {
+                      officialId: r.officialId,
+                    })}
+                  >
+                    <span className="rs-list-row__title">{moName}</span>
+                  </Link>
+                </li>
+              );
+            })}
+        </ul>
+      </div>
     );
+  }
+
+  const report =
+    (filerOfficialId && subjectOfficialId
+      ? submittedOnMatch.find(
+          (r) =>
+            r.officialId === filerOfficialId &&
+            r.subjectOfficialId === subjectOfficialId,
+        )
+      : subjectOfficialId
+        ? submittedOnMatch.find(
+            (r) =>
+              r.subjectOfficialId === subjectOfficialId &&
+              (filerOfficialId
+                ? r.officialId === filerOfficialId
+                : r.officialId === currentUser.uid),
+          ) ?? submittedOnMatch.find(
+            (r) => r.subjectOfficialId === subjectOfficialId,
+          )
+        : submittedOnMatch.find((r) => r.officialId === currentUser.uid)) ??
+    submittedOnMatch[0];
 
   const match = report
     ? displayMatchForCmoReport(report, state.matches)

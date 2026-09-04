@@ -30,8 +30,11 @@ export const COACHING_CMO_BACK: BackNav = {
 
 export const COACHING_MINE_BACK: BackNav = {
   to: '/referee/reports/coaching/mine',
-  label: 'My Coaching Reports',
+  label: 'Coaching reports about me',
 };
+
+/** Sub-tab label — reports filed about this user as MO (not CMO duty). */
+export const COACHING_ON_ME_TAB_LABEL = 'Coaching on me';
 
 export const CARD_REPORTS_BACK: BackNav = {
   to: '/referee/reports/cards',
@@ -53,12 +56,25 @@ export function matchReportViewPath(
   return `/referee/reports/match/${matchId}/view${qs ? `?${qs}` : ''}`;
 }
 
-export function cmoReportPath(matchId: string): string {
-  return `/referee/reports/coaching/${matchId}`;
+export function cmoReportPath(
+  matchId: string,
+  subjectOfficialId?: string,
+): string {
+  const base = `/referee/reports/coaching/${matchId}`;
+  if (!subjectOfficialId) return base;
+  return `${base}?subjectOfficialId=${encodeURIComponent(subjectOfficialId)}`;
 }
 
-export function cmoReportViewPath(matchId: string): string {
-  return `/referee/reports/coaching/${matchId}/view`;
+export function cmoReportViewPath(
+  matchId: string,
+  subjectOfficialId?: string,
+  opts?: { officialId?: string },
+): string {
+  const q = new URLSearchParams();
+  if (subjectOfficialId) q.set('subjectOfficialId', subjectOfficialId);
+  if (opts?.officialId) q.set('officialId', opts.officialId);
+  const qs = q.toString();
+  return `/referee/reports/coaching/${matchId}/view${qs ? `?${qs}` : ''}`;
 }
 
 export function cardReportPath(matchId: string): string {
@@ -106,13 +122,18 @@ export function submittedMoReportForMatch(
 export function submittedCmoReportForMatch(
   reports: MatchReport[],
   matchId: string,
+  subjectOfficialId?: string,
 ): MatchReport | undefined {
-  return reports.find(
+  const pool = reports.filter(
     (r) =>
       r.matchId === matchId &&
       r.slot === 'cmo' &&
       r.status === 'submitted',
   );
+  if (subjectOfficialId) {
+    return pool.find((r) => r.subjectOfficialId === subjectOfficialId);
+  }
+  return pool[0];
 }
 
 export function submittedCardReportForMatch(
@@ -148,12 +169,18 @@ export function resolveSubmittedMatchReport(
 }
 
 export function reportHrefForPending(report: MatchReport): string {
-  if (report.slot === 'cmo') return cmoReportPath(report.matchId);
+  if (report.slot === 'cmo') {
+    return cmoReportPath(report.matchId, report.subjectOfficialId);
+  }
   return matchReportPath(report.matchId);
 }
 
 export function reportHrefForSubmitted(report: MatchReport): string {
-  if (report.slot === 'cmo') return cmoReportViewPath(report.matchId);
+  if (report.slot === 'cmo') {
+    return cmoReportViewPath(report.matchId, report.subjectOfficialId, {
+      officialId: report.officialId,
+    });
+  }
   return matchReportViewPath(report.matchId, {
     officialId: report.officialId,
     slot: report.slot,
@@ -180,7 +207,7 @@ export function matchDetailReportActions(
     (r) => now >= new Date(r.dueAt).getTime(),
   );
   const crewPending = duePendings.find((r) => r.slot !== 'cmo');
-  const cmoPending = duePendings.find((r) => r.slot === 'cmo');
+  const cmoPendings = duePendings.filter((r) => r.slot === 'cmo');
   const moSubmitted = matchReports.find(
     (r) =>
       r.matchId === match.id &&
@@ -201,9 +228,14 @@ export function matchDetailReportActions(
             label: 'Complete AR report',
             to: matchReportPath(match.id),
           };
-  } else if (cmoPending) {
+  } else if (cmoPendings.length === 1) {
     primary = {
       label: 'Complete CMO report',
+      to: cmoReportPath(match.id, cmoPendings[0]!.subjectOfficialId),
+    };
+  } else if (cmoPendings.length > 1) {
+    primary = {
+      label: `Complete CMO reports (${cmoPendings.length})`,
       to: cmoReportPath(match.id),
     };
   }
@@ -236,9 +268,15 @@ export function matchDetailHeaderReportLinks(
     userId,
   ).filter((r) => now >= new Date(r.dueAt).getTime());
   const crewPending = pendings.find((r) => r.slot !== 'cmo');
-  const cmoPending = pendings.find((r) => r.slot === 'cmo');
+  const cmoPendings = pendings.filter((r) => r.slot === 'cmo');
+  const cmoSubmittedList = matchReports.filter(
+    (r) =>
+      r.matchId === match.id &&
+      r.officialId === userId &&
+      r.slot === 'cmo' &&
+      r.status === 'submitted',
+  );
   const moSubmitted = submittedMoReportForMatch(matchReports, match.id);
-  const cmoSubmitted = submittedCmoReportForMatch(matchReports, match.id);
   const cardSubmitted = submittedCardReportForMatch(cardReports, match.id);
   const isMo = crewPeople(match.crew.mo).some((a) => a.userId === userId);
 
@@ -260,15 +298,28 @@ export function matchDetailHeaderReportLinks(
     });
   }
 
-  if (cmoPending) {
+  if (cmoPendings.length === 1) {
     links.push({
       label: 'Complete coaching report',
+      to: cmoReportPath(match.id, cmoPendings[0]!.subjectOfficialId),
+    });
+  } else if (cmoPendings.length > 1) {
+    links.push({
+      label: `Complete coaching reports (${cmoPendings.length})`,
       to: cmoReportPath(match.id),
     });
-  } else if (cmoSubmitted) {
+  } else if (cmoSubmittedList.length === 1) {
     links.push({
       label: 'Coaching report',
-      to: cmoReportViewPath(match.id),
+      to: cmoReportViewPath(
+        match.id,
+        cmoSubmittedList[0]!.subjectOfficialId,
+      ),
+    });
+  } else if (cmoSubmittedList.length > 1) {
+    links.push({
+      label: 'Coaching reports',
+      to: cmoReportPath(match.id),
     });
   }
 
