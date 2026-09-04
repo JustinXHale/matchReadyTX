@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { EmptyState, EmptyStateBody } from '@patternfly/react-core';
+import { EmptyState, EmptyStateBody, TextInput } from '@patternfly/react-core';
 import { useApp } from '@/app/AppContext';
 import {
   formatMemberScheduleHint,
@@ -16,9 +16,30 @@ import {
   type MemberTab,
   type TeamAdminSort,
 } from '@/domain/members';
-import { genderLabel, type MatchGender, type UserProfile } from '@/domain/types';
+import {
+  genderLabel,
+  type MatchGender,
+  type Team,
+  type UserProfile,
+} from '@/domain/types';
 import { backState } from '@/nav/backNav';
 import { UserAvatar } from '@/ui/UserAvatar';
+
+function memberSearchHaystack(
+  user: UserProfile,
+  tab: MemberTab,
+  teams: Team[],
+): string {
+  const parts = [memberListName(user)];
+  if (tab === 'teamAdmins') {
+    parts.push(...teamNamesForUser(user, teams));
+  }
+  if (tab === 'fans') {
+    const favorite = fanFavoriteLabel(user, teams);
+    if (favorite) parts.push(favorite);
+  }
+  return parts.join(' ').toLowerCase();
+}
 
 const TABS: { id: MemberTab; label: string }[] = [
   { id: 'referees', label: 'Referees' },
@@ -106,6 +127,7 @@ export function MembersPage() {
   const [completeness, setCompleteness] = useState<
     'all' | 'complete' | 'incomplete'
   >('all');
+  const [query, setQuery] = useState('');
 
   const teamGenders = useMemo(
     () => teamGendersFromMatches(state.matches),
@@ -154,6 +176,27 @@ export function MembersPage() {
     }
     return groups;
   }, [tab, teamAdminSort, members, state.teams, genderFilter, teamGenders]);
+
+  const searchQuery = query.trim().toLowerCase();
+
+  const searchedMembers = useMemo(() => {
+    if (!searchQuery) return members;
+    return members.filter((user) =>
+      memberSearchHaystack(user, tab, state.teams).includes(searchQuery),
+    );
+  }, [members, searchQuery, tab, state.teams]);
+
+  const searchedTeamGroups = useMemo(() => {
+    if (!searchQuery) return teamGroups;
+    return teamGroups
+      .map((group) => ({
+        ...group,
+        admins: group.admins.filter((user) =>
+          memberSearchHaystack(user, tab, state.teams).includes(searchQuery),
+        ),
+      }))
+      .filter((group) => group.admins.length > 0);
+  }, [teamGroups, searchQuery, tab, state.teams]);
 
   const emptyLabel =
     TABS.find((t) => t.id === tab)?.label.toLowerCase() ?? 'members';
@@ -260,20 +303,31 @@ export function MembersPage() {
         </div>
       )}
 
+      <TextInput
+        id="members-search"
+        type="search"
+        value={query}
+        onChange={(_e, value) => setQuery(value)}
+        placeholder="Search members"
+        aria-label="Search members"
+      />
+
       {tab === 'teamAdmins' && teamAdminSort === 'team' ? (
-        teamGroups.length === 0 ? (
+        searchedTeamGroups.length === 0 ? (
           <EmptyState titleText="No members" headingLevel="h3">
             <EmptyStateBody>
-              No team admins
-              {genderFilter
-                ? ` for ${genderLabel(genderFilter).toLowerCase()} teams`
-                : ''}
-              .
+              {searchQuery
+                ? 'No team admins match your search.'
+                : `No team admins${
+                    genderFilter
+                      ? ` for ${genderLabel(genderFilter).toLowerCase()} teams`
+                      : ''
+                  }.`}
             </EmptyStateBody>
           </EmptyState>
         ) : (
           <div className="rs-members-team-groups">
-            {teamGroups.map((group) => (
+            {searchedTeamGroups.map((group) => (
               <section
                 key={group.teamId}
                 className="rs-members-team-group"
@@ -285,7 +339,7 @@ export function MembersPage() {
                 >
                   {group.teamName}
                 </h2>
-                <ul className="rs-list" aria-label={group.teamName}>
+                <ul className="rs-directory-grid" aria-label={group.teamName}>
                   {group.admins.map((user) => (
                     <li key={`${group.teamId}-${user.uid}`}>
                       <MemberRow
@@ -300,22 +354,24 @@ export function MembersPage() {
             ))}
           </div>
         )
-      ) : members.length === 0 ? (
+      ) : searchedMembers.length === 0 ? (
         <EmptyState titleText="No members" headingLevel="h3">
           <EmptyStateBody>
-            No registered {emptyLabel}
-            {tab === 'teamAdmins' && genderFilter
-              ? ` for ${genderLabel(genderFilter).toLowerCase()} teams`
-              : ''}
-            .
+            {searchQuery
+              ? 'No members match your search.'
+              : `No registered ${emptyLabel}${
+                  tab === 'teamAdmins' && genderFilter
+                    ? ` for ${genderLabel(genderFilter).toLowerCase()} teams`
+                    : ''
+                }.`}
           </EmptyStateBody>
         </EmptyState>
       ) : (
         <ul
-          className="rs-list"
+          className="rs-directory-grid"
           aria-label={TABS.find((t) => t.id === tab)?.label}
         >
-          {members.map((user) => {
+          {searchedMembers.map((user) => {
             const teams = teamNamesForUser(user, state.teams);
             const fanFavorite =
               tab === 'fans' ? fanFavoriteLabel(user, state.teams) : null;

@@ -1,3 +1,38 @@
+.rs-directory-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--rs-gap-grid);
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+@media (min-width: 720px) {
+  .rs-directory-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+.rs-directory-grid > li {
+  min-width: 0;
+}
+
+.rs-directory-grid .rs-member-row {
+  height: 100%;
+  padding: 12px;
+  border: 1px solid var(--rs-color-border);
+  border-radius: var(--rs-radius-card);
+  background: var(--rs-color-surface);
+}
+
+.rs-directory-grid .rs-member-row:hover,
+.rs-directory-grid .rs-member-row:focus-visible {
+  background: var(--rs-color-surface-muted);
+}
+
+.rs-directory-grid .rs-team-card {
+  height: 100%;
+}
 
 .rs-members-tabs {
   flex-wrap: wrap;

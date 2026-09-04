@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { EmptyState, EmptyStateBody } from '@patternfly/react-core';
+import { EmptyState, EmptyStateBody, TextInput } from '@patternfly/react-core';
 import { useApp, useAppHref } from '@/app/AppContext';
 import {
   formatTeamAddress,
@@ -23,6 +23,7 @@ export function SchedulerTeamsPage() {
   const [competitionFilter, setCompetitionFilter] = useState<string | null>(
     null,
   );
+  const [query, setQuery] = useState('');
 
   const entries = useMemo(
     () => scheduleTeamEntries(state.matches, state.teams),
@@ -37,9 +38,34 @@ export function SchedulerTeamsPage() {
   }, [entries]);
 
   const visible = useMemo(() => {
-    if (!competitionFilter) return entries;
-    return entries.filter((e) => e.competitions.includes(competitionFilter));
-  }, [entries, competitionFilter]);
+    let list = competitionFilter
+      ? entries.filter((e) => e.competitions.includes(competitionFilter))
+      : entries;
+    const q = query.trim().toLowerCase();
+    if (!q) return list;
+    return list.filter((entry) => {
+      const { team, matchCount, competitions } = entry;
+      const address = formatTeamAddress(team, state.matches);
+      const admins = teamAdminsForTeam(team.id, state.users);
+      const contacts = teamContactEmails(team);
+      const adminLabel =
+        admins.length > 0
+          ? admins.map((u) => memberListName(u)).join(', ')
+          : contacts.join(', ');
+      const haystack = [
+        team.name,
+        team.abbreviation,
+        teamConferenceLabel(competitions, team),
+        address,
+        adminLabel,
+        `${matchCount} match`,
+      ]
+        .filter(Boolean)
+        .join(' ')
+        .toLowerCase();
+      return haystack.includes(q);
+    });
+  }, [entries, competitionFilter, query, state.matches, state.users]);
 
   if (entries.length === 0) {
     return (
@@ -70,15 +96,24 @@ export function SchedulerTeamsPage() {
         stageSecondary={false}
         ariaLabel="Filter teams by conference"
       />
+      <TextInput
+        id="teams-search"
+        type="search"
+        value={query}
+        onChange={(_e, value) => setQuery(value)}
+        placeholder="Search teams"
+        aria-label="Search teams"
+      />
       {visible.length === 0 ? (
         <EmptyState titleText="No matching teams" headingLevel="h3">
           <EmptyStateBody>
-            No clubs in that conference. Choose All competitions to see every
-            club.
+            {query.trim()
+              ? 'No teams match your search.'
+              : 'No clubs in that conference. Choose All competitions to see every club.'}
           </EmptyStateBody>
         </EmptyState>
       ) : (
-        <ul className="rs-list" aria-label="Teams">
+        <ul className="rs-directory-grid" aria-label="Teams">
           {visible.map(({ team, matchCount, competitions }) => {
             const address = formatTeamAddress(team, state.matches);
             const admins = teamAdminsForTeam(team.id, state.users);
