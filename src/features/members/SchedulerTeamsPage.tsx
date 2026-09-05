@@ -34,7 +34,7 @@ export function SchedulerTeamsPage() {
     const competitions = [
       ...new Set(entries.flatMap((e) => e.competitions)),
     ].sort((a, b) => a.localeCompare(b));
-    return { competitions, levels: [] as string[], genders: [], matchTypes: [] };
+    return { competitions, levels: [] as string[], genders: [], formats: [] };
   }, [entries]);
 
   const visible = useMemo(() => {

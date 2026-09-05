@@ -1400,7 +1400,13 @@ export function MatchDetailPage() {
 
       <div className="rs-label-row">
         {match.status !== 'crew_pending' && (
-          <span className="rs-pill">
+          <span
+            className={`rs-pill${
+              match.status === 'cancelled' || match.status === 'postponed'
+                ? ' rs-pill--urgent'
+                : ''
+            }`}
+          >
             {statusLabel(
               pendingProposal
                 ? 'change_proposed'
@@ -1411,10 +1417,10 @@ export function MatchDetailPage() {
           </span>
         )}
         {match.playedForfeit ? (
-          <span className="rs-pill rs-pill--quiet">Played forfeit</span>
+          <span className="rs-pill rs-pill--urgent">Played forfeit</span>
         ) : null}
         {match.forfeitTeamId ? (
-          <span className="rs-pill rs-pill--quiet">
+          <span className="rs-pill rs-pill--urgent">
             Forfeit —{' '}
             {match.forfeitTeamId === match.homeTeamId
               ? match.homeTeamName

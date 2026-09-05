@@ -1,4 +1,5 @@
 import type { FixtureRequest, Match, MatchGender } from './types';
+import { matchGameplayFormat } from './matchGameplayFormat';
 import {
   matchInCompetition,
   uniqueDisplayedCompetitions,
@@ -8,21 +9,21 @@ export type DivisionFilterOptions = {
   genders: MatchGender[];
   levels: string[];
   competitions: string[];
-  matchTypes: string[];
+  formats: string[];
 };
 
 export type DivisionFilterState = {
   gender: MatchGender | null;
   level: string | null;
   competition: string | null;
-  matchType?: string | null;
+  format?: string | null;
 };
 
 export type MultiDivisionFilterState = {
   genders: MatchGender[];
   levels: string[];
   competitions: string[];
-  matchTypes: string[];
+  formats: string[];
 };
 
 export function divisionFiltersActive(filters: DivisionFilterState): boolean {
@@ -30,7 +31,7 @@ export function divisionFiltersActive(filters: DivisionFilterState): boolean {
     filters.gender != null ||
     filters.level != null ||
     filters.competition != null ||
-    filters.matchType != null
+    filters.format != null
   );
 }
 
@@ -41,7 +42,7 @@ export function multiDivisionFiltersActive(
     filters.genders.length > 0 ||
     filters.levels.length > 0 ||
     filters.competitions.length > 0 ||
-    filters.matchTypes.length > 0
+    filters.formats.length > 0
   );
 }
 
@@ -63,20 +64,21 @@ function optionsFromMatches(matches: Match[]): DivisionFilterOptions {
   const genders = new Set<MatchGender>();
   const levels: string[] = [];
   const competitions: string[] = [];
-  const matchTypes: string[] = [];
+  const formats: string[] = [];
 
   for (const m of matches) {
     genders.add(m.gender);
     if (m.level?.trim()) levels.push(m.level.trim());
     if (m.competition?.trim()) competitions.push(m.competition.trim());
-    if (m.matchType?.trim()) matchTypes.push(m.matchType.trim());
+    const format = matchGameplayFormat(m);
+    if (format) formats.push(format);
   }
 
   return {
     genders: (['men', 'women'] as MatchGender[]).filter((g) => genders.has(g)),
     levels: sortedUnique(levels),
     competitions: uniqueDisplayedCompetitions(competitions),
-    matchTypes: sortedUnique(matchTypes),
+    formats: sortedUnique(formats),
   };
 }
 
@@ -95,7 +97,7 @@ export function divisionFilterOptionsFromMatches(
     competitions: all.competitions,
     levels: scoped.levels,
     genders: scoped.genders,
-    matchTypes: scoped.matchTypes,
+    formats: scoped.formats,
   };
 }
 
@@ -176,7 +178,7 @@ export function divisionFilterOptionsFromFixtureRequests(
     genders: (['men', 'women'] as MatchGender[]).filter((g) => genders.has(g)),
     levels: sortedUnique(levels),
     competitions: sortedUnique(competitions),
-    matchTypes: [],
+    formats: [],
   };
 }
 
@@ -187,20 +189,20 @@ export function mergeDivisionFilterOptions(
   const genders = new Set<MatchGender>();
   const levels: string[] = [];
   const competitions: string[] = [];
-  const matchTypes: string[] = [];
+  const formats: string[] = [];
 
   for (const pool of pools) {
     for (const g of pool.genders) genders.add(g);
     levels.push(...pool.levels);
     competitions.push(...pool.competitions);
-    matchTypes.push(...pool.matchTypes);
+    formats.push(...pool.formats);
   }
 
   return {
     genders: (['men', 'women'] as MatchGender[]).filter((g) => genders.has(g)),
     levels: sortedUnique(levels),
     competitions: sortedUnique(competitions),
-    matchTypes: sortedUnique(matchTypes),
+    formats: sortedUnique(formats),
   };
 }
 
@@ -222,12 +224,13 @@ export function matchMatchesDivisionFilters(
   genderFilter: MatchGender | null,
   levelFilter: string | null,
   competitionFilter: string | null = null,
-  matchTypeFilter: string | null = null,
+  formatFilter: string | null = null,
 ): boolean {
   if (genderFilter && match.gender !== genderFilter) return false;
   if (levelFilter && match.level !== levelFilter) return false;
-  if (matchTypeFilter && (match.matchType?.trim() ?? '') !== matchTypeFilter) {
-    return false;
+  if (formatFilter) {
+    const format = matchGameplayFormat(match);
+    if (format !== formatFilter) return false;
   }
   if (!matchInCompetition(match, competitionFilter)) return false;
   return true;
@@ -246,11 +249,9 @@ export function matchMatchesMultiDivisionFilters(
   if (filters.levels.length > 0 && !filters.levels.includes(match.level)) {
     return false;
   }
-  if (
-    filters.matchTypes.length > 0 &&
-    !filters.matchTypes.includes(match.matchType?.trim() ?? '')
-  ) {
-    return false;
+  if (filters.formats.length > 0) {
+    const format = matchGameplayFormat(match);
+    if (!format || !filters.formats.includes(format)) return false;
   }
   if (filters.competitions.length > 0) {
     const comp = match.competition ?? '';

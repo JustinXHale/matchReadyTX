@@ -16,21 +16,16 @@ export function GlobalDivisionFilters({
   genderFilter,
   levelFilter,
   competitionFilter,
-  matchTypeFilter = null,
   onGenderChange,
   onLevelChange,
   onCompetitionChange,
-  onMatchTypeChange,
   ariaLabel = 'Filter by division',
   layout = 'chips',
   showSingleLevel = false,
-  showSingleMatchType = false,
   hideLevels = false,
-  hideMatchTypes = false,
   hideGenders = false,
   stageSecondary = true,
   levelChipAriaLabel = 'Filter by tier',
-  matchTypeChipAriaLabel = 'Filter by match type',
   showDate = false,
   dateFilter = null,
   onDateChange,
@@ -41,20 +36,15 @@ export function GlobalDivisionFilters({
   genderFilter: MatchGender | null;
   levelFilter: string | null;
   competitionFilter: string | null;
-  matchTypeFilter?: string | null;
   onGenderChange: (next: MatchGender | null) => void;
   onLevelChange: (next: string | null) => void;
   onCompetitionChange: (next: string | null) => void;
-  onMatchTypeChange?: (next: string | null) => void;
   ariaLabel?: string;
   /** Chip row vs compact dropdown row. */
   layout?: 'chips' | 'dropdowns';
   /** Show level chips even when only one level (crew defaults editor). */
   showSingleLevel?: boolean;
-  /** Show match-type chips even when only one type appears in the dataset. */
-  showSingleMatchType?: boolean;
   hideLevels?: boolean;
-  hideMatchTypes?: boolean;
   hideGenders?: boolean;
   /**
    * When multiple competitions exist, hide level/gender until one is chosen.
@@ -62,7 +52,6 @@ export function GlobalDivisionFilters({
    */
   stageSecondary?: boolean;
   levelChipAriaLabel?: string;
-  matchTypeChipAriaLabel?: string;
   showDate?: boolean;
   dateFilter?: string | null;
   onDateChange?: (next: string | null) => void;
@@ -79,13 +68,6 @@ export function GlobalDivisionFilters({
     !hideLevels &&
     secondaryUnlocked &&
     (showSingleLevel ? options.levels.length > 0 : options.levels.length > 1);
-  const showMatchTypes =
-    !hideMatchTypes &&
-    onMatchTypeChange != null &&
-    secondaryUnlocked &&
-    (showSingleMatchType
-      ? options.matchTypes.length > 0
-      : options.matchTypes.length > 1);
   const genderInCompetitionNames = competitionsEncodeGender(
     options.competitions,
   );
@@ -125,28 +107,13 @@ export function GlobalDivisionFilters({
     [options.genders],
   );
 
-  const matchTypeOptions = useMemo(
-    () =>
-      options.matchTypes.map((matchType) => ({
-        value: matchType,
-        label: matchType,
-      })),
-    [options.matchTypes],
-  );
-
   const showFilterRow =
     showCompetitionSelect ||
     showDate ||
     rowEnd != null ||
-    (useDropdowns && (showLevels || showGenders || showMatchTypes));
+    (useDropdowns && (showLevels || showGenders));
 
-  if (
-    !showFilterRow &&
-    !showLevels &&
-    !showGenders &&
-    !showMatchTypes &&
-    !showDate
-  ) {
+  if (!showFilterRow && !showLevels && !showGenders && !showDate) {
     return null;
   }
 
@@ -154,7 +121,6 @@ export function GlobalDivisionFilters({
     if (next !== competitionFilter) {
       onLevelChange(null);
       onGenderChange(null);
-      onMatchTypeChange?.(null);
     }
     onCompetitionChange(next);
   };
@@ -205,15 +171,6 @@ export function GlobalDivisionFilters({
               options={genderOptions}
             />
           )}
-          {useDropdowns && showMatchTypes && onMatchTypeChange && (
-            <RsFilterSelect
-              label="Match type"
-              value={matchTypeFilter}
-              onChange={onMatchTypeChange}
-              placeholder="All match types"
-              options={matchTypeOptions}
-            />
-          )}
           {rowEnd}
         </div>
       )}
@@ -254,31 +211,6 @@ export function GlobalDivisionFilters({
                 {genderLabel(g)}
               </button>
             ))}
-        </div>
-      )}
-      {!useDropdowns && showMatchTypes && onMatchTypeChange && (
-        <div
-          className="rs-filter-chips"
-          role="group"
-          aria-label={matchTypeChipAriaLabel}
-        >
-          {options.matchTypes.map((matchType) => (
-            <button
-              key={matchType}
-              type="button"
-              className={`rs-filter-chip${
-                matchTypeFilter === matchType ? ' rs-filter-chip--selected' : ''
-              }`}
-              aria-pressed={matchTypeFilter === matchType}
-              onClick={() =>
-                onMatchTypeChange(
-                  matchTypeFilter === matchType ? null : matchType,
-                )
-              }
-            >
-              {matchType}
-            </button>
-          ))}
         </div>
       )}
     </div>

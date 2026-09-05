@@ -249,6 +249,18 @@ export function countOfficialRequestInbox(
   }).length;
 }
 
+/** Match has a recorded final result — no longer open for raise-hand. */
+export function isMatchResultFinal(match: Match): boolean {
+  if (match.forfeitTeamId) return true;
+  if (match.playedForfeit) return true;
+  return (
+    match.homeScore != null &&
+    match.awayScore != null &&
+    Number.isFinite(match.homeScore) &&
+    Number.isFinite(match.awayScore)
+  );
+}
+
 export function canOfficialRequestMatch(
   match: Match,
   userId: string,
@@ -256,6 +268,7 @@ export function canOfficialRequestMatch(
   nowMs = Date.now(),
 ): boolean {
   if (!isKickoffUpcoming(match, nowMs)) return false;
+  if (isMatchResultFinal(match)) return false;
   if (!isMatchRequestable(match)) return false;
   if (isMatchFilled(match)) return false;
   if (

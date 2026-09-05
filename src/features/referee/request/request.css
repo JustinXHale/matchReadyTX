@@ -11,6 +11,61 @@
   gap: var(--pf-t--global--spacer--sm);
 }
 
+.rs-available-filters__toggle-wrap {
+  display: none;
+}
+
+.rs-available-filters__toggle {
+  display: flex;
+  align-items: center;
+  gap: var(--pf-t--global--spacer--xs);
+  width: 100%;
+  min-height: 40px;
+  padding: 0 var(--pf-t--global--spacer--sm);
+  border: 1px solid var(--rs-color-border);
+  border-radius: var(--rs-radius-chip);
+  background: var(--rs-color-surface);
+  color: inherit;
+  font: inherit;
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+}
+
+.rs-available-filters__toggle-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.25rem;
+  height: 1.25rem;
+  padding: 0 0.35rem;
+  border-radius: 999px;
+  background: var(--rs-color-ink);
+  color: var(--rs-color-surface);
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.rs-available-filters__toggle-icon {
+  margin-inline-start: auto;
+  color: var(--rs-color-ended);
+}
+
+.rs-available-filters__panel {
+  flex: 1 1 100%;
+  width: 100%;
+  margin: 0;
+}
+
+.rs-available-filters__panel-inner {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: var(--pf-t--global--spacer--sm);
+  width: 100%;
+}
+
 .rs-available-filters__date {
   flex: 1 1 10rem;
   min-width: 0;
@@ -21,11 +76,12 @@
   width: 100%;
 }
 
-.rs-available-filters__group.pf-v6-c-toolbar__group {
+.rs-available-filters__group {
   display: flex;
   flex-wrap: wrap;
   align-items: flex-end;
   gap: var(--pf-t--global--spacer--sm);
+  width: 100%;
 }
 
 .rs-available-filters .pf-v6-c-toolbar__item {
@@ -54,4 +110,24 @@
 .rs-multi-filter-toggle__badge {
   flex-shrink: 0;
   margin-inline-start: var(--pf-t--global--spacer--xs);
+}
+
+@media (max-width: 767px) {
+  .rs-available-filters__toggle-wrap {
+    display: block;
+    flex: 1 1 100%;
+    width: 100%;
+  }
+
+  .rs-available-filters:not(.rs-available-filters--expanded)
+    .rs-available-filters__panel {
+    display: none;
+  }
+}
+
+@media (min-width: 768px) {
+  .rs-available-filters--expanded .rs-available-filters__panel,
+  .rs-available-filters .rs-available-filters__panel {
+    display: block;
+  }
 }

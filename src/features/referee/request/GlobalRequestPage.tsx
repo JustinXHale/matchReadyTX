@@ -21,6 +21,7 @@ import {
   type RequestableSlot,
 } from '@/domain/types';
 import { backState, type BackNav } from '@/nav/backNav';
+import { GAMEPLAY_FORMATS } from '@/domain/matchGameplayFormat';
 import {
   formatMatchMonthLabel,
   matchMonthKey,
@@ -46,7 +47,7 @@ const EMPTY_FILTERS: AvailableMatchesFilterState = {
   competitions: [],
   tiers: [],
   genders: [],
-  matchTypes: [],
+  formats: [],
   roles: [],
 };
 
@@ -123,8 +124,10 @@ export function GlobalRequestPage() {
       genders: prev.genders.filter((value) =>
         filterOptions.genders.includes(value),
       ),
-      matchTypes: prev.matchTypes.filter((value) =>
-        filterOptions.matchTypes.includes(value),
+      formats: prev.formats.filter(
+        (value) =>
+          filterOptions.formats.includes(value) ||
+          (GAMEPLAY_FORMATS as readonly string[]).includes(value),
       ),
     }));
   }, [filterOptions]);
@@ -133,7 +136,7 @@ export function GlobalRequestPage() {
     genders: filters.genders,
     levels: filters.tiers,
     competitions: filters.competitions,
-    matchTypes: filters.matchTypes,
+    formats: filters.formats,
   });
 
   const matchesDivision = (m: Match) =>
@@ -143,7 +146,7 @@ export function GlobalRequestPage() {
         genders: filters.genders,
         levels: filters.tiers,
         competitions: filters.competitions,
-        matchTypes: filters.matchTypes,
+        formats: filters.formats,
       }));
 
   const matchesRole = (m: Match) =>
@@ -159,7 +162,7 @@ export function GlobalRequestPage() {
               genders: filters.genders,
               levels: filters.tiers,
               competitions: filters.competitions,
-              matchTypes: filters.matchTypes,
+              formats: filters.formats,
             })
           ) {
             return false;
@@ -168,7 +171,7 @@ export function GlobalRequestPage() {
           return true;
         }),
       ),
-    [filterPool, divisionActive, filters.genders, filters.tiers, filters.competitions, filters.matchTypes, filters.roles],
+    [filterPool, divisionActive, filters.genders, filters.tiers, filters.competitions, filters.formats, filters.roles],
   );
 
   useEffect(() => {

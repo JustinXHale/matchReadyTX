@@ -26,34 +26,34 @@ function match(partial: Partial<Match> & Pick<Match, 'id'>): Match {
   };
 }
 
-describe('divisionFilters match type', () => {
-  it('collects unique match types from the pool', () => {
+describe('divisionFilters gameplay format', () => {
+  it('collects unique 7s/10s/15s formats from match type labels', () => {
     const options = divisionFilterOptionsFromMatches([
-      match({ id: 'm1', matchType: '2nd Side' }),
-      match({ id: 'm2', matchType: 'League' }),
+      match({ id: 'm1', matchType: '15s' }),
+      match({ id: 'm2', matchType: '7s Tournament' }),
       match({ id: 'm3', matchType: '2nd Side' }),
-      match({ id: 'm4' }),
+      match({ id: 'm4', matchType: '15s' }),
     ]);
-    expect(options.matchTypes).toEqual(['2nd Side', 'League']);
+    expect(options.formats).toEqual(['15s', '7s']);
   });
 
-  it('filters matches by match type', () => {
-    const league = match({ id: 'm1', matchType: 'League' });
-    const side = match({ id: 'm2', matchType: '2nd Side' });
+  it('filters matches by gameplay format', () => {
+    const fifteen = match({ id: 'm1', matchType: '15s League' });
+    const sevens = match({ id: 'm2', matchType: '7s' });
     expect(
-      matchMatchesMultiDivisionFilters(league, {
+      matchMatchesMultiDivisionFilters(fifteen, {
         genders: [],
         levels: [],
         competitions: [],
-        matchTypes: ['League'],
+        formats: ['15s'],
       }),
     ).toBe(true);
     expect(
-      matchMatchesMultiDivisionFilters(side, {
+      matchMatchesMultiDivisionFilters(sevens, {
         genders: [],
         levels: [],
         competitions: [],
-        matchTypes: ['League'],
+        formats: ['15s'],
       }),
     ).toBe(false);
   });

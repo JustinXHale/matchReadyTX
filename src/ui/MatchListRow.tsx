@@ -3,6 +3,8 @@ import {
   formatMatchKickoffTime,
   orgTimeZone,
 } from '@/domain/matchTime';
+import { matchGameplayFormat } from '@/domain/matchGameplayFormat';
+import { statusLabel } from '@/domain/matchTransitions';
 import { genderLabel, type Match } from '@/domain/types';
 import type { ReactNode } from 'react';
 import { backState, type BackNav } from '@/nav/backNav';
@@ -111,6 +113,9 @@ export function MatchListRow({
   const homeScoreLabel = scored ? String(match.homeScore) : '–';
   const awayScoreLabel = scored ? String(match.awayScore) : '–';
   const linkState = back ? backState(back) : undefined;
+  const format = matchGameplayFormat(match);
+  const matchTypeLabel = match.matchType?.trim();
+  const showMatchTypeLabel = matchTypeLabel && !format;
 
   const teams =
     teamsLayout === 'inline' ? (
@@ -198,18 +203,28 @@ export function MatchListRow({
           <span className="rs-pill rs-pill--ink rs-list-row__chip">
             {match.level}
           </span>
-          {match.matchType?.trim() ? (
+          {format ? (
             <span className="rs-pill rs-pill--quiet rs-list-row__chip">
-              {match.matchType.trim()}
+              {format}
+            </span>
+          ) : null}
+          {showMatchTypeLabel ? (
+            <span className="rs-pill rs-pill--quiet rs-list-row__chip">
+              {matchTypeLabel}
+            </span>
+          ) : null}
+          {match.status === 'cancelled' || match.status === 'postponed' ? (
+            <span className="rs-pill rs-pill--urgent rs-list-row__chip">
+              {statusLabel(match.status)}
             </span>
           ) : null}
           {match.playedForfeit ? (
-            <span className="rs-pill rs-pill--quiet rs-list-row__chip">
+            <span className="rs-pill rs-pill--urgent rs-list-row__chip">
               Played forfeit
             </span>
           ) : null}
           {match.forfeitTeamId ? (
-            <span className="rs-pill rs-pill--quiet rs-list-row__chip">
+            <span className="rs-pill rs-pill--urgent rs-list-row__chip">
               Forfeit
             </span>
           ) : null}

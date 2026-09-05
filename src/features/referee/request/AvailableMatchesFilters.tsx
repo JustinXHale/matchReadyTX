@@ -1,14 +1,15 @@
+import { useId, useState } from 'react';
 import {
   Toolbar,
   ToolbarContent,
   ToolbarFilter,
-  ToolbarGroup,
   ToolbarItem,
 } from '@patternfly/react-core';
 import {
   competitionsEncodeGender,
   type DivisionFilterOptions,
 } from '@/domain/divisionFilters';
+import { GAMEPLAY_FORMATS } from '@/domain/matchGameplayFormat';
 import { genderLabel, type MatchGender } from '@/domain/types';
 import { RsDateField } from '@/ui/RsDateField';
 import { RsMultiFilterSelect } from '@/ui/RsMultiFilterSelect';
@@ -19,7 +20,7 @@ export type AvailableMatchesFilterState = {
   competitions: string[];
   tiers: string[];
   genders: MatchGender[];
-  matchTypes: string[];
+  formats: string[];
   roles: string[];
 };
 
@@ -47,7 +48,11 @@ export function AvailableMatchesFilters({
   const showGenders =
     options.genders.length > 1 &&
     !competitionsEncodeGender(options.competitions);
-  const showMatchTypes = options.matchTypes.length > 0;
+  const formatOptions =
+    options.formats.length > 0
+      ? options.formats
+      : [...GAMEPLAY_FORMATS];
+  const showFormats = true;
   const showRoleFilter = showRoles && roleOptions.length > 0;
 
   const patch = (partial: Partial<AvailableMatchesFilterState>) => {
@@ -57,7 +62,7 @@ export function AvailableMatchesFilters({
   const clearCategory = (
     key: keyof Pick<
       AvailableMatchesFilterState,
-      'competitions' | 'tiers' | 'genders' | 'matchTypes' | 'roles'
+      'competitions' | 'tiers' | 'genders' | 'formats' | 'roles'
     >,
   ) => {
     patch({ [key]: [] });
@@ -66,7 +71,7 @@ export function AvailableMatchesFilters({
   const removeLabel = (
     key: keyof Pick<
       AvailableMatchesFilterState,
-      'competitions' | 'tiers' | 'genders' | 'matchTypes' | 'roles'
+      'competitions' | 'tiers' | 'genders' | 'formats' | 'roles'
     >,
     label: string,
   ) => {
@@ -81,7 +86,7 @@ export function AvailableMatchesFilters({
       competitions: [],
       tiers: [],
       genders: [],
-      matchTypes: [],
+      formats: [],
       roles: [],
     });
   };
@@ -91,14 +96,25 @@ export function AvailableMatchesFilters({
     filters.competitions.length > 0 ||
     filters.tiers.length > 0 ||
     filters.genders.length > 0 ||
-    filters.matchTypes.length > 0 ||
+    filters.formats.length > 0 ||
     filters.roles.length > 0;
+
+  const activeFilterCount =
+    (filters.date ? 1 : 0) +
+    filters.competitions.length +
+    filters.tiers.length +
+    filters.genders.length +
+    filters.formats.length +
+    filters.roles.length;
+
+  const [expanded, setExpanded] = useState(false);
+  const panelId = useId();
 
   if (
     !showCompetitions &&
     !showTiers &&
     !showGenders &&
-    !showMatchTypes &&
+    !showFormats &&
     !showRoleFilter &&
     availableDates == null
   ) {
@@ -107,24 +123,51 @@ export function AvailableMatchesFilters({
 
   return (
     <Toolbar
-      className="rs-available-filters pf-m-toggle-group-container"
+      className={`rs-available-filters pf-m-toggle-group-container${
+        expanded ? ' rs-available-filters--expanded' : ''
+      }`}
       clearAllFilters={hasAnyFilter ? clearAll : undefined}
     >
       <ToolbarContent aria-label={ariaLabel}>
-        <ToolbarItem className="rs-available-filters__date">
-          <label className="rs-filter-field rs-filter-field--date">
-            <span className="rs-filter-field__label">Date</span>
-            <RsDateField
-              className="rs-filter-date"
-              value={filters.date ?? ''}
-              aria-label="Filter by date"
-              availableDates={availableDates}
-              onChange={(next) => patch({ date: next })}
-            />
-          </label>
+        <ToolbarItem className="rs-available-filters__toggle-wrap">
+          <button
+            type="button"
+            className="rs-available-filters__toggle"
+            aria-expanded={expanded}
+            aria-controls={panelId}
+            onClick={() => setExpanded((open) => !open)}
+          >
+            <span className="rs-available-filters__toggle-label">Filters</span>
+            {activeFilterCount > 0 ? (
+              <span className="rs-available-filters__toggle-count">
+                {activeFilterCount}
+              </span>
+            ) : null}
+            <span className="rs-available-filters__toggle-icon" aria-hidden>
+              {expanded ? '▾' : '▸'}
+            </span>
+          </button>
         </ToolbarItem>
 
-        <ToolbarGroup variant="filter-group" className="rs-available-filters__group">
+        <ToolbarItem
+          id={panelId}
+          className="rs-available-filters__panel"
+        >
+          <div className="rs-available-filters__panel-inner">
+            <div className="rs-available-filters__date">
+              <label className="rs-filter-field rs-filter-field--date">
+                <span className="rs-filter-field__label">Date</span>
+                <RsDateField
+                  className="rs-filter-date"
+                  value={filters.date ?? ''}
+                  aria-label="Filter by date"
+                  availableDates={availableDates}
+                  onChange={(next) => patch({ date: next })}
+                />
+              </label>
+            </div>
+
+            <div className="rs-available-filters__group">
           {showCompetitions && (
             <ToolbarFilter
               categoryName="Competition"
@@ -196,21 +239,21 @@ export function AvailableMatchesFilters({
             </ToolbarFilter>
           )}
 
-          {showMatchTypes && (
+          {showFormats && (
             <ToolbarFilter
-              categoryName="Match type"
-              labels={filters.matchTypes}
+              categoryName="Format"
+              labels={filters.formats}
               deleteLabel={(_category, label) =>
-                removeLabel('matchTypes', String(label))
+                removeLabel('formats', String(label))
               }
-              deleteLabelGroup={() => clearCategory('matchTypes')}
+              deleteLabelGroup={() => clearCategory('formats')}
             >
               <RsMultiFilterSelect
-                label="Match type"
-                placeholder="All match types"
-                selected={filters.matchTypes}
-                onChange={(matchTypes) => patch({ matchTypes })}
-                options={options.matchTypes.map((value) => ({
+                label="Format"
+                placeholder="All formats"
+                selected={filters.formats}
+                onChange={(formats) => patch({ formats })}
+                options={formatOptions.map((value) => ({
                   value,
                   label: value,
                 }))}
@@ -240,7 +283,9 @@ export function AvailableMatchesFilters({
               />
             </ToolbarFilter>
           )}
-        </ToolbarGroup>
+            </div>
+          </div>
+        </ToolbarItem>
       </ToolbarContent>
     </Toolbar>
   );

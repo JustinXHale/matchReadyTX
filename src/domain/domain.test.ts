@@ -773,6 +773,15 @@ describe('game requests', () => {
     };
     expect(isKickoffUpcoming(futureForfeit)).toBe(true);
     expect(isScheduleUpcoming(futureForfeit)).toBe(false);
+    expect(canOfficialRequestMatch(futureForfeit, 'u1', [])).toBe(false);
+
+    const futureScored = {
+      ...released,
+      kickoffAt: new Date(Date.now() + 3_600_000).toISOString(),
+      homeScore: 12,
+      awayScore: 7,
+    };
+    expect(canOfficialRequestMatch(futureScored, 'u1', [])).toBe(false);
 
     const filled = {
       ...released,

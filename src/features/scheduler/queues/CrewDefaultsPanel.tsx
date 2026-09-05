@@ -82,7 +82,7 @@ export function CrewDefaultsPanel() {
       competitions: filterOptions.competitions,
       genders: filterOptions.genders,
       levels: levelOptions.length ? levelOptions : filterOptions.levels,
-      matchTypes: filterOptions.matchTypes,
+      formats: filterOptions.formats,
     }),
     [filterOptions, levelOptions],
   );
