@@ -519,6 +519,31 @@ input.rs-filter-search {
   gap: var(--pf-t--global--spacer--sm);
 }
 
+.rs-filter-bar--available-matches .rs-filter-bar__row {
+  justify-content: flex-start;
+}
+
+.rs-filter-bar--available-matches .rs-filter-bar__pair-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--pf-t--global--spacer--sm);
+  align-items: end;
+}
+
+.rs-filter-bar--available-matches .rs-filter-field,
+.rs-filter-bar--available-matches .rs-filter-field--select,
+.rs-filter-bar--available-matches .rs-filter-field--date {
+  flex: unset;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+}
+
+.rs-filter-bar--available-matches .rs-filter-select-wrap,
+.rs-filter-bar--available-matches .rs-date-field-wrap {
+  width: 100%;
+}
+
 .rs-filter-field {
   display: flex;
   flex-direction: column;

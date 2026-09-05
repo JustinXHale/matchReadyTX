@@ -32,3 +32,10 @@ export function matchGameplayFormat(
   }
   return null;
 }
+
+/** Unlabeled schedule rows are treated as XVs (15-a-side). */
+export function matchGameplayFormatResolved(
+  match: Partial<Pick<Match, 'matchType' | 'title' | 'level' | 'competition'>>,
+): GameplayFormat {
+  return matchGameplayFormat(match) ?? '15s';
+}

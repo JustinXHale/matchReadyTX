@@ -11,6 +11,7 @@ import {
 } from '@/domain/divisionFilters';
 import { GAMEPLAY_FORMATS } from '@/domain/matchGameplayFormat';
 import { GlobalDivisionFilters } from '@/features/global/GlobalDivisionFilters';
+import { RsFilterSelect } from '@/ui/RsFilterSelect';
 import { MatchListRow } from '@/ui/MatchListRow';
 import { canOfficialRequestMatch, openRequestSlots } from '@/domain/requests';
 import {
@@ -104,10 +105,15 @@ export function GlobalRequestPage() {
     [filterPool, competitionFilter],
   );
 
-  const formatOptions =
-    filterOptions.formats.length > 0
-      ? filterOptions.formats
-      : [...GAMEPLAY_FORMATS];
+  const formatSelectOptions = useMemo(
+    () => GAMEPLAY_FORMATS.map((format) => ({ value: format, label: format })),
+    [],
+  );
+
+  const roleSelectOptions = useMemo(
+    () => ROLE_FILTERS.map((f) => ({ value: f.id, label: f.label })),
+    [],
+  );
 
   const divisionActive = divisionFiltersActive({
     gender: genderFilter,
@@ -266,6 +272,7 @@ export function GlobalRequestPage() {
   return (
     <div className="rs-stack">
       <GlobalDivisionFilters
+        className="rs-filter-bar--available-matches"
         options={filterOptions}
         genderFilter={genderFilter}
         levelFilter={levelFilter}
@@ -273,61 +280,33 @@ export function GlobalRequestPage() {
         onGenderChange={setGenderFilter}
         onLevelChange={setLevelFilter}
         onCompetitionChange={setCompetitionFilter}
-        layout="dropdowns"
+        layout="paired"
+        showSingleLevel
+        stageSecondary={false}
         showDate
         dateFilter={dateFilter}
         onDateChange={setDateFilter}
         availableDates={availableDates}
         ariaLabel="Filter requestable games"
+        pairRow2End={
+          <RsFilterSelect
+            label="Position"
+            value={roleFilter}
+            onChange={(next) => setRoleFilter(next as RoleFilter | null)}
+            placeholder="All positions"
+            options={roleSelectOptions}
+          />
+        }
+        pairRow3={
+          <RsFilterSelect
+            label="Format"
+            value={formatFilter}
+            onChange={setFormatFilter}
+            placeholder="All formats"
+            options={formatSelectOptions}
+          />
+        }
       />
-
-      {hasBase && (
-        <>
-          <div
-            className="rs-filter-chips"
-            role="group"
-            aria-label="Filter by format"
-          >
-            {formatOptions.map((format) => (
-              <button
-                key={format}
-                type="button"
-                className={`rs-filter-chip${
-                  formatFilter === format ? ' rs-filter-chip--selected' : ''
-                }`}
-                aria-pressed={formatFilter === format}
-                onClick={() =>
-                  setFormatFilter((prev) => (prev === format ? null : format))
-                }
-              >
-                {format}
-              </button>
-            ))}
-          </div>
-
-          <div
-            className="rs-filter-chips"
-            role="group"
-            aria-label="Filter by open position"
-          >
-            {ROLE_FILTERS.map((f) => (
-              <button
-                key={f.id}
-                type="button"
-                className={`rs-filter-chip${
-                  roleFilter === f.id ? ' rs-filter-chip--selected' : ''
-                }`}
-                aria-pressed={roleFilter === f.id}
-                onClick={() =>
-                  setRoleFilter((prev) => (prev === f.id ? null : f.id))
-                }
-              >
-                {f.label}
-              </button>
-            ))}
-          </div>
-        </>
-      )}
 
       {!hasBase ? (
         <EmptyState titleText="No available matches" headingLevel="h3">
@@ -338,7 +317,8 @@ export function GlobalRequestPage() {
       ) : !hasAny ? (
         <EmptyState titleText="No matching games" headingLevel="h3">
           <EmptyStateBody>
-            No available matches match this filter. Tap a chip again to clear.
+            No available matches match this filter. Clear a dropdown to see more
+            games.
           </EmptyStateBody>
         </EmptyState>
       ) : (

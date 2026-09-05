@@ -31,6 +31,9 @@ export function GlobalDivisionFilters({
   onDateChange,
   availableDates,
   rowEnd,
+  pairRow2End,
+  pairRow3,
+  className,
 }: {
   options: DivisionFilterOptions;
   genderFilter: MatchGender | null;
@@ -41,7 +44,7 @@ export function GlobalDivisionFilters({
   onCompetitionChange: (next: string | null) => void;
   ariaLabel?: string;
   /** Chip row vs compact dropdown row. */
-  layout?: 'chips' | 'dropdowns';
+  layout?: 'chips' | 'dropdowns' | 'paired';
   /** Show level chips even when only one level (crew defaults editor). */
   showSingleLevel?: boolean;
   hideLevels?: boolean;
@@ -59,8 +62,14 @@ export function GlobalDivisionFilters({
   availableDates?: string[];
   /** Extra controls appended to the filter row (e.g. role picker). */
   rowEnd?: ReactNode;
+  /** Second column on row 2 when layout is paired (e.g. position). */
+  pairRow2End?: ReactNode;
+  /** First column on row 3 when layout is paired (e.g. format). */
+  pairRow3?: ReactNode;
+  className?: string;
 }) {
-  const useDropdowns = layout === 'dropdowns';
+  const useDropdowns = layout === 'dropdowns' || layout === 'paired';
+  const usePaired = layout === 'paired';
   const showCompetitionSelect = options.competitions.length > 1;
   const secondaryUnlocked =
     !stageSecondary || !showCompetitionSelect || competitionFilter != null;
@@ -108,12 +117,28 @@ export function GlobalDivisionFilters({
   );
 
   const showFilterRow =
-    showCompetitionSelect ||
-    showDate ||
-    rowEnd != null ||
-    (useDropdowns && (showLevels || showGenders));
+    !usePaired &&
+    (showCompetitionSelect ||
+      showDate ||
+      rowEnd != null ||
+      (useDropdowns && (showLevels || showGenders)));
 
-  if (!showFilterRow && !showLevels && !showGenders && !showDate) {
+  const showPairedRows =
+    usePaired &&
+    (showDate ||
+      showCompetitionSelect ||
+      showLevels ||
+      showGenders ||
+      pairRow2End != null ||
+      pairRow3 != null);
+
+  if (
+    !showFilterRow &&
+    !showPairedRows &&
+    !showLevels &&
+    !showGenders &&
+    !showDate
+  ) {
     return null;
   }
 
@@ -126,7 +151,71 @@ export function GlobalDivisionFilters({
   };
 
   return (
-    <div className="rs-filter-bar" role="group" aria-label={ariaLabel}>
+    <div
+      className={`rs-filter-bar${className ? ` ${className}` : ''}`}
+      role="group"
+      aria-label={ariaLabel}
+    >
+      {usePaired ? (
+        <>
+          {(showDate || showCompetitionSelect) && (
+            <div className="rs-filter-bar__pair-row">
+              {showDate && onDateChange && (
+                <label className="rs-filter-field rs-filter-field--date">
+                  <span className="rs-filter-field__label">Date</span>
+                  <RsDateField
+                    className="rs-filter-date"
+                    value={dateFilter ?? ''}
+                    aria-label="Filter by date"
+                    availableDates={availableDates}
+                    onChange={onDateChange}
+                  />
+                </label>
+              )}
+              {showCompetitionSelect && (
+                <RsFilterSelect
+                  label="Competition"
+                  value={competitionFilter}
+                  onChange={setCompetition}
+                  placeholder="All competitions"
+                  options={competitionOptions}
+                />
+              )}
+            </div>
+          )}
+          {(showLevels || pairRow2End) && (
+            <div className="rs-filter-bar__pair-row">
+              {showLevels && (
+                <RsFilterSelect
+                  label="Tier"
+                  value={levelFilter}
+                  onChange={onLevelChange}
+                  placeholder="All tiers"
+                  options={levelOptions}
+                />
+              )}
+              {pairRow2End}
+            </div>
+          )}
+          {(pairRow3 || showGenders) && (
+            <div className="rs-filter-bar__pair-row">
+              {pairRow3}
+              {showGenders && (
+                <RsFilterSelect
+                  label="Gender"
+                  value={genderFilter}
+                  onChange={(next) =>
+                    onGenderChange(next as MatchGender | null)
+                  }
+                  placeholder="All genders"
+                  options={genderOptions}
+                />
+              )}
+            </div>
+          )}
+        </>
+      ) : (
+        <>
       {showFilterRow && (
         <div className="rs-filter-bar__row">
           {showDate && onDateChange && (
@@ -212,6 +301,8 @@ export function GlobalDivisionFilters({
               </button>
             ))}
         </div>
+      )}
+        </>
       )}
     </div>
   );

@@ -37,11 +37,11 @@ describe('divisionFilters gameplay format', () => {
     expect(options.formats).toEqual(['15s', '7s']);
   });
 
-  it('filters matches by gameplay format', () => {
-    const fifteen = match({ id: 'm1', matchType: '15s League' });
+  it('treats unlabeled match types as 15s when filtering', () => {
+    const unlabeled = match({ id: 'm3', matchType: '2nd Side' });
     const sevens = match({ id: 'm2', matchType: '7s' });
     expect(
-      matchMatchesMultiDivisionFilters(fifteen, {
+      matchMatchesMultiDivisionFilters(unlabeled, {
         genders: [],
         levels: [],
         competitions: [],

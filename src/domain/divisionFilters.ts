@@ -1,5 +1,5 @@
 import type { FixtureRequest, Match, MatchGender } from './types';
-import { matchGameplayFormat } from './matchGameplayFormat';
+import { matchGameplayFormatResolved } from './matchGameplayFormat';
 import {
   matchInCompetition,
   uniqueDisplayedCompetitions,
@@ -70,8 +70,8 @@ function optionsFromMatches(matches: Match[]): DivisionFilterOptions {
     genders.add(m.gender);
     if (m.level?.trim()) levels.push(m.level.trim());
     if (m.competition?.trim()) competitions.push(m.competition.trim());
-    const format = matchGameplayFormat(m);
-    if (format) formats.push(format);
+    const format = matchGameplayFormatResolved(m);
+    formats.push(format);
   }
 
   return {
@@ -229,7 +229,7 @@ export function matchMatchesDivisionFilters(
   if (genderFilter && match.gender !== genderFilter) return false;
   if (levelFilter && match.level !== levelFilter) return false;
   if (formatFilter) {
-    const format = matchGameplayFormat(match);
+    const format = matchGameplayFormatResolved(match);
     if (format !== formatFilter) return false;
   }
   if (!matchInCompetition(match, competitionFilter)) return false;
@@ -250,8 +250,8 @@ export function matchMatchesMultiDivisionFilters(
     return false;
   }
   if (filters.formats.length > 0) {
-    const format = matchGameplayFormat(match);
-    if (!format || !filters.formats.includes(format)) return false;
+    const format = matchGameplayFormatResolved(match);
+    if (!filters.formats.includes(format)) return false;
   }
   if (filters.competitions.length > 0) {
     const comp = match.competition ?? '';

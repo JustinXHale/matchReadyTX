@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   gameplayFormatFromLabel,
   matchGameplayFormat,
+  matchGameplayFormatResolved,
 } from '@/domain/matchGameplayFormat';
 
 describe('matchGameplayFormat', () => {
@@ -24,6 +25,14 @@ describe('matchGameplayFormat', () => {
       matchGameplayFormat({
         competition: 'Collegiate XV',
         matchType: undefined,
+      }),
+    ).toBe('15s');
+  });
+
+  it('defaults unlabeled matches to 15s', () => {
+    expect(
+      matchGameplayFormatResolved({
+        matchType: '2nd Side',
       }),
     ).toBe('15s');
   });
