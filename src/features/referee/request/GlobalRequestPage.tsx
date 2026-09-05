@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { EmptyState, EmptyStateBody, Title } from '@patternfly/react-core';
-import { useApp } from '@/app/AppContext';
+import { useApp, useAppHref } from '@/app/AppContext';
 import {
   AvailableMatchesFilters,
   type AvailableMatchesFilterState,
@@ -71,6 +71,7 @@ function formatOpenSlots(slots: RequestableSlot[]): string {
 /** Opens match detail so the official can pick a role and raise their hand. */
 function RaiseHandTrailing({ match }: { match: Match }) {
   const navigate = useNavigate();
+  const matchHref = useAppHref(`/matches/${match.id}?request=1`);
   const open = openRequestSlots(match);
   return (
     <button
@@ -80,7 +81,7 @@ function RaiseHandTrailing({ match }: { match: Match }) {
       onClick={(e) => {
         e.preventDefault();
         e.stopPropagation();
-        navigate(`/matches/${match.id}?request=1`, {
+        navigate(matchHref, {
           state: backState(GLOBAL_REQUEST_BACK),
         });
       }}

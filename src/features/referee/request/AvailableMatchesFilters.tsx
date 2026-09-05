@@ -1,4 +1,5 @@
 import { useEffect, useId, useState, type ReactNode } from 'react';
+import { useLocation } from 'react-router-dom';
 import {
   competitionsEncodeGender,
   type DivisionFilterOptions,
@@ -60,6 +61,11 @@ export function AvailableMatchesFilters({
   const mobileLayout = useMobileFiltersLayout();
   const [expanded, setExpanded] = useState(false);
   const panelId = useId();
+  const location = useLocation();
+
+  useEffect(() => {
+    setExpanded(false);
+  }, [location.pathname, location.search]);
 
   const showCompetitions = options.competitions.length > 1;
   const showTiers = options.levels.length > 0;

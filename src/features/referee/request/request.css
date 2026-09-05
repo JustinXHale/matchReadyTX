@@ -93,27 +93,82 @@
   text-decoration: underline;
 }
 
-.rs-filter-field--select .pf-v6-c-menu-toggle,
-.rs-multi-filter-toggle {
+.rs-filter-field--select .rs-multi-filter-toggle {
   width: 100%;
   min-height: 40px;
+  display: flex;
+  align-items: center;
   justify-content: space-between;
+  gap: var(--pf-t--global--spacer--xs);
+  border: var(--pf-t--global--border--width--regular) solid var(--rs-color-border);
+  background: var(--rs-color-surface);
+  color: var(--rs-color-ink);
+  border-radius: var(--rs-radius-pill);
+  padding: var(--pf-t--global--spacer--xs) var(--pf-t--global--spacer--sm);
+  font: var(--rs-font-chip);
+  cursor: pointer;
+  text-align: left;
 }
 
-.rs-filter-field--select > .pf-v6-c-menu,
-.rs-filter-field--select > div:first-of-type {
-  width: 100%;
+.rs-multi-filter {
+  position: relative;
 }
 
 .rs-multi-filter-toggle__text {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  flex: 1 1 auto;
+  min-width: 0;
 }
 
 .rs-multi-filter-toggle__badge {
   flex-shrink: 0;
-  margin-inline-start: var(--pf-t--global--spacer--xs);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.25rem;
+  height: 1.25rem;
+  padding: 0 0.35rem;
+  border-radius: 999px;
+  background: var(--rs-color-ink);
+  color: var(--rs-color-surface);
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.rs-multi-filter-menu {
+  position: absolute;
+  z-index: 200;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  max-height: min(16rem, 50vh);
+  overflow: auto;
+  border: 1px solid var(--rs-color-border);
+  border-radius: var(--rs-radius-chip);
+  background: var(--rs-color-surface);
+  box-shadow: 0 4px 16px color-mix(in srgb, var(--rs-color-ink) 12%, transparent);
+  padding: var(--pf-t--global--spacer--xs) 0;
+}
+
+.rs-multi-filter-option {
+  display: flex;
+  align-items: center;
+  gap: var(--pf-t--global--spacer--xs);
+  padding: var(--pf-t--global--spacer--xs) var(--pf-t--global--spacer--sm);
+  font: var(--rs-font-chip);
+  cursor: pointer;
+}
+
+.rs-multi-filter-option:hover {
+  background: color-mix(in srgb, var(--rs-color-ink) 6%, transparent);
+}
+
+.rs-date-field-wrap {
+  position: relative;
+  width: 100%;
 }
 
 @media (max-width: 767px) {

@@ -1,12 +1,4 @@
-import { useState } from 'react';
-import {
-  Badge,
-  MenuToggle,
-  Select,
-  SelectList,
-  SelectOption,
-  type MenuToggleElement,
-} from '@patternfly/react-core';
+import { useEffect, useId, useRef, useState } from 'react';
 
 export type RsMultiFilterOption = {
   value: string;
@@ -29,14 +21,36 @@ export function RsMultiFilterSelect({
   ariaLabel?: string;
 }) {
   const [isOpen, setIsOpen] = useState(false);
+  const rootRef = useRef<HTMLDivElement>(null);
+  const listboxId = useId();
   const togglePlaceholder = placeholder ?? 'All';
 
-  const onSelect = (
-    _event: React.MouseEvent<Element, MouseEvent> | undefined,
-    value?: string | number,
-  ) => {
-    if (value == null || value === '') return;
-    const key = String(value);
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const onPointerDown = (event: PointerEvent) => {
+      if (!rootRef.current?.contains(event.target as Node)) {
+        setIsOpen(false);
+      }
+    };
+
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setIsOpen(false);
+    };
+
+    document.addEventListener('pointerdown', onPointerDown, true);
+    document.addEventListener('keydown', onKeyDown, true);
+    return () => {
+      document.removeEventListener('pointerdown', onPointerDown, true);
+      document.removeEventListener('keydown', onKeyDown, true);
+    };
+  }, [isOpen]);
+
+  useEffect(() => {
+    return () => setIsOpen(false);
+  }, []);
+
+  const toggleSelection = (key: string) => {
     onChange(
       selected.includes(key)
         ? selected.filter((item) => item !== key)
@@ -45,48 +59,54 @@ export function RsMultiFilterSelect({
   };
 
   return (
-    <label className="rs-filter-field rs-filter-field--select">
+    <div
+      ref={rootRef}
+      className="rs-filter-field rs-filter-field--select rs-multi-filter"
+    >
       <span className="rs-filter-field__label">{label}</span>
-      <Select
+      <button
+        type="button"
+        className="rs-multi-filter-toggle"
         aria-label={ariaLabel ?? label}
-        role="menu"
-        selected={selected}
-        isOpen={isOpen}
-        onOpenChange={setIsOpen}
-        onSelect={onSelect}
-        toggle={(toggleRef: React.Ref<MenuToggleElement>) => (
-          <MenuToggle
-            ref={toggleRef}
-            onClick={() => setIsOpen((open) => !open)}
-            isExpanded={isOpen}
-            className="rs-multi-filter-toggle"
-          >
-            <span className="rs-multi-filter-toggle__text">
-              {selected.length > 0
-                ? `${selected.length} selected`
-                : togglePlaceholder}
-            </span>
-            {selected.length > 0 ? (
-              <Badge isRead className="rs-multi-filter-toggle__badge">
-                {selected.length}
-              </Badge>
-            ) : null}
-          </MenuToggle>
-        )}
+        aria-expanded={isOpen}
+        aria-haspopup="listbox"
+        aria-controls={listboxId}
+        onClick={() => setIsOpen((open) => !open)}
       >
-      <SelectList>
-        {options.map((opt) => (
-          <SelectOption
-            key={opt.value}
-            value={opt.value}
-            hasCheckbox
-            isSelected={selected.includes(opt.value)}
-          >
-            {opt.label}
-          </SelectOption>
-        ))}
-      </SelectList>
-      </Select>
-    </label>
+        <span className="rs-multi-filter-toggle__text">
+          {selected.length > 0
+            ? `${selected.length} selected`
+            : togglePlaceholder}
+        </span>
+        {selected.length > 0 ? (
+          <span className="rs-multi-filter-toggle__badge" aria-hidden>
+            {selected.length}
+          </span>
+        ) : null}
+      </button>
+      {isOpen ? (
+        <div
+          id={listboxId}
+          className="rs-multi-filter-menu"
+          role="listbox"
+          aria-label={ariaLabel ?? label}
+          aria-multiselectable="true"
+        >
+          {options.map((opt) => {
+            const checked = selected.includes(opt.value);
+            return (
+              <label key={opt.value} className="rs-multi-filter-option">
+                <input
+                  type="checkbox"
+                  checked={checked}
+                  onChange={() => toggleSelection(opt.value)}
+                />
+                <span>{opt.label}</span>
+              </label>
+            );
+          })}
+        </div>
+      ) : null}
+    </div>
   );
 }

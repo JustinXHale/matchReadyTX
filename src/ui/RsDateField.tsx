@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useMemo, useRef } from 'react';
 import { DatePicker } from '@patternfly/react-core';
 import { calendarDateKey } from '@/domain/divisionFilters';
 import { IconDateInput } from '@/ui/IconDateInput';
@@ -85,8 +85,10 @@ function RsDatePickerWithAllowlist({
     ],
     [availableSet],
   );
+  const rootRef = useRef<HTMLDivElement>(null);
 
   return (
+    <div ref={rootRef} className="rs-date-field-wrap">
     <DatePicker
       id={id}
       className={`rs-date-field${className ? ` ${className}` : ''}`}
@@ -94,7 +96,7 @@ function RsDatePickerWithAllowlist({
       placeholder={placeholder}
       aria-label={ariaLabel}
       buttonAriaLabel={buttonAriaLabel}
-      appendTo={() => document.body}
+      appendTo={() => rootRef.current as HTMLElement}
       validators={validators}
       onChange={(_, nextValue, date) => {
         if (!nextValue.trim()) {
@@ -107,5 +109,6 @@ function RsDatePickerWithAllowlist({
         onChange(key);
       }}
     />
+    </div>
   );
 }
