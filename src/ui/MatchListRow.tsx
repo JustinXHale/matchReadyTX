@@ -8,7 +8,7 @@ import { statusLabel } from '@/domain/matchTransitions';
 import { genderLabel, type Match } from '@/domain/types';
 import type { ReactNode } from 'react';
 import { backState, type BackNav } from '@/nav/backNav';
-import { useApp, useAppHref } from '@/app/AppContext';
+import { useApp } from '@/app/AppContext';
 
 function dayOrdinal(day: number): string {
   const j = day % 10;
@@ -108,13 +108,8 @@ export function MatchListRow({
 }) {
   const { state } = useApp();
   const timeZone = orgTimeZone(state.org.timezone);
-  const resolvedTo = useAppHref(to ?? '/');
-  const linkTo = to ? resolvedTo : undefined;
-  const backTarget = useAppHref(back?.to ?? '/');
-  const linkState = back
-    ? backState({ ...back, to: backTarget })
-    : undefined;
   const { month, day } = formatCardDate(match.kickoffAt, timeZone);
+  const linkState = back ? backState(back) : undefined;
   const scored = !hideScore && hasMatchScore(match);
   const homeScoreLabel = scored ? String(match.homeScore) : '–';
   const awayScoreLabel = scored ? String(match.awayScore) : '–';
@@ -273,7 +268,7 @@ export function MatchListRow({
     body = (
       <Link
         className="rs-list-row__card-link"
-        to={linkTo!}
+        to={to!}
         state={linkState}
       >
         <div className="rs-list-row__main">{main}</div>
@@ -285,7 +280,7 @@ export function MatchListRow({
       <>
         <Link
           className="rs-list-row__main"
-          to={linkTo!}
+          to={to!}
           state={linkState}
         >
           {main}

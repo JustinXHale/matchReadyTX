@@ -353,7 +353,7 @@ export function MobileShell() {
             <span>Sample schedule and members — not your live org.</span>
           </div>
         )}
-        <Outlet />
+        <Outlet key={location.key} />
       </PageSection>
       <UpdatePrompt />
       {showChrome && (
