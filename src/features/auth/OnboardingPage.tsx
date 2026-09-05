@@ -318,6 +318,7 @@ export function OnboardingPage() {
       roles.push('reportAnalytics');
     }
     if (currentUser.roles.includes('judicial')) roles.push('judicial');
+    if (currentUser.roles.includes('treasurer')) roles.push('treasurer');
 
     const favorite = fanFavoritePayload();
 

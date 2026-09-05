@@ -1,0 +1,209 @@
+/* Finance lens — extends shared shell (rs-filter-bar, rs-pill, rs-insights-stat-*). */
+
+ul.rs-stack {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.rs-finance-panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--rs-space-sm);
+  padding: var(--rs-space-md);
+  border: 1px solid var(--rs-color-border);
+  border-radius: var(--rs-radius-card);
+  background: var(--rs-color-surface);
+  box-shadow: var(--rs-shadow);
+}
+
+.rs-finance-panel--muted {
+  opacity: 0.88;
+}
+
+.rs-finance-panel__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--rs-space-sm);
+}
+
+.rs-finance-panel__title {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--rs-space-sm);
+  min-width: 0;
+}
+
+.rs-finance-panel__title strong {
+  font: var(--rs-font-card-title);
+  color: var(--rs-color-ink);
+}
+
+.rs-finance-panel__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--rs-space-sm);
+  align-items: center;
+}
+
+.rs-finance-panel__form {
+  padding-top: var(--rs-space-sm);
+  border-top: 1px solid var(--rs-color-border);
+}
+
+.rs-finance-panel .pf-v6-c-title {
+  margin: 0;
+}
+
+.rs-finance-filter-bar .rs-filter-field {
+  flex: 0 1 auto;
+  min-width: 8.5rem;
+}
+
+.rs-finance-filter-bar .pf-v6-c-form-select,
+.rs-finance-filter-bar .pf-v6-c-text-input-group,
+.rs-finance-filter-bar .rs-date-field-wrap {
+  width: auto;
+  min-width: 8.5rem;
+  max-width: 16rem;
+}
+
+/* Default invoice rates — four slots on one row (mobile-friendly). */
+.rs-finance-rates-row {
+  flex-wrap: nowrap;
+  gap: var(--rs-space-xs);
+}
+
+.rs-finance-rates-row .rs-filter-field {
+  flex: 1 1 0;
+  min-width: 0;
+  max-width: none;
+}
+
+.rs-finance-rates-row .rs-filter-field__label {
+  font-size: 11px;
+}
+
+.rs-finance-rates-row .pf-v6-c-text-input-group {
+  width: 100%;
+  min-width: 0;
+  max-width: none;
+}
+
+.rs-finance-payout-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--rs-space-sm);
+}
+
+.rs-finance-payout-form .rs-filter-bar__row {
+  align-items: end;
+}
+
+.rs-finance-payout-form__amount-row,
+.rs-finance-payout-form__pay-row {
+  flex-wrap: nowrap;
+  gap: var(--rs-space-xs);
+}
+
+.rs-finance-payout-form .rs-filter-field--amount {
+  flex: 1 1 0;
+  min-width: 0;
+  max-width: none;
+}
+
+.rs-finance-payout-form .rs-filter-field--method {
+  flex: 0 1 9.5rem;
+  min-width: 0;
+  max-width: 45%;
+}
+
+.rs-finance-payout-form .rs-filter-field--contact {
+  flex: 1 1 0;
+  min-width: 0;
+  max-width: none;
+}
+
+.rs-finance-payout-form .pf-v6-c-form-select,
+.rs-finance-payout-form .pf-v6-c-text-input-group {
+  width: 100%;
+  min-width: 0;
+  max-width: none;
+}
+
+/* Print view */
+.rs-finance-print {
+  max-width: 960px;
+  margin: 0 auto;
+  color: var(--rs-color-ink);
+}
+
+.rs-finance-print__header {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--rs-space-lg);
+  margin-bottom: var(--rs-space-lg);
+}
+
+.rs-finance-print__table {
+  width: 100%;
+  border-collapse: collapse;
+  font: var(--rs-font-meta);
+}
+
+.rs-finance-print__table th,
+.rs-finance-print__table td {
+  border: 1px solid var(--rs-color-border);
+  padding: var(--rs-space-sm);
+  vertical-align: top;
+}
+
+.rs-finance-print__table th {
+  text-align: left;
+  background: var(--rs-color-surface-muted);
+  color: var(--rs-color-ink);
+}
+
+.rs-finance-print__num {
+  text-align: right;
+  white-space: nowrap;
+}
+
+.rs-finance-print__totals {
+  margin-top: var(--rs-space-lg);
+  margin-left: auto;
+  width: min(100%, 320px);
+}
+
+.rs-finance-print__totals table {
+  width: 100%;
+  font: var(--rs-font-meta);
+}
+
+.rs-finance-print__totals td:last-child {
+  text-align: right;
+}
+
+.rs-finance-no-print {
+  margin-bottom: var(--rs-space-md);
+}
+
+@media print {
+  .rs-finance-no-print,
+  .rs-bottom-nav,
+  .rs-masthead,
+  .rs-top-tabs {
+    display: none !important;
+  }
+
+  .rs-finance-print {
+    max-width: none;
+  }
+
+  .rs-page-main {
+    padding: 0 !important;
+  }
+}

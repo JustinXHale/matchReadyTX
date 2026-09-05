@@ -600,3 +600,31 @@
     max-width: 7.5rem;
   }
 }
+
+/* Crew defaults — compact fee row (MO / AR / #4 / CMO on one line). */
+.rs-scheduler-fee-row-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: var(--rs-space-xs);
+}
+
+.rs-scheduler-fee-row {
+  flex-wrap: nowrap;
+  gap: var(--rs-space-xs);
+}
+
+.rs-scheduler-fee-row .rs-filter-field {
+  flex: 1 1 0;
+  min-width: 0;
+  max-width: none;
+}
+
+.rs-scheduler-fee-row .rs-filter-field__label {
+  font-size: 11px;
+}
+
+.rs-scheduler-fee-row .pf-v6-c-text-input-group {
+  width: 100%;
+  min-width: 0;
+  max-width: none;
+}

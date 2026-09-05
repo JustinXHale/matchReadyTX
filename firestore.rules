@@ -28,6 +28,13 @@ service cloud.firestore {
       return isMember(orgId)
         && 'judicial' in get(/databases/$(database)/documents/orgs/$(orgId)/members/$(request.auth.uid)).data.roles;
     }
+    function isTreasurer(orgId) {
+      return isMember(orgId)
+        && 'treasurer' in get(/databases/$(database)/documents/orgs/$(orgId)/members/$(request.auth.uid)).data.roles;
+    }
+    function isFinanceStaff(orgId) {
+      return isAssigner(orgId) || isTreasurer(orgId);
+    }
     function isAssigner(orgId) {
       return onboardingComplete()
         && exists(/databases/$(database)/documents/orgs/$(orgId)/members/$(request.auth.uid))
@@ -77,7 +84,8 @@ service cloud.firestore {
         && request.resource.data.roles is list
         && ('assigner' in resource.data.roles) == ('assigner' in request.resource.data.roles)
         && ('reportAnalytics' in resource.data.roles) == ('reportAnalytics' in request.resource.data.roles)
-        && ('judicial' in resource.data.roles) == ('judicial' in request.resource.data.roles);
+        && ('judicial' in resource.data.roles) == ('judicial' in request.resource.data.roles)
+        && ('treasurer' in resource.data.roles) == ('treasurer' in request.resource.data.roles);
     }
     function requestHasWorkingSocietyRole() {
       return request.resource.data.roles is list
@@ -87,6 +95,7 @@ service cloud.firestore {
           || 'cmo' in request.resource.data.roles
           || 'assigner' in request.resource.data.roles
           || 'judicial' in request.resource.data.roles
+          || 'treasurer' in request.resource.data.roles
         );
     }
     function requestHasRefereeLensRole() {
@@ -216,6 +225,7 @@ service cloud.firestore {
             && !('assigner' in request.resource.data.roles)
             && !('reportAnalytics' in request.resource.data.roles)
             && !('judicial' in request.resource.data.roles)
+            && !('treasurer' in request.resource.data.roles)
           )
         );
         // Assigner manages anyone; members may update own roles / favorites but not grant or revoke assigner.
@@ -229,6 +239,7 @@ service cloud.firestore {
           && ('assigner' in resource.data.roles) == ('assigner' in request.resource.data.roles)
           && ('reportAnalytics' in resource.data.roles) == ('reportAnalytics' in request.resource.data.roles)
           && ('judicial' in resource.data.roles) == ('judicial' in request.resource.data.roles)
+          && ('treasurer' in resource.data.roles) == ('treasurer' in request.resource.data.roles)
         );
         allow delete: if isAssigner(orgId);
       }
@@ -509,6 +520,7 @@ service cloud.firestore {
           return isMember(orgId)
             && (
               canReadInsights(orgId)
+              || isFinanceStaff(orgId)
               || resource.data.officialId == request.auth.uid
               || resource.data.get('subjectOfficialId', '') == request.auth.uid
               || (
@@ -552,6 +564,7 @@ service cloud.firestore {
             isAssigner(orgId)
             || isReportAnalytics(orgId)
             || isJudicial(orgId)
+            || isTreasurer(orgId)
             || resource.data.officialId == request.auth.uid
           );
         allow create, update: if signedIn()
@@ -603,6 +616,14 @@ service cloud.firestore {
         allow create, update: if (isAssigner(orgId) || isJudicial(orgId))
           && docId == 'dashboard'
           && request.resource.data.orgId == orgId;
+        allow delete: if isAssigner(orgId);
+      }
+      match /officialPayments/{paymentId} {
+        allow read, create, update: if isFinanceStaff(orgId);
+        allow delete: if isAssigner(orgId);
+      }
+      match /conferenceInvoices/{invoiceId} {
+        allow read, create, update: if isFinanceStaff(orgId);
         allow delete: if isAssigner(orgId);
       }
       match /adminRateLimits/{limitId} {

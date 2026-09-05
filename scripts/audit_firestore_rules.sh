@@ -12,19 +12,29 @@ fail() {
 [[ -f "$RULES" ]] || fail "firestore.rules not found"
 
 grep -q 'function isJudicial' "$RULES" || fail "isJudicial helper missing"
+grep -q 'function isTreasurer' "$RULES" || fail "isTreasurer helper missing"
+grep -q 'function isFinanceStaff' "$RULES" || fail "isFinanceStaff helper missing"
 grep -q 'function isAssigner' "$RULES" || fail "isAssigner helper missing"
 
 grep -q "('judicial' in resource.data.roles) == ('judicial' in request.resource.data.roles)" "$RULES" \
   || fail "self-patch must not grant or revoke judicial"
 
+grep -q "('treasurer' in resource.data.roles) == ('treasurer' in request.resource.data.roles)" "$RULES" \
+  || fail "self-patch must not grant or revoke treasurer"
+
 grep -q "!('judicial' in request.resource.data.roles)" "$RULES" \
   || fail "self-join must not grant judicial"
+
+grep -q "!('treasurer' in request.resource.data.roles)" "$RULES" \
+  || fail "self-join must not grant treasurer"
 
 grep -q 'isJudicial(orgId)' "$RULES" || fail "cardReports / cases must authorize judicial"
 
 grep -q 'match /judicialCases/{caseId}' "$RULES" || fail "judicialCases collection missing"
 grep -q 'match /comments/{commentId}' "$RULES" || fail "judicial case comments missing"
 grep -q 'match /judicialSettings/{docId}' "$RULES" || fail "judicialSettings missing"
+grep -q 'match /officialPayments/{paymentId}' "$RULES" || fail "officialPayments collection missing"
+grep -q 'match /conferenceInvoices/{invoiceId}' "$RULES" || fail "conferenceInvoices collection missing"
 grep -q "request.resource.data.authorUid == request.auth.uid" "$RULES" \
   || fail "comment create must bind authorUid"
 
@@ -37,4 +47,4 @@ grep -q "request.resource.data.status in \['recorded', 'pending'\]" "$RULES" \
 grep -q 'match /adminRateLimits/{limitId}' "$RULES" \
   || fail "adminRateLimits must deny client access"
 
-echo "OK: firestore.rules Judicial + locked-role checks passed"
+echo "OK: firestore.rules Judicial + Finance + locked-role checks passed"

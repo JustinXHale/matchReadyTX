@@ -123,7 +123,7 @@ export function matchEconomicsForUser(
   match: Match,
   org: OrgSettings,
   user: UserProfile,
-  slot: CrewSlot = 'mo',
+  slot: CrewSlot | 'cmo' = 'mo',
 ): {
   fee: number;
   /** One-way home → venue (haversine until Google Distance Matrix). */
@@ -162,6 +162,33 @@ export function matchEconomicsForUser(
 
 export function defaultFees(): FeeTable {
   return { mo: 80, ar1: 40, ar2: 40, no4: 30, cmo: 50 };
+}
+
+/** Default conference invoice rates (typically higher than payout). */
+export function defaultInvoiceFees(org: OrgSettings): FeeTable {
+  return (
+    org.defaultInvoiceFees ?? {
+      mo: 130,
+      ar1: 50,
+      ar2: 50,
+      no4: 40,
+      cmo: 100,
+    }
+  );
+}
+
+export function invoiceFeeForSlot(
+  match: Match,
+  org: OrgSettings,
+  slot: CrewSlot | 'cmo',
+  overrideRate?: number,
+): number {
+  if (overrideRate != null && !Number.isNaN(overrideRate)) return overrideRate;
+  const invoiceFees = defaultInvoiceFees(org);
+  if (slot === 'cmo') {
+    return match.feeOverride?.cmo ?? invoiceFees.cmo ?? 0;
+  }
+  return match.feeOverride?.[slot] ?? invoiceFees[slot];
 }
 
 /** Short label for assigner UI (miles; typically round-trip for pay). */

@@ -516,32 +516,29 @@ input.rs-filter-search {
   display: flex;
   flex-wrap: wrap;
   align-items: end;
-  gap: var(--pf-t--global--spacer--sm);
-}
-
-.rs-filter-bar--available-matches .rs-filter-bar__row {
   justify-content: flex-start;
+  gap: var(--pf-t--global--spacer--sm);
 }
 
 .rs-filter-bar--available-matches .rs-filter-bar__pair-row {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: var(--pf-t--global--spacer--sm);
+  display: flex;
+  flex-wrap: wrap;
   align-items: end;
+  justify-content: flex-start;
+  gap: var(--pf-t--global--spacer--sm);
 }
 
-.rs-filter-bar--available-matches .rs-filter-field,
-.rs-filter-bar--available-matches .rs-filter-field--select,
-.rs-filter-bar--available-matches .rs-filter-field--date {
-  flex: unset;
-  width: 100%;
+.rs-filter-bar--available-matches .rs-filter-bar__pair-row > .rs-filter-field {
+  flex: 0 0 auto;
+  width: auto;
+  max-width: calc(50% - var(--pf-t--global--spacer--sm) / 2);
+  min-width: min(100%, 8.5rem);
+}
+
+.rs-filter-bar--available-matches .rs-filter-bar__pair-row .rs-filter-select-wrap,
+.rs-filter-bar--available-matches .rs-filter-bar__pair-row .rs-date-field-wrap {
+  width: auto;
   max-width: 100%;
-  min-width: 0;
-}
-
-.rs-filter-bar--available-matches .rs-filter-select-wrap,
-.rs-filter-bar--available-matches .rs-date-field-wrap {
-  width: 100%;
 }
 
 .rs-filter-field {
@@ -558,7 +555,7 @@ input.rs-filter-search {
 }
 
 .rs-filter-field--select {
-  flex: 1 1 7.5rem;
+  flex: 0 1 auto;
   min-width: 0;
   max-width: 100%;
 }
@@ -569,7 +566,7 @@ input.rs-filter-search {
 }
 
 .rs-filter-field--date {
-  flex: 1 1 10rem;
+  flex: 0 1 auto;
   min-width: 0;
 }
 

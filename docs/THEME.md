@@ -68,6 +68,7 @@ MatchReadyTX uses PatternFly’s layered model:
 | `features/matches/match-detail.css` | `MatchDetailPage.tsx` |
 | `features/insights/insights.css` | `InsightsLayout.tsx` |
 | `features/judicial/judicial.css` | `JudicialLayout.tsx` |
+| `features/finance/finance.css` | `FinanceLayout.tsx` |
 | `features/auth/onboarding.css` | `OnboardingPage.tsx` |
 | `features/teamAdmin/team-admin.css` | `TeamAdminLayout.tsx` |
 | `features/scheduler/scheduler.css` | `SchedulerLayout.tsx` |

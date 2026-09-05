@@ -18,6 +18,7 @@ import {
   faChartLine,
   faEarthAmericas,
   faGavel,
+  faFileInvoiceDollar,
   faUser,
   faUsers,
 } from '@fortawesome/free-solid-svg-icons';
@@ -157,6 +158,25 @@ function navForRole(
       global,
       profile,
     ]);
+  }
+
+  if (roleView === 'finance') {
+    return [
+      about,
+      {
+        to: prefix('/finance/payouts'),
+        label: 'Finance',
+        icon: (
+          <FontAwesomeIcon
+            icon={faFileInvoiceDollar}
+            className={navIconClass}
+            aria-hidden
+          />
+        ),
+        isActive: active('/finance'),
+      },
+      profile,
+    ];
   }
 
   if (roleView === 'judicial') {

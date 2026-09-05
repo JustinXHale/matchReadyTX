@@ -11,6 +11,7 @@ import {
   type DefaultCrewByLevel,
 } from '@/domain/crewDefaults';
 import { GlobalDivisionFilters } from '@/features/global/GlobalDivisionFilters';
+import { FeeDefaultsPanel } from '@/features/scheduler/queues/FeeDefaultsPanel';
 import {
   REQUESTABLE_SLOT_SHORT,
   type MatchGender,
@@ -190,7 +191,8 @@ export function CrewDefaultsPanel() {
       <p className="rs-match-card__meta">
         Set default official roles per level from your sheet. Save stores
         settings for future syncs and releases. Apply updates matches with no
-        MO or AR assigned yet.
+        MO or AR assigned yet. Default match fees below apply payout amounts
+        across a date range.
       </p>
 
       <GlobalDivisionFilters
@@ -246,6 +248,11 @@ export function CrewDefaultsPanel() {
           </p>
         </section>
       )}
+
+      <FeeDefaultsPanel
+        competitionFilter={competitionFilter}
+        genderFilter={genderFilter}
+      />
 
       <div className="rs-actions">
         <Button

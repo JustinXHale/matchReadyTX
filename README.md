@@ -4,7 +4,7 @@ Mobile-first PWA for referee match scheduling. Google Sheet is the schedule sour
 
 Product: [`docs/PRD.md`](docs/PRD.md) · Implementation: [`docs/IMPLEMENTATION_SPEC.md`](docs/IMPLEMENTATION_SPEC.md) · Theme: [`docs/THEME.md`](docs/THEME.md)
 
-/**Personas:** **Referee/CMO** (one lens — Match Reports vs Coaching Reports under Reports), **Coach** (= Team Admin), **Scheduler** (= Assigner control center: Queues · Schedule · Org).
+/**Personas:** **Referee/CMO** (one lens — Match Reports vs Coaching Reports under Reports), **Coach** (= Team Admin), **Scheduler** (= Assigner control center), **Finance** (= Treasurer payout tracker + conference invoicing; assigner also), **Judicial**.
 
 ## Stack
 

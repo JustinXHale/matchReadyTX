@@ -231,6 +231,7 @@ export function ProfilePage() {
       roles.push('reportAnalytics');
     }
     if (currentUser.roles.includes('judicial')) roles.push('judicial');
+    if (currentUser.roles.includes('treasurer')) roles.push('treasurer');
 
     let nextFanTeamIds: string[] = [];
     let nextFanTeamOther: string | undefined;
@@ -649,12 +650,13 @@ export function ProfilePage() {
             </FormHelperText>
           )}
           {(currentUser.roles.includes('judicial') ||
+            currentUser.roles.includes('treasurer') ||
             currentUser.roles.includes('reportAnalytics')) && (
             <FormHelperText>
               <HelperText>
                 <HelperTextItem>
-                  Judicial and Insights access are granted by Scheduler or
-                  Judicial officers and cannot be changed here.
+                  Judicial, Treasurer, and Insights access are granted by
+                  Scheduler and cannot be changed here.
                 </HelperTextItem>
               </HelperText>
             </FormHelperText>

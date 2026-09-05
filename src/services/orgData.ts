@@ -29,6 +29,10 @@ import {
   applyLevelCrewDefaults,
   matchEligibleForCrewDefaultsReapply,
 } from '@/domain/crewDefaults';
+import {
+  feeOverrideForMatch,
+  matchesForFeeApply,
+} from '@/domain/feeDefaults';
 import { normalizeRequestableSlots } from '@/domain/requests';
 import { releaseMatch } from '@/domain/matchTransitions';
 import {
@@ -67,14 +71,19 @@ import {
   newAssignmentId,
   newCmoId,
   type ChangeProposal,
+  type ConferenceInvoice,
+  type ConferenceInvoiceLine,
   type CrewAssignment,
   type CmoContact,
   type FixtureRequest,
   type GameRequest,
+  type FeeTable,
   type Match,
   type MatchGender,
   type MeetingResource,
+  type OfficialPayment,
   type OrgSettings,
+  type PaymentMethod,
   type Team,
   type TeamContactPerson,
   type TeamLinkRequest,
@@ -319,6 +328,18 @@ export function orgPatchFromFirestore(
     defaultFees:
       data.defaultFees && typeof data.defaultFees === 'object'
         ? (data.defaultFees as OrgSettings['defaultFees'])
+        : undefined,
+    defaultFeesTourney:
+      data.defaultFeesTourney && typeof data.defaultFeesTourney === 'object'
+        ? (data.defaultFeesTourney as OrgSettings['defaultFeesTourney'])
+        : undefined,
+    defaultInvoiceFees:
+      data.defaultInvoiceFees && typeof data.defaultInvoiceFees === 'object'
+        ? (data.defaultInvoiceFees as OrgSettings['defaultInvoiceFees'])
+        : undefined,
+    financeBillToEmails:
+      data.financeBillToEmails && typeof data.financeBillToEmails === 'object'
+        ? (data.financeBillToEmails as OrgSettings['financeBillToEmails'])
         : undefined,
     matchLevels: Array.isArray(data.matchLevels)
       ? (data.matchLevels as string[])
@@ -1161,10 +1182,15 @@ export async function saveOrgSheetId(
   );
 }
 
-/** Persist crew defaults and/or match levels (assigner write). */
+/** Persist crew defaults, fee defaults, and/or match levels (assigner write). */
 export async function saveOrgCrewSettings(
   orgId: string,
-  patch: Partial<Pick<OrgSettings, 'defaultCrewByLevel' | 'matchLevels'>>,
+  patch: Partial<
+    Pick<
+      OrgSettings,
+      'defaultCrewByLevel' | 'matchLevels' | 'defaultFees' | 'defaultFeesTourney'
+    >
+  >,
 ): Promise<void> {
   const database = requireDb();
   await setDoc(
@@ -1264,6 +1290,50 @@ export async function applyCrewDefaultsToStockMatchesInFirestore(
         crew: crewForFirestore(next.crew),
         rolesNeeded: next.rolesNeeded ?? null,
         cmo: cmoForFirestore(next.cmo),
+        updatedAt: new Date().toISOString(),
+      }),
+      { merge: true },
+    );
+    ops += 1;
+    updated += 1;
+    if (ops >= 400) {
+      await batch.commit();
+      batch = writeBatch(database);
+      ops = 0;
+    }
+  }
+  if (ops > 0) await batch.commit();
+  return updated;
+}
+
+/** Apply league/tourney fee tables to matches in a kickoff date range (assigner). */
+export async function applyFeeDefaultsToMatchesInFirestore(
+  orgId: string,
+  matches: Match[],
+  opts: {
+    periodStart: string;
+    periodEnd: string;
+    league: FeeTable;
+    tourney: FeeTable;
+    competition?: string | null;
+    gender?: MatchGender | null;
+  },
+): Promise<number> {
+  const toUpdate = matchesForFeeApply(matches, opts);
+  if (toUpdate.length === 0) return 0;
+
+  const database = requireDb();
+  let batch = writeBatch(database);
+  let ops = 0;
+  let updated = 0;
+
+  for (const m of toUpdate) {
+    const feeOverride = feeOverrideForMatch(m, opts.league, opts.tourney);
+    const ref = doc(database, 'orgs', orgId, 'matches', m.id);
+    batch.set(
+      ref,
+      stripUndefined({
+        feeOverride,
         updatedAt: new Date().toISOString(),
       }),
       { merge: true },
@@ -2563,4 +2633,224 @@ export async function setJudicialRoleCallable(
   await fn({ uid, grant, orgId: defaultOrgId() });
 }
 
+const PAYMENT_METHODS: PaymentMethod[] = [
+  'paypal',
+  'zelle',
+  'venmo',
+  'check',
+  'cash',
+];
+
+function officialPaymentFromFirestore(
+  id: string,
+  data: Record<string, unknown>,
+): OfficialPayment | null {
+  const slot = data.slot;
+  if (
+    typeof data.matchId !== 'string' ||
+    typeof data.officialId !== 'string' ||
+    typeof data.kickoffAt !== 'string' ||
+    typeof slot !== 'string'
+  ) {
+    return null;
+  }
+  const status = data.status === 'paid' ? 'paid' : 'ready';
+  const method = data.paymentMethod;
+  return {
+    id,
+    matchId: data.matchId,
+    officialId: data.officialId,
+    slot: slot as RequestableSlot,
+    kickoffAt: data.kickoffAt,
+    payoutFee: typeof data.payoutFee === 'number' ? data.payoutFee : 0,
+    mileagePay: typeof data.mileagePay === 'number' ? data.mileagePay : 0,
+    status,
+    paymentMethod:
+      typeof method === 'string' &&
+      PAYMENT_METHODS.includes(method as PaymentMethod)
+        ? (method as PaymentMethod)
+        : undefined,
+    paymentContact:
+      typeof data.paymentContact === 'string' ? data.paymentContact : undefined,
+    paidAt: typeof data.paidAt === 'string' ? data.paidAt : undefined,
+    paidByUserId:
+      typeof data.paidByUserId === 'string' ? data.paidByUserId : undefined,
+    paidByName:
+      typeof data.paidByName === 'string' ? data.paidByName : undefined,
+    notes: typeof data.notes === 'string' ? data.notes : undefined,
+  };
+}
+
+function conferenceInvoiceLineFromFirestore(
+  data: Record<string, unknown>,
+): ConferenceInvoiceLine | null {
+  if (
+    typeof data.matchId !== 'string' ||
+    typeof data.kickoffAt !== 'string' ||
+    typeof data.matchLabel !== 'string' ||
+    typeof data.positionLabel !== 'string' ||
+    typeof data.slot !== 'string'
+  ) {
+    return null;
+  }
+  return {
+    matchId: data.matchId,
+    kickoffAt: data.kickoffAt,
+    matchLabel: data.matchLabel,
+    positionLabel: data.positionLabel,
+    slot: data.slot as RequestableSlot,
+    count: typeof data.count === 'number' ? data.count : 0,
+    unitCost: typeof data.unitCost === 'number' ? data.unitCost : 0,
+    mileageAmount:
+      typeof data.mileageAmount === 'number' ? data.mileageAmount : 0,
+    lineSubtotal:
+      typeof data.lineSubtotal === 'number' ? data.lineSubtotal : 0,
+  };
+}
+
+function conferenceInvoiceFromFirestore(
+  id: string,
+  data: Record<string, unknown>,
+): ConferenceInvoice | null {
+  if (
+    typeof data.invoiceNumber !== 'string' ||
+    typeof data.issueDate !== 'string' ||
+    typeof data.dueDate !== 'string' ||
+    typeof data.billToCompetition !== 'string' ||
+    typeof data.billToEmail !== 'string' ||
+    typeof data.periodStart !== 'string' ||
+    typeof data.periodEnd !== 'string'
+  ) {
+    return null;
+  }
+  const lineItems = Array.isArray(data.lineItems)
+    ? (data.lineItems as Record<string, unknown>[])
+        .map((row) => conferenceInvoiceLineFromFirestore(row))
+        .filter((l): l is ConferenceInvoiceLine => l != null)
+    : [];
+  return {
+    id,
+    invoiceNumber: data.invoiceNumber,
+    issueDate: data.issueDate,
+    dueDate: data.dueDate,
+    billToCompetition: data.billToCompetition,
+    billToEmail: data.billToEmail,
+    periodStart: data.periodStart,
+    periodEnd: data.periodEnd,
+    status: data.status === 'finalized' ? 'finalized' : 'draft',
+    defaultInvoiceRates:
+      data.defaultInvoiceRates && typeof data.defaultInvoiceRates === 'object'
+        ? (data.defaultInvoiceRates as ConferenceInvoice['defaultInvoiceRates'])
+        : { mo: 0, ar1: 0, ar2: 0, no4: 0, cmo: 0 },
+    surchargePercent:
+      typeof data.surchargePercent === 'number' ? data.surchargePercent : 0,
+    discountAmount:
+      typeof data.discountAmount === 'number' ? data.discountAmount : 0,
+    lineItems,
+    createdAt:
+      typeof data.createdAt === 'string'
+        ? data.createdAt
+        : new Date().toISOString(),
+    updatedAt:
+      typeof data.updatedAt === 'string'
+        ? data.updatedAt
+        : new Date().toISOString(),
+  };
+}
+
+export function subscribeOfficialPayments(
+  orgId: string,
+  onData: (payments: OfficialPayment[]) => void,
+  onError?: (err: Error) => void,
+): Unsubscribe {
+  const database = requireDb();
+  return onSnapshot(
+    collection(database, 'orgs', orgId, 'officialPayments'),
+    (snap) => {
+      const payments = snap.docs
+        .map((d) =>
+          officialPaymentFromFirestore(d.id, d.data() as Record<string, unknown>),
+        )
+        .filter((p): p is OfficialPayment => p != null);
+      onData(payments);
+    },
+    (err) => onError?.(err),
+  );
+}
+
+export async function saveOfficialPaymentInFirestore(
+  orgId: string,
+  payment: OfficialPayment,
+): Promise<void> {
+  await setDoc(doc(requireDb(), 'orgs', orgId, 'officialPayments', payment.id), {
+    matchId: payment.matchId,
+    officialId: payment.officialId,
+    slot: payment.slot,
+    kickoffAt: payment.kickoffAt,
+    payoutFee: payment.payoutFee,
+    mileagePay: payment.mileagePay,
+    status: payment.status,
+    paymentMethod: payment.paymentMethod ?? null,
+    paymentContact: payment.paymentContact ?? null,
+    paidAt: payment.paidAt ?? null,
+    paidByUserId: payment.paidByUserId ?? null,
+    paidByName: payment.paidByName ?? null,
+    notes: payment.notes ?? null,
+    updatedAt: new Date().toISOString(),
+  });
+}
+
+export function subscribeConferenceInvoices(
+  orgId: string,
+  onData: (invoices: ConferenceInvoice[]) => void,
+  onError?: (err: Error) => void,
+): Unsubscribe {
+  const database = requireDb();
+  return onSnapshot(
+    collection(database, 'orgs', orgId, 'conferenceInvoices'),
+    (snap) => {
+      const invoices = snap.docs
+        .map((d) =>
+          conferenceInvoiceFromFirestore(d.id, d.data() as Record<string, unknown>),
+        )
+        .filter((i): i is ConferenceInvoice => i != null);
+      onData(invoices);
+    },
+    (err) => onError?.(err),
+  );
+}
+
+export async function saveConferenceInvoiceInFirestore(
+  orgId: string,
+  invoice: ConferenceInvoice,
+): Promise<void> {
+  await setDoc(
+    doc(requireDb(), 'orgs', orgId, 'conferenceInvoices', invoice.id),
+    {
+      invoiceNumber: invoice.invoiceNumber,
+      issueDate: invoice.issueDate,
+      dueDate: invoice.dueDate,
+      billToCompetition: invoice.billToCompetition,
+      billToEmail: invoice.billToEmail,
+      periodStart: invoice.periodStart,
+      periodEnd: invoice.periodEnd,
+      status: invoice.status,
+      defaultInvoiceRates: invoice.defaultInvoiceRates,
+      surchargePercent: invoice.surchargePercent,
+      discountAmount: invoice.discountAmount,
+      lineItems: invoice.lineItems,
+      createdAt: invoice.createdAt,
+      updatedAt: invoice.updatedAt,
+    },
+  );
+}
+
+export async function deleteConferenceInvoiceInFirestore(
+  orgId: string,
+  invoiceId: string,
+): Promise<void> {
+  await deleteDoc(
+    doc(requireDb(), 'orgs', orgId, 'conferenceInvoices', invoiceId),
+  );
+}
 

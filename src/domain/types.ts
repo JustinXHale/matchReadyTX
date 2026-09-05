@@ -7,7 +7,8 @@ export type Role =
   | 'cmo'
   | 'fan'
   | 'reportAnalytics'
-  | 'judicial';
+  | 'judicial'
+  | 'treasurer';
 
 /** Society assessed grade range (scheduler-set; members may request within same range). */
 export const ASSESSED_LEVEL_MIN = 1;
@@ -360,6 +361,80 @@ export function hasInsightsAccessRole(roles: Role[]): boolean {
   );
 }
 
+/** Finance lens — assigner or delegated treasurer. */
+export function hasFinanceAccessRole(roles: Role[]): boolean {
+  return roles.includes('assigner') || roles.includes('treasurer');
+}
+
+export type PaymentMethod = 'paypal' | 'zelle' | 'venmo' | 'check' | 'cash';
+
+export const PAYMENT_METHOD_LABELS: Record<PaymentMethod, string> = {
+  paypal: 'PayPal',
+  zelle: 'Zelle',
+  venmo: 'Venmo',
+  check: 'Check',
+  cash: 'Cash',
+};
+
+export type OfficialPaymentStatus = 'ready' | 'paid';
+
+export interface OfficialPayment {
+  id: string;
+  matchId: string;
+  officialId: string;
+  slot: RequestableSlot;
+  kickoffAt: string;
+  payoutFee: number;
+  mileagePay: number;
+  status: OfficialPaymentStatus;
+  paymentMethod?: PaymentMethod;
+  paymentContact?: string;
+  paidAt?: string;
+  paidByUserId?: string;
+  paidByName?: string;
+  notes?: string;
+}
+
+export type ConferenceInvoiceStatus = 'draft' | 'finalized';
+
+export interface ConferenceInvoiceLine {
+  matchId: string;
+  kickoffAt: string;
+  matchLabel: string;
+  positionLabel: string;
+  slot: RequestableSlot;
+  count: number;
+  unitCost: number;
+  mileageAmount: number;
+  lineSubtotal: number;
+}
+
+export interface ConferenceInvoice {
+  id: string;
+  invoiceNumber: string;
+  issueDate: string;
+  dueDate: string;
+  billToCompetition: string;
+  billToEmail: string;
+  periodStart: string;
+  periodEnd: string;
+  status: ConferenceInvoiceStatus;
+  defaultInvoiceRates: FeeTable;
+  surchargePercent: number;
+  discountAmount: number;
+  lineItems: ConferenceInvoiceLine[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+export function officialPaymentDocId(
+  matchId: string,
+  officialId: string,
+  slot: RequestableSlot,
+): string {
+  return `${matchId}_${officialId}_${slot}`;
+}
+
 export function displayNameFromParts(
   firstName: string,
   lastName: string,
@@ -388,6 +463,12 @@ export interface OrgSettings {
   mileageRatePerMile: number;
   mileageMinMiles: number;
   defaultFees: FeeTable;
+  /** Official payout rates for tournament-style levels (Tourney, 7s, etc.). */
+  defaultFeesTourney?: FeeTable;
+  /** Conference invoice rates (may differ from official payout defaultFees). */
+  defaultInvoiceFees?: FeeTable;
+  /** Default bill-to email per competition label. */
+  financeBillToEmails?: Partial<Record<string, string>>;
   /** Admin-managed level options; defaults D1/D2/D3/Exhibition/Tourney */
   matchLevels: string[];
   /** Default crew roles per competition level (Scheduler → Queues → Crew). */

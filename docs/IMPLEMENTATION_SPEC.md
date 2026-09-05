@@ -40,10 +40,12 @@ See PRD §0 and §14. Summary: Sheet = schedule SoR; fees in-app **display only 
 orgs/{orgId}
   name, timezone, mileageRatePerMile, mileageMinMiles,
   defaultFees: { mo, ar1, ar2, no4 },
+  defaultInvoiceFees?: { mo, ar1, ar2, no4, cmo? },
+  financeBillToEmails?: Record<string, string>,
   sheetId?, sheetSyncedAt?
 
 orgs/{orgId}/members/{uid}
-  roles: ('assigner'|'teamAdmin'|'official'|'cmo'|'fan'|'reportAnalytics'|'judicial')[]
+  roles: ('assigner'|'teamAdmin'|'official'|'cmo'|'fan'|'reportAnalytics'|'judicial'|'treasurer')[]
   teamIds?: string[]
   fanTeamIds?: string[]   // Fan favorite club id (0–1); empty + no fanTeamOther = general
   fanTeamOther?: string  // Free-text when fan picks “Other”
@@ -133,7 +135,7 @@ users/{uid}
   homeAddress (composed), homeLat?, homeLng?,
   birthday?, refereeLevel?, assessedLevel?, refereeingSince?,
   jerseySize?, shortsSize?, photoUrl?,
-  profileComplete, roles: assigner|teamAdmin|official|cmo|fan|reportAnalytics|judicial,
+  profileComplete, roles: assigner|teamAdmin|official|cmo|fan|reportAnalytics|judicial|treasurer,
   fanTeamIds?: string[],
   fanTeamOther?: string
 
@@ -163,11 +165,12 @@ mail/{mailId}   // outbound queue — Admin SDK only; see docs/EMAIL.md
 - Officials: read own assignments + open requestable matches (facts + economics); write own confirm/availability/requests.
 - Assigner: full org read/write for scheduling.
 - **Coach feedback** (`coachFeedback`): assigner, CMO, and `reportAnalytics` read all; Team Admins read/update when `reportingTeamId` is in their `teamIds` (club-owned, one doc per match×side). Org members may read a **submitted** report only when the Scheduler has set `publicOnProfile == true` (shown on the official’s profile; submitter phone/email stay off that view). Create/update binds match facts via `get(matches/…)` (home/away, kickoff, crew-visible status) and requires doc id `matchId_reportingTeamId`. Team Admin writes must not change `publicOnProfile`. Assigners may update only `publicOnProfile` + `updatedAt` on a submitted report.
-- **Match reports** (`matchReports`): filer (`officialId`) read/write own; assigner, CMO, and `reportAnalytics` read all; MO may read CMO reports where `subjectOfficialId == auth.uid`. Any org member may read **submitted CMO** reports (`slot == 'cmo'`, `status == 'submitted'`) for public profile write-ups. Pending MO/AR/CMO and all card reports stay private to non-Insights readers. Pending create + submit with shape validation; assigner delete.
-- **Card reports** (`cardReports`): filer MO read/write own after kickoff; assigner, `reportAnalytics`, and `judicial` read all; assigner delete. CMO does not get global card-report read.
+- **Match reports** (`matchReports`): filer (`officialId`) read/write own; assigner, CMO, `reportAnalytics`, and finance staff read all; MO may read CMO reports where `subjectOfficialId == auth.uid`. Any org member may read **submitted CMO** reports (`slot == 'cmo'`, `status == 'submitted'`) for public profile write-ups. Pending MO/AR/CMO and all card reports stay private to non-Insights/finance readers. Pending create + submit with shape validation; assigner delete.
+- **Card reports** (`cardReports`): filer MO read/write own after kickoff; assigner, `reportAnalytics`, `judicial`, and finance staff read all; assigner delete. CMO does not get global card-report read.
 - **`reportAnalytics` role:** Scheduler grants on member profile only (not self-assignable, not in onboarding). Enables Insights for people who are not CMOs. CMO is self-selectable on profile/onboarding and also enables Insights + global read of coach feedback + match reports.
 - **`cmo` role:** Self-selectable on profile and onboarding. Unlocks Referee/CMO lens tools and the Insights tab.
 - **`judicial` role:** Scheduler or existing Judicial grants (Members checkbox for assigner; `setJudicialRole` callable for Judicial-only). Not self-assignable. Unlocks Judicial lens: dashboard, cases, comments, rulings. Phone required. Cases and comments are assigner/judicial only — not visible to the filing referee, teams, or Insights. Filing MOs may **create** `judicialCases` for their own submitted card report (recorded/pending only); rulings are assigner/judicial updates.
+- **`treasurer` role:** Scheduler grants on member profile only (not self-assignable). Unlocks **Finance** lens with assigner: payout readiness (reports gate `ready_to_pay`), per-assignment mark paid, conference invoice builder + print. Phone required. Writes: `officialPayments`, `conferenceInvoices`. No Stripe/payout rails.
 
 ---
 
@@ -205,6 +208,11 @@ mail/{mailId}   // outbound queue — Admin SDK only; see docs/EMAIL.md
 | `/judicial` | Executive discipline dashboard + print one-pager |
 | `/judicial/cases` | Card caseload |
 | `/judicial/cases/:incidentId` | Case detail, comments, ruling |
+| `/finance/payouts` | Official payout tracker (assigner / treasurer) |
+| `/finance/invoices` | Conference invoice list |
+| `/finance/invoices/new` | New invoice builder |
+| `/finance/invoices/:id` | Edit/view invoice draft |
+| `/finance/invoices/:id/print` | Print-friendly invoice |
 | `/matches/:id` | Canonical match detail |
 
 **Bottom nav (by lens):** About · (Referee/CMO \| Team Admin \| Scheduler \| Judicial home) · Global (except Judicial lens) · **Insights** (when assigner / CMO / `reportAnalytics`) · Profile — Members lives under Info sub-nav for all lenses.  

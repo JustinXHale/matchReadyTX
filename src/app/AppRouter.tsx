@@ -14,7 +14,7 @@ import {
   useApp,
 } from '@/app/AppContext';
 import { MobileShell } from '@/app/MobileShell';
-import { RequireAuth, RequireProfileIncomplete, RequireMembersAccess, RequireInsightsAccess, RequireJudicialAccess } from '@/app/guards';
+import { RequireAuth, RequireProfileIncomplete, RequireMembersAccess, RequireInsightsAccess, RequireJudicialAccess, RequireFinanceAccess } from '@/app/guards';
 import {
   isDemoPath,
   stripDemoPrefix,
@@ -357,6 +357,31 @@ const JudicialCaseDetailPage = lazy(() =>
     default: m.JudicialCaseDetailPage,
   })),
 );
+const FinanceLayout = lazy(() =>
+  import('@/features/finance/FinanceLayout').then((m) => ({
+    default: m.FinanceLayout,
+  })),
+);
+const PayoutsPage = lazy(() =>
+  import('@/features/finance/PayoutsPage').then((m) => ({
+    default: m.PayoutsPage,
+  })),
+);
+const InvoicesPage = lazy(() =>
+  import('@/features/finance/InvoicesPage').then((m) => ({
+    default: m.InvoicesPage,
+  })),
+);
+const InvoiceEditorPage = lazy(() =>
+  import('@/features/finance/InvoiceEditorPage').then((m) => ({
+    default: m.InvoiceEditorPage,
+  })),
+);
+const InvoicePrintPage = lazy(() =>
+  import('@/features/finance/InvoicePrintPage').then((m) => ({
+    default: m.InvoicePrintPage,
+  })),
+);
 
 /** Demo-aware absolute redirect (prefixes `/demo` while in the showcase). */
 function AppNavigate({
@@ -656,6 +681,19 @@ function FeatureRoutes() {
         path="availability"
         element={<AppNavigate to="/referee/availability" replace />}
       />
+      <Route element={<RequireFinanceAccess />}>
+        <Route path="finance" element={<FinanceLayout />}>
+          <Route index element={<AppNavigate to="/finance/payouts" replace />} />
+          <Route path="payouts" element={<PayoutsPage />} />
+          <Route path="invoices" element={<InvoicesPage />} />
+          <Route path="invoices/new" element={<InvoiceEditorPage />} />
+          <Route path="invoices/:invoiceId" element={<InvoiceEditorPage />} />
+          <Route
+            path="invoices/:invoiceId/print"
+            element={<InvoicePrintPage />}
+          />
+        </Route>
+      </Route>
       <Route element={<RequireJudicialAccess />}>
         <Route path="judicial" element={<JudicialLayout />}>
           <Route index element={<JudicialDashboardPage />} />

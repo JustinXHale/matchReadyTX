@@ -49,6 +49,16 @@ export function RequireInsightsAccess() {
   return <Outlet />;
 }
 
+/** Finance lens — assigner or delegated treasurer. */
+export function RequireFinanceAccess() {
+  const { hasFinanceAccess, dataMode } = useApp();
+  if (!hasFinanceAccess) {
+    const home = dataMode === 'demo' ? withDemoPrefix('/about') : '/about';
+    return <Navigate to={home} replace />;
+  }
+  return <Outlet />;
+}
+
 /** Judicial lens — granted judicial role only. */
 export function RequireJudicialAccess() {
   const { hasJudicialRole, dataMode } = useApp();

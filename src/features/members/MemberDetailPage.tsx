@@ -104,6 +104,7 @@ type EditDraft = {
   roleAssigner: boolean;
   roleReportAnalytics: boolean;
   roleJudicial: boolean;
+  roleTreasurer: boolean;
   roleFan: boolean;
   refereeLevel: string;
   levelUnknown: boolean;
@@ -154,6 +155,7 @@ function validateMemberEditDraft(
     draft.roleAssigner ||
     draft.roleReportAnalytics ||
     draft.roleJudicial ||
+    draft.roleTreasurer ||
     draft.roleFan;
   if (!hasRole) {
     return { message: 'Pick at least one role.', fields: ['roles'] };
@@ -166,7 +168,8 @@ function validateMemberEditDraft(
     !draft.roleCmo &&
     !draft.roleAssigner &&
     !draft.roleReportAnalytics &&
-    !draft.roleJudicial;
+    !draft.roleJudicial &&
+    !draft.roleTreasurer;
 
   if (!fanOnly && !draft.phone.trim()) push('phone');
 
@@ -244,6 +247,7 @@ function draftFromUser(user: UserProfile): EditDraft {
     roleAssigner: user.roles.includes('assigner'),
     roleReportAnalytics: user.roles.includes('reportAnalytics'),
     roleJudicial: user.roles.includes('judicial'),
+    roleTreasurer: user.roles.includes('treasurer'),
     roleFan: user.roles.includes('fan'),
     refereeLevel: user.refereeLevel != null ? String(user.refereeLevel) : '',
     levelUnknown:
@@ -513,7 +517,8 @@ export function MemberDetailPage() {
     !editDraft!.roleCmo &&
     !editDraft!.roleAssigner &&
     !editDraft!.roleReportAnalytics &&
-    !editDraft!.roleJudicial;
+    !editDraft!.roleJudicial &&
+    !editDraft!.roleTreasurer;
 
   const onApproveRequestedLevel = () => {
     const requested = user.requestedAssessedLevel;
@@ -631,6 +636,7 @@ export function MemberDetailPage() {
     if (editDraft.roleAssigner) roles.push('assigner');
     if (editDraft.roleReportAnalytics) roles.push('reportAnalytics');
     if (editDraft.roleJudicial) roles.push('judicial');
+    if (editDraft.roleTreasurer) roles.push('treasurer');
     if (editDraft.roleFan) roles.push('fan');
 
     const fanOnly =
@@ -640,7 +646,8 @@ export function MemberDetailPage() {
       !editDraft.roleCmo &&
       !editDraft.roleAssigner &&
       !editDraft.roleReportAnalytics &&
-      !editDraft.roleJudicial;
+      !editDraft.roleJudicial &&
+      !editDraft.roleTreasurer;
 
     const needsRef = editDraft.roleOfficial || editDraft.roleCmo;
     let refereeLevel: number | undefined;
@@ -1027,6 +1034,12 @@ export function MemberDetailPage() {
                   label="Judicial"
                   isChecked={editDraft.roleJudicial}
                   onChange={(_, v) => patchDraft({ roleJudicial: v })}
+                />
+                <Checkbox
+                  id="member-role-treasurer"
+                  label="Treasurer (Finance lens)"
+                  isChecked={editDraft.roleTreasurer}
+                  onChange={(_, v) => patchDraft({ roleTreasurer: v })}
                 />
               </div>
               <p className="rs-match-card__meta">

@@ -18,11 +18,13 @@ import {
   defaultOrgId,
   subscribeCoachFeedback,
   subscribeCardReports,
+  subscribeConferenceInvoices,
   subscribeJudicialCases,
   subscribeJudicialSettings,
   subscribeLiveOrg,
   subscribeLiveTeams,
   subscribeMatchReports,
+  subscribeOfficialPayments,
 } from '@/services/orgData';
 import { subscribeOrgRoster } from '@/services/orgMembers';
 import {
@@ -30,6 +32,7 @@ import {
   subscribeUsersAvailability,
 } from '@/services/availability';
 import {
+  hasFinanceAccessRole,
   hasInsightsAccessRole,
   hasRefereeLensRole,
   type UserProfile,
@@ -42,7 +45,7 @@ import { withDemoPrefix } from '@/app/demoPaths';
 import type { BackNav } from '@/nav/backNav';
 
 /** Header role switcher — Referee/CMO combined (Q-R6 locked). Team Admin = club lens. */
-export type RoleView = 'referee' | 'teamAdmin' | 'scheduler' | 'fan' | 'judicial';
+export type RoleView = 'referee' | 'teamAdmin' | 'scheduler' | 'fan' | 'judicial' | 'finance';
 
 /** Seed showcase vs Firebase + Firestore. Independent of Auth when on `/demo`. */
 export type DataMode = 'demo' | 'live';
@@ -55,6 +58,7 @@ const ROLE_VIEWS: RoleView[] = [
   'scheduler',
   'fan',
   'judicial',
+  'finance',
 ];
 
 export const ROLE_VIEW_LABELS: Record<RoleView, string> = {
@@ -63,6 +67,7 @@ export const ROLE_VIEW_LABELS: Record<RoleView, string> = {
   scheduler: 'Scheduler',
   fan: 'Fan',
   judicial: 'Judicial',
+  finance: 'Finance',
 };
 
 /** Lenses the user may enter from their domain roles. Scheduler = assigner only. */
@@ -72,6 +77,7 @@ export function lensesForUser(user: UserProfile | null): RoleView[] {
   if (hasRefereeLensRole(user.roles)) out.push('referee');
   if (shouldShowTeamAdminLens(user)) out.push('teamAdmin');
   if (user.roles.includes('assigner')) out.push('scheduler');
+  if (hasFinanceAccessRole(user.roles)) out.push('finance');
   if (user.roles.includes('judicial')) out.push('judicial');
   if (user.roles.includes('fan') || shouldShowPendingFanBrowse(user)) {
     out.push('fan');
@@ -111,6 +117,9 @@ interface AppContextValue {
   hasAssignerRole: boolean;
   hasReportAnalyticsRole: boolean;
   hasJudicialRole: boolean;
+  hasTreasurerRole: boolean;
+  /** Finance lens — assigner or delegated treasurer. */
+  hasFinanceAccess: boolean;
   /** Insights tab + routes — Scheduler, CMO, or delegated reportAnalytics. */
   hasInsightsAccess: boolean;
   hasOfficialRole: boolean;
@@ -135,6 +144,7 @@ interface AppContextValue {
   /** Fan browse lens (League schedule). */
   isFanView: boolean;
   isJudicialView: boolean;
+  isFinanceView: boolean;
   /** Firebase Auth first callback finished (avoid login bounce on refresh). */
   authReady: boolean;
 }
@@ -205,6 +215,7 @@ export function defaultRoleView(user: UserProfile | null): RoleView {
   if (hasRefereeLensRole(user.roles)) return 'referee';
   if (shouldShowTeamAdminLens(user)) return 'teamAdmin';
   if (user.roles.includes('assigner')) return 'scheduler';
+  if (hasFinanceAccessRole(user.roles)) return 'finance';
   if (user.roles.includes('judicial')) return 'judicial';
   if (user.roles.includes('fan') || shouldShowPendingFanBrowse(user)) {
     return 'fan';
@@ -219,6 +230,7 @@ export const ROLE_HOME: Record<RoleView, string> = {
   scheduler: '/scheduler',
   fan: '/global/schedule/upcoming',
   judicial: '/judicial',
+  finance: '/finance/payouts',
 };
 
 /** Labeled back target for the active role home (detail-screen fallback). */
@@ -499,11 +511,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
     const me = state.users.find((u) => u.uid === uid);
     if (!me) return;
     const isMatchReportsGlobal =
-      hasInsightsAccessRole(me.roles) || me.roles.includes('judicial');
+      hasInsightsAccessRole(me.roles) ||
+      me.roles.includes('judicial') ||
+      hasFinanceAccessRole(me.roles);
     const isCardReportsGlobal =
       me.roles.includes('assigner') ||
       me.roles.includes('reportAnalytics') ||
-      me.roles.includes('judicial');
+      me.roles.includes('judicial') ||
+      hasFinanceAccessRole(me.roles);
     const canRead =
       isMatchReportsGlobal ||
       isCardReportsGlobal ||
@@ -574,6 +589,44 @@ export function AppProvider({ children }: { children: ReactNode }) {
     return () => {
       unsubCases();
       unsubSettings();
+    };
+  }, [
+    dataMode,
+    state.currentUserId,
+    state.users.find((u) => u.uid === state.currentUserId)?.roles.join(','),
+  ]);
+
+  /** Official payments + conference invoices — assigner or treasurer. */
+  useEffect(() => {
+    if (!isFirebaseConfigured) return;
+    if (dataMode !== 'live') return;
+    const uid = state.currentUserId;
+    if (!uid || uid.startsWith('u_')) return;
+    const me = state.users.find((u) => u.uid === uid);
+    if (!me || !hasFinanceAccessRole(me.roles)) return;
+
+    const orgId = defaultOrgId();
+    const unsubPayments = subscribeOfficialPayments(
+      orgId,
+      (payments) => {
+        if (dataModeRef.current !== 'live') return;
+        demoStore.applyLiveOfficialPayments(payments);
+        setState(demoStore.getState());
+      },
+      (err) => console.error('Official payments subscription failed', err),
+    );
+    const unsubInvoices = subscribeConferenceInvoices(
+      orgId,
+      (invoices) => {
+        if (dataModeRef.current !== 'live') return;
+        demoStore.applyLiveConferenceInvoices(invoices);
+        setState(demoStore.getState());
+      },
+      (err) => console.error('Conference invoices subscription failed', err),
+    );
+    return () => {
+      unsubPayments();
+      unsubInvoices();
     };
   }, [
     dataMode,
@@ -663,6 +716,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
     currentUser?.roles.includes('reportAnalytics'),
   );
   const hasJudicialRole = Boolean(currentUser?.roles.includes('judicial'));
+  const hasTreasurerRole = Boolean(currentUser?.roles.includes('treasurer'));
+  const hasFinanceAccess = hasFinanceAccessRole(currentUser?.roles ?? []);
   const hasInsightsAccess = hasInsightsAccessRole(currentUser?.roles ?? []);
   const hasOfficialRole = Boolean(
     currentUser && hasRefereeLensRole(currentUser.roles),
@@ -698,6 +753,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const isOfficialView = isRefereeView;
   const isFanView = roleView === 'fan';
   const isJudicialView = roleView === 'judicial';
+  const isFinanceView = roleView === 'finance';
 
   const value = useMemo(
     () => ({
@@ -720,6 +776,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
       hasAssignerRole,
       hasReportAnalyticsRole,
       hasJudicialRole,
+      hasTreasurerRole,
+      hasFinanceAccess,
       hasInsightsAccess,
       hasOfficialRole,
       hasTeamAdminRole,
@@ -735,6 +793,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       isOfficialView,
       isFanView,
       isJudicialView,
+      isFinanceView,
       authReady,
     }),
     [
@@ -755,6 +814,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
       hasAssignerRole,
       hasReportAnalyticsRole,
       hasJudicialRole,
+      hasTreasurerRole,
+      hasFinanceAccess,
       hasInsightsAccess,
       hasOfficialRole,
       hasTeamAdminRole,
@@ -770,6 +831,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       isOfficialView,
       isFanView,
       isJudicialView,
+      isFinanceView,
       authReady,
     ],
   );

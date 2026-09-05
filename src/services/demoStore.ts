@@ -14,6 +14,7 @@ import {
   matchEligibleForCrewDefaultsReapply,
   type DefaultCrewByLevel,
 } from '@/domain/crewDefaults';
+import { feeOverrideForMatch, matchesForFeeApply } from '@/domain/feeDefaults';
 import { defaultFees, demoGeocode } from '@/domain/economics';
 import { formatMatchKickoff, orgTimeZone } from '@/domain/matchTime';
 import {
@@ -61,6 +62,8 @@ import {
   type JudicialDashboardSettings,
 } from '@/domain/judicial';
 import { seedDemoJudicialSeason } from '@/services/demoJudicialSeason';
+import { createDraftInvoice } from '@/domain/invoiceBuilder';
+import { buildAssignmentPayableRows } from '@/domain/paymentReadiness';
 import { matchFromFixtureRequest, newAppMatchId } from '@/domain/fixtureRequests';
 import {
   coachFeedbackDocId,
@@ -71,15 +74,19 @@ import {
 import type {
   AvailabilityRange,
   ChangeProposal,
+  ConferenceInvoice,
   CrewAssignment,
   CrewSlot,
   FixtureRequest,
+  FeeTable,
   GameRequest,
   Match,
   MatchGender,
   MeetingResource,
   NotificationLogEntry,
+  OfficialPayment,
   OrgSettings,
+  PaymentMethod,
   RequestableSlot,
   Team,
   TeamLinkRequest,
@@ -414,6 +421,22 @@ function seedUsers(): UserProfile[] {
       teamIds: ['team_dallas'],
       profileComplete: true,
       birthday: '1990-01-20',
+    },
+    {
+      uid: 'u_treasurer',
+      firstName: 'Mary',
+      lastName: 'Waller',
+      displayName: 'Mary Waller',
+      email: 'treasurer@example.com',
+      phone: '+15551110099',
+      smsOptIn: false,
+      ...withHome('800 Congress Ave', 'Austin', 'TX', '78701'),
+      homeLat: 30.2672,
+      homeLng: -97.7431,
+      roles: ['treasurer'],
+      teamIds: [],
+      profileComplete: true,
+      birthday: '1982-06-15',
     },
     {
       uid: 'u_ref1',
@@ -1420,6 +1443,64 @@ function seedMatches(): Match[] {
     cmo: [{ userId: 'u_assigner', userName: 'Alex Assigner' }],
   });
 
+  // Finance payouts demo — past matches in the current month with varied readiness.
+  const financePayoutSpecs: Array<{
+    id: string;
+    daysAgo: number;
+    homeScore: number;
+    awayScore: number;
+    crew: { mo: Person; ar1: Person; ar2: Person };
+  }> = [
+    {
+      id: 'm_fin_paid',
+      daysAgo: 2,
+      homeScore: 24,
+      awayScore: 19,
+      crew: { mo: 'riley', ar1: 'casey', ar2: 'none' },
+    },
+    {
+      id: 'm_fin_ready',
+      daysAgo: 3,
+      homeScore: 17,
+      awayScore: 21,
+      crew: { mo: 'casey', ar1: 'riley', ar2: 'alex' },
+    },
+    {
+      id: 'm_fin_pending',
+      daysAgo: 4,
+      homeScore: 14,
+      awayScore: 14,
+      crew: { mo: 'riley', ar1: 'casey', ar2: 'none' },
+    },
+  ];
+  for (const spec of financePayoutSpecs) {
+    results.push({
+      id: spec.id,
+      sheetRowKey: `sheet-${spec.id}`,
+      status: 'locked_confirmed',
+      kickoffAt: kickAt(-spec.daysAgo, 14),
+      venueName: 'Westlake Fields',
+      venueAddress: 'Austin, TX',
+      venueLat: austin.lat,
+      venueLng: austin.lng,
+      homeTeamId: 'team_austin',
+      awayTeamId: 'team_dallas',
+      homeTeamName: 'Austin RFC',
+      awayTeamName: 'Dallas RFC',
+      competition: 'Lonestar Men',
+      level: 'D1',
+      gender: 'men',
+      flightProvided: false,
+      housingProvided: false,
+      homeConfirmedAt: released,
+      awayConfirmedAt: released,
+      releasedAt: released,
+      homeScore: spec.homeScore,
+      awayScore: spec.awayScore,
+      crew: buildCrew(spec.crew),
+    });
+  }
+
   const all: Match[] = [
     ...extras,
     ...appointments,
@@ -1443,6 +1524,9 @@ function seedMatches(): Match[] {
     m_res01: 'Playoff',
     m_res02: 'Conference final',
     m_res_tourney: '7s tournament day',
+    m_fin_paid: 'Finance demo — paid',
+    m_fin_ready: 'Finance demo — ready to pay',
+    m_fin_pending: 'Finance demo — reports pending',
   };
 
   const demoScheduleUrls: Record<string, string> = {
@@ -1486,6 +1570,8 @@ export interface AppState {
   judicialCases: JudicialCase[];
   judicialComments: Record<string, JudicialComment[]>;
   judicialSettings: JudicialDashboardSettings | null;
+  officialPayments: OfficialPayment[];
+  conferenceInvoices: ConferenceInvoice[];
   /** Society coaching file notes (not CMO post-match forms). */
   coachingReports: CoachingReportStub[];
   currentUserId: string | null;
@@ -2200,6 +2286,78 @@ function seedMatchReports(matches: Match[]): MatchReport[] {
     });
   }
 
+  const pushSubmittedReport = (
+    id: string,
+    match: Match,
+    officialId: string,
+    slot: 'mo' | 'ar1' | 'ar2',
+    formKind: 'mo_quick' | 'ar_basic',
+    submittedDaysAgo: number,
+  ) => {
+    existing.push({
+      id,
+      matchId: match.id,
+      officialId,
+      slot,
+      formKind,
+      status: 'submitted',
+      dueAt: new Date(
+        new Date(match.kickoffAt).getTime() + 90 * 60 * 1000,
+      ).toISOString(),
+      kickoffAt: match.kickoffAt,
+      submittedAt: daysAgoIso(submittedDaysAgo),
+      moPayload:
+        slot === 'mo'
+          ? {
+              homePoints: match.homeScore ?? 0,
+              awayPoints: match.awayScore ?? 0,
+              yellowCards: 0,
+              redCards: 0,
+              lightFeedback: 'Finance demo — ready for payout.',
+            }
+          : undefined,
+    });
+  };
+
+  const finPaid = matches.find((m) => m.id === 'm_fin_paid');
+  if (finPaid) {
+    pushSubmittedReport(
+      'mr_fin_paid_mo',
+      finPaid,
+      'u_ref1',
+      'mo',
+      'mo_quick',
+      1,
+    );
+  }
+  const finReady = matches.find((m) => m.id === 'm_fin_ready');
+  if (finReady) {
+    pushSubmittedReport(
+      'mr_fin_ready_mo',
+      finReady,
+      'u_ref2',
+      'mo',
+      'mo_quick',
+      2,
+    );
+    pushSubmittedReport(
+      'mr_fin_ready_ar1',
+      finReady,
+      'u_ref1',
+      'ar1',
+      'ar_basic',
+      2,
+    );
+    pushSubmittedReport(
+      'mr_fin_ready_ar2',
+      finReady,
+      'u_assigner',
+      'ar2',
+      'ar_basic',
+      2,
+    );
+  }
+
   const cmoMatchIds = new Set(
     existing.filter((r) => r.slot === 'cmo').map((r) => r.matchId),
   );
@@ -2397,6 +2555,8 @@ function emptyLiveQueueState(): Pick<
   | 'judicialCases'
   | 'judicialComments'
   | 'judicialSettings'
+  | 'officialPayments'
+  | 'conferenceInvoices'
   | 'coachingReports'
 > {
   return {
@@ -2416,7 +2576,84 @@ function emptyLiveQueueState(): Pick<
     judicialCases: [],
     judicialComments: {},
     judicialSettings: null,
+    officialPayments: [],
+    conferenceInvoices: [],
     coachingReports: [],
+  };
+}
+
+function seedFinanceDemo(
+  matches: Match[],
+  users: UserProfile[],
+  org: OrgSettings,
+  matchReports: MatchReport[],
+  cardReports: CardReport[],
+): {
+  officialPayments: OfficialPayment[];
+  conferenceInvoices: ConferenceInvoice[];
+} {
+  const rows = buildAssignmentPayableRows(
+    matches,
+    users,
+    matchReports,
+    cardReports,
+    [],
+    org,
+  );
+  const paidRow = rows.find(
+    (r) =>
+      r.matchId === 'm_fin_paid' &&
+      r.officialId === 'u_ref1' &&
+      r.slot === 'mo',
+  );
+  const officialPayments: OfficialPayment[] = paidRow
+    ? [
+        {
+          id: paidRow.id,
+          matchId: paidRow.matchId,
+          officialId: paidRow.officialId,
+          slot: paidRow.slot,
+          kickoffAt: paidRow.kickoffAt,
+          payoutFee: paidRow.payoutFee,
+          mileagePay: paidRow.mileagePay,
+          status: 'paid',
+          paymentMethod: 'zelle',
+          paymentContact: paidRow.defaultPaymentContact,
+          paidAt: new Date().toISOString(),
+          paidByName: 'Mary Waller',
+        },
+      ]
+    : [];
+
+  const now = new Date();
+  const periodStart = new Date(now.getFullYear(), now.getMonth(), 1)
+    .toISOString()
+    .slice(0, 10);
+  const periodEnd = now.toISOString().slice(0, 10);
+  const draft = createDraftInvoice(org, matches, users, {
+    id: 'inv_demo_draft',
+    periodStart,
+    periodEnd,
+    billToCompetition: 'Lonestar Men',
+    billToEmail: org.financeBillToEmails?.['Lonestar Men'] ?? 'billing@lonestar.example',
+  });
+  const prevMonth = now.getMonth() === 0 ? 11 : now.getMonth() - 1;
+  const prevYear = now.getMonth() === 0 ? now.getFullYear() - 1 : now.getFullYear();
+  const finalized = createDraftInvoice(org, matches, users, {
+    id: 'inv_demo_final',
+    periodStart: new Date(prevYear, prevMonth, 1).toISOString().slice(0, 10),
+    periodEnd: new Date(prevYear, prevMonth + 1, 0).toISOString().slice(0, 10),
+    billToCompetition: 'Lonestar Women',
+    billToEmail: 'women@lonestar.example',
+    invoiceNumber: `${prevYear}-${String(prevMonth + 1).padStart(2, '0')}`,
+    surchargePercent: 10,
+    discountAmount: 50,
+  });
+  finalized.status = 'finalized';
+
+  return {
+    officialPayments,
+    conferenceInvoices: [draft, finalized],
   };
 }
 
@@ -2463,6 +2700,40 @@ function createInitialState(opts?: { seedDemoQueue?: boolean }): AppState {
           updatedAt: new Date().toISOString(),
         },
         coachingReports: seedCoachingReports(),
+        ...seedFinanceDemo(
+          seeded.matches,
+          seedUsers(),
+          {
+            id: 'demo-org',
+            name: 'Demo Rugby Society',
+            timezone: 'America/Chicago',
+            mileageRatePerMile: 0.67,
+            mileageMinMiles: 0,
+            defaultFees: defaultFees(),
+            defaultFeesTourney: {
+              mo: 100,
+              ar1: 55,
+              ar2: 55,
+              no4: 35,
+              cmo: 75,
+            },
+            defaultInvoiceFees: {
+              mo: 130,
+              ar1: 50,
+              ar2: 50,
+              no4: 40,
+              cmo: 100,
+            },
+            financeBillToEmails: {
+              'Lonestar Men': 'men@lonestar.example',
+              'Lonestar Women': 'women@lonestar.example',
+            },
+            matchLevels: [...DEFAULT_MATCH_LEVELS],
+            competitions: [...DEFAULT_COMPETITIONS],
+          },
+          seedMatchReports(seeded.matches),
+          seedCardReports(seeded.matches),
+        ),
       };
   return {
     org: {
@@ -2472,6 +2743,17 @@ function createInitialState(opts?: { seedDemoQueue?: boolean }): AppState {
       mileageRatePerMile: 0.67,
       mileageMinMiles: 0,
       defaultFees: defaultFees(),
+      defaultInvoiceFees: {
+        mo: 130,
+        ar1: 50,
+        ar2: 50,
+        no4: 40,
+        cmo: 100,
+      },
+      financeBillToEmails: {
+        'Lonestar Men': 'men@lonestar.example',
+        'Lonestar Women': 'women@lonestar.example',
+      },
       matchLevels: [...DEFAULT_MATCH_LEVELS],
       competitions: [...DEFAULT_COMPETITIONS],
       sheetId: live ? undefined : 'demo-sheet',
@@ -2745,6 +3027,73 @@ class DemoStore {
 
   applyLiveJudicialCases(judicialCases: JudicialCase[]): void {
     this.set((s) => ({ ...s, judicialCases }));
+  }
+
+  applyLiveOfficialPayments(officialPayments: OfficialPayment[]): void {
+    this.set((s) => ({ ...s, officialPayments }));
+  }
+
+  applyLiveConferenceInvoices(conferenceInvoices: ConferenceInvoice[]): void {
+    this.set((s) => ({ ...s, conferenceInvoices }));
+  }
+
+  async markOfficialPaid(input: {
+    rowId: string;
+    matchId: string;
+    officialId: string;
+    slot: RequestableSlot;
+    kickoffAt: string;
+    payoutFee: number;
+    mileagePay: number;
+    paymentMethod: PaymentMethod;
+    paymentContact: string;
+    paidByUserId?: string;
+    paidByName?: string;
+  }): Promise<void> {
+    const payment: OfficialPayment = {
+      id: input.rowId,
+      matchId: input.matchId,
+      officialId: input.officialId,
+      slot: input.slot,
+      kickoffAt: input.kickoffAt,
+      payoutFee: input.payoutFee,
+      mileagePay: input.mileagePay,
+      status: 'paid',
+      paymentMethod: input.paymentMethod,
+      paymentContact: input.paymentContact,
+      paidAt: new Date().toISOString(),
+      paidByUserId: input.paidByUserId,
+      paidByName: input.paidByName,
+    };
+    if (isLiveDataMode()) {
+      const { saveOfficialPaymentInFirestore } = await import('@/services/orgData');
+      await saveOfficialPaymentInFirestore(defaultOrgId(), payment);
+      return;
+    }
+    this.set((s) => ({
+      ...s,
+      officialPayments: [
+        ...s.officialPayments.filter((p) => p.id !== payment.id),
+        payment,
+      ],
+    }));
+  }
+
+  saveConferenceInvoice(invoice: ConferenceInvoice): void {
+    this.set((s) => ({
+      ...s,
+      conferenceInvoices: [
+        ...s.conferenceInvoices.filter((i) => i.id !== invoice.id),
+        invoice,
+      ],
+    }));
+  }
+
+  deleteConferenceInvoice(invoiceId: string): void {
+    this.set((s) => ({
+      ...s,
+      conferenceInvoices: s.conferenceInvoices.filter((i) => i.id !== invoiceId),
+    }));
   }
 
   applyLiveJudicialSettings(
@@ -4278,6 +4627,40 @@ class DemoStore {
         if (!matchEligibleForCrewDefaultsReapply(m)) return m;
         count += 1;
         return applyLevelCrewDefaults(m, configured);
+      }),
+    }));
+    return count;
+  }
+
+  setOrgFeeDefaults(league: FeeTable, tourney: FeeTable): void {
+    this.set((s) => ({
+      ...s,
+      org: { ...s.org, defaultFees: league, defaultFeesTourney: tourney },
+    }));
+  }
+
+  applyFeeDefaultsToMatches(opts: {
+    periodStart: string;
+    periodEnd: string;
+    league: FeeTable;
+    tourney: FeeTable;
+    competition?: string | null;
+    gender?: MatchGender | null;
+  }): number {
+    const targets = new Set(
+      matchesForFeeApply(this.state.matches, opts).map((m) => m.id),
+    );
+    if (targets.size === 0) return 0;
+    let count = 0;
+    this.set((s) => ({
+      ...s,
+      matches: s.matches.map((m) => {
+        if (!targets.has(m.id)) return m;
+        count += 1;
+        return {
+          ...m,
+          feeOverride: feeOverrideForMatch(m, opts.league, opts.tourney),
+        };
       }),
     }));
     return count;

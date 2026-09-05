@@ -75,12 +75,13 @@ Assigners currently manage schedules, contacts, and referee assignments across s
 | **Number 4** | Optional fourth official | Same when assigned |
 | **CMO (optional)** | Coaching Match Official on a fixture | Selectable profile role + crew/contact slot; **Coaching Reports** under the shared **Referee/CMO** lens — not a separate masthead role |
 | **Judicial** | Discipline officer | Review card reports, comment with other officers, record red-card rulings, conference discipline dashboard + printable one-pager. **Not** self-selected — Scheduler or an existing Judicial member grants the role. |
+| **Treasurer** | Society finance contact (e.g. conference billing / official pay tracking) | **Finance** lens: payout readiness (reports gate pay), mark assignments paid (PayPal/Zelle/etc.), generate conference invoices by date range with invoice rates distinct from payout rates. **Not** self-selected — Scheduler grants on member profile. Assigner also has Finance access. |
 | **Fan** | Spectator / society follower | Browse released schedule, standings, and teams; see official **names** only after MO confirmation (same as teams). Light onboarding (name + email); optional favorite clubs |
 | **Org / Tenant** | Society using an open-source deploy | Owns schedules, teams, officials, settings |
 
 **v1 assumption:** Assigner and Org Admin are often the same person. Model capabilities separately for other societies later.
 
-**UI lenses (masthead / bottom nav):** **Referee/CMO | Team Admin | Scheduler | Judicial | Fan**. Scheduler = Assigner **control center**. Judicial = discipline dashboard + cases. Fan home = Global schedule. Referee and CMO share one lens (**Q-R6** locked). Team Admin tabs: Schedule · Referee Feedback. Judicial tabs: Dashboard · Cases.
+**UI lenses (masthead / bottom nav):** **Referee/CMO | Team Admin | Scheduler | Finance | Judicial | Fan**. Scheduler = Assigner **control center**. Finance = payout tracker + conference invoicing (no payment rails). Judicial = discipline dashboard + cases. Fan home = Global schedule. Referee and CMO share one lens (**Q-R6** locked). Team Admin tabs: Schedule · Referee Feedback. Finance tabs: Payouts · Invoices. Judicial tabs: Dashboard · Cases.
 
 ### Role open items (non-blocking)
 
@@ -107,7 +108,7 @@ Assigners currently manage schedules, contacts, and referee assignments across s
 10. **Officials see match fee** and rare **flight / housing** perks when provided; **Where** opens Maps directions. Distance / mileage estimates stay in domain until driving distance is reliable. **Fees stay in-app**, never on the shared Sheet. Fans and teams do not see official fees.
 11. **Lean stack:** Vite + React + PatternFly + Firebase.
 12. **Multi-tenant later** — don’t hard-code a single society into the schema.
-13. **No payments** — the product never processes fees or mileage reimbursements.
+13. **No payment processing** — the product never processes fees or mileage reimbursements via Stripe/ACH. **Finance tracking and conference invoicing** (mark paid, print invoice) are in scope; money movement stays out of app.
 14. **Team Admin** — one club persona (domain `teamAdmin`); Contacts email auto-links; otherwise per-team link requests with assigner/TA review and Contacts write-back.
 
 ---

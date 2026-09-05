@@ -205,7 +205,7 @@ describe('judicial lens', () => {
     expect(lensesForUser(user)).toEqual(['judicial']);
     expect(
       lensesForUser({ ...user, roles: ['assigner', 'judicial'] }),
-    ).toEqual(['scheduler', 'judicial']);
+    ).toEqual(['scheduler', 'finance', 'judicial']);
   });
 });
 
