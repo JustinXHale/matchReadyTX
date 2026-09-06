@@ -1,8 +1,9 @@
 import { describe, expect, it } from 'vitest';
+import { deepStripUndefined } from '@/services/orgData';
 import { matchReportFromFirestore } from '@/services/orgData';
 
 describe('matchReportFromFirestore', () => {
-  it('keeps submitted status and ISO date strings', () => {
+  it('parses submitted MO quick payload from Firestore', () => {
     const row = matchReportFromFirestore('T1_u1_mo', {
       matchId: 'T1',
       officialId: 'u1',
@@ -33,5 +34,25 @@ describe('matchReportFromFirestore', () => {
     expect(row?.kickoffAt).toBe('2026-09-05T13:30:00.000Z');
     expect(row?.dueAt).toBe('2026-09-05T15:00:00.000Z');
     expect(row?.submittedAt).toBe('2026-09-05T13:30:00.000Z');
+  });
+});
+
+describe('deepStripUndefined', () => {
+  it('removes nested undefined fields from MO payloads', () => {
+    const cleaned = deepStripUndefined({
+      homePoints: 0,
+      awayPoints: 0,
+      yellowCards: 0,
+      redCards: 0,
+      tournamentMatch: true,
+      lightFeedback: undefined,
+      crewAbsenceNote: undefined,
+      crewAttendance: [
+        { slot: 'mo', userId: 'u1', userName: 'MO', attended: true },
+      ],
+    }) as Record<string, unknown>;
+    expect(cleaned).not.toHaveProperty('lightFeedback');
+    expect(cleaned).not.toHaveProperty('crewAbsenceNote');
+    expect(cleaned.tournamentMatch).toBe(true);
   });
 });

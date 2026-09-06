@@ -1384,6 +1384,34 @@ function stripUndefined<T extends Record<string, unknown>>(obj: T): T {
   return out;
 }
 
+/** Firestore rejects nested `undefined` inside maps and arrays. */
+export function deepStripUndefined(value: unknown): unknown {
+  if (value === undefined) return undefined;
+  if (value === null) return null;
+  if (Array.isArray(value)) {
+    return value
+      .map((item) => deepStripUndefined(item))
+      .filter((item) => item !== undefined);
+  }
+  if (typeof value === 'object') {
+    const out: Record<string, unknown> = {};
+    for (const [key, item] of Object.entries(
+      value as Record<string, unknown>,
+    )) {
+      const cleaned = deepStripUndefined(item);
+      if (cleaned !== undefined) out[key] = cleaned;
+    }
+    return out;
+  }
+  return value;
+}
+
+function firestoreJson(value: unknown): unknown {
+  if (value == null) return null;
+  const cleaned = deepStripUndefined(value);
+  return cleaned === undefined ? null : cleaned;
+}
+
 function assignmentForFirestore(a: CrewAssignment): Record<string, unknown> {
   return stripUndefined({
     id: a.id,
@@ -2191,11 +2219,11 @@ function matchReportToFirestore(
     kickoffAt: report.kickoffAt,
     submittedAt: report.submittedAt ?? null,
     subjectOfficialId: report.subjectOfficialId ?? null,
-    moPayload: report.moPayload ?? null,
-    arPayload: report.arPayload ?? null,
-    cmoPayload: report.cmoPayload ?? null,
+    moPayload: firestoreJson(report.moPayload),
+    arPayload: firestoreJson(report.arPayload),
+    cmoPayload: firestoreJson(report.cmoPayload),
     source: report.source ?? null,
-    legacyFixture: report.legacyFixture ?? null,
+    legacyFixture: firestoreJson(report.legacyFixture),
     updatedAt: new Date().toISOString(),
     createdAt: report.submittedAt ?? new Date().toISOString(),
   });
