@@ -3,9 +3,9 @@ import type {
   CardReport,
   CmoReportPayload,
   MoReportPayload,
+  ReportAssigneeSlot,
   ReportFormKind,
 } from '@/domain/reports';
-import { resolveCmoReportForUserOnMatch } from '@/domain/reports';
 import { demoStore } from '@/services/demoStore';
 import {
   defaultOrgId,
@@ -23,13 +23,9 @@ export async function ensureMatchReportReady(
   const s = demoStore.getState();
   const match = s.matches.find((m) => m.id === matchId);
   if (!match) return;
-  const existing = s.matchReports.find(
-    (r) => r.matchId === matchId && r.officialId === userId,
-  );
-  if (existing) return;
   const { slotForUserOnMatch } = await import('@/domain/reports');
   const slot = slotForUserOnMatch(match, userId);
-  if (!slot) return;
+  if (!slot || slot === 'cmo') return;
   const report = await ensurePendingMatchReportInFirestore(
     defaultOrgId(),
     match,
@@ -46,13 +42,6 @@ export async function ensureCmoReportReady(
   const s = demoStore.getState();
   const match = s.matches.find((m) => m.id === matchId);
   if (!match) return;
-  const existing = resolveCmoReportForUserOnMatch(
-    s.matchReports,
-    match,
-    cmoUserId,
-    subjectOfficialId,
-  );
-  if (existing) return;
   const report = await ensurePendingMatchReportInFirestore(
     defaultOrgId(),
     match,
@@ -66,6 +55,18 @@ export async function persistSubmittedMatchReport(
   formKind: ReportFormKind,
   payload: MoReportPayload | ArReportPayload,
 ): Promise<void> {
+  const before = demoStore.getState().matchReports.find((r) => r.id === reportId);
+  if (!before || before.slot === 'cmo') {
+    throw new Error('Match report not found.');
+  }
+  const match = demoStore.getState().matches.find((m) => m.id === before.matchId);
+  if (!match) throw new Error('Match not found.');
+
+  await ensurePendingMatchReportInFirestore(defaultOrgId(), match, {
+    userId: before.officialId,
+    slot: before.slot as ReportAssigneeSlot,
+  });
+
   demoStore.submitMatchReport(reportId, formKind, payload);
   const updated = demoStore
     .getState()
@@ -79,6 +80,19 @@ export async function persistSubmittedCmoReport(
   payload: CmoReportPayload,
   subjectOfficialId: string,
 ): Promise<void> {
+  const before = demoStore.getState().matchReports.find((r) => r.id === reportId);
+  if (!before || before.slot !== 'cmo') {
+    throw new Error('Coaching report not found.');
+  }
+  const match = demoStore.getState().matches.find((m) => m.id === before.matchId);
+  if (!match) throw new Error('Match not found.');
+
+  await ensurePendingMatchReportInFirestore(defaultOrgId(), match, {
+    userId: before.officialId,
+    slot: 'cmo',
+    subjectOfficialId,
+  });
+
   demoStore.submitCmoReport(reportId, payload, subjectOfficialId);
   const updated = demoStore
     .getState()
