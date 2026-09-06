@@ -2342,6 +2342,13 @@ export async function saveMatchReportInFirestore(
   );
 }
 
+export async function deleteMatchReportInFirestore(
+  orgId: string,
+  reportId: string,
+): Promise<void> {
+  await deleteDoc(doc(requireDb(), 'orgs', orgId, 'matchReports', reportId));
+}
+
 export async function saveCardReportInFirestore(
   orgId: string,
   report: CardReport,

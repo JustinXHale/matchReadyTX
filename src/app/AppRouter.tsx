@@ -130,6 +130,13 @@ const MatchReportFlowPage = lazy(() =>
     default: m.MatchReportFlowPage,
   })),
 );
+const AssignerMatchReportFlowPage = lazy(() =>
+  import('@/features/referee/reports/AssignerMatchReportFlowPage').then(
+    (m) => ({
+      default: m.AssignerMatchReportFlowPage,
+    }),
+  ),
+);
 const MatchReportViewPage = lazy(() =>
   import('@/features/referee/reports/MatchReportViewPage').then((m) => ({
     default: m.MatchReportViewPage,
@@ -763,6 +770,10 @@ function FeatureRoutes() {
         />
       </Route>
       <Route path="matches/:id" element={<MatchDetailPage />} />
+      <Route
+        path="matches/:matchId/file-report"
+        element={<AssignerMatchReportFlowPage />}
+      />
       <Route
         path="assigner"
         element={<AppNavigate to="/scheduler/upload" replace />}

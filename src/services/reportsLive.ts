@@ -1,14 +1,18 @@
-import type {
-  ArReportPayload,
-  CardReport,
-  CmoReportPayload,
-  MoReportPayload,
-  ReportAssigneeSlot,
-  ReportFormKind,
+import {
+  buildResetMatchReport,
+  type ArReportPayload,
+  type CardReport,
+  type CmoReportPayload,
+  type MatchReport,
+  type MoReportPayload,
+  type ReportAssigneeSlot,
+  type ReportFormKind,
 } from '@/domain/reports';
+import type { Match } from '@/domain/types';
 import { demoStore } from '@/services/demoStore';
 import {
   defaultOrgId,
+  deleteMatchReportInFirestore,
   ensurePendingMatchReportInFirestore,
   saveCardReportInFirestore,
   saveJudicialCasesInFirestore,
@@ -26,11 +30,22 @@ export async function ensureMatchReportReady(
   const { slotForUserOnMatch } = await import('@/domain/reports');
   const slot = slotForUserOnMatch(match, userId);
   if (!slot || slot === 'cmo') return;
-  const report = await ensurePendingMatchReportInFirestore(
-    defaultOrgId(),
-    match,
-    { userId, slot },
-  );
+  await ensureMatchReportReadyForAssignee(matchId, userId, slot);
+}
+
+export async function ensureMatchReportReadyForAssignee(
+  matchId: string,
+  userId: string,
+  slot: ReportAssigneeSlot,
+): Promise<void> {
+  if (slot === 'cmo') return;
+  const s = demoStore.getState();
+  const match = s.matches.find((m) => m.id === matchId);
+  if (!match) return;
+  const report = await ensurePendingMatchReportInFirestore(defaultOrgId(), match, {
+    userId,
+    slot,
+  });
   demoStore.upsertMatchReportLocal(report);
 }
 
@@ -120,6 +135,22 @@ export async function persistSubmittedCmoReport(
   };
   demoStore.upsertMatchReportLocal(updated);
   await saveMatchReportInFirestore(defaultOrgId(), updated);
+}
+
+export async function persistSchedulerDeleteMatchReport(
+  reportId: string,
+): Promise<void> {
+  demoStore.removeMatchReportLocal(reportId);
+  await deleteMatchReportInFirestore(defaultOrgId(), reportId);
+}
+
+export async function persistSchedulerResetMatchReport(
+  report: MatchReport,
+  match: Match,
+): Promise<void> {
+  const reset = buildResetMatchReport(report, match);
+  demoStore.resetMatchReportLocal(reset);
+  await saveMatchReportInFirestore(defaultOrgId(), reset);
 }
 
 export async function persistSubmittedCardReport(

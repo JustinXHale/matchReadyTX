@@ -2903,6 +2903,21 @@ class DemoStore {
     });
   }
 
+  removeMatchReportLocal(reportId: string): void {
+    this.set((s) => ({
+      ...s,
+      matchReports: syncPendingMatchReports(
+        s.matches,
+        s.matchReports.filter((r) => r.id !== reportId),
+        Date.now(),
+      ),
+    }));
+  }
+
+  resetMatchReportLocal(report: MatchReport): void {
+    this.upsertMatchReportLocal(report);
+  }
+
   upsertCardReportLocal(report: CardReport): void {
     this.set((s) => ({
       ...s,

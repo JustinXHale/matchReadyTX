@@ -699,6 +699,12 @@ button.rs-detail-people__confirm:focus-visible {
   padding-left: 2.75rem;
 }
 
+.rs-crew-report-status__admin {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 4px 8px;
+}
+
 .rs-crew-report-status .rs-detail-people__row {
   align-items: flex-start;
 }

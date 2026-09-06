@@ -7,6 +7,7 @@ import {
   pendingReportsForOfficialOnMatch,
   slotForUserOnMatch,
   type CardReport,
+  type CrewReportSlot,
   type ReportAssigneeSlot,
 } from '@/domain/reports';
 import type { Match } from '@/domain/types';
@@ -47,6 +48,16 @@ export function matchReportPath(matchId: string): string {
 
 export function matchReportEditPath(matchId: string): string {
   return `/referee/reports/match/${matchId}?edit=1`;
+}
+
+/** Scheduler files a crew MO/AR report on an official's behalf. */
+export function assignerMatchReportFilePath(
+  matchId: string,
+  officialId: string,
+  slot: CrewReportSlot,
+): string {
+  const q = new URLSearchParams({ officialId, slot });
+  return `/matches/${matchId}/file-report?${q.toString()}`;
 }
 
 export function matchReportViewPath(

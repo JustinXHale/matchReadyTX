@@ -583,22 +583,74 @@ service cloud.firestore {
             && request.resource.data.dueAt is string
             && request.resource.data.kickoffAt is string;
         }
+        /** Assigner clears a submitted report so the official can file again. */
+        function assignerMatchReportResetOk() {
+          return request.resource.data.orgId == orgId
+            && request.resource.data.matchId == resource.data.matchId
+            && request.resource.data.officialId == resource.data.officialId
+            && request.resource.data.slot == resource.data.slot
+            && request.resource.data.get('subjectOfficialId', null)
+              == resource.data.get('subjectOfficialId', null)
+            && resource.data.status == 'submitted'
+            && request.resource.data.status == 'pending'
+            && request.resource.data.dueAt == resource.data.dueAt
+            && request.resource.data.kickoffAt == resource.data.kickoffAt
+            && request.resource.data.submittedAt == null
+            && request.resource.data.moPayload == null
+            && request.resource.data.arPayload == null
+            && request.resource.data.cmoPayload == null;
+        }
+        /** Assigner creates a pending MO/AR row for another official. */
+        function assignerMatchReportCreateOk() {
+          return request.resource.data.orgId == orgId
+            && request.resource.data.matchId is string
+            && request.resource.data.officialId is string
+            && request.resource.data.officialId != request.auth.uid
+            && request.resource.data.slot in ['mo', 'ar1', 'ar2']
+            && request.resource.data.status == 'pending'
+            && request.resource.data.dueAt is string
+            && request.resource.data.kickoffAt is string
+            && reportId == request.resource.data.id;
+        }
+        /** Assigner submits a pending MO/AR report on an official's behalf. */
+        function assignerMatchReportSubmitOk() {
+          return request.resource.data.orgId == orgId
+            && request.resource.data.matchId == resource.data.matchId
+            && request.resource.data.officialId == resource.data.officialId
+            && request.resource.data.officialId != request.auth.uid
+            && request.resource.data.slot == resource.data.slot
+            && request.resource.data.get('subjectOfficialId', null)
+              == resource.data.get('subjectOfficialId', null)
+            && resource.data.status == 'pending'
+            && request.resource.data.status == 'submitted'
+            && request.resource.data.dueAt == resource.data.dueAt
+            && request.resource.data.kickoffAt == resource.data.kickoffAt
+            && request.resource.data.submittedAt is string
+            && request.resource.data.submittedAt.size() > 0;
+        }
         allow read: if canReadMatchReport();
-        allow create: if signedIn()
-          && isMember(orgId)
-          && matchReportShapeOk()
-          && request.resource.data.status == 'pending'
-          && reportId == request.resource.data.id;
-        allow update: if signedIn()
-          && isMember(orgId)
-          && resource.data.officialId == request.auth.uid
-          && request.resource.data.officialId == resource.data.officialId
-          && request.resource.data.matchId == resource.data.matchId
-          && request.resource.data.slot == resource.data.slot
-          && request.resource.data.status in ['pending', 'submitted']
-          && (
-            resource.data.status == 'pending'
-            || resource.data.status == request.resource.data.status
+        allow create: if isAssigner(orgId) && assignerMatchReportCreateOk()
+          || (
+            signedIn()
+            && isMember(orgId)
+            && matchReportShapeOk()
+            && request.resource.data.status == 'pending'
+            && reportId == request.resource.data.id
+          );
+        allow update: if isAssigner(orgId)
+          && (assignerMatchReportResetOk() || assignerMatchReportSubmitOk())
+          || (
+            signedIn()
+            && isMember(orgId)
+            && resource.data.officialId == request.auth.uid
+            && request.resource.data.officialId == resource.data.officialId
+            && request.resource.data.matchId == resource.data.matchId
+            && request.resource.data.slot == resource.data.slot
+            && request.resource.data.status in ['pending', 'submitted']
+            && (
+              resource.data.status == 'pending'
+              || resource.data.status == request.resource.data.status
+            )
           );
         allow delete: if isAssigner(orgId);
       }

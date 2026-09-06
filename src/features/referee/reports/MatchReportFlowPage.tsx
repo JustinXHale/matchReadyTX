@@ -16,13 +16,16 @@ import {
   isQuickReportLocked,
   matchHasAssignedCmo,
   MATCH_FEEDBACK_LABEL,
+  pendingCrewReportForAssignee,
+  submittedCrewReportForAssignee,
   totalCardsFromMoPayload,
   type ArReportPayload,
   type CrewAttendanceEntry,
+  type CrewReportSlot,
   type MoReportPayload,
   type ReportFormKind,
 } from '@/domain/reports';
-import { backState, useAppBack } from '@/nav/backNav';
+import { backState, useAppBack, type BackNav } from '@/nav/backNav';
 import { isTournamentMatch } from '@/domain/matchScheduleUrl';
 import {
   cardReportPath,
@@ -44,10 +47,19 @@ import {
 import {
   persistSubmittedMatchReport,
   ensureMatchReportReady,
+  ensureMatchReportReadyForAssignee,
 } from '@/services/reportsLive';
+import type { UserProfile } from '@/domain/types';
 import { MatchListRow } from '@/ui/MatchListRow';
 
 type Step = 'chooser' | 'form' | 'done';
+
+export type AssignerFilingContext = {
+  officialId: string;
+  slot: CrewReportSlot;
+  officialName: string;
+  back: BackNav;
+};
 
 function crewFormKind(
   formKind: ReportFormKind | undefined,
@@ -64,36 +76,62 @@ function crewFormKind(
   return null;
 }
 
-export function MatchReportFlowPage() {
+export function MatchReportFlowPage({
+  assignerFiling,
+}: {
+  assignerFiling?: AssignerFilingContext;
+} = {}) {
   const { matchId = '' } = useParams();
   const [searchParams] = useSearchParams();
   const { currentUser, state, store, dataMode } = useApp();
   const navigate = useNavigate();
-  const { goBack: exitToReports, backLabel: reportsBackLabel } =
-    useAppBack(MATCH_REPORTS_BACK);
+  const isAssignerFiling = Boolean(assignerFiling);
+  const filingUserId = assignerFiling?.officialId ?? currentUser?.uid ?? '';
+  const flowBack = assignerFiling?.back ?? MATCH_REPORTS_BACK;
+  const { goBack: exitFlow, backLabel: flowBackLabel } = useAppBack(flowBack);
 
   const match = state.matches.find((m) => m.id === matchId);
   const pending = useMemo(() => {
-    if (!currentUser || !matchId) return undefined;
+    if (!filingUserId || !matchId) return undefined;
+    if (assignerFiling) {
+      return pendingCrewReportForAssignee(
+        state.matchReports,
+        matchId,
+        assignerFiling.officialId,
+        assignerFiling.slot,
+      );
+    }
     return pendingCrewReportForUserOnMatch(
       state.matchReports,
       matchId,
-      currentUser.uid,
+      filingUserId,
     );
-  }, [currentUser, matchId, state.matchReports]);
+  }, [assignerFiling, filingUserId, matchId, state.matchReports]);
 
   const submitted = useMemo(() => {
-    if (!currentUser || !matchId) return undefined;
+    if (!filingUserId || !matchId) return undefined;
+    if (assignerFiling) {
+      return submittedCrewReportForAssignee(
+        state.matchReports,
+        matchId,
+        assignerFiling.officialId,
+        assignerFiling.slot,
+      );
+    }
     return state.matchReports.find(
       (r) =>
         r.matchId === matchId &&
-        r.officialId === currentUser.uid &&
+        r.officialId === filingUserId &&
         r.slot !== 'cmo' &&
         r.status === 'submitted',
     );
-  }, [currentUser, matchId, state.matchReports]);
+  }, [assignerFiling, filingUserId, matchId, state.matchReports]);
 
-  const isEditing = searchParams.get('edit') === '1' && Boolean(submitted) && !pending;
+  const isEditing =
+    !isAssignerFiling &&
+    searchParams.get('edit') === '1' &&
+    Boolean(submitted) &&
+    !pending;
   const report = pending ?? (isEditing ? submitted : undefined);
   const savedMo = isEditing ? submitted?.moPayload : undefined;
   const savedAr = isEditing ? submitted?.arPayload : undefined;
@@ -169,11 +207,22 @@ export function MatchReportFlowPage() {
   const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
-    if (dataMode !== 'live' || !currentUser || !matchId || isEditing) return;
+    if (dataMode !== 'live' || !matchId || isEditing) return;
+    if (assignerFiling) {
+      void ensureMatchReportReadyForAssignee(
+        matchId,
+        assignerFiling.officialId,
+        assignerFiling.slot,
+      ).catch((err) =>
+        console.error('ensureMatchReportReadyForAssignee failed', err),
+      );
+      return;
+    }
+    if (!currentUser) return;
     void ensureMatchReportReady(matchId, currentUser.uid).catch((err) =>
       console.error('ensureMatchReportReady failed', err),
     );
-  }, [dataMode, currentUser?.uid, matchId, isEditing]);
+  }, [assignerFiling, dataMode, currentUser?.uid, matchId, isEditing]);
 
   useEffect(() => {
     if (!match) return;
@@ -242,6 +291,18 @@ export function MatchReportFlowPage() {
 
   if (!currentUser) return null;
 
+  const filingUser: UserProfile =
+    state.users.find((u) => u.uid === filingUserId) ??
+    ({
+      ...currentUser,
+      uid: filingUserId,
+      displayName: assignerFiling?.officialName ?? currentUser.displayName,
+    } as UserProfile);
+
+  const finishAssignerFiling = () => {
+    navigate(assignerFiling!.back.to, { replace: true });
+  };
+
   if (!match) {
     return (
       <div className="rs-stack">
@@ -250,9 +311,9 @@ export function MatchReportFlowPage() {
         </Title>
         <Button
           variant="link"
-          onClick={exitToReports}
+          onClick={exitFlow}
         >
-          Back to Match Reports
+          Back to {flowBack.label}
         </Button>
       </div>
     );
@@ -266,44 +327,48 @@ export function MatchReportFlowPage() {
         </Title>
         <p className="rs-match-card__meta">
           {match.homeTeamName} vs {match.awayTeamName}
+          {isAssignerFiling && assignerFiling
+            ? ` · ${assignerFiling.officialName}`
+            : ''}
         </p>
         <Button
           variant="primary"
           onClick={() =>
             navigate(reportHrefForSubmitted(submitted), {
-              state: backState(MATCH_REPORTS_BACK),
+              state: backState(flowBack),
             })
           }
         >
           View report
         </Button>
-        <Button
-          variant="secondary"
-          onClick={() =>
-            navigate(matchReportEditPath(match.id), {
-              state: backState(MATCH_REPORTS_BACK),
-            })
-          }
-        >
-          Edit report
-        </Button>
-        {submitted.slot === 'mo' && (
-          <Button
-            variant="secondary"
-            onClick={() =>
-              navigate(cardReportPath(match.id), {
-                state: backState(MATCH_REPORTS_BACK),
-              })
-            }
-          >
-            Card report
-          </Button>
+        {!isAssignerFiling && (
+          <>
+            <Button
+              variant="secondary"
+              onClick={() =>
+                navigate(matchReportEditPath(match.id), {
+                  state: backState(flowBack),
+                })
+              }
+            >
+              Edit report
+            </Button>
+            {submitted.slot === 'mo' && (
+              <Button
+                variant="secondary"
+                onClick={() =>
+                  navigate(cardReportPath(match.id), {
+                    state: backState(flowBack),
+                  })
+                }
+              >
+                Card report
+              </Button>
+            )}
+          </>
         )}
-        <Button
-          variant="link"
-          onClick={exitToReports}
-        >
-          Back to Match Reports
+        <Button variant="link" onClick={exitFlow}>
+          Back to {flowBack.label}
         </Button>
       </div>
     );
@@ -316,18 +381,24 @@ export function MatchReportFlowPage() {
           No match report due
         </Title>
         <p className="rs-match-card__meta">
-          Open after kickoff + 90 minutes when you are MO, AR1, or AR2 on the
-          crew. No.4 does not file a match report.
+          {isAssignerFiling
+            ? 'This crew member has no pending match report on this match. Reset or delete an existing report first if you need them to file again.'
+            : 'Open after kickoff + 90 minutes when you are MO, AR1, or AR2 on the crew. No.4 does not file a match report.'}
         </p>
-        <Button
-          variant="secondary"
-          onClick={exitToReports}
-        >
-          Back to Match Reports
+        <Button variant="secondary" onClick={exitFlow}>
+          Back to {flowBack.label}
         </Button>
       </div>
     );
   }
+
+  const assignerFilingNote =
+    isAssignerFiling && assignerFiling ? (
+      <p className="rs-match-card__meta">
+        Filing on behalf of {assignerFiling.officialName} (
+        {assignerFiling.slot.toUpperCase()})
+      </p>
+    ) : null;
 
   const hasCmo = matchHasAssignedCmo(match);
   const quickLocked = isQuickReportLocked(match, cmoDidNotAttend);
@@ -362,14 +433,18 @@ export function MatchReportFlowPage() {
       setDoneCards(total);
       if (isEditing) {
         navigate(reportHrefForSubmitted({ ...report, status: 'submitted' }), {
-          state: backState(MATCH_REPORTS_BACK),
+          state: backState(flowBack),
           replace: true,
         });
         return;
       }
+      if (isAssignerFiling) {
+        finishAssignerFiling();
+        return;
+      }
       if (total > 0) {
         navigate(cardReportPath(match.id), {
-          state: backState(MATCH_REPORTS_BACK),
+          state: backState(flowBack),
           replace: true,
         });
         return;
@@ -420,9 +495,13 @@ export function MatchReportFlowPage() {
         }
         if (isEditing) {
           navigate(reportHrefForSubmitted({ ...report, status: 'submitted' }), {
-            state: backState(MATCH_REPORTS_BACK),
+            state: backState(flowBack),
             replace: true,
           });
+          return;
+        }
+        if (isAssignerFiling) {
+          finishAssignerFiling();
           return;
         }
         setStep('done');
@@ -501,31 +580,38 @@ export function MatchReportFlowPage() {
           {isEditing ? 'Report updated' : 'Report submitted'}
         </Title>
         <p className="rs-match-card__meta">
-          Thanks — {match.homeTeamName} vs {match.awayTeamName} is on file.
+          {isAssignerFiling && assignerFiling
+            ? `${assignerFiling.officialName}'s report for ${match.homeTeamName} vs ${match.awayTeamName} is on file.`
+            : `Thanks — ${match.homeTeamName} vs ${match.awayTeamName} is on file.`}
         </p>
         {doneCards > 0 ? (
           <>
             <p className="rs-match-card__meta">
-              You noted cards on this match. A card report is required next.
+              {isAssignerFiling
+                ? 'Cards were noted — the match official still needs to file a card report.'
+                : 'You noted cards on this match. A card report is required next.'}
             </p>
-            <Button
-              variant="primary"
-              isBlock
-              onClick={() =>
-                navigate(cardReportPath(match.id), {
-                  state: backState(MATCH_REPORTS_BACK),
-                })
-              }
-            >
-              File required card report
-            </Button>
+            {isAssignerFiling ? (
+              <Button variant="secondary" isBlock onClick={finishAssignerFiling}>
+                Back to {flowBack.label}
+              </Button>
+            ) : (
+              <Button
+                variant="primary"
+                isBlock
+                onClick={() =>
+                  navigate(cardReportPath(match.id), {
+                    state: backState(flowBack),
+                  })
+                }
+              >
+                File required card report
+              </Button>
+            )}
           </>
         ) : (
-          <Button
-            variant="secondary"
-            onClick={exitToReports}
-          >
-            Back to Match Reports
+          <Button variant="secondary" onClick={isAssignerFiling ? finishAssignerFiling : exitFlow}>
+            Back to {flowBack.label}
           </Button>
         )}
       </div>
@@ -542,13 +628,14 @@ export function MatchReportFlowPage() {
         <button
           type="button"
           className="rs-detail__back"
-          onClick={exitToReports}
+          onClick={exitFlow}
         >
-          ← {reportsBackLabel}
+          ← {flowBackLabel}
         </button>
         <Title headingLevel="h2" size="lg">
           Match report
         </Title>
+        {assignerFilingNote}
         <MatchListRow match={match} showTime hideScore />
         <p className="rs-match-card__meta">
           Choose a report type. Performance is always available.
@@ -585,17 +672,19 @@ export function MatchReportFlowPage() {
             onChange={(_e, checked) => setCmoDidNotAttend(checked)}
           />
         )}
-        <Button
-          variant="link"
-          isBlock
-          onClick={() =>
-            navigate(cardReportPath(match.id), {
-              state: backState(MATCH_REPORTS_BACK),
-            })
-          }
-        >
-          File card report first
-        </Button>
+        {!isAssignerFiling && (
+          <Button
+            variant="link"
+            isBlock
+            onClick={() =>
+              navigate(cardReportPath(match.id), {
+                state: backState(flowBack),
+              })
+            }
+          >
+            File card report first
+          </Button>
+        )}
       </div>
     );
   }
@@ -604,14 +693,14 @@ export function MatchReportFlowPage() {
     return (
       <PerformanceReportForm
         match={match}
-        user={currentUser}
+        user={filingUser}
         cmoDidNotAttend={cmoDidNotAttend}
         initial={savedMo}
         isUpdate={isEditing}
         onBack={() => {
           if (isEditing) {
             navigate(reportHrefForSubmitted(report), {
-              state: backState(MATCH_REPORTS_BACK),
+              state: backState(flowBack),
             });
             return;
           }
@@ -634,23 +723,28 @@ export function MatchReportFlowPage() {
         onClick={() => {
           if (isEditing) {
             navigate(reportHrefForSubmitted(report), {
-              state: backState(MATCH_REPORTS_BACK),
+              state: backState(flowBack),
             });
+            return;
+          }
+          if (isAssignerFiling) {
+            exitFlow();
             return;
           }
           if (report.slot === 'mo') {
             setFormKind(null);
             setStep('chooser');
           } else {
-            exitToReports();
+            exitFlow();
           }
         }}
       >
-        ← {isEditing || report.slot !== 'mo' ? reportsBackLabel : 'Choose form'}
+        ← {isEditing || report.slot !== 'mo' ? flowBackLabel : 'Choose form'}
       </button>
       <Title headingLevel="h2" size="lg">
         {title}
       </Title>
+      {assignerFilingNote}
       <MatchListRow match={match} showTime hideScore />
       {hasCmo && kind === 'mo_quick' && cmoDidNotAttend && (
         <p className="rs-match-card__meta">

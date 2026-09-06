@@ -823,6 +823,83 @@ export function buildPendingReport(
   return base;
 }
 
+/** Match report rows for one assignee on a match (CMO may return several subjects). */
+export function matchReportsForAssignee(
+  reports: MatchReport[],
+  matchId: string,
+  officialId: string,
+  slot: ReportAssigneeSlot,
+): MatchReport[] {
+  return reports.filter(
+    (r) =>
+      r.matchId === matchId &&
+      r.officialId === officialId &&
+      r.slot === slot,
+  );
+}
+
+/** Scheduler reset — same doc id, pending status, answers cleared. */
+export function buildResetMatchReport(
+  report: MatchReport,
+  match: Match,
+): MatchReport {
+  const reset = buildPendingReport(
+    match,
+    {
+      userId: report.officialId,
+      slot: report.slot,
+      subjectOfficialId: report.subjectOfficialId,
+    },
+    () => report.id,
+  );
+  return {
+    ...reset,
+    dueAt: report.dueAt,
+    kickoffAt: report.kickoffAt,
+    deadlineAt: report.deadlineAt ?? reset.deadlineAt,
+  };
+}
+
+export type CrewReportSlot = 'mo' | 'ar1' | 'ar2';
+
+export function officialHasCrewReportSlot(
+  match: Match,
+  userId: string,
+  slot: CrewReportSlot,
+): boolean {
+  return crewPeople(match.crew[slot]).some((a) => a.userId === userId);
+}
+
+export function pendingCrewReportForAssignee(
+  reports: MatchReport[],
+  matchId: string,
+  officialId: string,
+  slot: CrewReportSlot,
+): MatchReport | undefined {
+  return reports.find(
+    (r) =>
+      r.matchId === matchId &&
+      r.officialId === officialId &&
+      r.slot === slot &&
+      r.status === 'pending',
+  );
+}
+
+export function submittedCrewReportForAssignee(
+  reports: MatchReport[],
+  matchId: string,
+  officialId: string,
+  slot: CrewReportSlot,
+): MatchReport | undefined {
+  return reports.find(
+    (r) =>
+      r.matchId === matchId &&
+      r.officialId === officialId &&
+      r.slot === slot &&
+      r.status === 'submitted',
+  );
+}
+
 /** When duplicate rows share a storage key, keep the submitted copy. */
 function putMatchReportRow(
   byKey: Map<string, MatchReport>,
