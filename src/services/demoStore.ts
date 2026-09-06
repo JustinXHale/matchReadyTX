@@ -2868,7 +2868,7 @@ class DemoStore {
       ...s,
       matchReports: syncPendingMatchReports(
         s.matches,
-        [...matchReports, ...s.matchReports],
+        matchReports,
         Date.now(),
       ),
     }));

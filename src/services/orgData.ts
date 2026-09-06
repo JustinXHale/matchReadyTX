@@ -53,6 +53,7 @@ import {
   defaultMatchReportDocIdForAssignee,
   moOfficialIdOnMatch,
   moOfficialIdsOnMatch,
+  reportDueAt,
 } from '@/domain/reports';
 import {
   isCardLawId,
@@ -2051,6 +2052,27 @@ function parseCardIncidents(raw: unknown): CardIncident[] {
   return out;
 }
 
+function isoFromFirestoreTime(raw: unknown): string {
+  if (typeof raw === 'string' && raw.trim()) return raw.trim();
+  if (raw && typeof raw === 'object') {
+    const rec = raw as { toDate?: unknown; seconds?: unknown };
+    if (typeof rec.toDate === 'function') {
+      try {
+        const d = (rec.toDate as () => Date)();
+        if (d instanceof Date && !Number.isNaN(d.getTime())) {
+          return d.toISOString();
+        }
+      } catch {
+        /* ignore */
+      }
+    }
+    if (typeof rec.seconds === 'number' && Number.isFinite(rec.seconds)) {
+      return new Date(rec.seconds * 1000).toISOString();
+    }
+  }
+  return '';
+}
+
 export function matchReportFromFirestore(
   id: string,
   data: Record<string, unknown>,
@@ -2060,8 +2082,10 @@ export function matchReportFromFirestore(
   const slot = parseReportAssigneeSlot(data.slot);
   if (!matchId || !officialId || !slot) return null;
   const status = parseMatchReportStatus(data.status);
-  const dueAt = typeof data.dueAt === 'string' ? data.dueAt : '';
-  const kickoffAt = typeof data.kickoffAt === 'string' ? data.kickoffAt : '';
+  const kickoffAt = isoFromFirestoreTime(data.kickoffAt);
+  const dueAt =
+    isoFromFirestoreTime(data.dueAt) ||
+    (kickoffAt ? reportDueAt(kickoffAt) : '');
   if (!dueAt || !kickoffAt) return null;
   return {
     id,
@@ -2071,11 +2095,9 @@ export function matchReportFromFirestore(
     formKind: parseReportFormKind(data.formKind),
     status,
     dueAt,
-    deadlineAt:
-      typeof data.deadlineAt === 'string' ? data.deadlineAt : undefined,
+    deadlineAt: isoFromFirestoreTime(data.deadlineAt) || undefined,
     kickoffAt,
-    submittedAt:
-      typeof data.submittedAt === 'string' ? data.submittedAt : undefined,
+    submittedAt: isoFromFirestoreTime(data.submittedAt) || undefined,
     subjectOfficialId:
       typeof data.subjectOfficialId === 'string'
         ? data.subjectOfficialId
@@ -2363,6 +2385,8 @@ export async function ensurePendingMatchReportInFirestore(
       snap.data() as Record<string, unknown>,
     );
     if (parsed) return parsed;
+    // Existing docs (including submitted) must never be replaced with a blank pending.
+    throw new Error('Match report exists but could not be read.');
   }
   const pending = buildPendingReport(match, resolvedAssignee, () => id);
   await setDoc(ref, matchReportToFirestore(orgId, pending));

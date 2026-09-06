@@ -62,10 +62,13 @@ export async function persistSubmittedMatchReport(
   const match = demoStore.getState().matches.find((m) => m.id === before.matchId);
   if (!match) throw new Error('Match not found.');
 
-  const fsRow = await ensurePendingMatchReportInFirestore(defaultOrgId(), match, {
-    userId: before.officialId,
-    slot: before.slot as ReportAssigneeSlot,
-  });
+  const fsRow =
+    before.status === 'submitted'
+      ? before
+      : await ensurePendingMatchReportInFirestore(defaultOrgId(), match, {
+          userId: before.officialId,
+          slot: before.slot as ReportAssigneeSlot,
+        });
 
   demoStore.submitMatchReport(before.id, formKind, payload);
   const submittedAt =
