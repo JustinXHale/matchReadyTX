@@ -246,6 +246,30 @@ export function CrewDefaultsPanel() {
             MO is always required. Pick a level chip above, then toggle roles
             for that tier.
           </p>
+          <div className="rs-actions rs-actions--inline">
+            <Button
+              variant="primary"
+              isDisabled={!dirty || busy != null}
+              isLoading={busy === 'save'}
+              onClick={() => void save()}
+            >
+              Save crew defaults
+            </Button>
+            <Button
+              variant="secondary"
+              isDisabled={busy != null || stockMatchCount === 0}
+              isLoading={busy === 'apply'}
+              onClick={() => void applyToStock()}
+            >
+              Apply to unassigned MO/AR
+              {stockMatchCount > 0 ? ` (${stockMatchCount})` : ''}
+            </Button>
+          </div>
+          {note && (
+            <p className="rs-match-card__meta" role="status">
+              {note}
+            </p>
+          )}
         </section>
       )}
 
@@ -253,31 +277,6 @@ export function CrewDefaultsPanel() {
         competitionFilter={competitionFilter}
         genderFilter={genderFilter}
       />
-
-      <div className="rs-actions">
-        <Button
-          variant="primary"
-          isDisabled={!dirty || busy != null}
-          isLoading={busy === 'save'}
-          onClick={() => void save()}
-        >
-          Save crew defaults
-        </Button>
-        <Button
-          variant="secondary"
-          isDisabled={busy != null || stockMatchCount === 0}
-          isLoading={busy === 'apply'}
-          onClick={() => void applyToStock()}
-        >
-          Apply to unassigned MO/AR
-          {stockMatchCount > 0 ? ` (${stockMatchCount})` : ''}
-        </Button>
-      </div>
-      {note && (
-        <p className="rs-match-card__meta" role="status">
-          {note}
-        </p>
-      )}
     </div>
   );
 }

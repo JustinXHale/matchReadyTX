@@ -218,7 +218,7 @@ export function FeeDefaultsPanel({
       <FeeRow label="League / standard" values={league} onChange={(p) => setLeague((prev) => ({ ...prev, ...p }))} />
       <FeeRow label="Tournament" values={tourney} onChange={(p) => setTourney((prev) => ({ ...prev, ...p }))} />
 
-      <div className="rs-actions">
+      <div className="rs-actions rs-actions--inline">
         <Button
           variant="primary"
           isDisabled={!dirty || busy != null}
