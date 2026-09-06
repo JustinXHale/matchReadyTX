@@ -67,7 +67,7 @@ function findMatchReport(
   slot: RequestableSlot,
   subjectOfficialId?: string,
 ): MatchReport | undefined {
-  return reports.find((r) => {
+  const matches = reports.filter((r) => {
     if (r.matchId !== matchId || r.officialId !== officialId || r.slot !== slot) {
       return false;
     }
@@ -76,6 +76,8 @@ function findMatchReport(
     }
     return true;
   });
+  if (matches.length === 0) return undefined;
+  return matches.find((r) => r.status === 'submitted') ?? matches[0];
 }
 
 function cmoReportsComplete(

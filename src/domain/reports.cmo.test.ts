@@ -108,4 +108,29 @@ describe('multi-MO CMO reports', () => {
       merged.filter((r) => r.slot === 'cmo' && r.status === 'pending'),
     ).toHaveLength(1);
   });
+
+  it('prefers submitted MO rows when legacy pending duplicates exist', () => {
+    const match = tournamentMatch(['mo-a'], 'cmo-1');
+    const now = new Date('2020-01-01T21:00:00Z').getTime();
+    const pending: MatchReport = {
+      id: 'legacy_mr',
+      matchId: match.id,
+      officialId: 'mo-a',
+      slot: 'mo',
+      status: 'pending',
+      dueAt: new Date(now).toISOString(),
+      kickoffAt: match.kickoffAt,
+    };
+    const submitted: MatchReport = {
+      ...pending,
+      id: `${match.id}_mo-a_mo`,
+      status: 'submitted',
+      submittedAt: new Date(now).toISOString(),
+      formKind: 'mo_quick',
+      moPayload: { homePoints: 0, awayPoints: 0, tournamentMatch: true },
+    };
+    const merged = syncPendingMatchReports([match], [pending, submitted], now);
+    const mo = merged.find((r) => r.slot === 'mo' && r.officialId === 'mo-a');
+    expect(mo?.status).toBe('submitted');
+  });
 });

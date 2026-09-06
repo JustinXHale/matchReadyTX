@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { defaultFees } from '@/domain/economics';
-import { buildAssignmentPayableRows } from '@/domain/paymentReadiness';
+import { assigneeReportStatusesForMatch, buildAssignmentPayableRows } from '@/domain/paymentReadiness';
 import type { CardReport, MatchReport } from '@/domain/reports';
 import {
   emptyAssignment,
@@ -156,5 +156,24 @@ describe('paymentReadiness', () => {
     });
     const rows = buildAssignmentPayableRows([match], users, [], [], [], org);
     expect(rows.find((r) => r.slot === 'no4')?.readiness).toBe('ready_to_pay');
+  });
+
+  it('treats MO as submitted when duplicate pending and submitted rows share a key', () => {
+    const match = pastMatch();
+    const pending: MatchReport = { ...moReport('pending'), id: 'legacy_pending' };
+    const submitted: MatchReport = {
+      ...moReport('submitted'),
+      id: 'm1_u_mo_mo',
+      submittedAt: new Date().toISOString(),
+    };
+    const rows = assigneeReportStatusesForMatch(
+      match,
+      users,
+      [pending, submitted],
+      [],
+    );
+    const mo = rows.find((r) => r.slot === 'mo');
+    expect(mo?.matchReportSubmitted).toBe(true);
+    expect(mo?.payReady).toBe(true);
   });
 });

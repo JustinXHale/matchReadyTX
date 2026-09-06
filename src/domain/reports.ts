@@ -808,6 +808,18 @@ export function buildPendingReport(
   return base;
 }
 
+/** When duplicate rows share a storage key, keep the submitted copy. */
+function putMatchReportRow(
+  byKey: Map<string, MatchReport>,
+  key: string,
+  row: MatchReport,
+): void {
+  const cur = byKey.get(key);
+  if (!cur || (cur.status === 'pending' && row.status === 'submitted')) {
+    byKey.set(key, row);
+  }
+}
+
 /**
  * Ensure every due assignee has a pending/submitted report row.
  * Returns merged list (existing submissions kept; missing pendings added).
@@ -828,9 +840,9 @@ export function syncPendingMatchReports(
   const byKey = new Map<string, MatchReport>();
   for (const r of existing) {
     if (r.slot === 'cmo') {
-      byKey.set(cmoReportStorageKeyFromReport(r), r);
+      putMatchReportRow(byKey, cmoReportStorageKeyFromReport(r), r);
     } else {
-      byKey.set(`${r.matchId}:${r.officialId}:${r.slot}`, r);
+      putMatchReportRow(byKey, `${r.matchId}:${r.officialId}:${r.slot}`, r);
     }
   }
   for (const match of matches) {
