@@ -6,14 +6,7 @@ import { fulfillRaiseHandsOnAssignmentConfirm } from './raiseHandFulfillment';
 const CREW_SLOTS = ['mo', 'ar1', 'ar2', 'no4'] as const;
 type CrewSlot = (typeof CREW_SLOTS)[number];
 
-export const MATCH_SELF_SERVICE_ACTIONS = [
-  'confirm',
-  'decline',
-  't72_official_yes',
-  't72_official_no',
-  't72_team_yes',
-  't72_team_no',
-] as const;
+export const MATCH_SELF_SERVICE_ACTIONS = ['confirm', 'decline'] as const;
 
 export type MatchSelfServiceAction =
   (typeof MATCH_SELF_SERVICE_ACTIONS)[number];
@@ -137,8 +130,7 @@ async function assertMember(
 }
 
 /**
- * Official confirm/decline and T-72 answers. Admin SDK write — clients cannot
- * patch `crew` on the match doc.
+ * Official confirm/decline. Admin SDK write — clients cannot patch `crew` on the match doc.
  */
 export async function runMatchSelfService(opts: {
   db: Firestore;
@@ -152,11 +144,7 @@ export async function runMatchSelfService(opts: {
   reason?: string;
 }): Promise<{ ok: true; status: string }> {
   const { db, orgId, uid, matchId, action } = opts;
-  const member = await assertMember(db, orgId, uid);
-  const roles = Array.isArray(member.roles) ? member.roles.map(String) : [];
-  const teamIds = Array.isArray(member.teamIds)
-    ? member.teamIds.map(String)
-    : [];
+  await assertMember(db, orgId, uid);
 
   const matchRef = db.doc(`orgs/${orgId}/matches/${matchId}`);
   const matchSnap = await matchRef.get();
@@ -166,44 +154,6 @@ export async function runMatchSelfService(opts: {
   const data = matchSnap.data() ?? {};
   const at = new Date().toISOString();
   const patch: Record<string, unknown> = { updatedAt: at };
-
-  if (action === 't72_team_yes' || action === 't72_team_no') {
-    if (!roles.includes('teamAdmin')) {
-      throw new HttpsError(
-        'permission-denied',
-        'Only a Team Admin for this match can answer T-72.',
-      );
-    }
-    const side = opts.side === 'away' ? 'away' : opts.side === 'home' ? 'home' : '';
-    if (!side) {
-      throw new HttpsError('invalid-argument', 'side must be home or away.');
-    }
-    const teamId =
-      side === 'home'
-        ? String(data.homeTeamId ?? '')
-        : String(data.awayTeamId ?? '');
-    if (!teamId || !teamIds.includes(teamId)) {
-      throw new HttpsError(
-        'permission-denied',
-        'You are not a Team Admin for that side.',
-      );
-    }
-    const answer = action === 't72_team_yes' ? 'yes' : 'no';
-    if (side === 'home') patch.t72TeamHome = answer;
-    else patch.t72TeamAway = answer;
-    if (answer === 'no') {
-      patch.status = 'cancelled';
-      patch.cancelledAt = at;
-    } else {
-      const other =
-        side === 'home' ? data.t72TeamAway : data.t72TeamHome;
-      patch.status =
-        other === 'yes' ? 't72_officials_pending' : 't72_team_pending';
-    }
-    await matchRef.set(patch, { merge: true });
-    logger.info('matchSelfService team T-72', { orgId, matchId, uid, action });
-    return { ok: true, status: String(patch.status) };
-  }
 
   const slotRaw = String(opts.slot ?? '').trim();
   const slot = isCrewSlot(slotRaw) ? slotRaw : undefined;
@@ -225,34 +175,20 @@ export async function runMatchSelfService(opts: {
     if (found.slot === 'mo') status = 'mo_confirmed';
     if (
       allPeopleConfirmed(crew) &&
-      ['mo_confirmed', 'crew_confirmed', 't72_team_pending', 't72_officials_pending', 'locked_confirmed'].includes(
-        status,
-      )
+      ['mo_confirmed', 'crew_confirmed', 'locked_confirmed'].includes(status)
     ) {
       status = 'crew_confirmed';
     }
-  } else if (action === 'decline' || action === 't72_official_no') {
+  } else if (action === 'decline') {
     const reason = String(opts.reason ?? '').trim().slice(0, 500);
     crew[found.slot][found.index] = clearRow(
       row,
       uid,
       at,
-      action === 't72_official_no' ? 't72_no' : 'declined',
+      'declined',
       reason || undefined,
     );
     if (crewPeople(crew.mo).length === 0) status = 'needs_reassignment';
-  } else if (action === 't72_official_yes') {
-    const stillAssigned = CREW_SLOTS.filter(
-      (s) => crewPeople(crew[s]).length > 0,
-    );
-    const othersConfirmed = stillAssigned.every((s) =>
-      crewPeople(crew[s]).every(
-        (a) => a.status === 'confirmed' || (s === found.slot && a.userId === uid),
-      ),
-    );
-    if (status === 't72_officials_pending' && othersConfirmed) {
-      status = 'locked_confirmed';
-    }
   } else {
     throw new HttpsError('invalid-argument', 'Unknown action.');
   }

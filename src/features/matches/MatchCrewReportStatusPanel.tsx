@@ -8,6 +8,7 @@ import {
   kickoffHasPassed,
   buildResetMatchReport,
   matchReportsForAssignee,
+  orphanCrewMatchReports,
   type CardReport,
   type MatchReport,
   type ReportAssigneeSlot,
@@ -21,6 +22,7 @@ import {
   matchReportViewPath,
 } from '@/features/referee/reports/reportLinks';
 import {
+  persistSchedulerDeleteCardReport,
   persistSchedulerDeleteMatchReport,
   persistSchedulerResetMatchReport,
 } from '@/services/reportsLive';
@@ -76,6 +78,7 @@ export function MatchCrewReportStatusPanel({
   const [error, setError] = useState<string | null>(null);
 
   const kickoffPassed = kickoffHasPassed(match.kickoffAt, now);
+  const orphans = orphanCrewMatchReports(match, matchReports);
   const rows = assigneeReportStatusesForMatch(
     match,
     users,
@@ -118,7 +121,36 @@ export function MatchCrewReportStatusPanel({
     }
   };
 
-  if (rows.length === 0) return null;
+  const deleteCardReport = async (
+    rowKey: string,
+    report: CardReport,
+    officialName: string,
+  ) => {
+    if (
+      !window.confirm(
+        `Delete ${officialName}'s card report for this match?`,
+      )
+    ) {
+      return;
+    }
+    setError(null);
+    setBusyKey(rowKey);
+    try {
+      if (dataMode === 'live') {
+        await persistSchedulerDeleteCardReport(report.id);
+      } else {
+        store.removeCardReportLocal(report.id);
+      }
+    } catch (err) {
+      setError(
+        err instanceof Error ? err.message : 'Could not delete card report.',
+      );
+    } finally {
+      setBusyKey(null);
+    }
+  };
+
+  if (rows.length === 0 && orphans.length === 0) return null;
 
   return (
     <section className="rs-detail-card" aria-labelledby="crew-reports-heading">
@@ -129,11 +161,11 @@ export function MatchCrewReportStatusPanel({
         Match and coaching reports gate payout. Card reports are filed separately
         and do not block pay. Reset clears a submission so the official can
         file again; delete removes the record (a new due report appears when
-        they open Reports).
+        they open Reports). Orphan rows are for people no longer on this crew.
       </p>
       {!kickoffPassed ? (
         <p className="rs-match-card__meta">Reports are due after kickoff.</p>
-      ) : (
+      ) : rows.length > 0 ? (
         <ul className="rs-detail-people rs-crew-report-status">
           {rows.map((row) => {
             const isCmo = row.slot === 'cmo';
@@ -169,6 +201,10 @@ export function MatchCrewReportStatusPanel({
               row.cardReportSubmitted || row.cardReportRequired
                 ? cardReportPath(match.id)
                 : undefined;
+            const cardRows = cardReports.filter(
+              (c) =>
+                c.matchId === match.id && c.officialId === row.officialId,
+            );
             const busy = busyKey === rowKey;
 
             return (
@@ -277,6 +313,24 @@ export function MatchCrewReportStatusPanel({
                         >
                           Delete report
                         </Button>
+                        {row.slot === 'mo' &&
+                          cardRows.map((card) => (
+                            <Button
+                              key={card.id}
+                              variant="link"
+                              isInline
+                              isDisabled={busy}
+                              onClick={() =>
+                                void deleteCardReport(
+                                  `${rowKey}-card-${card.id}`,
+                                  card,
+                                  row.officialName,
+                                )
+                              }
+                            >
+                              Delete card report
+                            </Button>
+                          ))}
                       </span>
                     )}
                   </div>
@@ -285,6 +339,104 @@ export function MatchCrewReportStatusPanel({
             );
           })}
         </ul>
+      ) : null}
+      {orphans.length > 0 && (
+        <>
+          <p className="rs-detail-note">
+            These report records belong to officials who are no longer on this
+            crew. Delete them to clear stray due items (including card-report
+            prompts).
+          </p>
+          <ul className="rs-detail-people rs-crew-report-status">
+            {orphans.map((report) => {
+            const name =
+              users.find((u) => u.uid === report.officialId)?.displayName ??
+              report.officialId;
+            const rowKey = `orphan-${report.id}`;
+            const busy = busyKey === rowKey;
+            const slot = report.slot as ReportAssigneeSlot;
+            const viewPath =
+              report.status === 'submitted'
+                ? matchReportViewPath(match.id, {
+                    officialId: report.officialId,
+                    slot,
+                  })
+                : undefined;
+            const orphanCards = cardReports.filter(
+              (c) =>
+                c.matchId === match.id && c.officialId === report.officialId,
+            );
+            return (
+              <li key={rowKey}>
+                <div className="rs-detail-people__row rs-detail-people__row--static">
+                  <span className="rs-detail-people__slot">
+                    {REQUESTABLE_SLOT_SHORT[slot]}
+                  </span>
+                  <span className="rs-detail-people__name">{name}</span>
+                  <span className="rs-pill rs-pill--quiet">Off crew</span>
+                  <span className="rs-pill">
+                    {report.status === 'submitted' ? 'Submitted' : 'Pending'}
+                  </span>
+                </div>
+                <div className="rs-match-card__meta rs-crew-report-status__links">
+                  {viewPath && <Link to={viewPath}>View match report</Link>}
+                  <span className="rs-crew-report-status__admin">
+                    {report.status === 'submitted' && (
+                      <Button
+                        variant="link"
+                        isInline
+                        isDisabled={busy}
+                        onClick={() =>
+                          void runForReports(
+                            rowKey,
+                            [report],
+                            'reset',
+                            `Reset ${name}'s match report?`,
+                          )
+                        }
+                      >
+                        Reset report
+                      </Button>
+                    )}
+                    <Button
+                      variant="link"
+                      isInline
+                      isDisabled={busy}
+                      onClick={() =>
+                        void runForReports(
+                          rowKey,
+                          [report],
+                          'delete',
+                          `Delete ${name}'s match report record? This clears stray due items when they are no longer on the crew.`,
+                        )
+                      }
+                    >
+                      Delete report
+                    </Button>
+                    {orphanCards.map((card) => (
+                      <Button
+                        key={card.id}
+                        variant="link"
+                        isInline
+                        isDisabled={busy}
+                        onClick={() =>
+                          void deleteCardReport(
+                            `${rowKey}-card-${card.id}`,
+                            card,
+                            name,
+                          )
+                        }
+                      >
+                        Delete card report
+                      </Button>
+                    ))}
+                  </span>
+                </div>
+              </li>
+            );
+          })}
+          </ul>
+        </>
       )}
       {error && (
         <p className="rs-match-card__meta" role="alert">

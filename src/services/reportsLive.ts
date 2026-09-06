@@ -14,6 +14,7 @@ import {
   defaultOrgId,
   deleteMatchReportInFirestore,
   ensurePendingMatchReportInFirestore,
+  deleteCardReportInFirestore,
   saveCardReportInFirestore,
   saveJudicialCasesInFirestore,
   saveMatchReportInFirestore,
@@ -142,6 +143,13 @@ export async function persistSchedulerDeleteMatchReport(
 ): Promise<void> {
   demoStore.removeMatchReportLocal(reportId);
   await deleteMatchReportInFirestore(defaultOrgId(), reportId);
+}
+
+export async function persistSchedulerDeleteCardReport(
+  reportId: string,
+): Promise<void> {
+  demoStore.removeCardReportLocal(reportId);
+  await deleteCardReportInFirestore(defaultOrgId(), reportId);
 }
 
 export async function persistSchedulerResetMatchReport(

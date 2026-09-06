@@ -1,5 +1,5 @@
 /**
- * Cloud Functions entry — Sheet sync, notify, T-72, writeback, geocode.
+ * Cloud Functions entry — Sheet sync, notify, writeback, geocode.
  * Deploy with Firebase; secrets via Secret Manager.
  */
 import { onRequest, onCall, HttpsError } from 'firebase-functions/v2/https';
@@ -244,28 +244,6 @@ export const sheetPoll = onSchedule(
   },
 );
 
-/** Hourly T-72 sweep */
-export const t72Sweep = onSchedule('every 60 minutes', async () => {
-  const orgId = process.env.DEFAULT_ORG_ID || 'lonestar';
-  const now = Date.now();
-  const horizon = now + 72 * 60 * 60 * 1000;
-  const snap = await db
-    .collection(`orgs/${orgId}/matches`)
-    .where('status', 'in', [
-      'mo_confirmed',
-      'crew_confirmed',
-      'locked_confirmed',
-    ])
-    .get();
-  for (const doc of snap.docs) {
-    const kickoff = new Date(doc.data().kickoffAt as string).getTime();
-    if (kickoff > now && kickoff <= horizon) {
-      await doc.ref.set({ status: 't72_team_pending' }, { merge: true });
-      logger.info('Entered T-72', { matchId: doc.id });
-    }
-  }
-});
-
 /**
  * After other-team accept + assigner ack: write approved facts to Schedule + match.
  * Body: { orgId?, matchId, proposalId, kickoffAt?, venueName?, venueAddress? }
@@ -399,8 +377,8 @@ export const approveFixtureRequest = onCall(
 );
 
 /**
- * Official confirm/decline and T-72 answers. Writes crew via Admin SDK
- * because match-doc rules only let assigners patch `crew`.
+ * Official confirm/decline. Writes crew via Admin SDK because match-doc rules
+ * only let assigners patch `crew`.
  * Auth + org membership + own assignment (or Team Admin side) is the gate;
  * Firebase callable quotas / App Check cover abuse.
  * Body: { orgId?, matchId, action, slot?, assignmentId?, side?, reason? }

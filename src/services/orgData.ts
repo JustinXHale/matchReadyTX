@@ -1888,15 +1888,9 @@ export async function callReviewTeamLinkRequest(input: {
   return result.data as { ok: true };
 }
 
-export type MatchSelfServiceAction =
-  | 'confirm'
-  | 'decline'
-  | 't72_official_yes'
-  | 't72_official_no'
-  | 't72_team_yes'
-  | 't72_team_no';
+export type MatchSelfServiceAction = 'confirm' | 'decline';
 
-/** Official confirm/decline and T-72 — Cloud Function (Admin SDK crew write). */
+/** Official confirm/decline — Cloud Function (Admin SDK crew write). */
 export async function callMatchSelfService(input: {
   orgId?: string;
   matchId: string;
@@ -2375,6 +2369,13 @@ export async function deleteMatchReportInFirestore(
   reportId: string,
 ): Promise<void> {
   await deleteDoc(doc(requireDb(), 'orgs', orgId, 'matchReports', reportId));
+}
+
+export async function deleteCardReportInFirestore(
+  orgId: string,
+  reportId: string,
+): Promise<void> {
+  await deleteDoc(doc(requireDb(), 'orgs', orgId, 'cardReports', reportId));
 }
 
 export async function saveCardReportInFirestore(

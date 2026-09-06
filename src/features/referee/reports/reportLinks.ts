@@ -257,7 +257,7 @@ export function matchDetailReportActions(
 
   let cardLink: { label: string; to: string; nudge: boolean } | undefined;
   if (slot === 'mo' && kickoffHasPassed(match.kickoffAt, now)) {
-    const nudge = needsCardReportNudge(moSubmitted, cardReports);
+    const nudge = needsCardReportNudge(moSubmitted, cardReports, match);
     cardLink = {
       label: nudge ? 'File card report (cards noted)' : 'Card report',
       to: cardReportPath(match.id),

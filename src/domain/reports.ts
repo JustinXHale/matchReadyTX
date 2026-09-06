@@ -8,6 +8,7 @@ import {
   type MatchGender,
   type UserProfile,
 } from '@/domain/types';
+import { isTournamentMatch } from '@/domain/matchScheduleUrl';
 import {
   isFivePointValue,
   parseFivePointChoice,
@@ -154,6 +155,37 @@ export function attendanceForReportForm(
     );
     return prev ? { ...row, attended: prev.attended } : row;
   });
+}
+
+/** True when this official still holds the report slot on the match crew. */
+export function officialAssignedOnMatch(
+  match: Match,
+  officialId: string,
+  slot: ReportAssigneeSlot,
+): boolean {
+  if (slot === 'cmo') {
+    return (match.cmo ?? []).some((c) => c.userId === officialId);
+  }
+  if (slot === 'mo' || slot === 'ar1' || slot === 'ar2') {
+    return crewPeople(match.crew[slot]).some((a) => a.userId === officialId);
+  }
+  return false;
+}
+
+/** Report rows whose assignee is no longer on this match crew. */
+export function orphanCrewMatchReports(
+  match: Match,
+  reports: MatchReport[],
+): MatchReport[] {
+  const assigned = new Set(
+    reportAssignees(match).map((a) => `${a.userId}:${a.slot}`),
+  );
+  return reports.filter(
+    (r) =>
+      r.matchId === match.id &&
+      (r.slot === 'mo' || r.slot === 'ar1' || r.slot === 'ar2') &&
+      !assigned.has(`${r.officialId}:${r.slot}`),
+  );
 }
 
 /** MO Quick / Performance payload. */
@@ -1139,7 +1171,7 @@ export function countCardReportsDue(
         r.slot === 'mo' &&
         r.status === 'submitted',
     );
-    return needsCardReportNudge(moReport, cardReports);
+    return needsCardReportNudge(moReport, cardReports, m);
   }).length;
 }
 
@@ -1162,9 +1194,17 @@ export function totalCardsFromMoPayload(p: MoReportPayload | undefined): {
 export function needsCardReportNudge(
   matchReport: MatchReport | undefined,
   cardReports: CardReport[],
+  match?: Match,
 ): boolean {
   if (!matchReport || matchReport.status !== 'submitted') return false;
   if (matchReport.slot !== 'mo') return false;
+  if (match && isTournamentMatch(match)) return false;
+  if (
+    match &&
+    !officialAssignedOnMatch(match, matchReport.officialId, 'mo')
+  ) {
+    return false;
+  }
   const { yellow, red } = totalCardsFromMoPayload(matchReport.moPayload);
   if (yellow + red <= 0) return false;
   return !cardReports.some(

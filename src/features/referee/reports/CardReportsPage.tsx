@@ -46,7 +46,7 @@ export function CardReportsPage() {
       byMatch.set(match.id, {
         matchId: match.id,
         filed,
-        required: needsCardReportNudge(moReport, state.cardReports),
+        required: needsCardReportNudge(moReport, state.cardReports, match),
       });
     }
 

@@ -147,7 +147,7 @@ export function MatchReportsPage() {
                         </>
                       )}
                       {r.status === 'submitted' &&
-                        needsCardReportNudge(r, state.cardReports) && (
+                        needsCardReportNudge(r, state.cardReports, match) && (
                           <>
                             {' '}
                             <span className="rs-pill rs-pill--urgent">

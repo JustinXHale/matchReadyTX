@@ -57,15 +57,6 @@ export function matchesNeedingReassignment(matches: Match[]): Match[] {
   );
 }
 
-export function matchesT72Due(matches: Match[]): Match[] {
-  return sortByKickoffAsc(
-    matches.filter(
-      (m) =>
-        m.status === 't72_team_pending' || m.status === 't72_officials_pending',
-    ),
-  );
-}
-
 /** Pending proposals not yet applied, or approved proposals assigner hasn't seen. */
 export function proposalsNeedingAssignerReview(
   proposals: ChangeProposal[],
@@ -143,7 +134,6 @@ export type SchedulerQueueCounts = {
   needsOfficials: number;
   needsReassignment: number;
   proposals: number;
-  t72: number;
   notifications: number;
   /** Coverage + changes work queues (excludes inbound requests). */
   workActionable: number;
@@ -166,7 +156,6 @@ export function countSchedulerQueues(state: AppState): SchedulerQueueCounts {
     state.proposals,
     state.matches,
   ).length;
-  const t72 = matchesT72Due(state.matches).length;
   const notifications = state.notifications.length;
   const workActionable = proposals;
   return {
@@ -176,7 +165,6 @@ export function countSchedulerQueues(state: AppState): SchedulerQueueCounts {
     needsOfficials,
     needsReassignment,
     proposals,
-    t72,
     notifications,
     workActionable,
     totalActionable:

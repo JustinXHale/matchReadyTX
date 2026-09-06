@@ -235,9 +235,6 @@ export function MatchDetailPage() {
   const { goBack, backLabel } = useAppBack(homeBack);
   const [reason, setReason] = useState('');
   const [showDecline, setShowDecline] = useState(false);
-  const [declineMode, setDeclineMode] = useState<'assignment' | 't72'>(
-    'assignment',
-  );
   const [personContact, setPersonContact] = useState<PersonContact | null>(null);
   const [showEmailMatch, setShowEmailMatch] = useState(false);
   const [emailScope, setEmailScope] = useState<EmailScope>('both');
@@ -588,13 +585,6 @@ export function MatchDetailPage() {
     ((isHomeAdmin && !match.awayConfirmedAt) ||
       (isAwayAdmin && !match.homeConfirmedAt));
 
-  const needsT72Team =
-    match.status === 't72_team_pending' && (isHomeAdmin || isAwayAdmin);
-  const needsT72Official =
-    isOfficialView &&
-    match.status === 't72_officials_pending' &&
-    Boolean(mySlot);
-
   const feeParts =
     showMatchEconomics ? matchFeeBreakdown(match, state.org) : [];
   const showFees = feeParts.length > 0;
@@ -924,8 +914,7 @@ export function MatchDetailPage() {
     setShowEmailMatch(false);
   };
 
-  const openDecline = (mode: 'assignment' | 't72') => {
-    setDeclineMode(mode);
+  const openDecline = () => {
     setReason('');
     setShowDecline(true);
   };
@@ -933,22 +922,18 @@ export function MatchDetailPage() {
   const confirmDecline = async () => {
     if (!mySlot || !reason.trim() || !match) return;
     setSelfServiceBusy(true);
-    if (declineMode === 't72') {
-      store.answerT72Official(match.id, mySlot, 'no', reason);
-    } else {
-      store.officialUnavailable(
-        match.id,
-        mySlot,
-        reason,
-        match.status === 'needs_reconfirmation'
-          ? 'unavailable_on_change'
-          : 'declined',
-        myAssignment?.id,
-      );
-    }
+    store.officialUnavailable(
+      match.id,
+      mySlot,
+      reason,
+      match.status === 'needs_reconfirmation'
+        ? 'unavailable_on_change'
+        : 'declined',
+      myAssignment?.id,
+    );
     const ok = await persistSelfServiceIfLive({
       matchId: match.id,
-      action: declineMode === 't72' ? 't72_official_no' : 'decline',
+      action: 'decline',
       slot: mySlot,
       assignmentId: myAssignment?.id,
       reason: reason.trim() || undefined,
@@ -1153,34 +1138,6 @@ export function MatchDetailPage() {
         label: 'Confirm details',
         onClick: () =>
           store.confirmMatchTeam(match.id, isHomeAdmin ? 'home' : 'away'),
-      };
-    }
-    if (needsT72Team) {
-      return {
-        label: 'Yes — still on',
-        onClick: () => {
-          const side = isHomeAdmin ? 'home' : 'away';
-          store.answerT72Team(match.id, side, 'yes');
-          persistSelfServiceIfLive({
-            matchId: match.id,
-            action: 't72_team_yes',
-            side,
-          });
-        },
-      };
-    }
-    if (needsT72Official && mySlot) {
-      return {
-        label: 'Yes — still attending',
-        onClick: () => {
-          store.answerT72Official(match.id, mySlot, 'yes');
-          persistSelfServiceIfLive({
-            matchId: match.id,
-            action: 't72_official_yes',
-            slot: mySlot,
-            assignmentId: myAssignment?.id,
-          });
-        },
       };
     }
     return null;
@@ -2594,51 +2551,6 @@ export function MatchDetailPage() {
         </section>
       )}
 
-      {needsT72Team && (
-        <div className="rs-detail-secondary">
-          <Button
-            variant="link"
-            isDanger
-            onClick={() => {
-              const side = isHomeAdmin ? 'home' : 'away';
-              store.answerT72Team(match.id, side, 'no');
-              persistSelfServiceIfLive({
-                matchId: match.id,
-                action: 't72_team_no',
-                side,
-              });
-            }}
-          >
-            No — match not on
-          </Button>
-        </div>
-      )}
-
-      {needsT72Official && mySlot && (
-        <div className="rs-detail-secondary">
-          <Button
-            variant="link"
-            isDanger
-            onClick={() => openDecline('t72')}
-          >
-            Can&apos;t attend
-          </Button>
-        </div>
-      )}
-
-      {isAssigner && (
-        <details className="rs-detail-tools">
-          <summary>Assigner tools</summary>
-          <p className="rs-detail-note">
-            T-72 is the 72-hour reconfirm before kickoff (teams, then officials).
-            Use this only to demo that flow.
-          </p>
-          <Button variant="secondary" onClick={() => store.startT72(match.id)}>
-            Start T-72 reconfirm
-          </Button>
-        </details>
-      )}
-
       {showAcceptDecline && mySlot && (
         <div className="rs-detail-sticky rs-detail-sticky--split">
           <Button
@@ -2656,7 +2568,7 @@ export function MatchDetailPage() {
             variant="secondary"
             className="rs-detail-sticky__half"
             isDisabled={selfServiceBusy}
-            onClick={() => openDecline('assignment')}
+            onClick={() => openDecline()}
           >
             {match.status === 'needs_reconfirmation'
               ? 'Can’t attend'

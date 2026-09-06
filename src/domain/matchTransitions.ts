@@ -204,36 +204,6 @@ export function reactivateMatch(match: Match): Match {
   };
 }
 
-export function enterT72(match: Match): Match {
-  if (
-    match.status === 'mo_confirmed' ||
-    match.status === 'crew_confirmed' ||
-    match.status === 'locked_confirmed'
-  ) {
-    return { ...match, status: 't72_team_pending' };
-  }
-  return match;
-}
-
-export function applyT72Team(
-  match: Match,
-  side: 'home' | 'away',
-  answer: 'yes' | 'no',
-): Match {
-  const next: Match = {
-    ...match,
-    t72TeamHome: side === 'home' ? answer : match.t72TeamHome,
-    t72TeamAway: side === 'away' ? answer : match.t72TeamAway,
-  };
-  if (answer === 'no') {
-    return cancelMatch(next);
-  }
-  if (next.t72TeamHome === 'yes' && next.t72TeamAway === 'yes') {
-    return { ...next, status: 't72_officials_pending' };
-  }
-  return { ...next, status: 't72_team_pending' };
-}
-
 export function statusLabel(status: MatchStatus): string {
   const map: Record<MatchStatus, string> = {
     draft: 'Draft',
@@ -243,8 +213,8 @@ export function statusLabel(status: MatchStatus): string {
     crew_pending: 'Awaiting officials',
     mo_confirmed: 'MO confirmed',
     crew_confirmed: 'Crew confirmed',
-    t72_team_pending: 'T-72 teams',
-    t72_officials_pending: 'T-72 officials',
+    t72_team_pending: 'Confirmed',
+    t72_officials_pending: 'Confirmed',
     locked_confirmed: 'Locked in',
     needs_reconfirmation: 'Needs reconfirm',
     needs_reassignment: 'Needs reassignment',

@@ -145,7 +145,7 @@ function slotReportStatus(
     };
   }
 
-  const cardRequired = needsCardReportNudge(matchReport, cardReports);
+  const cardRequired = needsCardReportNudge(matchReport, cardReports, match);
   const cardSubmitted = cardRequired
     ? cardReports.some(
         (c) =>

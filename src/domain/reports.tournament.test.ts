@@ -62,6 +62,56 @@ describe('tournament match reports', () => {
       ),
     ).toBe(true);
   });
+
+  it('needsCardReportNudge skips when MO is no longer on the match crew', () => {
+    const kickoffAt = '2026-09-05T13:30:00.000Z';
+    const match = {
+      id: 'm1',
+      sheetRowKey: 's1',
+      status: 'locked_confirmed' as const,
+      kickoffAt,
+      venueName: 'Field',
+      venueAddress: 'San Marcos, TX',
+      venueLat: 0,
+      venueLng: 0,
+      homeTeamId: 'h',
+      awayTeamId: 'a',
+      homeTeamName: 'Home',
+      awayTeamName: 'Away',
+      level: 'D1',
+      gender: 'men' as const,
+      flightProvided: false,
+      housingProvided: false,
+      crew: emptyCrew(),
+    };
+    const report: MatchReport = {
+      id: 'r1',
+      matchId: 'm1',
+      officialId: 'u1',
+      slot: 'mo',
+      status: 'submitted',
+      dueAt: '2026-09-05T15:00:00.000Z',
+      kickoffAt,
+      moPayload: leaguePayload,
+    };
+    expect(needsCardReportNudge(report, [], match)).toBe(false);
+  });
+
+  it('needsCardReportNudge skips tournament matches even without tournamentMatch on payload', () => {
+    const report: MatchReport = {
+      id: 'r1',
+      matchId: 'm1',
+      officialId: 'u1',
+      slot: 'mo',
+      status: 'submitted',
+      dueAt: '2026-01-01T12:00:00.000Z',
+      kickoffAt: '2026-01-01T10:00:00.000Z',
+      moPayload: leaguePayload,
+    };
+    expect(
+      needsCardReportNudge(report, [], { isTournament: true } as never),
+    ).toBe(false);
+  });
 });
 
 describe('attendanceForReportForm', () => {

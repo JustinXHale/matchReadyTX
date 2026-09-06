@@ -19,12 +19,10 @@ import { defaultFees, demoGeocode } from '@/domain/economics';
 import { formatMatchKickoff, orgTimeZone } from '@/domain/matchTime';
 import {
   applySheetFacts,
-  applyT72Team,
   beginChangeProposed,
   cancelMatch,
   markNeedsReconfirmation,
   setTeamDetailsConfirmed as applyTeamDetailsConfirmed,
-  enterT72,
   postponeMatch,
   reactivateMatch,
   releaseMatch,
@@ -2489,7 +2487,7 @@ function seedCoachingReports(): CoachingReportStub[] {
   ];
 }
 
-/** Demo rows so Scheduler → Queues is not empty for reassignment / T-72 / proposals. */
+/** Demo rows so Scheduler → Queues is not empty for reassignment / proposals. */
 function seedAssignerQueueDemos(matches: Match[]): {
   matches: Match[];
   proposals: ChangeProposal[];
@@ -2497,7 +2495,7 @@ function seedAssignerQueueDemos(matches: Match[]): {
   const source = matches.find((m) => m.id === 'm_tc01');
   const next = matches.map((m) => {
     if (m.id === 'm_a06') return { ...m, status: 'needs_reassignment' as const };
-    if (m.id === 'm_a07') return { ...m, status: 't72_team_pending' as const };
+    if (m.id === 'm_a07') return { ...m, status: 'crew_confirmed' as const };
     if (m.id === 'm_tc01') return beginChangeProposed(m);
     return m;
   });
@@ -2928,6 +2926,13 @@ class DemoStore {
         ),
         report,
       ],
+    }));
+  }
+
+  removeCardReportLocal(reportId: string): void {
+    this.set((s) => ({
+      ...s,
+      cardReports: s.cardReports.filter((c) => c.id !== reportId),
     }));
   }
 
@@ -5409,56 +5414,6 @@ class DemoStore {
       return;
     }
     this.assignCrew(req.matchId, chosen, req.userId, true);
-  }
-
-  startT72(matchId: string): void {
-    this.set((s) => ({
-      ...s,
-      matches: s.matches.map((m) => (m.id === matchId ? enterT72(m) : m)),
-    }));
-  }
-
-  answerT72Team(matchId: string, side: 'home' | 'away', answer: 'yes' | 'no'): void {
-    this.set((s) => ({
-      ...s,
-      matches: s.matches.map((m) => {
-        if (m.id !== matchId) return m;
-        return applyT72Team(m, side, answer);
-      }),
-    }));
-  }
-
-  answerT72Official(
-    matchId: string,
-    slot: CrewSlot,
-    answer: 'yes' | 'no',
-    reason?: string,
-  ): void {
-    if (answer === 'no') {
-      this.officialUnavailable(matchId, slot, reason ?? 'T-72 decline', 't72_no');
-      return;
-    }
-    this.set((s) => ({
-      ...s,
-      matches: s.matches.map((m) => {
-        if (m.id !== matchId) return m;
-        // If all assigned officials still present and we're in t72_officials_pending, lock
-        const stillAssigned = (['mo', 'ar1', 'ar2', 'no4'] as CrewSlot[]).filter(
-          (sl) => crewPeople(m.crew[sl]).length > 0,
-        );
-        if (
-          m.status === 't72_officials_pending' &&
-          stillAssigned.every(
-            (sl) =>
-              crewPeople(m.crew[sl]).every((a) => a.status === 'confirmed') ||
-              sl === slot,
-          )
-        ) {
-          return { ...m, status: 'locked_confirmed' };
-        }
-        return m;
-      }),
-    }));
   }
 
   cancelOrPostpone(matchId: string, kind: 'cancel' | 'postpone'): void {
