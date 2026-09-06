@@ -2866,7 +2866,11 @@ class DemoStore {
   applyLiveMatchReports(matchReports: MatchReport[]): void {
     this.set((s) => ({
       ...s,
-      matchReports: syncPendingMatchReports(s.matches, matchReports, Date.now()),
+      matchReports: syncPendingMatchReports(
+        s.matches,
+        [...matchReports, ...s.matchReports],
+        Date.now(),
+      ),
     }));
   }
 
@@ -2876,7 +2880,18 @@ class DemoStore {
 
   upsertMatchReportLocal(report: MatchReport): void {
     this.set((s) => {
-      const rest = s.matchReports.filter((r) => r.id !== report.id);
+      const rest = s.matchReports.filter((r) => {
+        if (r.id === report.id) return false;
+        if (
+          r.matchId === report.matchId &&
+          r.officialId === report.officialId &&
+          r.slot === report.slot &&
+          (r.slot !== 'cmo' || r.subjectOfficialId === report.subjectOfficialId)
+        ) {
+          return false;
+        }
+        return true;
+      });
       return {
         ...s,
         matchReports: syncPendingMatchReports(

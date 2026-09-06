@@ -165,16 +165,14 @@ export function CardReportsPage() {
                   meta={
                     <span
                       className={`rs-pill${
-                        entry.required || !entry.filed
-                          ? ' rs-pill--urgent'
-                          : ''
+                        entry.required && !entry.filed ? ' rs-pill--urgent' : ''
                       }`}
                     >
                       {entry.filed
                         ? 'Card report on file'
                         : entry.required
                           ? 'Card report required'
-                          : 'File card report'}
+                          : 'Optional — no cards on match report'}
                     </span>
                   }
                 />

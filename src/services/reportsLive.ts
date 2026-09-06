@@ -62,16 +62,25 @@ export async function persistSubmittedMatchReport(
   const match = demoStore.getState().matches.find((m) => m.id === before.matchId);
   if (!match) throw new Error('Match not found.');
 
-  await ensurePendingMatchReportInFirestore(defaultOrgId(), match, {
+  const fsRow = await ensurePendingMatchReportInFirestore(defaultOrgId(), match, {
     userId: before.officialId,
     slot: before.slot as ReportAssigneeSlot,
   });
 
-  demoStore.submitMatchReport(reportId, formKind, payload);
-  const updated = demoStore
-    .getState()
-    .matchReports.find((r) => r.id === reportId);
-  if (!updated) return;
+  demoStore.submitMatchReport(before.id, formKind, payload);
+  const submittedAt = new Date().toISOString();
+  const updated = {
+    ...before,
+    ...fsRow,
+    id: fsRow.id,
+    formKind,
+    status: 'submitted' as const,
+    submittedAt: fsRow.submittedAt ?? submittedAt,
+    ...(formKind === 'ar_basic'
+      ? { arPayload: payload as ArReportPayload }
+      : { moPayload: payload as MoReportPayload }),
+  };
+  demoStore.upsertMatchReportLocal(updated);
   await saveMatchReportInFirestore(defaultOrgId(), updated);
 }
 
@@ -87,17 +96,25 @@ export async function persistSubmittedCmoReport(
   const match = demoStore.getState().matches.find((m) => m.id === before.matchId);
   if (!match) throw new Error('Match not found.');
 
-  await ensurePendingMatchReportInFirestore(defaultOrgId(), match, {
+  const fsRow = await ensurePendingMatchReportInFirestore(defaultOrgId(), match, {
     userId: before.officialId,
     slot: 'cmo',
     subjectOfficialId,
   });
 
-  demoStore.submitCmoReport(reportId, payload, subjectOfficialId);
-  const updated = demoStore
-    .getState()
-    .matchReports.find((r) => r.id === reportId);
-  if (!updated) return;
+  demoStore.submitCmoReport(before.id, payload, subjectOfficialId);
+  const submittedAt = new Date().toISOString();
+  const updated = {
+    ...before,
+    ...fsRow,
+    id: fsRow.id,
+    formKind: 'cmo' as const,
+    status: 'submitted' as const,
+    submittedAt: fsRow.submittedAt ?? submittedAt,
+    subjectOfficialId,
+    cmoPayload: payload,
+  };
+  demoStore.upsertMatchReportLocal(updated);
   await saveMatchReportInFirestore(defaultOrgId(), updated);
 }
 
