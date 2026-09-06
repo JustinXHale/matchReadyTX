@@ -43,7 +43,12 @@ describe('feeDefaults', () => {
       tourney,
     );
     const tr = feeOverrideForMatch(
-      match({ id: 'm2', kickoffAt: '2026-09-01T14:00:00.000Z', level: 'Tourney' }),
+      match({
+        id: 'm2',
+        kickoffAt: '2026-09-01T14:00:00.000Z',
+        level: 'D1',
+        isTournament: true,
+      }),
       league,
       tourney,
     );

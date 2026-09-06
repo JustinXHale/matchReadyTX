@@ -16,16 +16,16 @@ export type LevelCrewDefaults = {
 export type DefaultCrewByLevel = Record<string, LevelCrewDefaults>;
 
 /** Sensible defaults when the assigner has not configured a level yet. */
+const TOURNAMENT_CREW_ROLES: RequestableSlot[] = [
+  'mo',
+  'ar1',
+  'ar2',
+  'no4',
+  'cmo',
+];
+
 export function fallbackCrewDefaultsForLevel(level: string): LevelCrewDefaults {
   const l = level.trim().toLowerCase();
-  if (
-    l === '7s' ||
-    l.includes('tourney') ||
-    l.includes('tournament') ||
-    l === 'tourney'
-  ) {
-    return { roles: ['mo', 'ar1', 'ar2', 'no4', 'cmo'] };
-  }
   if (l.includes('tier 3') || l === 'd3' || l.includes('exhibition')) {
     return { roles: ['mo'] };
   }
@@ -43,6 +43,16 @@ export function resolveCrewDefaultsForLevel(
   const custom = configured?.[key];
   if (custom?.roles?.length) return custom;
   return fallbackCrewDefaultsForLevel(key);
+}
+
+export function resolveCrewDefaultsForMatch(
+  match: Match,
+  configured?: DefaultCrewByLevel | null,
+): LevelCrewDefaults {
+  if (match.isTournament) {
+    return { roles: [...TOURNAMENT_CREW_ROLES] };
+  }
+  return resolveCrewDefaultsForLevel(match.level, configured);
 }
 
 /** Union org levels with sheet-derived levels (stable order). */
@@ -123,7 +133,7 @@ export function applyLevelCrewDefaults(
   match: Match,
   configured?: DefaultCrewByLevel | null,
 ): Match {
-  const defs = resolveCrewDefaultsForLevel(match.level, configured);
+  const defs = resolveCrewDefaultsForMatch(match, configured);
   const built = matchFromCrewRoles(defs.roles);
   return {
     ...match,

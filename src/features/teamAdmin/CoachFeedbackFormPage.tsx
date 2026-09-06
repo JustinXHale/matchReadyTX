@@ -14,11 +14,9 @@ import {
   COACH_FEEDBACK_CRITERION_HINTS,
   COACH_FEEDBACK_CRITERION_LABELS,
   COACH_FEEDBACK_SCALE_KEYS,
-  COACH_FEEDBACK_SCALE_LEGEND,
-  appendCoachFeedbackEdit,
-  coachFeedbackDocId,
+  buildCoachFeedback,
+  coachFeedbackScaleLegend,
   existingCoachFeedback,
-  formatMatchScore,
   isMatchEligibleForCoachFeedback,
   matchOfficialForFeedback,
   reportingTeamIdForUser,
@@ -26,6 +24,7 @@ import {
   type CoachFeedback,
   type CoachFeedbackCommentKey,
   type CoachFeedbackEditAction,
+  type CoachFeedbackScope,
   type CoachFeedbackScaleKey,
   type CoachFeedbackScaleValue,
   type CoachFeedbackStatus,
@@ -162,18 +161,20 @@ export function CoachFeedbackFormPage() {
     if (!isMatchEligibleForCoachFeedback(match, currentUser)) return null;
     const reportingTeamId = reportingTeamIdForUser(match, currentUser);
     if (!reportingTeamId) return null;
-    const mo = matchOfficialForFeedback(match);
-    if (!mo) return null;
     const reportingTeamName =
       reportingTeamId === match.homeTeamId
         ? match.homeTeamName
         : match.awayTeamName;
     const existing = existingCoachFeedback(
       state.coachFeedback,
-      match.id,
+      match,
       reportingTeamId,
     );
-    return { reportingTeamId, reportingTeamName, mo, existing };
+    const scope: CoachFeedbackScope = match.isTournament ? 'crew' : 'official';
+    const mo =
+      scope === 'official' ? matchOfficialForFeedback(match) : null;
+    if (scope === 'official' && !mo) return null;
+    return { reportingTeamId, reportingTeamName, mo, existing, scope };
   }, [currentUser, match, state.coachFeedback]);
 
   const existing = context?.existing;
@@ -272,43 +273,29 @@ export function CoachFeedbackFormPage() {
     );
   }
 
-  const { reportingTeamId, reportingTeamName, mo } = context;
-  const officialProfile = state.users.find((u) => u.uid === mo.userId);
+  const { reportingTeamId, reportingTeamName, mo, scope } = context;
+  const isCrew = scope === 'crew';
+  const officialProfile =
+    mo != null ? state.users.find((u) => u.uid === mo.userId) : undefined;
 
   const buildFeedback = (
     status: CoachFeedbackStatus,
     action: CoachFeedbackEditAction,
   ): CoachFeedback => {
-    const now = new Date().toISOString();
-    const edit = {
-      at: now,
-      byUserId: currentUser.uid,
-      byName: currentUser.displayName,
-      action,
-    };
     const textOrUndef = (open: boolean, value: string) =>
       open && value.trim() ? value.trim() : undefined;
 
-    return {
-      id: coachFeedbackDocId(match.id, reportingTeamId),
+    return buildCoachFeedback({
+      match,
+      reportingTeamId,
+      reportingTeamName,
       orgId: dataMode === 'live' ? defaultOrgId() : state.org.id,
-      matchId: match.id,
-      slot: 'mo',
-      officialUserId: mo.userId,
-      officialName: mo.userName,
-      homeTeamId: match.homeTeamId,
-      homeTeamName: match.homeTeamName,
-      awayTeamId: match.awayTeamId,
-      awayTeamName: match.awayTeamName,
-      kickoffAt: match.kickoffAt,
-      competition: match.competition,
-      level: match.level,
-      score: formatMatchScore(match),
+      user: currentUser,
+      status,
+      action,
+      existing,
       scales,
-      commentsOnScores: textOrUndef(
-        commentOpen.commentsOnScores,
-        commentsOnScores,
-      ),
+      commentsOnScores: textOrUndef(commentOpen.commentsOnScores, commentsOnScores),
       areasDoneWell: textOrUndef(commentOpen.areasDoneWell, areasDoneWell),
       areasToImprove: textOrUndef(commentOpen.areasToImprove, areasToImprove),
       otherFeedback: textOrUndef(commentOpen.otherFeedback, otherFeedback),
@@ -318,24 +305,10 @@ export function CoachFeedbackFormPage() {
       ),
       videoLink: videoLink.trim() || undefined,
       videoNotes: textOrUndef(commentOpen.videoNotes, videoNotes),
-      submitterUserId: currentUser.uid,
-      submitterName: currentUser.displayName,
-      submitterEmail: currentUser.email,
-      submitterPhone: phone.trim() || undefined,
       clubRole: clubRole.trim(),
+      submitterPhone: phone.trim() || undefined,
       contactAboutReport,
-      reportingTeamId,
-      reportingTeamName,
-      status,
-      submittedAt:
-        status === 'submitted'
-          ? (existing?.submittedAt ?? now)
-          : existing?.submittedAt,
-      publicOnProfile: existing?.publicOnProfile,
-      edits: appendCoachFeedbackEdit(existing?.edits, edit),
-      createdAt: existing?.createdAt ?? now,
-      updatedAt: now,
-    };
+    });
   };
 
   const persist = async (feedback: CoachFeedback) => {
@@ -417,31 +390,43 @@ export function CoachFeedbackFormPage() {
         {title}
       </Title>
 
-      <section className="rs-detail-card rs-coach-fb-subject" aria-labelledby="cf-mo">
-        <h2 id="cf-mo" className="rs-detail-section__label">
-          Match Official being rated
+      <section className="rs-detail-card rs-coach-fb-subject" aria-labelledby="cf-subject">
+        <h2 id="cf-subject" className="rs-detail-section__label">
+          {isCrew ? 'Referee crew being rated' : 'Match Official being rated'}
         </h2>
-        <div className="rs-coach-fb-subject__person">
-          <UserAvatar
-            user={
-              officialProfile ?? {
-                displayName: mo.userName,
-                firstName: '',
-                lastName: '',
-              }
-            }
-            size="md"
-          />
+        {isCrew ? (
           <div>
-            <p className="rs-coach-fb-subject__name">{mo.userName}</p>
+            <p className="rs-coach-fb-subject__name">
+              {match.title?.trim() || 'Tournament'}
+            </p>
             <p className="rs-match-card__meta">
-              Feedback from {reportingTeamName}
+              Feedback from {reportingTeamName} · {match.level} tier · referee
+              crew for the tournament
             </p>
           </div>
-        </div>
+        ) : (
+          <div className="rs-coach-fb-subject__person">
+            <UserAvatar
+              user={
+                officialProfile ?? {
+                  displayName: mo!.userName,
+                  firstName: '',
+                  lastName: '',
+                }
+              }
+              size="md"
+            />
+            <div>
+              <p className="rs-coach-fb-subject__name">{mo!.userName}</p>
+              <p className="rs-match-card__meta">
+                Feedback from {reportingTeamName}
+              </p>
+            </div>
+          </div>
+        )}
       </section>
 
-      <MatchListRow match={match} />
+      <MatchListRow match={match} hideScore={isCrew} />
 
       <div className="rs-form-stack">
         <h2 className="rs-detail-section__label">Your details</h2>
@@ -506,7 +491,7 @@ export function CoachFeedbackFormPage() {
             Performance ratings
           </h2>
           <p className="rs-match-card__meta rs-coach-fb-scale-legend">
-            {COACH_FEEDBACK_SCALE_LEGEND}
+            {coachFeedbackScaleLegend(scope)}
           </p>
 
           {COACH_FEEDBACK_SCALE_KEYS.map((key) => (

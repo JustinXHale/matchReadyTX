@@ -104,6 +104,11 @@ export const COACH_FEEDBACK_CRITERION_HINTS: Record<
 export const COACH_FEEDBACK_SCALE_LEGEND =
   '1 Poor · 2 Below Average · 3 Average · 4 Above Average · 5 Excellent · N/A not applicable — rate how the Match Official performed at this level, or N/A if it does not apply.';
 
+export const COACH_FEEDBACK_CREW_SCALE_LEGEND =
+  '1 Poor · 2 Below Average · 3 Average · 4 Above Average · 5 Excellent · N/A not applicable — rate how the referee crew performed for this tournament, or N/A if it does not apply.';
+
+export type CoachFeedbackScope = 'official' | 'crew';
+
 export type CoachFeedbackCommentKey =
   | 'commentsOnScores'
   | 'areasDoneWell'
@@ -157,11 +162,16 @@ export interface CoachFeedbackEdit {
 export interface CoachFeedback {
   id: string;
   orgId: string;
-  /** Always MO in v1. */
-  slot: 'mo';
+  feedbackScope: CoachFeedbackScope;
+  /** Anchor match row for display and validation. */
   matchId: string;
-  officialUserId: string;
-  officialName: string;
+  slot: 'mo' | 'crew';
+  officialUserId?: string;
+  officialName?: string;
+  /** Normalized title slug — doc id for crew-scoped feedback. */
+  tournamentGroupKey?: string;
+  /** Event title snapshot for crew feedback display. */
+  tournamentTitle?: string;
   homeTeamId: string;
   homeTeamName: string;
   awayTeamId: string;
@@ -204,12 +214,40 @@ export interface CoachFeedback {
   updatedAt: string;
 }
 
-/** Deterministic id — enforces one submission per (match, reporting team). */
+/** Deterministic id — one submission per (match or tournament group, reporting team). */
+export function tournamentGroupKeyFromMatch(match: Match): string {
+  const title = match.title?.trim();
+  if (!title) return match.id;
+  const slug = title
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 96);
+  return slug || match.id;
+}
+
+export function coachFeedbackScopeForMatch(match: Match): CoachFeedbackScope {
+  return match.isTournament ? 'crew' : 'official';
+}
+
+export function isCrewScopeCoachFeedback(feedback: CoachFeedback): boolean {
+  return feedback.feedbackScope === 'crew';
+}
+
 export function coachFeedbackDocId(
-  matchId: string,
+  match: Match,
   reportingTeamId: string,
 ): string {
-  return `${matchId}_${reportingTeamId}`;
+  if (match.isTournament) {
+    return `${tournamentGroupKeyFromMatch(match)}_${reportingTeamId}`;
+  }
+  return `${match.id}_${reportingTeamId}`;
+}
+
+export function coachFeedbackScaleLegend(scope: CoachFeedbackScope): string {
+  return scope === 'crew'
+    ? COACH_FEEDBACK_CREW_SCALE_LEGEND
+    : COACH_FEEDBACK_SCALE_LEGEND;
 }
 
 export function formatMatchScore(match: Match): string {
@@ -253,10 +291,17 @@ export function reportingTeamIdForUser(
   return null;
 }
 
+function matchHasAssignedCrew(match: Match): boolean {
+  for (const slot of ['mo', 'ar1', 'ar2', 'no4'] as const) {
+    if (crewPeople(match.crew[slot]).some((a) => a.userId)) return true;
+  }
+  return false;
+}
+
 /**
- * Past matches where this team admin may leave MO feedback.
- * Requires crew visible to teams and an assigned MO.
- * Home and away sides each get their own feedback doc.
+ * Past matches where this team admin may leave feedback.
+ * League: home or away, one MO report each.
+ * Tournament: host (home) only — crew-scoped, grouped by title.
  */
 export function isMatchEligibleForCoachFeedback(
   match: Match,
@@ -267,18 +312,191 @@ export function isMatchEligibleForCoachFeedback(
   if (match.status === 'cancelled' || match.status === 'draft') return false;
   if (isKickoffUpcoming(match, nowMs)) return false;
   if (!isCrewVisibleToTeams(match)) return false;
-  if (!matchOfficialForFeedback(match)) return false;
-  return reportingTeamIdForUser(match, user) != null;
+  const reportingTeamId = reportingTeamIdForUser(match, user);
+  if (!reportingTeamId) return false;
+  if (match.isTournament) {
+    return reportingTeamId === match.homeTeamId && matchHasAssignedCrew(match);
+  }
+  return matchOfficialForFeedback(match) != null;
+}
+
+/** Pick the anchor match for a tournament group (latest kickoff). */
+export function anchorMatchForTournamentGroup(
+  matches: Match[],
+  groupKey: string,
+): Match | undefined {
+  const group = matches.filter(
+    (m) => m.isTournament && tournamentGroupKeyFromMatch(m) === groupKey,
+  );
+  if (group.length === 0) return undefined;
+  return [...group].sort(
+    (a, b) => new Date(b.kickoffAt).getTime() - new Date(a.kickoffAt).getTime(),
+  )[0];
 }
 
 export function existingCoachFeedback(
   feedback: CoachFeedback[],
-  matchId: string,
+  match: Match,
   reportingTeamId: string,
 ): CoachFeedback | undefined {
-  return feedback.find(
-    (f) => f.matchId === matchId && f.reportingTeamId === reportingTeamId,
+  const id = coachFeedbackDocId(match, reportingTeamId);
+  return feedback.find((f) => f.id === id);
+}
+
+export type CoachFeedbackListRow =
+  | {
+      kind: 'official';
+      match: Match;
+      reportingTeamId: string;
+      existing?: CoachFeedback;
+      mo: { userId: string; userName: string };
+    }
+  | {
+      kind: 'crew';
+      match: Match;
+      reportingTeamId: string;
+      existing?: CoachFeedback;
+      tournamentTitle: string;
+    };
+
+/** Rows for Team Admin feedback list — one row per league match or tournament group. */
+export function coachFeedbackListRows(
+  matches: Match[],
+  user: UserProfile,
+  feedback: CoachFeedback[],
+  nowMs = Date.now(),
+): CoachFeedbackListRow[] {
+  const eligible = matches.filter((m) =>
+    isMatchEligibleForCoachFeedback(m, user, nowMs),
   );
+  const rows: CoachFeedbackListRow[] = [];
+  const tournamentGroups = new Map<string, Match[]>();
+
+  for (const match of eligible) {
+    const reportingTeamId = reportingTeamIdForUser(match, user)!;
+    if (match.isTournament) {
+      const key = tournamentGroupKeyFromMatch(match);
+      const list = tournamentGroups.get(key) ?? [];
+      list.push(match);
+      tournamentGroups.set(key, list);
+      continue;
+    }
+    const mo = matchOfficialForFeedback(match);
+    if (!mo) continue;
+    rows.push({
+      kind: 'official',
+      match,
+      reportingTeamId,
+      existing: existingCoachFeedback(feedback, match, reportingTeamId),
+      mo,
+    });
+  }
+
+  for (const [, groupMatches] of tournamentGroups) {
+    const anchor = [...groupMatches].sort(
+      (a, b) =>
+        new Date(b.kickoffAt).getTime() - new Date(a.kickoffAt).getTime(),
+    )[0]!;
+    const reportingTeamId = reportingTeamIdForUser(anchor, user)!;
+    rows.push({
+      kind: 'crew',
+      match: anchor,
+      reportingTeamId,
+      existing: existingCoachFeedback(feedback, anchor, reportingTeamId),
+      tournamentTitle: anchor.title?.trim() || 'Tournament',
+    });
+  }
+
+  return rows.sort((a, b) =>
+    new Date(a.match.kickoffAt).getTime() -
+    new Date(b.match.kickoffAt).getTime(),
+  );
+}
+
+export function buildCoachFeedback(input: {
+  match: Match;
+  reportingTeamId: string;
+  reportingTeamName: string;
+  orgId: string;
+  user: UserProfile;
+  status: CoachFeedbackStatus;
+  action: CoachFeedbackEditAction;
+  existing?: CoachFeedback;
+  scales: Partial<Record<CoachFeedbackScaleKey, CoachFeedbackScaleValue>>;
+  commentsOnScores?: string;
+  areasDoneWell?: string;
+  areasToImprove?: string;
+  otherFeedback?: string;
+  otherCrewFeedback?: string;
+  videoLink?: string;
+  videoNotes?: string;
+  clubRole: string;
+  submitterPhone?: string;
+  contactAboutReport?: boolean;
+}): CoachFeedback {
+  const { match, reportingTeamId, reportingTeamName, user, status, action } =
+    input;
+  const scope = coachFeedbackScopeForMatch(match);
+  const now = new Date().toISOString();
+  const edit = {
+    at: now,
+    byUserId: user.uid,
+    byName: user.displayName,
+    action,
+  };
+  const mo =
+    scope === 'official' ? matchOfficialForFeedback(match) : null;
+  if (scope === 'official' && !mo) {
+    throw new Error('Match Official required for league feedback.');
+  }
+
+  return {
+    id: coachFeedbackDocId(match, reportingTeamId),
+    orgId: input.orgId,
+    feedbackScope: scope,
+    matchId: match.id,
+    slot: scope === 'crew' ? 'crew' : 'mo',
+    officialUserId: mo?.userId,
+    officialName: mo?.userName,
+    tournamentGroupKey:
+      scope === 'crew' ? tournamentGroupKeyFromMatch(match) : undefined,
+    tournamentTitle:
+      scope === 'crew' ? match.title?.trim() || 'Tournament' : undefined,
+    homeTeamId: match.homeTeamId,
+    homeTeamName: match.homeTeamName,
+    awayTeamId: match.awayTeamId,
+    awayTeamName: match.awayTeamName,
+    kickoffAt: match.kickoffAt,
+    competition: match.competition,
+    level: match.level,
+    score: scope === 'crew' ? '' : formatMatchScore(match),
+    scales: input.scales,
+    commentsOnScores: input.commentsOnScores,
+    areasDoneWell: input.areasDoneWell,
+    areasToImprove: input.areasToImprove,
+    otherFeedback: input.otherFeedback,
+    otherCrewFeedback: input.otherCrewFeedback,
+    videoLink: input.videoLink,
+    videoNotes: input.videoNotes,
+    submitterUserId: user.uid,
+    submitterName: user.displayName,
+    submitterEmail: user.email,
+    submitterPhone: input.submitterPhone,
+    clubRole: input.clubRole.trim(),
+    contactAboutReport: input.contactAboutReport === true,
+    reportingTeamId,
+    reportingTeamName,
+    status,
+    submittedAt:
+      status === 'submitted'
+        ? (input.existing?.submittedAt ?? now)
+        : input.existing?.submittedAt,
+    publicOnProfile:
+      scope === 'crew' ? false : input.existing?.publicOnProfile,
+    edits: appendCoachFeedbackEdit(input.existing?.edits, edit),
+    createdAt: input.existing?.createdAt ?? now,
+    updatedAt: now,
+  };
 }
 
 /** Card still needs attention (lit/warn) until submitted or declined. */

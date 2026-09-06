@@ -420,13 +420,15 @@ service cloud.firestore {
         function canReadPublishedFeedback() {
           return isMember(orgId)
             && resource.data.status == 'submitted'
-            && resource.data.get('publicOnProfile', false) == true;
+            && resource.data.get('publicOnProfile', false) == true
+            && resource.data.get('feedbackScope', 'official') == 'official';
         }
         function onlyPublishFlagChanged() {
           return request.resource.data.diff(resource.data).affectedKeys()
             .hasOnly(['publicOnProfile', 'updatedAt'])
             && request.resource.data.publicOnProfile is bool
-            && resource.data.status == 'submitted';
+            && resource.data.status == 'submitted'
+            && resource.data.get('feedbackScope', 'official') == 'official';
         }
         function publishFlagUnchanged() {
           return request.resource.data.get('publicOnProfile', false)
@@ -434,6 +436,9 @@ service cloud.firestore {
         }
         function matchPath() {
           return /databases/$(database)/documents/orgs/$(orgId)/matches/$(request.resource.data.matchId);
+        }
+        function coachFeedbackScope() {
+          return request.resource.data.get('feedbackScope', 'official');
         }
         function matchAllowsCoachFeedback() {
           return exists(matchPath())
@@ -443,20 +448,55 @@ service cloud.firestore {
             && !(get(matchPath()).data.status in ['cancelled', 'draft', 'postponed'])
             && crewVisible(get(matchPath()).data)
             && (
-              request.resource.data.reportingTeamId == get(matchPath()).data.homeTeamId
-              || request.resource.data.reportingTeamId == get(matchPath()).data.awayTeamId
+              (
+                coachFeedbackScope() == 'crew'
+                && get(matchPath()).data.get('isTournament', false) == true
+                && request.resource.data.reportingTeamId == get(matchPath()).data.homeTeamId
+              )
+              || (
+                coachFeedbackScope() == 'official'
+                && (
+                  request.resource.data.reportingTeamId == get(matchPath()).data.homeTeamId
+                  || request.resource.data.reportingTeamId == get(matchPath()).data.awayTeamId
+                )
+              )
             );
         }
         function coachFeedbackIdOk() {
           return request.resource.data.id == feedbackId
-            && feedbackId == request.resource.data.matchId + '_' + request.resource.data.reportingTeamId;
+            && (
+              (
+                coachFeedbackScope() == 'official'
+                && feedbackId == request.resource.data.matchId + '_' + request.resource.data.reportingTeamId
+              )
+              || (
+                coachFeedbackScope() == 'crew'
+                && feedbackId == request.resource.data.tournamentGroupKey + '_' + request.resource.data.reportingTeamId
+              )
+            );
         }
         function coachFeedbackStatusOk() {
           return request.resource.data.status in ['draft', 'submitted', 'declined'];
         }
+        function coachFeedbackOfficialShapeOk() {
+          return coachFeedbackScope() == 'official'
+            && request.resource.data.slot == 'mo'
+            && request.resource.data.officialUserId is string
+            && request.resource.data.officialUserId.size() > 0
+            && request.resource.data.officialName is string
+            && request.resource.data.officialName.size() > 0;
+        }
+        function coachFeedbackCrewShapeOk() {
+          return coachFeedbackScope() == 'crew'
+            && request.resource.data.slot == 'crew'
+            && request.resource.data.tournamentGroupKey is string
+            && request.resource.data.tournamentGroupKey.size() > 0
+            && request.resource.data.tournamentTitle is string
+            && request.resource.data.tournamentTitle.size() > 0;
+        }
         function coachFeedbackCreateShape() {
           return request.resource.data.keys().hasAll([
-            'id', 'orgId', 'matchId', 'slot', 'officialUserId', 'officialName',
+            'id', 'orgId', 'feedbackScope', 'matchId', 'slot',
             'homeTeamId', 'homeTeamName', 'awayTeamId', 'awayTeamName',
             'kickoffAt', 'level', 'score', 'scales', 'submitterUserId',
             'submitterName', 'submitterEmail', 'clubRole', 'reportingTeamId',
@@ -464,19 +504,29 @@ service cloud.firestore {
           ])
           && request.resource.data.orgId == orgId
           && coachFeedbackIdOk()
-          && request.resource.data.slot == 'mo'
           && coachFeedbackStatusOk()
           && request.resource.data.submitterUserId == request.auth.uid
-          && request.resource.data.officialUserId is string
-          && request.resource.data.officialUserId.size() > 0
-          && request.resource.data.officialName is string
-          && request.resource.data.officialName.size() > 0
           && request.resource.data.scales is map
           && matchAllowsCoachFeedback()
+          && (
+            coachFeedbackOfficialShapeOk()
+            || coachFeedbackCrewShapeOk()
+          )
           && (
             !request.resource.data.keys().hasAny(['publicOnProfile'])
             || request.resource.data.publicOnProfile == false
           );
+        }
+        function coachFeedbackUpdateShapeOk() {
+          return coachFeedbackStatusOk()
+            && request.resource.data.submitterUserId == request.auth.uid
+            && request.resource.data.scales is map
+            && matchAllowsCoachFeedback()
+            && publishFlagUnchanged()
+            && (
+              coachFeedbackOfficialShapeOk()
+              || coachFeedbackCrewShapeOk()
+            );
         }
         allow read: if canReadInsights(orgId)
           || canReadClubFeedback()
@@ -497,12 +547,7 @@ service cloud.firestore {
               && resource.data.orgId == request.resource.data.orgId
               && resource.data.id == request.resource.data.id
               && coachFeedbackIdOk()
-              && request.resource.data.slot == 'mo'
-              && coachFeedbackStatusOk()
-              && request.resource.data.submitterUserId == request.auth.uid
-              && request.resource.data.scales is map
-              && matchAllowsCoachFeedback()
-              && publishFlagUnchanged()
+              && coachFeedbackUpdateShapeOk()
             )
           );
         allow delete: if isAssigner(orgId);

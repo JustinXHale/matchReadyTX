@@ -1,18 +1,38 @@
 import { describe, expect, it } from 'vitest';
 import {
-  isTournamentMatchLevel,
+  isTournamentMatch,
   isValidScheduleUrl,
   normalizeScheduleUrl,
   validateScheduleUrlInput,
 } from './matchScheduleUrl';
+import type { Match } from './types';
+
+function match(partial: Partial<Match>): Match {
+  return {
+    id: 'm1',
+    sheetRowKey: 'm1',
+    status: 'locked_confirmed',
+    kickoffAt: '2026-09-01T14:00:00.000Z',
+    venueName: 'Field',
+    venueAddress: 'Austin, TX',
+    homeTeamId: 'h',
+    awayTeamId: 'a',
+    homeTeamName: 'Home',
+    awayTeamName: 'Away',
+    level: 'D1',
+    gender: 'men',
+    flightProvided: false,
+    housingProvided: false,
+    crew: { mo: [], ar1: [], ar2: [], no4: [] },
+    ...partial,
+  };
+}
 
 describe('matchScheduleUrl', () => {
-  it('detects tournament match levels', () => {
-    expect(isTournamentMatchLevel('Tourney')).toBe(true);
-    expect(isTournamentMatchLevel('7s')).toBe(true);
-    expect(isTournamentMatchLevel('Spring Tournament')).toBe(true);
-    expect(isTournamentMatchLevel('D1')).toBe(false);
-    expect(isTournamentMatchLevel(undefined)).toBe(false);
+  it('detects tournament events from isTournament flag', () => {
+    expect(isTournamentMatch({ isTournament: true })).toBe(true);
+    expect(isTournamentMatch(match({ level: 'Tourney' }))).toBe(false);
+    expect(isTournamentMatch(match({}))).toBe(false);
   });
 
   it('normalizes empty input to undefined', () => {

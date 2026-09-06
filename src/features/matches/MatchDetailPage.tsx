@@ -20,6 +20,7 @@ import {
 } from '@patternfly/react-core';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faPen } from '@fortawesome/free-solid-svg-icons';
+import { MatchCrewReportStatusPanel } from '@/features/matches/MatchCrewReportStatusPanel';
 import { canSeeMatchFees } from '@/domain/visibility';
 import { roleHomeBack, useApp } from '@/app/AppContext';
 import { statusLabel } from '@/domain/matchTransitions';
@@ -74,10 +75,10 @@ import {
 } from '@/domain/requests';
 import { openGroupMailto, uniqueEmails } from '@/services/mailto';
 import { persistCrewAssignmentAndEmail, persistCrewUnassignmentAndEmail, resendCrewAssignmentEmail } from '@/services/liveAssignment';
-import { defaultOrgId, clearMatchForfeitInFirestore, createGameRequestInFirestore, patchGameRequestContentInFirestore, saveMatchCrewAssignment, saveMatchForfeitInFirestore, saveMatchPlayedForfeitInFirestore, saveMatchScheduleUrlInFirestore, callMatchSelfService } from '@/services/orgData';
+import { defaultOrgId, clearMatchForfeitInFirestore, createGameRequestInFirestore, patchGameRequestContentInFirestore, saveMatchCrewAssignment, saveMatchEventFlagsInFirestore, saveMatchForfeitInFirestore, saveMatchPlayedForfeitInFirestore, saveMatchScheduleUrlInFirestore, callMatchSelfService } from '@/services/orgData';
 import { isFirebaseConfigured } from '@/services/firebase';
 import {
-  isTournamentMatchLevel,
+  isTournamentMatch,
   validateScheduleUrlInput,
 } from '@/domain/matchScheduleUrl';
 import { backState, useAppBack } from '@/nav/backNav';
@@ -273,6 +274,7 @@ export function MatchDetailPage() {
   const [selfServiceBusy, setSelfServiceBusy] = useState(false);
   const [scheduleUrlDraft, setScheduleUrlDraft] = useState('');
   const [scheduleUrlError, setScheduleUrlError] = useState('');
+  const [titleDraft, setTitleDraft] = useState('');
   const requestSectionRef = useRef<HTMLElement | null>(null);
   const titleRowRef = useRef<HTMLDivElement | null>(null);
 
@@ -284,6 +286,10 @@ export function MatchDetailPage() {
     setScheduleUrlDraft(match?.scheduleUrl ?? '');
     setScheduleUrlError('');
   }, [id, match?.scheduleUrl]);
+
+  useEffect(() => {
+    setTitleDraft(match?.title ?? '');
+  }, [id, match?.title]);
 
   const persistScheduleUrl = useCallback(
     (raw: string) => {
@@ -473,7 +479,7 @@ export function MatchDetailPage() {
   }
 
   const isAssigner = isAssignerView;
-  const showTournamentSchedule = isTournamentMatchLevel(match.level);
+  const showTournamentSchedule = isTournamentMatch(match);
   const showMatchEconomics = canSeeMatchFees({
     hasAssignerRole,
     isAssignerView,
@@ -1331,12 +1337,54 @@ export function MatchDetailPage() {
         )}
       </div>
 
-      {match.title?.trim() ? (
+      {isAssigner ? (
+        <FormGroup fieldId="match-event-title" label="Event title">
+          <TextInput
+            id="match-event-title"
+            value={titleDraft}
+            onChange={(_e, v) => setTitleDraft(v)}
+            onBlur={() => {
+              const next = titleDraft.trim() || undefined;
+              if ((match.title ?? '') === (next ?? '')) return;
+              store.setMatchFlags(match.id, { title: next });
+              if (dataMode === 'live' && isFirebaseConfigured) {
+                void saveMatchEventFlagsInFirestore(defaultOrgId(), match.id, {
+                  isTournament: match.isTournament === true,
+                  title: next ?? null,
+                }).catch((err) => {
+                  console.error('saveMatchEventFlagsInFirestore failed', err);
+                });
+              }
+            }}
+            placeholder="Tournament or event name (groups coach feedback)"
+            aria-label="Event title"
+          />
+        </FormGroup>
+      ) : match.title?.trim() ? (
         <p className="rs-detail__event-title">{match.title.trim()}</p>
       ) : null}
 
       {isAssigner ? (
         <div className="rs-detail__top-chips" aria-label="Match division">
+          <label className="rs-filter-chip rs-filter-chip--toggle">
+            <input
+              type="checkbox"
+              checked={match.isTournament === true}
+              onChange={(e) => {
+                const checked = e.target.checked;
+                store.setMatchFlags(match.id, { isTournament: checked });
+                if (dataMode === 'live' && isFirebaseConfigured) {
+                  void saveMatchEventFlagsInFirestore(defaultOrgId(), match.id, {
+                    isTournament: checked,
+                    title: match.title ?? null,
+                  }).catch((err) => {
+                    console.error('saveMatchEventFlagsInFirestore failed', err);
+                  });
+                }
+              }}
+            />
+            Tournament event
+          </label>
           <div
             className="rs-slot-picker"
             role="radiogroup"
@@ -1392,6 +1440,9 @@ export function MatchDetailPage() {
             {genderLabel(match.gender)}
           </span>
           <span className="rs-pill rs-pill--ink">{match.level}</span>
+          {match.isTournament ? (
+            <span className="rs-pill rs-pill--quiet">Tournament</span>
+          ) : null}
           {match.matchType?.trim() ? (
             <span className="rs-pill rs-pill--quiet">{match.matchType.trim()}</span>
           ) : null}
@@ -2420,6 +2471,15 @@ export function MatchDetailPage() {
           </>
         )}
       </section>
+
+      {isAssigner && (
+        <MatchCrewReportStatusPanel
+          match={match}
+          users={state.users}
+          matchReports={state.matchReports}
+          cardReports={state.cardReports}
+        />
+      )}
 
       {isAssigner && (
         <section className="rs-detail-card">

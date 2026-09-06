@@ -262,6 +262,11 @@ const SchedulerFeedbackPage = lazy(() =>
     default: m.SchedulerFeedbackPage,
   })),
 );
+const SchedulerMatchReportsPage = lazy(() =>
+  import('@/features/scheduler/reports/SchedulerMatchReportsPage').then(
+    (m) => ({ default: m.SchedulerMatchReportsPage }),
+  ),
+);
 const SchedulerFeedbackDetailPage = lazy(() =>
   import('@/features/scheduler/feedback/SchedulerFeedbackDetailPage').then(
     (m) => ({ default: m.SchedulerFeedbackDetailPage }),
@@ -745,6 +750,7 @@ function FeatureRoutes() {
           <Route path="crew" element={<SchedulerCrewDefaultsPage />} />
         </Route>
         <Route path="queues/*" element={<SchedulerQueuesLegacyRedirect />} />
+        <Route path="reports" element={<SchedulerMatchReportsPage />} />
         <Route path="feedback" element={<SchedulerFeedbackPage />} />
         <Route
           path="feedback/:feedbackId"

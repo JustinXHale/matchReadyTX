@@ -21,6 +21,7 @@ function baseCoach(
   return {
     id: 'm1_team',
     orgId: 'lonestar',
+    feedbackScope: 'official',
     matchId: 'm1',
     slot: 'mo',
     officialUserId: 'u1',

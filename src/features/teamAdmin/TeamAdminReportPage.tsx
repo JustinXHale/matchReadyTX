@@ -4,14 +4,10 @@ import { Link } from 'react-router-dom';
 import { useApp, useAppHref } from '@/app/AppContext';
 import {
   COACH_FEEDBACK_SCALE_LABELS,
-  appendCoachFeedbackEdit,
+  buildCoachFeedback,
   coachFeedbackDocId,
+  coachFeedbackListRows,
   coachFeedbackNeedsAttention,
-  existingCoachFeedback,
-  formatMatchScore,
-  isMatchEligibleForCoachFeedback,
-  matchOfficialForFeedback,
-  reportingTeamIdForUser,
   type CoachFeedback,
 } from '@/domain/coachFeedback';
 import { matchesForUser } from '@/domain/visibility';
@@ -66,19 +62,11 @@ export function TeamAdminReportPage() {
   const rows = useMemo(() => {
     if (!currentUser) return [];
     const visible = matchesForUser(state.matches, currentUser, 'teamAdmin');
-    return visible
-      .filter((m) => isMatchEligibleForCoachFeedback(m, currentUser))
-      .map((match) => {
-        const reportingTeamId = reportingTeamIdForUser(match, currentUser)!;
-        const existing = existingCoachFeedback(
-          state.coachFeedback,
-          match.id,
-          reportingTeamId,
-        );
-        const mo = matchOfficialForFeedback(match);
-        return { match, reportingTeamId, existing, mo };
-      })
-      .sort((a, b) => compareKickoffAsc(a.match, b.match));
+    return coachFeedbackListRows(
+      visible,
+      currentUser,
+      state.coachFeedback,
+    ).sort((a, b) => compareKickoffAsc(a.match, b.match));
   }, [currentUser, state.matches, state.coachFeedback]);
 
   const filterOptions = useMemo(
@@ -153,64 +141,29 @@ export function TeamAdminReportPage() {
     if (!currentUser) return;
     const match = state.matches.find((m) => m.id === matchId);
     if (!match) return;
-    const mo = matchOfficialForFeedback(match);
-    if (!mo) return;
     const reportingTeamName =
       reportingTeamId === match.homeTeamId
         ? match.homeTeamName
         : match.awayTeamName;
-    const existing = existingCoachFeedback(
-      state.coachFeedback,
-      matchId,
-      reportingTeamId,
-    );
+    const existing = rows.find(
+      (r) => r.match.id === matchId && r.reportingTeamId === reportingTeamId,
+    )?.existing;
     if (existing?.status === 'submitted') return;
 
-    const now = new Date().toISOString();
-    const edit = {
-      at: now,
-      byUserId: currentUser.uid,
-      byName: currentUser.displayName,
-      action: 'decline' as const,
-    };
-    const feedback: CoachFeedback = {
-      id: coachFeedbackDocId(matchId, reportingTeamId),
-      orgId: dataMode === 'live' ? defaultOrgId() : state.org.id,
-      matchId,
-      slot: 'mo',
-      officialUserId: mo.userId,
-      officialName: mo.userName,
-      homeTeamId: match.homeTeamId,
-      homeTeamName: match.homeTeamName,
-      awayTeamId: match.awayTeamId,
-      awayTeamName: match.awayTeamName,
-      kickoffAt: match.kickoffAt,
-      competition: match.competition,
-      level: match.level,
-      score: formatMatchScore(match),
-      scales: existing?.scales ?? {},
-      commentsOnScores: existing?.commentsOnScores,
-      areasDoneWell: existing?.areasDoneWell,
-      areasToImprove: existing?.areasToImprove,
-      otherFeedback: existing?.otherFeedback,
-      videoLink: existing?.videoLink,
-      videoNotes: existing?.videoNotes,
-      otherCrewFeedback: existing?.otherCrewFeedback,
-      submitterUserId: currentUser.uid,
-      submitterName: currentUser.displayName,
-      submitterEmail: currentUser.email,
-      submitterPhone: existing?.submitterPhone ?? currentUser.phone,
-      clubRole: existing?.clubRole ?? '',
-      contactAboutReport: existing?.contactAboutReport === true,
+    const feedback = buildCoachFeedback({
+      match,
       reportingTeamId,
       reportingTeamName,
+      orgId: dataMode === 'live' ? defaultOrgId() : state.org.id,
+      user: currentUser,
       status: 'declined',
-      submittedAt: existing?.submittedAt,
-      publicOnProfile: existing?.publicOnProfile,
-      edits: appendCoachFeedbackEdit(existing?.edits, edit),
-      createdAt: existing?.createdAt ?? now,
-      updatedAt: now,
-    };
+      action: 'decline',
+      existing,
+      scales: existing?.scales ?? {},
+      clubRole: existing?.clubRole ?? '',
+      submitterPhone: existing?.submitterPhone ?? currentUser.phone,
+      contactAboutReport: existing?.contactAboutReport,
+    });
 
     setBusyId(feedback.id);
     try {
@@ -242,10 +195,9 @@ export function TeamAdminReportPage() {
         Referee feedback
       </Title>
       <p className="rs-match-card__meta">
-        Optional reports on the Match Official after a game. Only the Scheduler
-        reviews these — referees do not see them. Leaving feedback helps the
-        society spot trends and coaching needs. Home and away sides each leave
-        their own report.
+        Optional reports after a game. League matches rate the Match Official.
+        Tournament events (host club only) rate the referee crew for the whole
+        event. Only the Scheduler reviews these — referees do not see them.
       </p>
 
       {myTeams.length > 1 && (
@@ -315,8 +267,8 @@ export function TeamAdminReportPage() {
         rows.length === 0 ? (
           <EmptyState titleText="No games to report yet" headingLevel="h3">
             <EmptyStateBody>
-              After a past match with a confirmed Match Official, it will show
-              up here for optional feedback.
+              After a past match with assigned officials, it will show up here
+              for optional feedback.
             </EmptyStateBody>
           </EmptyState>
         ) : (
@@ -328,14 +280,16 @@ export function TeamAdminReportPage() {
         )
       ) : (
         <div className="rs-stack">
-          {filtered.map(({ match, reportingTeamId, existing, mo }) => {
+          {filtered.map((row) => {
+            const { match, reportingTeamId, existing } = row;
             const needs = coachFeedbackNeedsAttention(existing);
             const canDecline =
               existing?.status !== 'submitted' && existing?.status !== 'declined';
             const formHref = `${reportBase}/${match.id}`;
+            const docId = coachFeedbackDocId(match, reportingTeamId);
             return (
               <MatchListRow
-                key={`${match.id}_${reportingTeamId}`}
+                key={docId}
                 match={match}
                 to={formHref}
                 split="action"
@@ -351,20 +305,21 @@ export function TeamAdminReportPage() {
                       >
                         {statusLabel(existing)}
                       </span>
-                      {mo ? (
+                      {row.kind === 'crew' ? (
                         <span className="rs-coach-feedback-trailing__mo">
-                          MO {mo.userName}
+                          Referee crew · {row.tournamentTitle}
                         </span>
-                      ) : null}
+                      ) : (
+                        <span className="rs-coach-feedback-trailing__mo">
+                          MO {row.mo.userName}
+                        </span>
+                      )}
                     </Link>
                     {canDecline ? (
                       <button
                         type="button"
                         className="rs-coach-feedback-decline"
-                        disabled={
-                          busyId ===
-                          coachFeedbackDocId(match.id, reportingTeamId)
-                        }
+                        disabled={busyId === docId}
                         onClick={() =>
                           void onDecline(match.id, reportingTeamId)
                         }

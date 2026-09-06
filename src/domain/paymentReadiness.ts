@@ -94,18 +94,40 @@ function cmoReportsComplete(
   });
 }
 
-function reportsCompleteForSlot(
+export interface SlotReportStatus {
+  /** Whether required match/coaching reports are in — gates payout. Card reports do not. */
+  payReady: boolean;
+  matchReportRequired: boolean;
+  matchReportSubmitted: boolean;
+  cardReportRequired: boolean;
+  cardReportSubmitted: boolean;
+}
+
+function slotReportStatus(
   match: Match,
   officialId: string,
   slot: RequestableSlot,
   reports: MatchReport[],
   cardReports: CardReport[],
-): { complete: boolean; cardRequired: boolean; cardSubmitted: boolean } {
-  if (slot === 'cmo') {
+): SlotReportStatus {
+  if (slot === 'no4') {
     return {
-      complete: cmoReportsComplete(match, officialId, reports),
-      cardRequired: false,
-      cardSubmitted: true,
+      payReady: true,
+      matchReportRequired: false,
+      matchReportSubmitted: true,
+      cardReportRequired: false,
+      cardReportSubmitted: true,
+    };
+  }
+
+  if (slot === 'cmo') {
+    const complete = cmoReportsComplete(match, officialId, reports);
+    return {
+      payReady: complete,
+      matchReportRequired: true,
+      matchReportSubmitted: complete,
+      cardReportRequired: false,
+      cardReportSubmitted: true,
     };
   }
 
@@ -113,9 +135,11 @@ function reportsCompleteForSlot(
   const matchSubmitted = matchReport?.status === 'submitted';
   if (slot !== 'mo') {
     return {
-      complete: matchSubmitted,
-      cardRequired: false,
-      cardSubmitted: true,
+      payReady: matchSubmitted,
+      matchReportRequired: true,
+      matchReportSubmitted: matchSubmitted,
+      cardReportRequired: false,
+      cardReportSubmitted: true,
     };
   }
 
@@ -130,10 +154,139 @@ function reportsCompleteForSlot(
     : true;
 
   return {
-    complete: matchSubmitted && cardSubmitted,
-    cardRequired,
-    cardSubmitted,
+    payReady: matchSubmitted,
+    matchReportRequired: true,
+    matchReportSubmitted: matchSubmitted,
+    cardReportRequired: cardRequired,
+    cardReportSubmitted: cardSubmitted,
   };
+}
+
+export interface AssigneeReportStatusRow {
+  officialId: string;
+  officialName: string;
+  slot: RequestableSlot;
+  matchReportRequired: boolean;
+  matchReportSubmitted: boolean;
+  cardReportRequired: boolean;
+  cardReportSubmitted: boolean;
+  payReady: boolean;
+  /** First submitted CMO report — used for view links when multiple MO subjects exist. */
+  cmoSubjectOfficialId?: string;
+}
+
+export function assigneeReportStatusesForMatch(
+  match: Match,
+  users: UserProfile[],
+  matchReports: MatchReport[],
+  cardReports: CardReport[],
+  now?: number,
+): AssigneeReportStatusRow[] {
+  const syncedReports = syncPendingMatchReports(
+    [match],
+    matchReports,
+    now ?? Date.now(),
+  );
+  const userById = new Map(users.map((u) => [u.uid, u]));
+
+  return collectAssignments(match).map((a) => {
+    const status = slotReportStatus(
+      match,
+      a.userId,
+      a.slot,
+      syncedReports,
+      cardReports,
+    );
+    const user = userById.get(a.userId);
+    let cmoSubjectOfficialId: string | undefined;
+    if (a.slot === 'cmo' && status.matchReportSubmitted) {
+      const submitted = syncedReports.find(
+        (r) =>
+          r.matchId === match.id &&
+          r.officialId === a.userId &&
+          r.slot === 'cmo' &&
+          r.status === 'submitted',
+      );
+      cmoSubjectOfficialId = submitted?.subjectOfficialId;
+    }
+    return {
+      officialId: a.userId,
+      officialName: user?.displayName ?? a.userName,
+      slot: a.slot,
+      ...status,
+      cmoSubjectOfficialId,
+    };
+  });
+}
+
+export interface MatchCrewReportSummary {
+  assignedCount: number;
+  pendingMatchReports: number;
+  pendingCardReports: number;
+  completeMatchReports: number;
+  allMatchReportsIn: boolean;
+}
+
+export function matchCrewReportSummary(
+  match: Match,
+  users: UserProfile[],
+  matchReports: MatchReport[],
+  cardReports: CardReport[],
+  now?: number,
+): MatchCrewReportSummary | null {
+  const rows = assigneeReportStatusesForMatch(
+    match,
+    users,
+    matchReports,
+    cardReports,
+    now,
+  ).filter((r) => r.officialId);
+  if (rows.length === 0) return null;
+
+  let pendingMatchReports = 0;
+  let pendingCardReports = 0;
+  let completeMatchReports = 0;
+  for (const row of rows) {
+    if (row.matchReportRequired) {
+      if (row.matchReportSubmitted) completeMatchReports++;
+      else pendingMatchReports++;
+    }
+    if (row.cardReportRequired && !row.cardReportSubmitted) {
+      pendingCardReports++;
+    }
+  }
+
+  return {
+    assignedCount: rows.length,
+    pendingMatchReports,
+    pendingCardReports,
+    completeMatchReports,
+    allMatchReportsIn: pendingMatchReports === 0,
+  };
+}
+
+export function countSchedulerMatchesWithPendingReports(
+  matches: Match[],
+  users: UserProfile[],
+  matchReports: MatchReport[],
+  cardReports: CardReport[],
+  now?: number,
+): number {
+  const t = now ?? Date.now();
+  let count = 0;
+  for (const match of matches) {
+    if (match.status === 'cancelled' || match.status === 'draft') continue;
+    if (!isPastKickoff(match.kickoffAt, t)) continue;
+    const summary = matchCrewReportSummary(
+      match,
+      users,
+      matchReports,
+      cardReports,
+      t,
+    );
+    if (summary && summary.pendingMatchReports > 0) count++;
+  }
+  return count;
 }
 
 function collectAssignments(match: Match): {
@@ -212,7 +365,7 @@ export function buildAssignmentPayableRows(
 
       const id = officialPaymentDocId(match.id, a.userId, slot);
       const payment = paymentById.get(id);
-      const reportStatus = reportsCompleteForSlot(
+      const reportStatus = slotReportStatus(
         match,
         a.userId,
         slot,
@@ -225,18 +378,11 @@ export function buildAssignmentPayableRows(
         readiness = 'paid';
       } else if (!isPastKickoff(match.kickoffAt, now)) {
         readiness = 'not_played';
-      } else if (reportStatus.complete) {
+      } else if (reportStatus.payReady) {
         readiness = 'ready_to_pay';
       } else {
         readiness = 'reports_pending';
       }
-
-      const matchReport = findMatchReport(
-        syncedReports,
-        match.id,
-        a.userId,
-        slot,
-      );
 
       rows.push({
         id,
@@ -251,9 +397,9 @@ export function buildAssignmentPayableRows(
         slot,
         payoutFee: economics.fee,
         mileagePay: economics.mileagePay,
-        matchReportSubmitted: matchReport?.status === 'submitted',
-        cardReportSubmitted: reportStatus.cardSubmitted,
-        cardReportRequired: reportStatus.cardRequired,
+        matchReportSubmitted: reportStatus.matchReportSubmitted,
+        cardReportSubmitted: reportStatus.cardReportSubmitted,
+        cardReportRequired: reportStatus.cardReportRequired,
         readiness,
         payment,
         defaultPaymentContact: user?.email?.trim() || user?.phone?.trim() || '',

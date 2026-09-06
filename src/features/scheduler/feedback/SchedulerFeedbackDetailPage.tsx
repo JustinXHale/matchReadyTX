@@ -140,7 +140,11 @@ export function SchedulerFeedbackDetailPage() {
   const officialHref = feedback.officialUserId
     ? `${memberBase}/${feedback.officialUserId}`
     : null;
-  const canPublish = isAssignerView && hasAssignerRole;
+  const canPublish =
+    isAssignerView &&
+    hasAssignerRole &&
+    feedback.feedbackScope !== 'crew' &&
+    Boolean(feedback.officialUserId);
   const onProfile = feedback.publicOnProfile === true;
 
   const setPublished = async (next: boolean) => {
@@ -183,11 +187,19 @@ export function SchedulerFeedbackDetailPage() {
         Coach feedback
       </Title>
       <p className="rs-match-card__meta">
-        Match Official:{' '}
-        {officialHref ? (
-          <Link to={officialHref}>{feedback.officialName}</Link>
+        {feedback.feedbackScope === 'crew' ? (
+          <>
+            Referee crew · {feedback.tournamentTitle ?? 'Tournament'}
+          </>
         ) : (
-          feedback.officialName
+          <>
+            Match Official:{' '}
+            {officialHref ? (
+              <Link to={officialHref}>{feedback.officialName}</Link>
+            ) : (
+              feedback.officialName
+            )}
+          </>
         )}{' '}
         · Reporting as {feedback.reportingTeamName}
         {avg != null ? ` · Avg ${Number.isInteger(avg) ? avg : avg.toFixed(1)}` : ''}

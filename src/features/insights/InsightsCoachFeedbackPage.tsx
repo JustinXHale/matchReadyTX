@@ -10,7 +10,7 @@ import {
 } from '@patternfly/react-core';
 import { Link } from 'react-router-dom';
 import { useApp, useAppHref } from '@/app/AppContext';
-import { coachFeedbackAverage } from '@/domain/coachFeedback';
+import { coachFeedbackAverage, isCrewScopeCoachFeedback } from '@/domain/coachFeedback';
 import { formatInsightsAvg } from '@/features/insights/insightsFormat';
 import { InsightsReportTrailing } from '@/features/insights/InsightsReportTrailing';
 import { MatchListRow } from '@/ui/MatchListRow';
@@ -143,17 +143,24 @@ export function InsightsCoachFeedbackPage() {
             const officialHref = f.officialUserId
               ? `${memberBase}/${f.officialUserId}`
               : null;
+            const isCrew = isCrewScopeCoachFeedback(f);
             const meta = (
               <span className="rs-match-card__meta">
                 {f.reportingTeamName} · {f.submitterName}
                 {f.clubRole ? ` · ${f.clubRole}` : ''}
+                {isCrew ? ' · Tournament crew' : ''}
               </span>
             );
             const trailing = (
               <InsightsReportTrailing
                 score={avg != null ? formatAvg(avg) : '—'}
-                officialName={f.officialName}
-                officialHref={officialHref ?? undefined}
+                officialName={
+                  isCrew
+                    ? (f.tournamentTitle ?? 'Tournament')
+                    : (f.officialName ?? 'Official')
+                }
+                officialHref={isCrew ? undefined : (officialHref ?? undefined)}
+                namePrefix={isCrew ? 'Crew' : 'MO'}
               />
             );
 

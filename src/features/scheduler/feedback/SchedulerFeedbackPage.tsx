@@ -2,7 +2,7 @@ import { useMemo } from 'react';
 import { EmptyState, EmptyStateBody, Title } from '@patternfly/react-core';
 import { Link } from 'react-router-dom';
 import { useApp, useAppHref } from '@/app/AppContext';
-import { coachFeedbackAverage } from '@/domain/coachFeedback';
+import { coachFeedbackAverage, isCrewScopeCoachFeedback } from '@/domain/coachFeedback';
 import { MatchListRow } from '@/ui/MatchListRow';
 
 function formatAvg(avg: number): string {
@@ -42,8 +42,8 @@ export function SchedulerFeedbackPage() {
         Coach feedback
       </Title>
       <p className="rs-match-card__meta">
-        Confidential Team Admin reports on Match Officials. Officials cannot
-        see these. Drafts and declines stay with the club until submitted. The
+        Confidential Team Admin reports on Match Officials and tournament
+        referee crews. Officials cannot see these. Drafts and declines stay with the club until submitted. The
         score on each card is the average of all ratings (1–5).
       </p>
 
@@ -62,10 +62,12 @@ export function SchedulerFeedbackPage() {
             const officialHref = f.officialUserId
               ? `${memberBase}/${f.officialUserId}`
               : null;
+            const isCrew = isCrewScopeCoachFeedback(f);
             const meta = (
               <span className="rs-match-card__meta">
                 {f.reportingTeamName} · {f.submitterName}
                 {f.clubRole ? ` · ${f.clubRole}` : ''}
+                {isCrew ? ' · Tournament crew' : ''}
               </span>
             );
             const trailing = (
@@ -73,7 +75,11 @@ export function SchedulerFeedbackPage() {
                 <span className="rs-pill">
                   {avg != null ? formatAvg(avg) : '—'}
                 </span>
-                {officialHref ? (
+                {isCrew ? (
+                  <span className="rs-coach-feedback-trailing__mo">
+                    Crew · {f.tournamentTitle ?? 'Tournament'}
+                  </span>
+                ) : officialHref ? (
                   <Link
                     to={officialHref}
                     className="rs-coach-feedback-trailing__mo"

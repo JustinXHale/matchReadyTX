@@ -23,7 +23,7 @@ import {
   type ReportFormKind,
 } from '@/domain/reports';
 import { backState, useAppBack } from '@/nav/backNav';
-import { isTournamentMatchLevel } from '@/domain/matchScheduleUrl';
+import { isTournamentMatch } from '@/domain/matchScheduleUrl';
 import {
   cardReportPath,
   MATCH_REPORTS_BACK,
@@ -107,7 +107,7 @@ export function MatchReportFlowPage() {
   const [awayYellow, setAwayYellow] = useState('0');
   const [awayRed, setAwayRed] = useState('0');
   const [isTournament, setIsTournament] = useState(() =>
-    match ? isTournamentMatchLevel(match.level) : false,
+    match ? isTournamentMatch(match) : false,
   );
   const [lightFeedback, setLightFeedback] = useState('');
   const [crewAttendance, setCrewAttendance] = useState<CrewAttendanceEntry[]>(
@@ -126,7 +126,7 @@ export function MatchReportFlowPage() {
   useEffect(() => {
     if (!match) return;
     setCrewAttendance(crewForAttendance(match));
-    setIsTournament(isTournamentMatchLevel(match.level));
+    setIsTournament(isTournamentMatch(match));
   }, [match?.id]);
 
   const [crewIssuesNote, setCrewIssuesNote] = useState('');

@@ -67,6 +67,8 @@ import { buildAssignmentPayableRows } from '@/domain/paymentReadiness';
 import { matchFromFixtureRequest, newAppMatchId } from '@/domain/fixtureRequests';
 import {
   coachFeedbackDocId,
+  coachFeedbackScopeForMatch,
+  tournamentGroupKeyFromMatch,
   type CoachFeedback,
   type CoachFeedbackScaleKey,
   type CoachFeedbackScaleValue,
@@ -1421,7 +1423,9 @@ function seedMatches(): Match[] {
     homeTeamName: 'Austin RFC',
     awayTeamName: 'Dallas RFC',
     competition: 'Club',
-    level: 'Tourney',
+    level: 'D1',
+    isTournament: true,
+    title: '7s tournament day',
     gender: 'men',
     flightProvided: false,
     housingProvided: false,
@@ -1539,9 +1543,10 @@ function seedMatches(): Match[] {
   return all.map((m) => ({
     ...m,
     competition: competitionForGender(m.gender),
-    title: demoTitles[m.id],
-    level:
-      m.id === 'm_a08' || m.id === 'm_res03' ? 'Tourney' : m.level,
+    title: demoTitles[m.id] ?? m.title,
+    level: m.id === 'm_res03' ? 'Exhibition' : m.level,
+    isTournament:
+      m.isTournament === true || m.id === 'm_a08' || m.id === 'm_res_tourney',
     scheduleUrl: demoScheduleUrls[m.id],
   }));
 }
@@ -1733,7 +1738,8 @@ function seedCoachFeedback(matches: Match[]): CoachFeedback[] {
     },
   ): CoachFeedback | null => {
     const mo = crewPeople(match.crew.mo).find((a) => a.userId && a.userName);
-    if (!mo?.userId || !mo.userName) return null;
+    const scope = coachFeedbackScopeForMatch(match);
+    if (scope === 'official' && (!mo?.userId || !mo.userName)) return null;
     const reportingTeamName =
       reportingTeamId === match.homeTeamId
         ? match.homeTeamName
@@ -1744,12 +1750,17 @@ function seedCoachFeedback(matches: Match[]): CoachFeedback[] {
     const lastEdit = opts.edits?.[opts.edits.length - 1];
     const firstSubmit = opts.edits?.find((e) => e.action === 'submit');
     return {
-      id: coachFeedbackDocId(match.id, reportingTeamId),
+      id: coachFeedbackDocId(match, reportingTeamId),
       orgId: 'demo-org',
+      feedbackScope: scope,
       matchId: match.id,
-      slot: 'mo',
-      officialUserId: mo.userId,
-      officialName: mo.userName,
+      slot: scope === 'crew' ? 'crew' : 'mo',
+      officialUserId: mo?.userId,
+      officialName: mo?.userName,
+      tournamentGroupKey:
+        scope === 'crew' ? tournamentGroupKeyFromMatch(match) : undefined,
+      tournamentTitle:
+        scope === 'crew' ? match.title?.trim() || 'Tournament' : undefined,
       homeTeamId: match.homeTeamId,
       homeTeamName: match.homeTeamName,
       awayTeamId: match.awayTeamId,
@@ -1757,7 +1768,7 @@ function seedCoachFeedback(matches: Match[]): CoachFeedback[] {
       kickoffAt: match.kickoffAt,
       competition: match.competition,
       level: match.level,
-      score: `${match.homeScore ?? 0}–${match.awayScore ?? 0}`,
+      score: scope === 'crew' ? '' : `${match.homeScore ?? 0}–${match.awayScore ?? 0}`,
       scales: opts.scales,
       commentsOnScores: opts.commentsOnScores,
       areasDoneWell: opts.areasDoneWell,
@@ -2035,7 +2046,7 @@ function seedCoachFeedback(matches: Match[]): CoachFeedback[] {
   for (let i = 0; i < extraInsightMatches.length; i += 1) {
     const match = extraInsightMatches[i];
     const reportingTeamId = match.homeTeamId;
-    const docId = coachFeedbackDocId(match.id, reportingTeamId);
+    const docId = coachFeedbackDocId(match, reportingTeamId);
     if (out.some((f) => f.id === docId)) continue;
     const submitter =
       reportingTeamId === 'team_austin'
@@ -2311,7 +2322,7 @@ function seedMatchReports(matches: Match[]): MatchReport[] {
           ? {
               homePoints: match.homeScore ?? 0,
               awayPoints: match.awayScore ?? 0,
-              yellowCards: 0,
+              yellowCards: 1,
               redCards: 0,
               lightFeedback: 'Finance demo — ready for payout.',
             }
@@ -4554,6 +4565,8 @@ class DemoStore {
         | 'gender'
         | 'notes'
         | 'scheduleUrl'
+        | 'isTournament'
+        | 'title'
         | 'playedForfeit'
         | 'forfeitTeamId'
         | 'homeScore'
@@ -4851,26 +4864,32 @@ class DemoStore {
     const user = this.state.users.find((u) => u.uid === feedback.submitterUserId);
     if (!user || !user.roles.includes('teamAdmin')) return null;
     if (!user.teamIds.includes(feedback.reportingTeamId)) return null;
+    const match = this.state.matches.find((m) => m.id === feedback.matchId);
+    if (!match) return null;
     if (
+      feedback.feedbackScope === 'crew' &&
+      feedback.reportingTeamId !== match.homeTeamId
+    ) {
+      return null;
+    }
+    if (
+      feedback.feedbackScope !== 'crew' &&
       feedback.reportingTeamId !== feedback.homeTeamId &&
       feedback.reportingTeamId !== feedback.awayTeamId
     ) {
       return null;
     }
-    const match = this.state.matches.find((m) => m.id === feedback.matchId);
-    if (!match) return null;
-    const expectedId = coachFeedbackDocId(
-      feedback.matchId,
-      feedback.reportingTeamId,
-    );
+    const expectedId = coachFeedbackDocId(match, feedback.reportingTeamId);
     if (feedback.id !== expectedId) return null;
 
     const existing = this.state.coachFeedback.find((f) => f.id === feedback.id);
 
     const next: CoachFeedback = {
       ...feedback,
-      slot: 'mo',
-      publicOnProfile: existing?.publicOnProfile,
+      publicOnProfile:
+        feedback.feedbackScope === 'crew'
+          ? false
+          : (feedback.publicOnProfile ?? existing?.publicOnProfile),
       edits: feedback.edits ?? existing?.edits ?? [],
       createdAt: existing?.createdAt ?? feedback.createdAt,
       updatedAt: new Date().toISOString(),

@@ -683,3 +683,22 @@ button.rs-detail-people__confirm:focus-visible {
   color: var(--rs-color-muted);
   font-weight: 600;
 }
+
+.rs-crew-report-status__pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  justify-content: flex-end;
+}
+
+.rs-crew-report-status__links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+  margin-top: 4px;
+  padding-left: 2.75rem;
+}
+
+.rs-crew-report-status .rs-detail-people__row {
+  align-items: flex-start;
+}

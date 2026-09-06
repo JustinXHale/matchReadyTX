@@ -1872,7 +1872,26 @@ describe('coachFeedback', () => {
       scalesNeedComments,
       validateCoachFeedbackScales,
     } = await import('@/domain/coachFeedback');
-    expect(coachFeedbackDocId('m1', 'team_a')).toBe('m1_team_a');
+    expect(coachFeedbackDocId(
+      {
+        id: 'm1',
+        sheetRowKey: 'm1',
+        status: 'locked_confirmed',
+        kickoffAt: '',
+        venueName: '',
+        venueAddress: '',
+        homeTeamId: 'h',
+        awayTeamId: 'a',
+        homeTeamName: 'H',
+        awayTeamName: 'A',
+        level: 'D1',
+        gender: 'men',
+        flightProvided: false,
+        housingProvided: false,
+        crew: emptyCrew(),
+      },
+      'team_a',
+    )).toBe('m1_team_a');
     expect(normalizeScaleValue('poor')).toBe(1);
     expect(normalizeScaleValue(5)).toBe(5);
     expect(

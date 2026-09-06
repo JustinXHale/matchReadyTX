@@ -113,6 +113,8 @@ export interface Match {
   awayTeamName: string;
   /** Optional event name from the Schedule sheet `title` column. */
   title?: string;
+  /** Tournament event — tourney fees/crew, schedule link, crew-scoped coach feedback. */
+  isTournament?: boolean;
   /** Short format label from Schedule `match_type` (e.g. 2nd Side). */
   matchType?: string;
   competition?: string;
@@ -161,7 +163,6 @@ export const DEFAULT_MATCH_LEVELS = [
   'D2',
   'D3',
   'Exhibition',
-  'Tourney',
 ] as const;
 
 export const DEFAULT_COMPETITIONS = [

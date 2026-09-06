@@ -1,4 +1,4 @@
-import { isTournamentMatchLevel } from '@/domain/matchScheduleUrl';
+import { isTournamentMatch } from '@/domain/matchScheduleUrl';
 import type { FeeTable, Match, MatchGender } from '@/domain/types';
 
 /** Scheduler fee form — AR rate applies to both AR1 and AR2. */
@@ -33,7 +33,7 @@ export function feeOverrideForMatch(
   league: FeeTable,
   tourney: FeeTable,
 ): Partial<FeeTable> {
-  const base = isTournamentMatchLevel(match.level) ? tourney : league;
+  const base = isTournamentMatch(match) ? tourney : league;
   return { ...base };
 }
 

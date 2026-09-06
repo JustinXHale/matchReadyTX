@@ -1,17 +1,12 @@
 /** Optional Google Drive (or https) link to a tournament bracket / schedule. */
 
+import type { Match } from '@/domain/types';
+
 const MAX_SCHEDULE_URL_LENGTH = 500;
 
-/** Match level is tournament-style (Tourney chip, 7s, etc.). */
-export function isTournamentMatchLevel(level: string | undefined): boolean {
-  const l = (level ?? '').trim().toLowerCase();
-  if (!l) return false;
-  return (
-    l === 'tourney' ||
-    l === '7s' ||
-    l.includes('tournament') ||
-    l.includes('tourney')
-  );
+/** Tournament event — explicit assigner flag, not inferred from level. */
+export function isTournamentMatch(match: Pick<Match, 'isTournament'>): boolean {
+  return match.isTournament === true;
 }
 
 export function normalizeScheduleUrl(raw?: string): string | undefined {

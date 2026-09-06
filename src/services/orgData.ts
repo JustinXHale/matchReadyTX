@@ -200,6 +200,7 @@ export function matchFromFirestore(
       typeof data.title === 'string' && data.title.trim()
         ? data.title.trim()
         : undefined,
+    isTournament: data.isTournament === true,
     matchType:
       typeof data.matchType === 'string' && data.matchType.trim()
         ? data.matchType.trim()
@@ -427,13 +428,36 @@ export function coachFeedbackFromFirestore(
   }
   const status = parseCoachFeedbackStatus(data.status);
   const scales = parseCoachFeedbackScales(data.scales);
+  const feedbackScope =
+    data.feedbackScope === 'crew' ? 'crew' : ('official' as const);
+  const slot = data.slot === 'crew' ? 'crew' : 'mo';
+  const officialUserId =
+    typeof data.officialUserId === 'string' && data.officialUserId.trim()
+      ? data.officialUserId.trim()
+      : undefined;
+  const officialName =
+    typeof data.officialName === 'string' && data.officialName.trim()
+      ? data.officialName.trim()
+      : undefined;
+  if (feedbackScope === 'official' && (!officialUserId || !officialName)) {
+    return null;
+  }
   return {
     id,
     orgId: typeof data.orgId === 'string' ? data.orgId : '',
+    feedbackScope,
     matchId: data.matchId,
-    slot: 'mo',
-    officialUserId: String(data.officialUserId ?? ''),
-    officialName: String(data.officialName ?? ''),
+    slot,
+    officialUserId,
+    officialName,
+    tournamentGroupKey:
+      typeof data.tournamentGroupKey === 'string'
+        ? data.tournamentGroupKey
+        : undefined,
+    tournamentTitle:
+      typeof data.tournamentTitle === 'string'
+        ? data.tournamentTitle
+        : undefined,
     homeTeamId: String(data.homeTeamId ?? ''),
     homeTeamName: String(data.homeTeamName ?? ''),
     awayTeamId: String(data.awayTeamId ?? ''),
@@ -1391,6 +1415,23 @@ function cmoForFirestore(cmo: Match['cmo']): unknown {
   );
 }
 
+/** Persist tournament flag + event title (assigner; live mode). */
+export async function saveMatchEventFlagsInFirestore(
+  orgId: string,
+  matchId: string,
+  flags: { isTournament?: boolean; title?: string | null },
+): Promise<void> {
+  await setDoc(
+    doc(requireDb(), 'orgs', orgId, 'matches', matchId),
+    stripUndefined({
+      isTournament: flags.isTournament === true,
+      title: flags.title?.trim() ? flags.title.trim() : null,
+      updatedAt: new Date().toISOString(),
+    }),
+    { merge: true },
+  );
+}
+
 /** Persist optional tournament schedule link (assigner; live mode). */
 export async function saveMatchScheduleUrlInFirestore(
   orgId: string,
@@ -1857,10 +1898,13 @@ export async function saveCoachFeedbackInFirestore(
   const payload = stripUndefined({
     id: feedback.id,
     orgId,
+    feedbackScope: feedback.feedbackScope,
     matchId: feedback.matchId,
-    slot: 'mo' as const,
-    officialUserId: feedback.officialUserId,
-    officialName: feedback.officialName,
+    slot: feedback.slot,
+    officialUserId: feedback.officialUserId ?? null,
+    officialName: feedback.officialName ?? null,
+    tournamentGroupKey: feedback.tournamentGroupKey ?? null,
+    tournamentTitle: feedback.tournamentTitle ?? null,
     homeTeamId: feedback.homeTeamId,
     homeTeamName: feedback.homeTeamName,
     awayTeamId: feedback.awayTeamId,

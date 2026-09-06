@@ -122,7 +122,8 @@ export function officialInsightRows(
   );
   const coachByOfficial = new Map<string, CoachFeedback[]>();
   for (const f of coachFeedback) {
-    if (f.status !== 'submitted' || !f.officialUserId) continue;
+    if (f.status !== 'submitted' || f.feedbackScope === 'crew') continue;
+    if (!f.officialUserId) continue;
     const list = coachByOfficial.get(f.officialUserId) ?? [];
     list.push(f);
     coachByOfficial.set(f.officialUserId, list);
@@ -189,7 +190,8 @@ export function gradePyramid(
   );
   const coachByOfficial = new Map<string, number[]>();
   for (const f of coachFeedback) {
-    if (f.status !== 'submitted' || !f.officialUserId) continue;
+    if (f.status !== 'submitted' || f.feedbackScope === 'crew') continue;
+    if (!f.officialUserId) continue;
     const avg = coachFeedbackAverage(f.scales);
     if (avg == null) continue;
     const list = coachByOfficial.get(f.officialUserId) ?? [];
@@ -378,7 +380,10 @@ export function officialCoachFeedbackStatsForUser(
   criterionAverages: Partial<Record<string, number>>;
 } {
   const submitted = feedback.filter(
-    (f) => f.status === 'submitted' && f.officialUserId === userId,
+    (f) =>
+      f.status === 'submitted' &&
+      f.feedbackScope !== 'crew' &&
+      f.officialUserId === userId,
   );
   const avgs = submitted
     .map((f) => coachFeedbackAverage(f.scales))

@@ -2,6 +2,7 @@ import { useMemo } from 'react';
 import { NavLink, Navigate, Outlet } from 'react-router-dom';
 import './scheduler.css';
 import { ROLE_HOME, useApp, useAppHref } from '@/app/AppContext';
+import { countSchedulerMatchesWithPendingReports } from '@/domain/paymentReadiness';
 import { countSchedulerQueues } from '@/features/scheduler/queues/selectors';
 import { formatDueBadge } from '@/features/referee/reports/dueCounts';
 
@@ -9,6 +10,7 @@ import { formatDueBadge } from '@/features/referee/reports/dueCounts';
 export function SchedulerLayout() {
   const { hasAssignerRole, isAssignerView, roleView, state } = useApp();
   const scheduleHref = useAppHref('/scheduler/schedule');
+  const reportsHref = useAppHref('/scheduler/reports');
   const feedbackHref = useAppHref('/scheduler/feedback');
   const uploadHref = useAppHref('/scheduler/upload');
   const roleHome = useAppHref(ROLE_HOME[roleView]);
@@ -21,6 +23,17 @@ export function SchedulerLayout() {
       counts.totalActionable
     );
   }, [state]);
+
+  const pendingReportsCount = useMemo(
+    () =>
+      countSchedulerMatchesWithPendingReports(
+        state.matches,
+        state.users,
+        state.matchReports,
+        state.cardReports,
+      ),
+    [state.matches, state.users, state.matchReports, state.cardReports],
+  );
 
   if (!hasAssignerRole) {
     return (
@@ -55,6 +68,24 @@ export function SchedulerLayout() {
           {scheduleActionCount > 0 && (
             <span className="rs-nav-badge rs-nav-badge--inline" aria-hidden>
               {formatDueBadge(scheduleActionCount)}
+            </span>
+          )}
+        </NavLink>
+        <NavLink
+          to={reportsHref}
+          className={({ isActive }) =>
+            `rs-nav-with-badge${isActive ? ' active' : ''}`
+          }
+          aria-label={
+            pendingReportsCount > 0
+              ? `Match reports, ${pendingReportsCount} with pending reports`
+              : 'Match reports'
+          }
+        >
+          Match reports
+          {pendingReportsCount > 0 && (
+            <span className="rs-nav-badge rs-nav-badge--inline" aria-hidden>
+              {formatDueBadge(pendingReportsCount)}
             </span>
           )}
         </NavLink>

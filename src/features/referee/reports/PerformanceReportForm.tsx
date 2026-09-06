@@ -21,7 +21,7 @@ import {
   type Match,
   type UserProfile,
 } from '@/domain/types';
-import { isTournamentMatchLevel } from '@/domain/matchScheduleUrl';
+import { isTournamentMatch } from '@/domain/matchScheduleUrl';
 import { CrewAttendanceFields, formatCrewAttendanceNote } from '@/features/referee/reports/CrewAttendanceFields';
 import {
   TeamScoreCard,
@@ -86,7 +86,7 @@ export function PerformanceReportForm({
   const [awayYellow, setAwayYellow] = useState('0');
   const [awayRed, setAwayRed] = useState('0');
   const [isTournament, setIsTournament] = useState(() =>
-    isTournamentMatchLevel(match.level),
+    isTournamentMatch(match),
   );
 
   const [gameTemperature, setGameTemperature] = useState<number | ''>('');

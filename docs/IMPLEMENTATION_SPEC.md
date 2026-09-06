@@ -170,7 +170,7 @@ mail/{mailId}   // outbound queue — Admin SDK only; see docs/EMAIL.md
 - **`reportAnalytics` role:** Scheduler grants on member profile only (not self-assignable, not in onboarding). Enables Insights for people who are not CMOs. CMO is self-selectable on profile/onboarding and also enables Insights + global read of coach feedback + match reports.
 - **`cmo` role:** Self-selectable on profile and onboarding. Unlocks Referee/CMO lens tools and the Insights tab.
 - **`judicial` role:** Scheduler or existing Judicial grants (Members checkbox for assigner; `setJudicialRole` callable for Judicial-only). Not self-assignable. Unlocks Judicial lens: dashboard, cases, comments, rulings. Phone required. Cases and comments are assigner/judicial only — not visible to the filing referee, teams, or Insights. Filing MOs may **create** `judicialCases` for their own submitted card report (recorded/pending only); rulings are assigner/judicial updates.
-- **`treasurer` role:** Scheduler grants on member profile only (not self-assignable). Unlocks **Finance** lens with assigner: payout readiness (reports gate `ready_to_pay`), per-assignment mark paid, conference invoice builder + print. Phone required. Writes: `officialPayments`, `conferenceInvoices`. No Stripe/payout rails.
+- **`treasurer` role:** Scheduler grants on member profile only (not self-assignable). Unlocks **Finance** lens with assigner: payout readiness (`ready_to_pay` when match/coaching reports are in; card reports tracked separately and do not block pay), per-assignment mark paid, conference invoice builder + print. Phone required. Writes: `officialPayments`, `conferenceInvoices`. No Stripe/payout rails.
 
 ---
 

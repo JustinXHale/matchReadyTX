@@ -262,11 +262,27 @@ export function PayoutsPage() {
                     ? ` · Mileage ${formatMoney(displayMileage)}`
                     : ''}
                 </p>
-                {!row.matchReportSubmitted && row.readiness !== 'not_played' && (
-                  <p className="rs-match-card__meta">Match report missing</p>
+                {row.matchReportSubmitted ? (
+                  <p className="rs-match-card__meta">Match report complete</p>
+                ) : (
+                  row.readiness !== 'not_played' &&
+                  row.slot !== 'no4' &&
+                  row.slot !== 'cmo' && (
+                    <p className="rs-match-card__meta">Match report pending</p>
+                  )
                 )}
+                {row.slot === 'cmo' &&
+                  !row.matchReportSubmitted &&
+                  row.readiness !== 'not_played' && (
+                    <p className="rs-match-card__meta">Coaching report pending</p>
+                  )}
                 {row.cardReportRequired && !row.cardReportSubmitted && (
-                  <p className="rs-match-card__meta">Card report missing</p>
+                  <p className="rs-match-card__meta">
+                    Card report pending (does not block pay)
+                  </p>
+                )}
+                {row.cardReportRequired && row.cardReportSubmitted && (
+                  <p className="rs-match-card__meta">Card report complete</p>
                 )}
                 {row.readiness === 'ready_to_pay' && (
                   <div className="rs-finance-panel__form rs-finance-payout-form">
