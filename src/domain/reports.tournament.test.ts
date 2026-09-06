@@ -1,10 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import {
+  attendanceForReportForm,
   needsCardReportNudge,
   totalCardsFromMoPayload,
   type MatchReport,
   type MoReportPayload,
 } from '@/domain/reports';
+import { emptyCrew } from '@/domain/types';
 
 const tournamentPayload: MoReportPayload = {
   homePoints: 0,
@@ -59,5 +61,58 @@ describe('tournament match reports', () => {
         [],
       ),
     ).toBe(true);
+  });
+});
+
+describe('attendanceForReportForm', () => {
+  it('restores absent flags onto the current crew list', () => {
+    const kickoffAt = '2026-09-05T13:30:00.000Z';
+    const match = {
+      id: 'm1',
+      sheetRowKey: 's1',
+      status: 'locked_confirmed' as const,
+      kickoffAt,
+      venueName: 'Field',
+      venueAddress: 'San Marcos, TX',
+      venueLat: 0,
+      venueLng: 0,
+      homeTeamId: 'h',
+      awayTeamId: 'a',
+      homeTeamName: 'Home',
+      awayTeamName: 'Away',
+      level: 'T3',
+      gender: 'men' as const,
+      flightProvided: false,
+      housingProvided: false,
+      crew: {
+        ...emptyCrew(),
+        mo: [
+          {
+            id: 'ca_mo',
+            slot: 'mo' as const,
+            userId: 'mo-1',
+            userName: 'MO One',
+            status: 'confirmed' as const,
+            history: [],
+          },
+        ],
+      },
+    };
+    const rows = attendanceForReportForm(match, [
+      {
+        slot: 'mo',
+        userId: 'mo-1',
+        userName: 'MO One',
+        attended: false,
+      },
+    ]);
+    expect(rows).toEqual([
+      {
+        slot: 'mo',
+        userId: 'mo-1',
+        userName: 'MO One',
+        attended: false,
+      },
+    ]);
   });
 });

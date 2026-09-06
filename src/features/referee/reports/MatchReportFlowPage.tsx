@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import {
   Button,
   Checkbox,
@@ -12,7 +12,7 @@ import {
 import { useApp } from '@/app/AppContext';
 import {
   AR_COMFORT_QUESTION,
-  crewForAttendance,
+  attendanceForReportForm,
   isQuickReportLocked,
   matchHasAssignedCmo,
   MATCH_FEEDBACK_LABEL,
@@ -27,6 +27,7 @@ import { isTournamentMatch } from '@/domain/matchScheduleUrl';
 import {
   cardReportPath,
   MATCH_REPORTS_BACK,
+  matchReportEditPath,
   pendingCrewReportForUserOnMatch,
   reportHrefForSubmitted,
 } from '@/features/referee/reports/reportLinks';
@@ -48,15 +49,31 @@ import { MatchListRow } from '@/ui/MatchListRow';
 
 type Step = 'chooser' | 'form' | 'done';
 
+function crewFormKind(
+  formKind: ReportFormKind | undefined,
+  slot: string | undefined,
+): ReportFormKind | null {
+  if (
+    formKind === 'mo_performance' ||
+    formKind === 'mo_quick' ||
+    formKind === 'ar_basic'
+  ) {
+    return formKind;
+  }
+  if (slot === 'ar1' || slot === 'ar2') return 'ar_basic';
+  return null;
+}
+
 export function MatchReportFlowPage() {
   const { matchId = '' } = useParams();
+  const [searchParams] = useSearchParams();
   const { currentUser, state, store, dataMode } = useApp();
   const navigate = useNavigate();
   const { goBack: exitToReports, backLabel: reportsBackLabel } =
     useAppBack(MATCH_REPORTS_BACK);
 
   const match = state.matches.find((m) => m.id === matchId);
-  const report = useMemo(() => {
+  const pending = useMemo(() => {
     if (!currentUser || !matchId) return undefined;
     return pendingCrewReportForUserOnMatch(
       state.matchReports,
@@ -76,66 +93,151 @@ export function MatchReportFlowPage() {
     );
   }, [currentUser, matchId, state.matchReports]);
 
-  const initialKind: ReportFormKind | null =
-    report?.formKind === 'mo_performance' ||
-    report?.formKind === 'mo_quick' ||
-    report?.formKind === 'ar_basic'
-      ? report.formKind
-      : report?.slot === 'ar1' || report?.slot === 'ar2'
-        ? 'ar_basic'
-        : null;
+  const isEditing = searchParams.get('edit') === '1' && Boolean(submitted) && !pending;
+  const report = pending ?? (isEditing ? submitted : undefined);
+  const savedMo = isEditing ? submitted?.moPayload : undefined;
+  const savedAr = isEditing ? submitted?.arPayload : undefined;
+
+  const initialKind: ReportFormKind | null = crewFormKind(
+    report?.formKind,
+    report?.slot,
+  );
 
   const [step, setStep] = useState<Step>(() =>
-    report?.slot === 'mo'
-      ? 'chooser'
-      : initialKind
-        ? 'form'
+    isEditing || initialKind
+      ? 'form'
+      : report?.slot === 'mo'
+        ? 'chooser'
         : report?.slot === 'ar1' || report?.slot === 'ar2'
           ? 'form'
           : 'chooser',
   );
-  const [formKind, setFormKind] = useState<ReportFormKind | null>(() =>
-    report?.slot === 'mo' ? null : initialKind,
+  const [formKind, setFormKind] = useState<ReportFormKind | null>(() => {
+    if (isEditing) {
+      return (
+        initialKind ??
+        (submitted?.moPayload
+          ? 'mo_quick'
+          : submitted?.arPayload
+            ? 'ar_basic'
+            : null)
+      );
+    }
+    return report?.slot !== 'mo' ? initialKind : null;
+  });
+  const [cmoDidNotAttend, setCmoDidNotAttend] = useState(
+    () => Boolean(savedMo?.cmoDidNotAttend),
   );
-  const [cmoDidNotAttend, setCmoDidNotAttend] = useState(false);
   const [doneCards, setDoneCards] = useState(0);
 
-  const [homePoints, setHomePoints] = useState('');
-  const [awayPoints, setAwayPoints] = useState('');
-  const [homeYellow, setHomeYellow] = useState('0');
-  const [homeRed, setHomeRed] = useState('0');
-  const [awayYellow, setAwayYellow] = useState('0');
-  const [awayRed, setAwayRed] = useState('0');
+  const [homePoints, setHomePoints] = useState(() =>
+    savedMo && !savedMo.tournamentMatch && savedMo.homePoints != null
+      ? String(savedMo.homePoints)
+      : '',
+  );
+  const [awayPoints, setAwayPoints] = useState(() =>
+    savedMo && !savedMo.tournamentMatch && savedMo.awayPoints != null
+      ? String(savedMo.awayPoints)
+      : '',
+  );
+  const [homeYellow, setHomeYellow] = useState(() =>
+    String(savedMo?.homeYellowCards ?? '0'),
+  );
+  const [homeRed, setHomeRed] = useState(() => String(savedMo?.homeRedCards ?? '0'));
+  const [awayYellow, setAwayYellow] = useState(() =>
+    String(savedMo?.awayYellowCards ?? '0'),
+  );
+  const [awayRed, setAwayRed] = useState(() => String(savedMo?.awayRedCards ?? '0'));
   const [isTournament, setIsTournament] = useState(() =>
-    match ? isTournamentMatch(match) : false,
+    savedMo?.tournamentMatch ?? (match ? isTournamentMatch(match) : false),
   );
-  const [lightFeedback, setLightFeedback] = useState('');
+  const [lightFeedback, setLightFeedback] = useState(
+    () => savedMo?.lightFeedback ?? '',
+  );
   const [crewAttendance, setCrewAttendance] = useState<CrewAttendanceEntry[]>(
-    () => (match ? crewForAttendance(match) : []),
+    () =>
+      match
+        ? attendanceForReportForm(
+            match,
+            savedMo?.crewAttendance ?? savedAr?.crewAttendance,
+          )
+        : [],
   );
-  const [crewAbsenceNote, setCrewAbsenceNote] = useState('');
+  const [crewAbsenceNote, setCrewAbsenceNote] = useState(
+    () => savedMo?.crewAbsenceNote ?? savedAr?.crewAbsenceNote ?? '',
+  );
   const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
-    if (dataMode !== 'live' || !currentUser || !matchId) return;
+    if (dataMode !== 'live' || !currentUser || !matchId || isEditing) return;
     void ensureMatchReportReady(matchId, currentUser.uid).catch((err) =>
       console.error('ensureMatchReportReady failed', err),
     );
-  }, [dataMode, currentUser?.uid, matchId]);
+  }, [dataMode, currentUser?.uid, matchId, isEditing]);
 
   useEffect(() => {
     if (!match) return;
-    setCrewAttendance(crewForAttendance(match));
-    setIsTournament(isTournamentMatch(match));
+    setCrewAttendance(
+      attendanceForReportForm(
+        match,
+        savedMo?.crewAttendance ?? savedAr?.crewAttendance,
+      ),
+    );
+    if (!savedMo) setIsTournament(isTournamentMatch(match));
   }, [match?.id]);
 
-  const [crewIssuesNote, setCrewIssuesNote] = useState('');
+  useEffect(() => {
+    if (!isEditing || !submitted || !match) return;
+    const mo = submitted.moPayload;
+    const ar = submitted.arPayload;
+    if (mo) {
+      setCmoDidNotAttend(Boolean(mo.cmoDidNotAttend));
+      setIsTournament(Boolean(mo.tournamentMatch));
+      setHomePoints(
+        !mo.tournamentMatch && mo.homePoints != null ? String(mo.homePoints) : '',
+      );
+      setAwayPoints(
+        !mo.tournamentMatch && mo.awayPoints != null ? String(mo.awayPoints) : '',
+      );
+      setHomeYellow(String(mo.homeYellowCards ?? '0'));
+      setHomeRed(String(mo.homeRedCards ?? '0'));
+      setAwayYellow(String(mo.awayYellowCards ?? '0'));
+      setAwayRed(String(mo.awayRedCards ?? '0'));
+      setLightFeedback(mo.lightFeedback ?? '');
+      setCrewAttendance(attendanceForReportForm(match, mo.crewAttendance));
+      setCrewAbsenceNote(mo.crewAbsenceNote ?? '');
+      setCrewIssuesNote(mo.crewIssuesNote ?? '');
+    }
+    if (ar) {
+      setStillComfortable(ar.stillComfortable);
+      setArIncidents(ar.keyIncidents ?? '');
+      setArNote(ar.note ?? '');
+      setArMatchFeedback(ar.matchFeedback ?? '');
+      setCrewAttendance(attendanceForReportForm(match, ar.crewAttendance));
+      setCrewAbsenceNote(ar.crewAbsenceNote ?? '');
+      setCrewIssuesNote(ar.crewIssuesNote ?? '');
+    }
+    const kind = crewFormKind(submitted.formKind, submitted.slot);
+    setFormKind(
+      kind ??
+        (mo ? 'mo_quick' : ar ? 'ar_basic' : null),
+    );
+    setStep('form');
+  }, [isEditing, submitted?.id, match?.id]);
+
+  const [crewIssuesNote, setCrewIssuesNote] = useState(
+    () => savedMo?.crewIssuesNote ?? savedAr?.crewIssuesNote ?? '',
+  );
   const [stillComfortable, setStillComfortable] = useState<
     ArReportPayload['stillComfortable']
-  >('');
-  const [arIncidents, setArIncidents] = useState('');
-  const [arNote, setArNote] = useState('');
-  const [arMatchFeedback, setArMatchFeedback] = useState('');
+  >(() => savedAr?.stillComfortable ?? '');
+  const [arIncidents, setArIncidents] = useState(
+    () => savedAr?.keyIncidents ?? '',
+  );
+  const [arNote, setArNote] = useState(() => savedAr?.note ?? '');
+  const [arMatchFeedback, setArMatchFeedback] = useState(
+    () => savedAr?.matchFeedback ?? '',
+  );
   const [error, setError] = useState<string | null>(null);
 
   if (!currentUser) return null;
@@ -174,6 +276,16 @@ export function MatchReportFlowPage() {
           }
         >
           View report
+        </Button>
+        <Button
+          variant="secondary"
+          onClick={() =>
+            navigate(matchReportEditPath(match.id), {
+              state: backState(MATCH_REPORTS_BACK),
+            })
+          }
+        >
+          Edit report
         </Button>
         {submitted.slot === 'mo' && (
           <Button
@@ -219,6 +331,12 @@ export function MatchReportFlowPage() {
 
   const hasCmo = matchHasAssignedCmo(match);
   const quickLocked = isQuickReportLocked(match, cmoDidNotAttend);
+  const resolvedKind =
+    formKind ??
+    (isEditing
+      ? crewFormKind(report.formKind, report.slot) ??
+        (report.moPayload ? 'mo_quick' : report.arPayload ? 'ar_basic' : null)
+      : null);
 
   const choose = (kind: 'mo_quick' | 'mo_performance') => {
     if (kind === 'mo_quick' && quickLocked) return;
@@ -242,6 +360,13 @@ export function MatchReportFlowPage() {
       const { yellow, red } = totalCardsFromMoPayload(payload);
       const total = yellow + red;
       setDoneCards(total);
+      if (isEditing) {
+        navigate(reportHrefForSubmitted({ ...report, status: 'submitted' }), {
+          state: backState(MATCH_REPORTS_BACK),
+          replace: true,
+        });
+        return;
+      }
       if (total > 0) {
         navigate(cardReportPath(match.id), {
           state: backState(MATCH_REPORTS_BACK),
@@ -260,12 +385,12 @@ export function MatchReportFlowPage() {
   };
 
   const submit = async () => {
-    if (!formKind || !report) return;
+    if (!resolvedKind || !report) return;
     setError(null);
     setSubmitting(true);
 
     try {
-      if (formKind === 'ar_basic') {
+      if (resolvedKind === 'ar_basic') {
         if (!stillComfortable) {
           setError(
             'Please answer whether you were comfortable as an assistant referee at this level.',
@@ -293,12 +418,19 @@ export function MatchReportFlowPage() {
         } else {
           store.submitMatchReport(report.id, 'ar_basic', arPayload);
         }
+        if (isEditing) {
+          navigate(reportHrefForSubmitted({ ...report, status: 'submitted' }), {
+            state: backState(MATCH_REPORTS_BACK),
+            replace: true,
+          });
+          return;
+        }
         setStep('done');
         setDoneCards(0);
         return;
       }
 
-      if (formKind === 'mo_quick' && quickLocked) {
+      if (resolvedKind === 'mo_quick' && quickLocked && !isEditing) {
         setError('Confirm that the CMO did not attend to use Quick Report.');
         return;
       }
@@ -348,7 +480,7 @@ export function MatchReportFlowPage() {
             : undefined,
           crewIssuesNote: crewIssuesNote.trim() || undefined,
           refereeTeamNote: formatCrewAttendanceNote(crewAttendance) || undefined,
-          cmoDidNotAttend: hasCmo && formKind === 'mo_quick' ? true : undefined,
+          cmoDidNotAttend: hasCmo && resolvedKind === 'mo_quick' ? true : undefined,
           tournamentMatch: isTournament || undefined,
         },
         'mo_quick',
@@ -366,7 +498,7 @@ export function MatchReportFlowPage() {
     return (
       <div className="rs-stack">
         <Title headingLevel="h2" size="lg">
-          Report submitted
+          {isEditing ? 'Report updated' : 'Report submitted'}
         </Title>
         <p className="rs-match-card__meta">
           Thanks — {match.homeTeamName} vs {match.awayTeamName} is on file.
@@ -400,7 +532,7 @@ export function MatchReportFlowPage() {
     );
   }
 
-  if (step === 'chooser' || (report.slot === 'mo' && !formKind)) {
+  if (!isEditing && (step === 'chooser' || (report.slot === 'mo' && !resolvedKind))) {
     const cmoName = (match.cmo ?? [])
       .map((c) => c.userName)
       .filter(Boolean)
@@ -468,13 +600,21 @@ export function MatchReportFlowPage() {
     );
   }
 
-  if (formKind === 'mo_performance') {
+  if (resolvedKind === 'mo_performance') {
     return (
       <PerformanceReportForm
         match={match}
         user={currentUser}
         cmoDidNotAttend={cmoDidNotAttend}
+        initial={savedMo}
+        isUpdate={isEditing}
         onBack={() => {
+          if (isEditing) {
+            navigate(reportHrefForSubmitted(report), {
+              state: backState(MATCH_REPORTS_BACK),
+            });
+            return;
+          }
           setFormKind(null);
           setStep('chooser');
         }}
@@ -483,7 +623,7 @@ export function MatchReportFlowPage() {
     );
   }
 
-  const kind = formKind ?? 'ar_basic';
+  const kind = resolvedKind ?? 'ar_basic';
   const title = kind === 'mo_quick' ? 'Quick Report' : 'AR Report';
 
   return (
@@ -492,6 +632,12 @@ export function MatchReportFlowPage() {
         type="button"
         className="rs-detail__back"
         onClick={() => {
+          if (isEditing) {
+            navigate(reportHrefForSubmitted(report), {
+              state: backState(MATCH_REPORTS_BACK),
+            });
+            return;
+          }
           if (report.slot === 'mo') {
             setFormKind(null);
             setStep('chooser');
@@ -500,7 +646,7 @@ export function MatchReportFlowPage() {
           }
         }}
       >
-        ← {report.slot === 'mo' ? 'Choose form' : reportsBackLabel}
+        ← {isEditing || report.slot !== 'mo' ? reportsBackLabel : 'Choose form'}
       </button>
       <Title headingLevel="h2" size="lg">
         {title}
@@ -633,7 +779,7 @@ export function MatchReportFlowPage() {
         )}
 
         <Button type="submit" variant="primary" isBlock isLoading={submitting}>
-          Submit report
+          {isEditing ? 'Update report' : 'Submit report'}
         </Button>
       </Form>
     </div>

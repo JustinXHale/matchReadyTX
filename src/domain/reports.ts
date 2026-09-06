@@ -141,6 +141,21 @@ export function crewForAttendance(match: Match): CrewAttendanceEntry[] {
   return out;
 }
 
+/** Current crew list with attendance flags restored from a saved report. */
+export function attendanceForReportForm(
+  match: Match,
+  saved?: CrewAttendanceEntry[],
+): CrewAttendanceEntry[] {
+  const fresh = crewForAttendance(match);
+  if (!saved?.length) return fresh;
+  return fresh.map((row) => {
+    const prev = saved.find(
+      (s) => s.userId === row.userId && s.slot === row.slot,
+    );
+    return prev ? { ...row, attended: prev.attended } : row;
+  });
+}
+
 /** MO Quick / Performance payload. */
 export interface MoReportPayload {
   homePoints: number;

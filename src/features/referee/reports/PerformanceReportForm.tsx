@@ -9,7 +9,7 @@ import {
 } from '@patternfly/react-core';
 import {
   BREAKDOWN_REWARD_OPTIONS,
-  crewForAttendance,
+  attendanceForReportForm,
   MATCH_FEEDBACK_LABEL,
   type BreakdownReward,
   type CrewAttendanceEntry,
@@ -49,12 +49,16 @@ export function PerformanceReportForm({
   match,
   user,
   cmoDidNotAttend,
+  initial,
+  isUpdate = false,
   onBack,
   onSubmit,
 }: {
   match: Match;
   user: UserProfile;
   cmoDidNotAttend: boolean;
+  initial?: MoReportPayload;
+  isUpdate?: boolean;
   onBack: () => void;
   onSubmit: (payload: MoReportPayload) => void;
 }) {
@@ -63,46 +67,93 @@ export function PerformanceReportForm({
   const [error, setError] = useState<string | null>(null);
 
   const [crewAttendance, setCrewAttendance] = useState<CrewAttendanceEntry[]>(
-    () => crewForAttendance(match),
+    () => attendanceForReportForm(match, initial?.crewAttendance),
   );
-  const [crewAbsenceNote, setCrewAbsenceNote] = useState('');
-  const [crewIssuesNote, setCrewIssuesNote] = useState('');
+  const [crewAbsenceNote, setCrewAbsenceNote] = useState(
+    () => initial?.crewAbsenceNote ?? '',
+  );
+  const [crewIssuesNote, setCrewIssuesNote] = useState(
+    () => initial?.crewIssuesNote ?? '',
+  );
 
   const someoneAbsent = useMemo(
     () => crewAttendance.some((c) => !c.attended),
     [crewAttendance],
   );
 
-  const [refereeName, setRefereeName] = useState(user.displayName);
-  const [matchDate, setMatchDate] = useState(match.kickoffAt.slice(0, 10));
-  const [format, setFormat] = useState<MatchFormat | ''>('15s');
+  const [refereeName, setRefereeName] = useState(
+    () => initial?.refereeName ?? user.displayName,
+  );
+  const [matchDate, setMatchDate] = useState(
+    () => initial?.matchDate ?? match.kickoffAt.slice(0, 10),
+  );
+  const [format, setFormat] = useState<MatchFormat | ''>(
+    () => initial?.format ?? '15s',
+  );
   const [division, setDivision] = useState(
-    `${genderLabel(match.gender)} ${match.level}`,
+    () => initial?.division ?? `${genderLabel(match.gender)} ${match.level}`,
   );
-  const [homePoints, setHomePoints] = useState('');
-  const [awayPoints, setAwayPoints] = useState('');
-  const [homeYellow, setHomeYellow] = useState('0');
-  const [homeRed, setHomeRed] = useState('0');
-  const [awayYellow, setAwayYellow] = useState('0');
-  const [awayRed, setAwayRed] = useState('0');
+  const [homePoints, setHomePoints] = useState(() =>
+    initial && !initial.tournamentMatch && initial.homePoints != null
+      ? String(initial.homePoints)
+      : '',
+  );
+  const [awayPoints, setAwayPoints] = useState(() =>
+    initial && !initial.tournamentMatch && initial.awayPoints != null
+      ? String(initial.awayPoints)
+      : '',
+  );
+  const [homeYellow, setHomeYellow] = useState(() =>
+    String(initial?.homeYellowCards ?? '0'),
+  );
+  const [homeRed, setHomeRed] = useState(() =>
+    String(initial?.homeRedCards ?? '0'),
+  );
+  const [awayYellow, setAwayYellow] = useState(() =>
+    String(initial?.awayYellowCards ?? '0'),
+  );
+  const [awayRed, setAwayRed] = useState(() =>
+    String(initial?.awayRedCards ?? '0'),
+  );
   const [isTournament, setIsTournament] = useState(() =>
-    isTournamentMatch(match),
+    initial?.tournamentMatch ?? isTournamentMatch(match),
   );
 
-  const [gameTemperature, setGameTemperature] = useState<number | ''>('');
-  const [controlAndFlow, setControlAndFlow] = useState<number | ''>('');
-  const [todayIPerformed, setTodayIPerformed] = useState('');
+  const [gameTemperature, setGameTemperature] = useState<number | ''>(
+    () => initial?.gameTemperature ?? '',
+  );
+  const [controlAndFlow, setControlAndFlow] = useState<number | ''>(
+    () => initial?.controlAndFlow ?? '',
+  );
+  const [todayIPerformed, setTodayIPerformed] = useState(
+    () => initial?.todayIPerformed ?? '',
+  );
 
-  const [momentAndDecision, setMomentAndDecision] = useState('');
+  const [momentAndDecision, setMomentAndDecision] = useState(
+    () => initial?.decidedAndWhy ?? initial?.typeOfMoment ?? '',
+  );
   const [breakdownRewards, setBreakdownRewards] = useState<BreakdownReward[]>(
-    [],
+    () =>
+      (initial?.breakdownRewards ?? []).filter((r): r is BreakdownReward =>
+        (BREAKDOWN_REWARD_OPTIONS as readonly string[]).includes(r),
+      ),
   );
-  const [setPieceChallenge, setSetPieceChallenge] = useState('');
-  const [advantageUse, setAdvantageUse] = useState<number | ''>('');
+  const [setPieceChallenge, setSetPieceChallenge] = useState(
+    () => initial?.setPieceChallenge ?? '',
+  );
+  const [advantageUse, setAdvantageUse] = useState<number | ''>(
+    () => initial?.advantageUse ?? '',
+  );
 
-  const [nonCardProblems, setNonCardProblems] = useState('');
-  const [otherCommentsOrLink, setOtherCommentsOrLink] = useState('');
-  const [matchFeedback, setMatchFeedback] = useState('');
+  const [nonCardProblems, setNonCardProblems] = useState(
+    () => initial?.nonCardProblems ?? '',
+  );
+  const [otherCommentsOrLink, setOtherCommentsOrLink] = useState(
+    () => initial?.otherCommentsOrLink ?? '',
+  );
+  const [matchFeedback, setMatchFeedback] = useState(
+    () => initial?.lightFeedback ?? '',
+  );
 
   const sectionErrors = (idx: number): string | null => {
     if (idx === 0) {
@@ -232,7 +283,7 @@ export function PerformanceReportForm({
   return (
     <div className="rs-stack rs-perf-report">
       <button type="button" className="rs-detail__back" onClick={goPrev}>
-        ← {section === 0 ? 'Choose form' : SECTION_TITLES[section - 1]}
+        ← {section === 0 ? (isUpdate ? 'Match report' : 'Choose form') : SECTION_TITLES[section - 1]}
       </button>
       <Title headingLevel="h2" size="lg" className="rs-perf-report__title">
         Performance Report
@@ -562,7 +613,7 @@ export function PerformanceReportForm({
             Back
           </Button>
           <Button type="submit" variant="primary" className="rs-btn--gold">
-            {section < SECTION_COUNT - 1 ? 'Continue' : 'Submit report'}
+            {section < SECTION_COUNT - 1 ? 'Continue' : isUpdate ? 'Update report' : 'Submit report'}
           </Button>
         </div>
       </Form>

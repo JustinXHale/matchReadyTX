@@ -68,14 +68,15 @@ export async function persistSubmittedMatchReport(
   });
 
   demoStore.submitMatchReport(before.id, formKind, payload);
-  const submittedAt = new Date().toISOString();
+  const submittedAt =
+    before.submittedAt ?? fsRow.submittedAt ?? new Date().toISOString();
   const updated = {
     ...before,
     ...fsRow,
     id: fsRow.id,
     formKind,
     status: 'submitted' as const,
-    submittedAt: fsRow.submittedAt ?? submittedAt,
+    submittedAt,
     ...(formKind === 'ar_basic'
       ? { arPayload: payload as ArReportPayload }
       : { moPayload: payload as MoReportPayload }),

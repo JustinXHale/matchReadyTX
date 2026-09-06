@@ -45,6 +45,10 @@ export function matchReportPath(matchId: string): string {
   return `/referee/reports/match/${matchId}`;
 }
 
+export function matchReportEditPath(matchId: string): string {
+  return `/referee/reports/match/${matchId}?edit=1`;
+}
+
 export function matchReportViewPath(
   matchId: string,
   opts?: { officialId?: string; slot?: ReportAssigneeSlot },

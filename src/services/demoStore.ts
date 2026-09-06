@@ -2928,11 +2928,12 @@ class DemoStore {
     payload: MoReportPayload | ArReportPayload,
   ): void {
     const report = this.state.matchReports.find((r) => r.id === reportId);
-    if (!report || report.status === 'submitted') return;
+    if (!report) return;
     if (report.slot === 'cmo') return;
     if (formKind === 'cmo') return;
 
     const nowIso = new Date().toISOString();
+    const submittedAt = report.submittedAt ?? nowIso;
     this.set((s) => {
       let matches = s.matches;
       if (
@@ -2958,7 +2959,7 @@ class DemoStore {
               ...r,
               formKind,
               status: 'submitted' as const,
-              submittedAt: nowIso,
+              submittedAt,
               arPayload: payload as ArReportPayload,
             };
           }
@@ -2966,7 +2967,7 @@ class DemoStore {
             ...r,
             formKind,
             status: 'submitted' as const,
-            submittedAt: nowIso,
+            submittedAt,
             moPayload: payload as MoReportPayload,
           };
         }),

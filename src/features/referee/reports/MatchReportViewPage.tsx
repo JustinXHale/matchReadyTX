@@ -20,14 +20,15 @@ import { cmoSubjectName } from '@/features/insights/insightsDisplay';
 import { moDisplayNames } from '@/features/referee/appointments/crewLines';
 import {
   cmoReportViewPath,
+  matchReportEditPath,
   matchReportViewPath,
   COACHING_CMO_BACK,
   MATCH_REPORTS_BACK,
   resolveSubmittedMatchReport,
   submittedMatchReportsForMatch,
 } from '@/features/referee/reports/reportLinks';
+import { backState, useAppBack } from '@/nav/backNav';
 import { SubmittedPerformanceReportView } from '@/features/referee/reports/SubmittedPerformanceReportView';
-import { useAppBack } from '@/nav/backNav';
 import { MatchListRow } from '@/ui/MatchListRow';
 
 function Field({
@@ -127,6 +128,19 @@ export function MatchReportViewPage() {
           ? ` · ${new Date(report.submittedAt).toLocaleString()}`
           : ''}
       </p>
+      {report.officialId === currentUser.uid && (
+        <Button
+          variant="secondary"
+          isBlock
+          onClick={() =>
+            navigate(matchReportEditPath(matchId), {
+              state: backState(MATCH_REPORTS_BACK),
+            })
+          }
+        >
+          Edit report
+        </Button>
+      )}
 
       {siblings.length > 1 && (
         <div className="rs-report-view__siblings">
