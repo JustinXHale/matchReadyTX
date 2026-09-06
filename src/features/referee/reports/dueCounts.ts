@@ -24,14 +24,15 @@ export function countCoachingReportsDue(
   return countCmoReportsDue(reports, userId, now);
 }
 
-/** Card reports still open for MO after kickoff. */
+/** Card reports required after MO match report notes cards. */
 export function countCardReportsDue(
   matches: Match[],
   cardReports: CardReport[],
+  matchReports: MatchReport[],
   userId: string,
   now = Date.now(),
 ): number {
-  return countCardDue(matches, cardReports, userId, now);
+  return countCardDue(matches, cardReports, matchReports, userId, now);
 }
 
 export function countReportsDue(
@@ -44,7 +45,7 @@ export function countReportsDue(
   return (
     countMatchReportsDue(matchReports, userId, now) +
     countCoachingReportsDue(matchReports, userId, now) +
-    countCardReportsDue(matches, cardReports, userId, now)
+    countCardReportsDue(matches, cardReports, matchReports, userId, now)
   );
 }
 

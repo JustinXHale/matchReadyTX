@@ -3311,9 +3311,13 @@ class DemoStore {
         fixtureRequests: snap.fixtureRequests ?? [],
         teamLinkRequests: snap.teamLinkRequests ?? [],
         meetingResources: snap.meetingResources ?? [],
-        // coachFeedback / matchReports / cardReports filled by live subscriptions.
+        // coachFeedback / cardReports filled by live subscriptions.
         coachFeedback: s.coachFeedback,
-        matchReports: s.matchReports,
+        matchReports: syncPendingMatchReports(
+          matches,
+          s.matchReports,
+          Date.now(),
+        ),
         cardReports: s.cardReports,
         judicialCases: s.judicialCases,
         judicialComments: s.judicialComments,

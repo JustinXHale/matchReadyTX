@@ -76,7 +76,7 @@ export function CardReportsPage() {
   ]);
 
   const hasDue = useMemo(
-    () => entries.some((e) => !e.filed),
+    () => entries.some((e) => e.required && !e.filed),
     [entries],
   );
 
@@ -87,7 +87,7 @@ export function CardReportsPage() {
   const visible = useMemo(() => {
     const filtered =
       filter === 'due'
-        ? entries.filter((e) => !e.filed)
+        ? entries.filter((e) => e.required && !e.filed)
         : filter === 'submitted'
           ? entries.filter((e) => e.filed)
           : entries;

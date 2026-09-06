@@ -23,9 +23,10 @@ export function ReportsSubNav() {
     return countCardReportsDue(
       state.matches,
       state.cardReports,
+      state.matchReports,
       currentUser.uid,
     );
-  }, [currentUser, state.matches, state.cardReports]);
+  }, [currentUser, state.matches, state.cardReports, state.matchReports]);
   const coachingDue = useMemo(() => {
     if (!currentUser) return 0;
     return countCoachingReportsDue(state.matchReports, currentUser.uid);

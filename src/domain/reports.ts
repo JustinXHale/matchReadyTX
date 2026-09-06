@@ -1033,18 +1033,21 @@ export function countCmoReportsDue(
 export function countCardReportsDue(
   matches: Match[],
   cardReports: CardReport[],
+  matchReports: MatchReport[],
   userId: string,
   now = Date.now(),
 ): number {
   return matches.filter((m) => {
     if (!crewPeople(m.crew.mo).some((a) => a.userId === userId)) return false;
     if (!kickoffHasPassed(m.kickoffAt, now)) return false;
-    return !cardReports.some(
-      (c) =>
-        c.matchId === m.id &&
-        c.officialId === userId &&
-        c.status === 'submitted',
+    const moReport = matchReports.find(
+      (r) =>
+        r.matchId === m.id &&
+        r.officialId === userId &&
+        r.slot === 'mo' &&
+        r.status === 'submitted',
     );
+    return needsCardReportNudge(moReport, cardReports);
   }).length;
 }
 
