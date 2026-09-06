@@ -127,7 +127,13 @@ describe('multi-MO CMO reports', () => {
       status: 'submitted',
       submittedAt: new Date(now).toISOString(),
       formKind: 'mo_quick',
-      moPayload: { homePoints: 0, awayPoints: 0, tournamentMatch: true },
+      moPayload: {
+        homePoints: 0,
+        awayPoints: 0,
+        yellowCards: 0,
+        redCards: 0,
+        tournamentMatch: true,
+      },
     };
     const merged = syncPendingMatchReports([match], [pending, submitted], now);
     const mo = merged.find((r) => r.slot === 'mo' && r.officialId === 'mo-a');
