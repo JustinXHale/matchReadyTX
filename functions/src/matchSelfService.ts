@@ -96,7 +96,7 @@ function clearRow(
   row: CrewRow,
   uid: string,
   at: string,
-  action: 'declined' | 't72_no',
+  action: 'declined' | 'released' | 't72_no',
   reason?: string,
 ): CrewRow {
   return appendHistory(
@@ -181,11 +181,12 @@ export async function runMatchSelfService(opts: {
     }
   } else if (action === 'decline') {
     const reason = String(opts.reason ?? '').trim().slice(0, 500);
+    const wasConfirmed = String(row.status ?? '') === 'confirmed';
     crew[found.slot][found.index] = clearRow(
       row,
       uid,
       at,
-      'declined',
+      wasConfirmed ? 'released' : 'declined',
       reason || undefined,
     );
     if (crewPeople(crew.mo).length === 0) status = 'needs_reassignment';

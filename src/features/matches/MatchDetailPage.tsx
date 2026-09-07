@@ -235,6 +235,9 @@ export function MatchDetailPage() {
   const { goBack, backLabel } = useAppBack(homeBack);
   const [reason, setReason] = useState('');
   const [showDecline, setShowDecline] = useState(false);
+  const [declineMode, setDeclineMode] = useState<'decline' | 'withdraw'>(
+    'decline',
+  );
   const [personContact, setPersonContact] = useState<PersonContact | null>(null);
   const [showEmailMatch, setShowEmailMatch] = useState(false);
   const [emailScope, setEmailScope] = useState<EmailScope>('both');
@@ -915,6 +918,13 @@ export function MatchDetailPage() {
   };
 
   const openDecline = () => {
+    setDeclineMode('decline');
+    setReason('');
+    setShowDecline(true);
+  };
+
+  const openWithdraw = () => {
+    setDeclineMode('withdraw');
     setReason('');
     setShowDecline(true);
   };
@@ -926,9 +936,11 @@ export function MatchDetailPage() {
       match.id,
       mySlot,
       reason,
-      match.status === 'needs_reconfirmation'
-        ? 'unavailable_on_change'
-        : 'declined',
+      declineMode === 'withdraw'
+        ? 'released'
+        : match.status === 'needs_reconfirmation'
+          ? 'unavailable_on_change'
+          : 'declined',
       myAssignment?.id,
     );
     const ok = await persistSelfServiceIfLive({
@@ -1144,6 +1156,14 @@ export function MatchDetailPage() {
   })();
 
   const showAcceptDecline = Boolean(needsOfficialConfirm && mySlot);
+
+  const canWithdrawFromAppointment =
+    Boolean(mySlot) &&
+    myAssignment?.userId === currentUser.uid &&
+    myAssignment?.status === 'confirmed' &&
+    !showAcceptDecline &&
+    match.status !== 'cancelled' &&
+    match.status !== 'postponed';
 
   const reportActions = matchDetailReportActions(
     match,
@@ -2577,6 +2597,20 @@ export function MatchDetailPage() {
         </div>
       )}
 
+      {canWithdrawFromAppointment && mySlot && (
+        <div className="rs-detail-sticky">
+          <Button
+            variant="danger"
+            isBlock
+            isLoading={selfServiceBusy}
+            isDisabled={selfServiceBusy}
+            onClick={() => openWithdraw()}
+          >
+            Withdraw from appointment
+          </Button>
+        </div>
+      )}
+
       {showRaiseHandCard && !raiseHandLocked && (
         <div className="rs-detail-sticky">
           <Button
@@ -2672,12 +2706,16 @@ export function MatchDetailPage() {
       >
         <ModalHeader>
           <Title headingLevel="h2" id="decline-appointment-title" size="lg">
-            Decline appointment?
+            {declineMode === 'withdraw'
+              ? 'Withdraw from appointment?'
+              : 'Decline appointment?'}
           </Title>
         </ModalHeader>
         <ModalBody>
           <p id="decline-appointment-desc" className="rs-modal-lede">
-            Let the assigner know why you can&apos;t take this game.
+            {declineMode === 'withdraw'
+              ? "You already accepted this game. Let the assigner know why you can't work it — your slot will open for reassignment."
+              : "Let the assigner know why you can't take this game."}
           </p>
           <FormGroup label="Reason" isRequired fieldId="decline-reason">
             <TextArea
@@ -2699,7 +2737,9 @@ export function MatchDetailPage() {
             isLoading={selfServiceBusy}
             onClick={() => void confirmDecline()}
           >
-            Confirm decline
+            {declineMode === 'withdraw'
+              ? 'Confirm withdraw'
+              : 'Confirm decline'}
           </Button>
         </ModalFooter>
       </Modal>
