@@ -23,6 +23,7 @@ import {
   faUsers,
 } from '@fortawesome/free-solid-svg-icons';
 import { ROLE_HOME, ROLE_VIEW_LABELS, useApp, type RoleView } from '@/app/AppContext';
+import { resolveRoleSwitchTarget } from '@/nav/roleSwitchNav';
 import { appBuildLabel } from '@/app/appBuild';
 import { stripDemoPrefix, withDemoPrefix, isDemoPath } from '@/app/demoPaths';
 import { isPublicPath } from '@/features/public/publicPaths';
@@ -278,8 +279,12 @@ export function MobileShell() {
 
   const switchView = (next: RoleView) => {
     setRoleView(next);
-    const home = ROLE_HOME[next];
-    navigate(isDemoShowcase ? withDemoPrefix(home) : home);
+    const target = resolveRoleSwitchTarget(
+      location.pathname,
+      location.search,
+      next,
+    );
+    navigate(target);
   };
 
   return (

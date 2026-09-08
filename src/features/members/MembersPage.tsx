@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { EmptyState, EmptyStateBody, TextInput } from '@patternfly/react-core';
 import { useApp } from '@/app/AppContext';
@@ -14,7 +14,6 @@ import {
   teamGendersFromMatches,
   teamNamesForUser,
   type MemberTab,
-  type TeamAdminSort,
 } from '@/domain/members';
 import {
   genderLabel,
@@ -22,7 +21,11 @@ import {
   type Team,
   type UserProfile,
 } from '@/domain/types';
-import { backState } from '@/nav/backNav';
+import { backState, type BackNav } from '@/nav/backNav';
+import {
+  pathWithSearch,
+  useMembersFilterParams,
+} from '@/nav/listFilterParams';
 import { UserAvatar } from '@/ui/UserAvatar';
 
 function memberSearchHaystack(
@@ -54,19 +57,21 @@ function MemberRow({
   teamMeta,
   scheduleHint,
   showIncomplete,
+  membersBack,
 }: {
   user: UserProfile;
   tab: MemberTab;
   teamMeta?: string | null;
   scheduleHint?: string | null;
   showIncomplete: boolean;
+  membersBack: BackNav;
 }) {
   const pills = rolePillsForMember(user.roles);
   const name = memberListName(user);
   return (
     <Link
       to={`/about/members/${user.uid}`}
-      state={backState({ to: '/about/members', label: 'Members' })}
+      state={backState(membersBack)}
       className="rs-member-row"
     >
       <UserAvatar user={user} size="md" />
@@ -120,14 +125,27 @@ export function MembersPage() {
   const { state, hasAssignerRole, isAssignerView } = useApp();
   const showIncomplete = hasAssignerRole && isAssignerView;
   const canFilterCompleteness = showIncomplete;
-  const [tab, setTab] = useState<MemberTab>('referees');
-  const [teamAdminSort, setTeamAdminSort] =
-    useState<TeamAdminSort>('contact');
-  const [genderFilter, setGenderFilter] = useState<MatchGender | null>(null);
-  const [completeness, setCompleteness] = useState<
-    'all' | 'complete' | 'incomplete'
-  >('all');
-  const [query, setQuery] = useState('');
+  const {
+    searchParams,
+    tab,
+    query,
+    completeness,
+    teamAdminSort,
+    genderFilter,
+    setTab,
+    setQuery,
+    setCompleteness,
+    setTeamAdminSort,
+    setGenderFilter,
+  } = useMembersFilterParams();
+
+  const membersBack: BackNav = useMemo(
+    () => ({
+      to: pathWithSearch('/about/members', searchParams),
+      label: 'Members',
+    }),
+    [searchParams],
+  );
 
   const teamGenders = useMemo(
     () => teamGendersFromMatches(state.matches),
@@ -346,6 +364,7 @@ export function MembersPage() {
                         user={user}
                         tab={tab}
                         showIncomplete={showIncomplete}
+                        membersBack={membersBack}
                       />
                     </li>
                   ))}
@@ -390,6 +409,7 @@ export function MembersPage() {
                   user={user}
                   tab={tab}
                   showIncomplete={showIncomplete}
+                  membersBack={membersBack}
                   teamMeta={
                     tab === 'teamAdmins'
                       ? teams.length > 0

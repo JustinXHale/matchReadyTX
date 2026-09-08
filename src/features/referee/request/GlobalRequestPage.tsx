@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { EmptyState, EmptyStateBody, Title } from '@patternfly/react-core';
 import { useApp } from '@/app/AppContext';
@@ -17,22 +17,23 @@ import { canOfficialRequestMatch, openRequestSlots } from '@/domain/requests';
 import {
   REQUESTABLE_SLOT_SHORT,
   type Match,
-  type MatchGender,
   type RequestableSlot,
 } from '@/domain/types';
 import { backState, type BackNav } from '@/nav/backNav';
+import {
+  pathWithSearch,
+  useAvailableMatchesFilterParams,
+  type AvailableRoleFilter,
+} from '@/nav/listFilterParams';
 import {
   formatMatchMonthLabel,
   matchMonthKey,
   orgTimeZone,
 } from '@/domain/matchTime';
 
-const GLOBAL_REQUEST_BACK: BackNav = {
-  to: '/referee/appointments/open',
-  label: 'Available matches',
-};
+const OPEN_MATCHES_PATH = '/referee/appointments/open';
 
-type RoleFilter = 'mo' | 'ar' | 'cmo' | 'no4';
+type RoleFilter = AvailableRoleFilter;
 
 const ROLE_FILTERS: { id: RoleFilter; label: string }[] = [
   { id: 'mo', label: 'MO Only' },
@@ -54,7 +55,13 @@ function formatOpenSlots(slots: RequestableSlot[]): string {
 }
 
 /** Opens match detail so the official can pick a role and raise their hand. */
-function RaiseHandTrailing({ match }: { match: Match }) {
+function RaiseHandTrailing({
+  match,
+  requestBack,
+}: {
+  match: Match;
+  requestBack: BackNav;
+}) {
   const navigate = useNavigate();
   const open = openRequestSlots(match);
   return (
@@ -66,7 +73,7 @@ function RaiseHandTrailing({ match }: { match: Match }) {
         e.preventDefault();
         e.stopPropagation();
         navigate(`/matches/${match.id}?request=1`, {
-          state: backState(GLOBAL_REQUEST_BACK),
+          state: backState(requestBack),
         });
       }}
     >
@@ -83,14 +90,29 @@ function RaiseHandTrailing({ match }: { match: Match }) {
 export function GlobalRequestPage() {
   const { currentUser, state } = useApp();
   const timeZone = orgTimeZone(state.org.timezone);
-  const [roleFilter, setRoleFilter] = useState<RoleFilter | null>(null);
-  const [genderFilter, setGenderFilter] = useState<MatchGender | null>(null);
-  const [levelFilter, setLevelFilter] = useState<string | null>(null);
-  const [competitionFilter, setCompetitionFilter] = useState<string | null>(
-    null,
+  const {
+    searchParams,
+    roleFilter,
+    genderFilter,
+    levelFilter,
+    competitionFilter,
+    formatFilter,
+    dateFilter,
+    setRoleFilter,
+    setGenderFilter,
+    setLevelFilter,
+    setCompetitionFilter,
+    setFormatFilter,
+    setDateFilter,
+  } = useAvailableMatchesFilterParams();
+
+  const requestBack: BackNav = useMemo(
+    () => ({
+      to: pathWithSearch(OPEN_MATCHES_PATH, searchParams),
+      label: 'Available matches',
+    }),
+    [searchParams],
   );
-  const [formatFilter, setFormatFilter] = useState<string | null>(null);
-  const [dateFilter, setDateFilter] = useState<string | null>(null);
 
   const filterPool = useMemo(() => {
     if (!currentUser) return [] as Match[];
@@ -333,8 +355,8 @@ export function GlobalRequestPage() {
                     showTime
                     split="action"
                     urgent
-                    back={GLOBAL_REQUEST_BACK}
-                    trailing={<RaiseHandTrailing match={m} />}
+                    back={requestBack}
+                    trailing={<RaiseHandTrailing match={m} requestBack={requestBack} />}
                   />
                 </li>
               ))}
@@ -354,8 +376,8 @@ export function GlobalRequestPage() {
                       to={`/matches/${m.id}?request=1`}
                       showTime
                       split="action"
-                      back={GLOBAL_REQUEST_BACK}
-                      trailing={<RaiseHandTrailing match={m} />}
+                      back={requestBack}
+                      trailing={<RaiseHandTrailing match={m} requestBack={requestBack} />}
                     />
                   </li>
                 ))}

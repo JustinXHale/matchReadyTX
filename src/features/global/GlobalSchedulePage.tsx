@@ -1,5 +1,5 @@
 import { Title, EmptyState, EmptyStateBody } from '@patternfly/react-core';
-import { useMemo, useState } from 'react';
+import { useMemo } from 'react';
 import { Navigate, useParams } from 'react-router-dom';
 import { useApp, useAppHref } from '@/app/AppContext';
 import { isScheduleUpcoming } from '@/domain/requests';
@@ -12,10 +12,14 @@ import {
 import { isTeamMatch, releasedMatches } from '@/domain/visibility';
 import { MatchListRow } from '@/ui/MatchListRow';
 import { MatchCrewTrailing } from '@/ui/MatchCrewTrailing';
-import type { Match, MatchGender } from '@/domain/types';
+import type { Match } from '@/domain/types';
 import { GlobalDivisionFilters } from '@/features/global/GlobalDivisionFilters';
 import { GlobalScheduleSubNav } from '@/features/global/GlobalScheduleSubNav';
 import type { BackNav } from '@/nav/backNav';
+import {
+  pathWithSearch,
+  useGlobalScheduleFilterParams,
+} from '@/nav/listFilterParams';
 import {
   formatMatchMonthLabel,
   matchMonthKey,
@@ -23,7 +27,6 @@ import {
 } from '@/domain/matchTime';
 
 type SchedulePane = 'upcoming' | 'completed';
-type SortDir = 'asc' | 'desc';
 
 function parsePane(raw: string | undefined): SchedulePane | null {
   if (raw === 'upcoming' || raw === 'completed') return raw;
@@ -38,14 +41,21 @@ export function GlobalSchedulePage() {
   const timeZone = orgTimeZone(state.org.timezone);
   const upcomingHref = useAppHref('/global/schedule/upcoming');
   const completedHref = useAppHref('/global/schedule/completed');
-  const [genderFilter, setGenderFilter] = useState<MatchGender | null>(null);
-  const [levelFilter, setLevelFilter] = useState<string | null>(null);
-  const [competitionFilter, setCompetitionFilter] = useState<string | null>(
-    null,
-  );
-  const [dateFilter, setDateFilter] = useState<string | null>(null);
-  const [sortDir, setSortDir] = useState<SortDir>('asc');
-  const [myTeamsOnly, setMyTeamsOnly] = useState(false);
+  const {
+    searchParams,
+    genderFilter,
+    levelFilter,
+    competitionFilter,
+    dateFilter,
+    sortDir,
+    myTeamsOnly,
+    setGenderFilter,
+    setLevelFilter,
+    setCompetitionFilter,
+    setDateFilter,
+    setSortDir,
+    setMyTeamsOnly,
+  } = useGlobalScheduleFilterParams();
 
   const fanFavorites = currentUser?.fanTeamIds;
   const showMyTeamsChip =
@@ -84,13 +94,13 @@ export function GlobalSchedulePage() {
     currentUser,
   ]);
 
-  const scheduleBack: BackNav = useMemo(
-    () => ({
-      to: pane === 'completed' ? completedHref : upcomingHref,
+  const scheduleBack: BackNav = useMemo(() => {
+    const base = pane === 'completed' ? completedHref : upcomingHref;
+    return {
+      to: pathWithSearch(base, searchParams),
       label: pane === 'completed' ? 'Completed Matches' : 'Upcoming Matches',
-    }),
-    [pane, completedHref, upcomingHref],
-  );
+    };
+  }, [pane, completedHref, upcomingHref, searchParams]);
 
   const list = useMemo(() => {
     if (!pane) return [];
@@ -209,7 +219,7 @@ export function GlobalSchedulePage() {
                 type="button"
                 className={`rs-filter-chip${myTeamsOnly ? ' rs-filter-chip--selected' : ''}`}
                 aria-pressed={myTeamsOnly}
-                onClick={() => setMyTeamsOnly((v) => !v)}
+                onClick={() => setMyTeamsOnly(!myTeamsOnly)}
               >
                 My teams
               </button>

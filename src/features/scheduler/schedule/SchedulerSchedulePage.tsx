@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Link, useSearchParams } from 'react-router-dom';
+import { useCallback, useMemo, useState } from 'react';
+import { Link } from 'react-router-dom';
 import {
   Button,
   EmptyState,
@@ -22,8 +22,6 @@ import {
   rolesNeededForMatch,
   type CrewSlot,
   type Match,
-  type MatchGender,
-  type MatchStatus,
 } from '@/domain/types';
 import {
   doubleBookedOfficialIdsForMatch,
@@ -42,6 +40,11 @@ import {
 } from '@/features/scheduler/queues/selectors';
 import { SchedulerAssignTrailing } from '@/features/scheduler/schedule/SchedulerAssignTrailing';
 import type { BackNav } from '@/nav/backNav';
+import {
+  pathWithSearch,
+  useSchedulerScheduleFilterParams,
+  type SchedulerStatusFilter,
+} from '@/nav/listFilterParams';
 import { MatchListRow } from '@/ui/MatchListRow';
 import {
   formatMatchMonthLabel,
@@ -49,16 +52,9 @@ import {
   orgTimeZone,
 } from '@/domain/matchTime';
 
-const SCHEDULER_SCHEDULE_BACK: BackNav = {
-  to: '/scheduler/schedule',
-  label: 'Schedule',
-};
+const SCHEDULER_SCHEDULE_PATH = '/scheduler/schedule';
 
-type StatusFilter =
-  | MatchStatus
-  | 'open_slots'
-  | 'needs_assignment'
-  | 'all';
+type StatusFilter = SchedulerStatusFilter;
 
 const STATUS_FILTERS: { id: StatusFilter; label: string }[] = [
   { id: 'all', label: 'All' },
@@ -121,20 +117,27 @@ export function SchedulerSchedulePage() {
   const { currentUser, state } = useApp();
   const { onApproveRaiseHand, onDeclineRaiseHand } =
     useSchedulerRequestActions();
-  const [searchParams, setSearchParams] = useSearchParams();
-  const timeZone = orgTimeZone(state.org.timezone);
-  const [genderFilter, setGenderFilter] = useState<MatchGender | null>(null);
-  const [levelFilter, setLevelFilter] = useState<string | null>(null);
-  const [competitionFilter, setCompetitionFilter] = useState<string | null>(
-    null,
+  const {
+    searchParams,
+    genderFilter,
+    levelFilter,
+    competitionFilter,
+    dateFilter,
+    statusFilter,
+    setGenderFilter,
+    setLevelFilter,
+    setCompetitionFilter,
+    setDateFilter,
+    setStatusFilter,
+  } = useSchedulerScheduleFilterParams();
+  const scheduleBack: BackNav = useMemo(
+    () => ({
+      to: pathWithSearch(SCHEDULER_SCHEDULE_PATH, searchParams),
+      label: 'Schedule',
+    }),
+    [searchParams],
   );
-  const [statusFilter, setStatusFilter] = useState<StatusFilter>(() => {
-    const needs = searchParams.get('needs');
-    return needs === '1' || needs === 'assignment'
-      ? 'needs_assignment'
-      : 'all';
-  });
-  const [dateFilter, setDateFilter] = useState<string | null>(null);
+  const timeZone = orgTimeZone(state.org.timezone);
   const [pick, setPick] = useState<{
     match: Match;
     target: CrewPickTarget;
@@ -148,13 +151,6 @@ export function SchedulerSchedulePage() {
     () => matchesNeedingReassignment(state.matches),
     [state.matches],
   );
-
-  useEffect(() => {
-    const needs = searchParams.get('needs');
-    if (needs === '1' || needs === 'assignment') {
-      setStatusFilter('needs_assignment');
-    }
-  }, [searchParams]);
 
   const filterOptions = useMemo(
     () => divisionFilterOptionsFromMatches(state.matches, competitionFilter),
@@ -238,11 +234,6 @@ export function SchedulerSchedulePage() {
 
   const selectStatusFilter = (id: StatusFilter) => {
     setStatusFilter(id);
-    if (id === 'needs_assignment') {
-      setSearchParams({ needs: '1' }, { replace: true });
-    } else if (searchParams.has('needs')) {
-      setSearchParams({}, { replace: true });
-    }
   };
 
   return (
@@ -343,7 +334,7 @@ export function SchedulerSchedulePage() {
                       showTime
                       split="action"
                       urgent={urgent}
-                      back={SCHEDULER_SCHEDULE_BACK}
+                      back={scheduleBack}
                       meta={
                         <>
                           <span className="rs-pill">{statusLabel(m.status)}</span>
@@ -357,7 +348,7 @@ export function SchedulerSchedulePage() {
                       trailing={
                         <SchedulerAssignTrailing
                           match={m}
-                          back={SCHEDULER_SCHEDULE_BACK}
+                          back={scheduleBack}
                           highlightUserId={currentUser?.uid}
                           onPick={(target) =>
                             setPick({ match: m, target })
@@ -375,7 +366,7 @@ export function SchedulerSchedulePage() {
                       <CoverageMatchRequesters
                         match={m}
                         requests={raiseHand}
-                        matchBack={SCHEDULER_SCHEDULE_BACK}
+                        matchBack={scheduleBack}
                         onApprove={onApproveRaiseHand}
                         onDecline={onDeclineRaiseHand}
                       />
