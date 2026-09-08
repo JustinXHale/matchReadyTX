@@ -20,6 +20,8 @@ export function isMatchRequestable(match: Match): boolean {
   ) {
     return false;
   }
+  // Any open MO/AR/No.4/CMO block — including after MO is already assigned.
+  if (openRequestSlots(match).length > 0) return true;
   if (emptyCrewBlocks(match.crew.mo).length > 0) return true;
   if (crewPeople(match.crew.mo).length === 0) return true;
   return (

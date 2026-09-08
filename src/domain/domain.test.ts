@@ -56,6 +56,7 @@ import {
   MATCH_ASSIGNMENT_FULFILLED_DECLINE_REASON,
   normalizeRequestableSlots,
   openCrewAssignTargets,
+  openRequestSlots,
   raiseHandsToFulfillOnAssignmentConfirm,
 } from '@/domain/requests';
 import { matchesNeedingOfficials } from '@/features/scheduler/queues/selectors';
@@ -755,6 +756,34 @@ describe('game requests', () => {
         },
       ]),
     ).toBe(false);
+  });
+
+  it('stays requestable after MO assigned when AR or CMO slots remain open', () => {
+    const released = releaseMatch(baseMatch());
+    const moFilled = {
+      ...released,
+      status: 'mo_confirmed' as const,
+      rolesNeeded: ['mo', 'ar1', 'cmo'] as Match['rolesNeeded'],
+      crew: {
+        ...released.crew,
+        mo: [
+          {
+            id: 'ca_mo',
+            slot: 'mo' as const,
+            userId: 'r2',
+            userName: 'MO',
+            status: 'confirmed' as const,
+            history: [],
+          },
+        ],
+        ar1: [emptyAssignment('ar1')],
+      },
+      cmo: [{ id: 'cmo1', userName: 'Open CMO' }],
+    };
+    expect(isMatchRequestable(moFilled)).toBe(true);
+    expect(isMatchFilled(moFilled)).toBe(false);
+    expect(canOfficialRequestMatch(moFilled, 'u1', [])).toBe(true);
+    expect(openRequestSlots(moFilled).sort()).toEqual(['ar1', 'cmo']);
   });
 
   it('hides past and filled matches from request surfaces', () => {
