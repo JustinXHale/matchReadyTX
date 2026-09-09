@@ -561,7 +561,7 @@ export function CoachFeedbackFormPage() {
 
         {error && <Alert variant="danger" title={error} isInline />}
 
-        <div className="rs-actions">
+        <div className="rs-actions rs-actions--inline">
           <Button
             variant="primary"
             onClick={() => void onSubmit()}

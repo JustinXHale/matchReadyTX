@@ -6,6 +6,7 @@ import { FieldValue, type Firestore } from 'firebase-admin/firestore';
 import { HttpsError } from 'firebase-functions/v2/https';
 import { logger } from 'firebase-functions';
 import { enqueueMail } from './sendMail';
+import { schedulerTeamLinksUrl } from './appLinks';
 
 const CONTACTS_TAB_ALIASES = [
   'Contacts',
@@ -245,7 +246,17 @@ async function notifyReviewers(opts: {
   }
 
   const subject = `Team Admin request: ${teamName}`;
-  const body = `${requesterName} (${requesterEmail}) asked to manage ${teamName}. Review in Scheduler → Queues or Team Admin.`;
+  const reviewUrl = schedulerTeamLinksUrl();
+  const body = [
+    `${requesterName} (${requesterEmail}) asked to manage ${teamName}.`,
+    '',
+    `Review and approve or deny: ${reviewUrl}`,
+    '',
+    `If you are not signed in, log in first — you'll be taken to Team links afterward.`,
+  ].join('\n');
+  const html = `<p><strong>${requesterName}</strong> (<a href="mailto:${requesterEmail}">${requesterEmail}</a>) asked to manage <strong>${teamName}</strong>.</p>
+<p><a href="${reviewUrl}">Review Team Admin requests</a> — approve or deny in Scheduler → Requests → Team links.</p>
+<p style="color:#666;font-size:13px;">If you are not signed in, you'll be asked to log in first, then taken to Team links.</p>`;
 
   for (const uid of uids) {
     const user = await db.doc(`users/${uid}`).get();
@@ -256,6 +267,7 @@ async function notifyReviewers(opts: {
         to: email,
         subject,
         text: body,
+        html,
         uid,
         event: 'team_link_request',
       });

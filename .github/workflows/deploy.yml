@@ -73,8 +73,9 @@ jobs:
           if [ -z "$FROM_EMAIL" ]; then
             FROM_EMAIL='MatchReadyTX <onboarding@resend.dev>'
           fi
-          printf 'RESEND_FROM_EMAIL=%s\n' "$FROM_EMAIL" > functions/.env.matchreadytx
-          echo "Wrote functions/.env.matchreadytx (RESEND_FROM_EMAIL only)"
+          APP_ORIGIN='${{ vars.VITE_APP_ORIGIN || 'https://matchreadytx.web.app' }}'
+          printf 'RESEND_FROM_EMAIL=%s\nAPP_ORIGIN=%s\n' "$FROM_EMAIL" "$APP_ORIGIN" > functions/.env.matchreadytx
+          echo "Wrote functions/.env.matchreadytx (RESEND_FROM_EMAIL, APP_ORIGIN)"
 
       - name: Deploy to Firebase
         run: npx firebase-tools@13 deploy --only hosting,firestore,functions --project matchreadytx --non-interactive --force
