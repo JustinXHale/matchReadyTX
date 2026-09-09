@@ -56,6 +56,7 @@ export type CoachFeedbackScaleKey =
   | 'safety'
   | 'communication'
   | 'professionalism'
+  | 'fitness'
   | 'overall';
 
 export const COACH_FEEDBACK_SCALE_KEYS: CoachFeedbackScaleKey[] = [
@@ -65,6 +66,7 @@ export const COACH_FEEDBACK_SCALE_KEYS: CoachFeedbackScaleKey[] = [
   'safety',
   'communication',
   'professionalism',
+  'fitness',
   'overall',
 ];
 
@@ -78,6 +80,7 @@ export const COACH_FEEDBACK_CRITERION_LABELS: Record<
   safety: 'Safety / foul play',
   communication: 'Communication',
   professionalism: 'Professionalism',
+  fitness: 'Fitness',
   overall: 'Overall',
 };
 
@@ -98,6 +101,8 @@ export const COACH_FEEDBACK_CRITERION_HINTS: Record<
     'Clear calls so teams understand and trust the process; voice, signals, and body language; keeps managing while communicating.',
   professionalism:
     'Calm under pressure; accurate high-impact decisions; rapport and influence; equal, uniform standards for both sides.',
+  fitness:
+    'Pace and endurance — stays with play, reaches breakdowns and set pieces in time, and maintains positioning for the full match.',
   overall: 'Overall performance across the match.',
 };
 

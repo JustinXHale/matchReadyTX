@@ -2027,6 +2027,7 @@ describe('coachFeedback', () => {
         safety: 4,
         communication: 3,
         professionalism: 5,
+        fitness: 4,
         overall: 3,
       }),
     ).toBe(true);
@@ -2039,6 +2040,7 @@ describe('coachFeedback', () => {
         safety: 4,
         communication: 3,
         professionalism: 5,
+        fitness: 'na',
         overall: 3,
       }),
     ).toBe(true);

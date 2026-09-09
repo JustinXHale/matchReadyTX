@@ -2035,12 +2035,12 @@ function seedCoachFeedback(matches: Match[]): CoachFeedback[] {
   const scaleSets: Partial<
     Record<CoachFeedbackScaleKey, CoachFeedbackScaleValue>
   >[] = [
-    { breakdown: 4, scrum: 4, lineout: 4, safety: 4, communication: 4, professionalism: 4, overall: 4 },
-    { breakdown: 3, scrum: 4, lineout: 3, safety: 4, communication: 4, professionalism: 3, overall: 3 },
-    { breakdown: 4, scrum: 3, lineout: 4, safety: 5, communication: 4, professionalism: 4, overall: 4 },
-    { breakdown: 5, scrum: 4, lineout: 4, safety: 4, communication: 5, professionalism: 4, overall: 5 },
-    { breakdown: 3, scrum: 3, lineout: 3, safety: 4, communication: 3, professionalism: 4, overall: 3 },
-    { breakdown: 4, scrum: 4, lineout: 4, safety: 4, communication: 4, professionalism: 5, overall: 4 },
+    { breakdown: 4, scrum: 4, lineout: 4, safety: 4, communication: 4, professionalism: 4, fitness: 4, overall: 4 },
+    { breakdown: 3, scrum: 4, lineout: 3, safety: 4, communication: 4, professionalism: 3, fitness: 3, overall: 3 },
+    { breakdown: 4, scrum: 3, lineout: 4, safety: 5, communication: 4, professionalism: 4, fitness: 4, overall: 4 },
+    { breakdown: 5, scrum: 4, lineout: 4, safety: 4, communication: 5, professionalism: 4, fitness: 5, overall: 5 },
+    { breakdown: 3, scrum: 3, lineout: 3, safety: 4, communication: 3, professionalism: 4, fitness: 3, overall: 3 },
+    { breakdown: 4, scrum: 4, lineout: 4, safety: 4, communication: 4, professionalism: 5, fitness: 4, overall: 4 },
   ];
 
   for (let i = 0; i < extraInsightMatches.length; i += 1) {
