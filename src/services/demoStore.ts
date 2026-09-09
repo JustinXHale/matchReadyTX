@@ -1,6 +1,7 @@
 import { csvRowToKickoffIso, parseScheduleCsv, type CsvMatchRow } from '@/domain/csvImport';
 import {
   assignOfficial,
+  archiveCrewAssignmentsHistory,
   confirmOfficialSlot,
   markUnavailableAndRelease,
 } from '@/domain/crew';
@@ -4412,15 +4413,21 @@ class DemoStore {
         if (blockId) return withCrewBlockRemoved(m, role, blockId);
         if (role === 'cmo') return { ...m, cmo: undefined };
         if (role === 'mo') {
+          const archived = archiveCrewAssignmentsHistory(m, 'mo', m.crew.mo ?? []);
           return {
-            ...m,
+            ...archived,
             crew: {
-              ...m.crew,
+              ...archived.crew,
               mo: [emptyAssignment('mo')],
             },
           };
         }
-        return { ...m, crew: { ...m.crew, [role]: [] } };
+        const archived = archiveCrewAssignmentsHistory(
+          m,
+          role,
+          m.crew[role] ?? [],
+        );
+        return { ...archived, crew: { ...archived.crew, [role]: [] } };
       }),
     }));
   }

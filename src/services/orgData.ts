@@ -79,6 +79,7 @@ import {
   type FixtureRequest,
   type GameRequest,
   type FeeTable,
+  type HistoryEntry,
   type Match,
   type MatchGender,
   type MeetingResource,
@@ -152,6 +153,42 @@ function normalizeCrew(raw: unknown): Match['crew'] {
     }
   }
   return ensureDefaultMoBlock(base);
+}
+
+function normalizeAssignmentHistoryArchive(
+  raw: unknown,
+): Match['assignmentHistoryArchive'] {
+  if (!Array.isArray(raw)) return undefined;
+  const rows: NonNullable<Match['assignmentHistoryArchive']> = [];
+  for (const item of raw) {
+    if (!item || typeof item !== 'object') continue;
+    const rec = item as Record<string, unknown>;
+    const slot = rec.slot;
+    const entry = rec.entry;
+    if (
+      slot !== 'mo' &&
+      slot !== 'ar1' &&
+      slot !== 'ar2' &&
+      slot !== 'no4'
+    ) {
+      continue;
+    }
+    if (!entry || typeof entry !== 'object') continue;
+    const e = entry as Record<string, unknown>;
+    if (typeof e.id !== 'string' || typeof e.at !== 'string') continue;
+    rows.push({
+      slot,
+      entry: {
+        id: e.id,
+        at: e.at,
+        userId: typeof e.userId === 'string' ? e.userId : '',
+        userName: typeof e.userName === 'string' ? e.userName : '',
+        action: (e.action as HistoryEntry['action']) || 'released',
+        reason: typeof e.reason === 'string' ? e.reason : undefined,
+      },
+    });
+  }
+  return rows.length ? rows : undefined;
 }
 
 /** Accept legacy single CMO object or array. */
@@ -253,6 +290,9 @@ export function matchFromFirestore(
         ? data.forfeitTeamId.trim()
         : undefined,
     crew: normalizeCrew(data.crew),
+    assignmentHistoryArchive: normalizeAssignmentHistoryArchive(
+      data.assignmentHistoryArchive,
+    ),
     homeScore: typeof data.homeScore === 'number' ? data.homeScore : undefined,
     awayScore: typeof data.awayScore === 'number' ? data.awayScore : undefined,
   };
@@ -1534,7 +1574,10 @@ export async function clearMatchForfeitInFirestore(
 /** Persist crew + match status after an assigner assignment (live mode). */
 export async function saveMatchCrewAssignment(
   orgId: string,
-  match: Pick<Match, 'id' | 'crew' | 'status' | 'cmo' | 'rolesNeeded'>,
+  match: Pick<
+    Match,
+    'id' | 'crew' | 'status' | 'cmo' | 'rolesNeeded' | 'assignmentHistoryArchive'
+  >,
 ): Promise<void> {
   const { setDoc } = await import('firebase/firestore');
   const payload = stripUndefined({
@@ -1542,6 +1585,12 @@ export async function saveMatchCrewAssignment(
     status: match.status,
     rolesNeeded: match.rolesNeeded ?? null,
     cmo: cmoForFirestore(match.cmo),
+    assignmentHistoryArchive: match.assignmentHistoryArchive?.length
+      ? match.assignmentHistoryArchive.map(({ slot, entry }) => ({
+          slot,
+          entry: firestoreJson(entry),
+        }))
+      : null,
     updatedAt: new Date().toISOString(),
   });
   await setDoc(doc(requireDb(), 'orgs', orgId, 'matches', match.id), payload, {

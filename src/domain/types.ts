@@ -151,6 +151,11 @@ export interface Match {
   forfeitTeamId?: string;
   /** 0..N people per role (tournaments may assign several MOs, ARs, etc.). */
   crew: Record<CrewSlot, CrewAssignment[]>;
+  /**
+   * Assignment audit rows kept when an assigner removes a crew block entirely
+   * (history on active blocks lives on each CrewAssignment).
+   */
+  assignmentHistoryArchive?: { slot: CrewSlot; entry: HistoryEntry }[];
   /** Final score when reported (from match report). */
   homeScore?: number;
   awayScore?: number;

@@ -233,6 +233,37 @@
   );
 }
 
+/* Forfeit — muted card (completed / no longer active) */
+.rs-list-row--forfeit {
+  background: color-mix(in srgb, var(--rs-color-muted) 10%, var(--rs-color-surface));
+  border-color: color-mix(in srgb, var(--rs-color-muted) 28%, var(--rs-color-border));
+  opacity: 0.88;
+}
+
+.rs-list-row--forfeit .rs-list-row__teams,
+.rs-list-row--forfeit .rs-list-row__date,
+.rs-list-row--forfeit .rs-list-row__day,
+.rs-list-row--forfeit .rs-list-row__month,
+.rs-list-row--forfeit .rs-list-row__venue,
+.rs-list-row--forfeit .rs-list-row__time,
+.rs-list-row--forfeit .rs-list-row__ha,
+.rs-list-row--forfeit .rs-list-row__name {
+  color: color-mix(in srgb, var(--rs-color-text) 70%, var(--rs-color-muted));
+}
+
+.rs-list-row--forfeit .rs-list-row__main:hover,
+.rs-list-row--forfeit .rs-list-row__main:focus-visible,
+.rs-list-row--forfeit .rs-list-row__card-link:hover .rs-list-row__main,
+.rs-list-row--forfeit .rs-list-row__card-link:focus-visible .rs-list-row__main {
+  background: color-mix(in srgb, var(--rs-color-muted) 14%, var(--rs-color-surface));
+}
+
+.pf-v6-theme-dark .rs-list-row--forfeit {
+  background: color-mix(in srgb, var(--rs-color-muted) 16%, var(--rs-color-surface));
+  border-color: var(--rs-color-border);
+  opacity: 0.92;
+}
+
 .rs-list-row__main {
   display: flex;
   flex: 3 1 0%;

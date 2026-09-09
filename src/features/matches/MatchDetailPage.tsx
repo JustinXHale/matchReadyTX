@@ -57,13 +57,15 @@ import {
   teamFacingCrewShapeLabel,
   type CrewAssignment,
   type CrewSlot,
-  type HistoryEntry,
   type Match,
   type RequestableSlot,
   type Team,
   type UserProfile,
 } from '@/domain/types';
-import { namedOfficialsNeedingAvailability } from '@/domain/crew';
+import {
+  collectAssignmentHistory,
+  namedOfficialsNeedingAvailability,
+} from '@/domain/crew';
 import { availableCrewRolesToAdd, roleHasAssignee } from '@/domain/crewSize';
 import { IconDateInput } from '@/ui/IconDateInput';
 import {
@@ -352,21 +354,10 @@ export function MatchDetailPage() {
     [state.users],
   );
 
-  const assignmentHistory = useMemo(() => {
-    if (!match) return [] as { slot: CrewSlot; entry: HistoryEntry }[];
-    const rows: { slot: CrewSlot; entry: HistoryEntry }[] = [];
-    for (const slot of CREW_SLOTS) {
-      for (const assignment of match.crew[slot] ?? []) {
-        for (const entry of assignment.history) {
-          rows.push({ slot, entry });
-        }
-      }
-    }
-    return rows.sort(
-      (a, b) =>
-        new Date(b.entry.at).getTime() - new Date(a.entry.at).getTime(),
-    );
-  }, [match]);
+  const assignmentHistory = useMemo(
+    () => (match ? collectAssignmentHistory(match) : []),
+    [match],
+  );
 
   const teamEmails = useMemo(() => {
     if (!match) return [];

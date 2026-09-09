@@ -34,7 +34,8 @@ import {
   reactivateMatch,
   releaseMatch,
 } from '@/domain/matchTransitions';
-import { assignOfficial, confirmOfficialSlot, markUnavailableAndRelease } from '@/domain/crew';
+import { assignOfficial, collectAssignmentHistory, confirmOfficialSlot, markUnavailableAndRelease } from '@/domain/crew';
+import { withCrewBlockRemoved } from '@/domain/crewSize';
 import { emptyCrew, crewBlocks, crewPeople, emptyCrewBlocks, emptyAssignment, hasInsightsAccessRole, isCrewVisibleToTeams, type Match, type OrgSettings, type Team, type UserProfile, type RequestableSlot } from '@/domain/types';
 import {
   matchFromFixtureRequest,
@@ -2378,6 +2379,25 @@ describe('crewColumnLines', () => {
       (l) => l.slotLabel === 'MO' && l.value === 'Open',
     );
     expect(openMoLine?.assignTarget?.assignmentId).toBe(openMo.id);
+  });
+});
+
+describe('assignment history archive', () => {
+  it('keeps history when assigner removes a crew block', () => {
+    let m = baseMatch();
+    m = assignOfficial(m, 'mo', { uid: 'u_ref', displayName: 'Chris Goetz' });
+    const blockId = m.crew.mo[0]!.id;
+    m = withCrewBlockRemoved(m, 'mo', blockId);
+    const history = collectAssignmentHistory(m);
+    expect(history.some((h) => h.entry.userName === 'Chris Goetz')).toBe(true);
+  });
+
+  it('keeps history on empty stub after unassign', () => {
+    let m = baseMatch();
+    m = assignOfficial(m, 'mo', { uid: 'u_ref', displayName: 'Chris Goetz' });
+    m = markUnavailableAndRelease(m, 'mo', 'Forfeit cleanup', 'released');
+    const history = collectAssignmentHistory(m);
+    expect(history.some((h) => h.entry.action === 'released')).toBe(true);
   });
 });
 

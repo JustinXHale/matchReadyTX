@@ -248,6 +248,7 @@ export function MatchListRow({
     </>
   );
 
+  const isForfeited = Boolean(match.forfeitTeamId);
   const rowClass = [
     'rs-list-row',
     split === 'action' ? 'rs-list-row--action' : '',
@@ -255,6 +256,7 @@ export function MatchListRow({
     aside ? 'rs-list-row--with-aside' : '',
     urgent ? 'rs-list-row--urgent' : '',
     !urgent && warn ? 'rs-list-row--warn' : '',
+    !urgent && !warn && isForfeited ? 'rs-list-row--forfeit' : '',
   ]
     .filter(Boolean)
     .join(' ');

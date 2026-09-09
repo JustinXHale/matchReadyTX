@@ -7,6 +7,7 @@ import {
   emptyCmoContact,
   rolesNeededForMatch,
 } from './types';
+import { archiveCrewAssignmentsHistory } from './crew';
 
 /** Always list every role type — Add role appends another empty block. */
 export function availableCrewRolesToAdd(_match?: Match): RequestableSlot[] {
@@ -62,22 +63,27 @@ export function withCrewBlockRemoved(
   }
 
   const list = match.crew[role] ?? [];
+  const removed = list.filter((a) => a.id === blockId);
+  let archived = match;
+  for (const assignment of removed) {
+    archived = archiveCrewAssignmentsHistory(archived, role, [assignment]);
+  }
   const next = list.filter((a) => a.id !== blockId);
 
   if (role === 'mo' && crewBlocks(next).length === 0) {
     // Never leave the match without an MO capacity block.
     return {
-      ...match,
-      crew: { ...match.crew, mo: [emptyAssignment('mo')] },
+      ...archived,
+      crew: { ...archived.crew, mo: [emptyAssignment('mo')] },
     };
   }
 
-  const crew = { ...match.crew, [role]: next };
-  const needed = new Set(rolesNeededForMatch({ ...match, crew }));
+  const crew = { ...archived.crew, [role]: next };
+  const needed = new Set(rolesNeededForMatch({ ...archived, crew }));
   if (crewBlocks(next).length === 0) needed.delete(role);
 
   return {
-    ...match,
+    ...archived,
     crew,
     rolesNeeded: REQUESTABLE_SLOTS.filter((r) => needed.has(r)),
   };

@@ -197,3 +197,42 @@ export function allActiveAssignments(
   }
   return out;
 }
+
+/** Copy assignment history off blocks that are about to be deleted. */
+export function archiveCrewAssignmentsHistory(
+  match: Match,
+  slot: CrewSlot,
+  assignments: CrewAssignment[],
+): Match {
+  const additions = assignments.flatMap((a) =>
+    a.history.map((entry) => ({ slot, entry })),
+  );
+  if (additions.length === 0) return match;
+  return {
+    ...match,
+    assignmentHistoryArchive: [
+      ...(match.assignmentHistoryArchive ?? []),
+      ...additions,
+    ],
+  };
+}
+
+/** All assignment history rows for assigner audit (active blocks + archive). */
+export function collectAssignmentHistory(
+  match: Match,
+): { slot: CrewSlot; entry: HistoryEntry }[] {
+  const rows: { slot: CrewSlot; entry: HistoryEntry }[] = [];
+  for (const slot of CREW_SLOTS) {
+    for (const assignment of match.crew[slot] ?? []) {
+      for (const entry of assignment.history) {
+        rows.push({ slot, entry });
+      }
+    }
+  }
+  for (const row of match.assignmentHistoryArchive ?? []) {
+    rows.push(row);
+  }
+  return rows.sort(
+    (a, b) => new Date(b.entry.at).getTime() - new Date(a.entry.at).getTime(),
+  );
+}
