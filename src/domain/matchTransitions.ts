@@ -1,8 +1,10 @@
+import { archiveCrewAssignmentsHistory } from './crew';
 import type { Match, MatchStatus } from './types';
 import {
   CREW_SLOTS,
   bothTeamsConfirmed,
   crewPeople,
+  emptyCrew,
   isCrewVisibleToTeams,
 } from './types';
 
@@ -141,8 +143,39 @@ export function applySheetFacts(
   };
 }
 
+/** Clear all assignees when a match will not be played (forfeit / cancel). */
+export function clearMatchCrewForTerminalOutcome(match: Match): Match {
+  let archived = match;
+  for (const slot of CREW_SLOTS) {
+    archived = archiveCrewAssignmentsHistory(archived, slot, match.crew[slot] ?? []);
+  }
+  return {
+    ...archived,
+    crew: emptyCrew(),
+    cmo: undefined,
+    rolesNeeded: ['mo'],
+  };
+}
+
 export function cancelMatch(match: Match, at = new Date().toISOString()): Match {
-  return { ...match, status: 'cancelled', cancelledAt: at };
+  return {
+    ...clearMatchCrewForTerminalOutcome(match),
+    status: 'cancelled',
+    cancelledAt: at,
+  };
+}
+
+export function applyMatchForfeitOutcome(
+  match: Match,
+  input: { forfeitTeamId: string; homeScore: number; awayScore: number },
+): Match {
+  return {
+    ...clearMatchCrewForTerminalOutcome(match),
+    forfeitTeamId: input.forfeitTeamId,
+    homeScore: input.homeScore,
+    awayScore: input.awayScore,
+    playedForfeit: false,
+  };
 }
 
 export function postponeMatch(match: Match, at = new Date().toISOString()): Match {

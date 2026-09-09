@@ -27,7 +27,10 @@ function authErrorMessage(provider: 'Google' | 'Apple', err: unknown): string {
     return 'Sign-in was cancelled.';
   }
   if (message.includes('auth/popup-blocked')) {
-    return 'Pop-up blocked. Allow pop-ups for this site (or use Chrome, not the IDE browser), then try again.';
+    return 'Pop-up blocked. Allow pop-ups for MatchReadyTX, or open this site in Safari or Chrome (not an in-app or private browser), then try again.';
+  }
+  if (message.includes('missing initial state')) {
+    return 'Sign-in was interrupted by your browser. Open MatchReadyTX in Safari or Chrome, sign in, then return to your match.';
   }
   if (
     message.includes('invalid_client') ||

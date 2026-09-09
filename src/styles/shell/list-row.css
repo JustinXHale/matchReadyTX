@@ -90,6 +90,40 @@
   color: color-mix(in srgb, var(--rs-color-on-urgent) 88%, transparent);
 }
 
+.rs-list-row--urgent .rs-appt-crew__assign {
+  color: color-mix(in srgb, var(--rs-color-on-urgent) 88%, transparent);
+}
+
+.rs-list-row--urgent .rs-appt-crew__assign:hover,
+.rs-list-row--urgent .rs-appt-crew__assign:focus-visible {
+  background: color-mix(
+    in srgb,
+    var(--rs-color-on-urgent) 12%,
+    var(--rs-color-urgent)
+  );
+  color: var(--rs-color-on-urgent);
+  outline: none;
+}
+
+.rs-list-row--urgent .rs-appt-crew__assign:focus-visible {
+  box-shadow: inset 0 0 0 2px var(--rs-color-on-urgent);
+}
+
+.rs-list-row--urgent a.rs-appt-crew__line:hover,
+.rs-list-row--urgent a.rs-appt-crew__line:focus-visible {
+  background: color-mix(
+    in srgb,
+    var(--rs-color-on-urgent) 12%,
+    var(--rs-color-urgent)
+  );
+  color: var(--rs-color-on-urgent);
+  outline: none;
+}
+
+.rs-list-row--urgent a.rs-appt-crew__line:focus-visible {
+  box-shadow: inset 0 0 0 2px var(--rs-color-on-urgent);
+}
+
 .rs-list-row--urgent .rs-appt-crew__slot {
   color: color-mix(in srgb, var(--rs-color-on-urgent) 72%, transparent);
 }

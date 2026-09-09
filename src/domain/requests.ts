@@ -38,10 +38,34 @@ export function isKickoffUpcoming(match: Match, nowMs = Date.now()): boolean {
   return new Date(match.kickoffAt).getTime() > nowMs;
 }
 
-/** League schedule panes: upcoming until kickoff, unless ended early (forfeit). */
+/** League schedule panes: upcoming until kickoff, unless ended early (forfeit/cancel). */
 export function isScheduleUpcoming(match: Match, nowMs = Date.now()): boolean {
   if (match.forfeitTeamId) return false;
+  if (match.status === 'cancelled') return false;
   return isKickoffUpcoming(match, nowMs);
+}
+
+/** Forfeit or cancel — match did not take place as scheduled. */
+export function isMatchDidNotPlay(match: Match): boolean {
+  return match.status === 'cancelled' || Boolean(match.forfeitTeamId);
+}
+
+export type CompletedOutcomeFilter = 'all' | 'played' | 'not_played';
+
+export function parseCompletedOutcomeParam(
+  raw: string | null,
+): CompletedOutcomeFilter {
+  if (raw === 'played' || raw === 'not_played') return raw;
+  return 'all';
+}
+
+export function matchMatchesCompletedOutcome(
+  match: Match,
+  filter: CompletedOutcomeFilter,
+): boolean {
+  if (filter === 'all') return true;
+  const didNotPlay = isMatchDidNotPlay(match);
+  return filter === 'not_played' ? didNotPlay : !didNotPlay;
 }
 
 /** No raise-hand positions left (no empty capacity blocks). */

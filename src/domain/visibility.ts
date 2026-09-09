@@ -61,6 +61,11 @@ export function releasedMatches(matches: Match[]): Match[] {
   return matches.filter((m) => m.status !== 'draft' && m.status !== 'cancelled');
 }
 
+/** League schedule browse — includes cancelled (completed pane) but not drafts. */
+export function globalScheduleMatches(matches: Match[]): Match[] {
+  return matches.filter((m) => m.status !== 'draft');
+}
+
 /**
  * Apply all | mine scope after role visibility.
  * - Officials mine → assigned slots only

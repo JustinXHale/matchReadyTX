@@ -5,6 +5,7 @@ import {
 } from '@/domain/matchTime';
 import { matchGameplayFormat } from '@/domain/matchGameplayFormat';
 import { statusLabel } from '@/domain/matchTransitions';
+import { isMatchDidNotPlay } from '@/domain/requests';
 import { genderLabel, type Match } from '@/domain/types';
 import type { ReactNode } from 'react';
 import { backState, type BackNav } from '@/nav/backNav';
@@ -248,7 +249,7 @@ export function MatchListRow({
     </>
   );
 
-  const isForfeited = Boolean(match.forfeitTeamId);
+  const isMutedOutcome = isMatchDidNotPlay(match);
   const rowClass = [
     'rs-list-row',
     split === 'action' ? 'rs-list-row--action' : '',
@@ -256,7 +257,7 @@ export function MatchListRow({
     aside ? 'rs-list-row--with-aside' : '',
     urgent ? 'rs-list-row--urgent' : '',
     !urgent && warn ? 'rs-list-row--warn' : '',
-    !urgent && !warn && isForfeited ? 'rs-list-row--forfeit' : '',
+    !urgent && !warn && isMutedOutcome ? 'rs-list-row--forfeit' : '',
   ]
     .filter(Boolean)
     .join(' ');

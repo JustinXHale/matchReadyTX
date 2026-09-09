@@ -23,7 +23,13 @@ import { faPen } from '@fortawesome/free-solid-svg-icons';
 import { MatchCrewReportStatusPanel } from '@/features/matches/MatchCrewReportStatusPanel';
 import { canSeeMatchFees } from '@/domain/visibility';
 import { roleHomeBack, useApp } from '@/app/AppContext';
-import { statusLabel } from '@/domain/matchTransitions';
+import {
+  applyMatchForfeitOutcome,
+  cancelMatch,
+  postponeMatch,
+  reactivateMatch,
+  statusLabel,
+} from '@/domain/matchTransitions';
 import {
   crewChipClass,
   crewStatusChipsForMatch,
@@ -77,7 +83,7 @@ import {
 } from '@/domain/requests';
 import { openGroupMailto, uniqueEmails } from '@/services/mailto';
 import { persistCrewAssignmentAndEmail, persistCrewUnassignmentAndEmail, resendCrewAssignmentEmail } from '@/services/liveAssignment';
-import { defaultOrgId, clearMatchForfeitInFirestore, createGameRequestInFirestore, patchGameRequestContentInFirestore, saveMatchCrewAssignment, saveMatchEventFlagsInFirestore, saveMatchForfeitInFirestore, saveMatchPlayedForfeitInFirestore, saveMatchScheduleUrlInFirestore, callMatchSelfService } from '@/services/orgData';
+import { defaultOrgId, clearMatchForfeitInFirestore, createGameRequestInFirestore, patchGameRequestContentInFirestore, saveMatchCrewAssignment, saveMatchEventFlagsInFirestore, saveMatchForfeitInFirestore, saveMatchPlayedForfeitInFirestore, saveMatchScheduleUrlInFirestore, saveMatchWorkflowInFirestore, callMatchSelfService } from '@/services/orgData';
 import { isFirebaseConfigured } from '@/services/firebase';
 import {
   isTournamentMatch,
@@ -1039,12 +1045,40 @@ export function MatchDetailPage() {
         store.sendCoverageAlert(match.id);
         setCoverageAlertSent(true);
         break;
-      case 'cancel':
+      case 'cancel': {
         store.cancelOrPostpone(match.id, 'cancel');
+        if (dataMode === 'live' && isFirebaseConfigured) {
+          void saveMatchWorkflowInFirestore(
+            defaultOrgId(),
+            cancelMatch(match),
+          ).catch((err) => {
+            console.error('saveMatchWorkflowInFirestore failed', err);
+            window.alert(
+              err instanceof Error
+                ? `Updated locally, but save failed: ${err.message}`
+                : 'Updated locally, but save failed.',
+            );
+          });
+        }
         break;
-      case 'postpone':
+      }
+      case 'postpone': {
         store.cancelOrPostpone(match.id, 'postpone');
+        if (dataMode === 'live' && isFirebaseConfigured) {
+          void saveMatchWorkflowInFirestore(
+            defaultOrgId(),
+            postponeMatch(match),
+          ).catch((err) => {
+            console.error('saveMatchWorkflowInFirestore failed', err);
+            window.alert(
+              err instanceof Error
+                ? `Updated locally, but save failed: ${err.message}`
+                : 'Updated locally, but save failed.',
+            );
+          });
+        }
         break;
+      }
       case 'played_forfeit': {
         store.setMatchFlags(match.id, { playedForfeit: true });
         if (dataMode === 'live' && isFirebaseConfigured) {
@@ -1097,9 +1131,23 @@ export function MatchDetailPage() {
         }
         break;
       }
-      case 'reactivate':
+      case 'reactivate': {
         store.reactivateMatch(match.id);
+        if (dataMode === 'live' && isFirebaseConfigured) {
+          void saveMatchWorkflowInFirestore(
+            defaultOrgId(),
+            reactivateMatch(match),
+          ).catch((err) => {
+            console.error('saveMatchWorkflowInFirestore failed', err);
+            window.alert(
+              err instanceof Error
+                ? `Updated locally, but save failed: ${err.message}`
+                : 'Updated locally, but save failed.',
+            );
+          });
+        }
         break;
+      }
     }
     setAssignerConfirm(null);
   };
@@ -1119,16 +1167,17 @@ export function MatchDetailPage() {
   }) => {
     store.recordMatchForfeit(match.id, input);
     if (dataMode === 'live' && isFirebaseConfigured) {
-      void saveMatchForfeitInFirestore(defaultOrgId(), match.id, input).catch(
-        (err) => {
-          console.error('saveMatchForfeitInFirestore failed', err);
-          window.alert(
-            err instanceof Error
-              ? `Updated locally, but save failed: ${err.message}`
-              : 'Updated locally, but save failed.',
-          );
-        },
-      );
+      void saveMatchForfeitInFirestore(
+        defaultOrgId(),
+        applyMatchForfeitOutcome(match, input),
+      ).catch((err) => {
+        console.error('saveMatchForfeitInFirestore failed', err);
+        window.alert(
+          err instanceof Error
+            ? `Updated locally, but save failed: ${err.message}`
+            : 'Updated locally, but save failed.',
+        );
+      });
     }
   };
 

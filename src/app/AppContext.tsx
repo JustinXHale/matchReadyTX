@@ -12,7 +12,12 @@ import { flushSync } from 'react-dom';
 import type { AppState } from '@/services/demoStore';
 import { demoStore } from '@/services/demoStore';
 import { isDemoMode, isFirebaseConfigured } from '@/services/firebase';
-import { signOutFirebase, subscribeAuth, completeRedirectSignIn } from '@/services/auth';
+import {
+  signOutFirebase,
+  subscribeAuth,
+  completeRedirectSignIn,
+  isMissingRedirectStateError,
+} from '@/services/auth';
 import { ensureFirebaseUser, loadFirebaseProfile } from '@/services/userProfile';
 import {
   defaultOrgId,
@@ -321,6 +326,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
     // Finish mobile redirect sign-in before relying on auth state alone.
     void completeRedirectSignIn().catch((err) => {
+      if (isMissingRedirectStateError(err)) {
+        console.warn('Stale redirect sign-in state on bootstrap', err);
+        return;
+      }
       console.error('Redirect sign-in failed', err);
       if (!cancelled) {
         setAuthBootstrapError(

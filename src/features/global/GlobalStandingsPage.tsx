@@ -2,16 +2,19 @@ import { EmptyState, EmptyStateBody, Title } from '@patternfly/react-core';
 import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useApp } from '@/app/AppContext';
-import { standingsByDivision } from '@/domain/standings';
+import { standingsByDivision, standingsCombined } from '@/domain/standings';
 import { divisionFilterOptionsFromMatches } from '@/domain/divisionFilters';
 import { matchInCompetition } from '@/domain/competitions';
 import type { MatchGender } from '@/domain/types';
 import { GlobalDivisionFilters } from '@/features/global/GlobalDivisionFilters';
 import { backState } from '@/nav/backNav';
 
+type StandingsViewMode = 'combined' | 'by_tier';
+
 export function GlobalStandingsPage() {
   const { state } = useApp();
   const navigate = useNavigate();
+  const [viewMode, setViewMode] = useState<StandingsViewMode>('combined');
   const [genderFilter, setGenderFilter] = useState<MatchGender | null>(null);
   const [levelFilter, setLevelFilter] = useState<string | null>(null);
   const [competitionFilter, setCompetitionFilter] = useState<string | null>(
@@ -23,45 +26,83 @@ export function GlobalStandingsPage() {
     [state.matches, competitionFilter],
   );
 
-  const allGroups = useMemo(
-    () => standingsByDivision(state.matches),
-    [state.matches],
-  );
-
-  const groups = useMemo(() => {
-    return allGroups.filter((g) => {
-      if (genderFilter && g.gender !== genderFilter) return false;
-      if (levelFilter && g.level !== levelFilter) return false;
-      if (competitionFilter) {
-        const inComp = state.matches.some(
-          (m) =>
-            m.level === g.level &&
-            m.gender === g.gender &&
-            matchInCompetition(m, competitionFilter) &&
-            typeof m.homeScore === 'number' &&
-            typeof m.awayScore === 'number',
-        );
-        if (!inComp) return false;
+  const filteredMatches = useMemo(() => {
+    return state.matches.filter((m) => {
+      if (genderFilter && m.gender !== genderFilter) return false;
+      if (viewMode === 'by_tier' && levelFilter && m.level !== levelFilter) {
+        return false;
+      }
+      if (competitionFilter && !matchInCompetition(m, competitionFilter)) {
+        return false;
       }
       return true;
     });
-  }, [allGroups, genderFilter, levelFilter, competitionFilter, state.matches]);
+  }, [
+    state.matches,
+    genderFilter,
+    levelFilter,
+    competitionFilter,
+    viewMode,
+  ]);
 
-  const hasBase = allGroups.length > 0;
+  const groups = useMemo(() => {
+    return viewMode === 'combined'
+      ? standingsCombined(filteredMatches)
+      : standingsByDivision(filteredMatches);
+  }, [filteredMatches, viewMode]);
+
+  const hasBase = useMemo(
+    () =>
+      (viewMode === 'combined'
+        ? standingsCombined(state.matches)
+        : standingsByDivision(state.matches)
+      ).length > 0,
+    [state.matches, viewMode],
+  );
+
+  const setViewModeAndClearTier = (mode: StandingsViewMode) => {
+    setViewMode(mode);
+    if (mode === 'combined') setLevelFilter(null);
+  };
 
   return (
     <>
       {hasBase && (
-        <GlobalDivisionFilters
-          options={filterOptions}
-          genderFilter={genderFilter}
-          levelFilter={levelFilter}
-          competitionFilter={competitionFilter}
-          onGenderChange={setGenderFilter}
-          onLevelChange={setLevelFilter}
-          onCompetitionChange={setCompetitionFilter}
-          ariaLabel="Filter standings"
-        />
+        <>
+          <GlobalDivisionFilters
+            options={filterOptions}
+            genderFilter={genderFilter}
+            levelFilter={levelFilter}
+            competitionFilter={competitionFilter}
+            onGenderChange={setGenderFilter}
+            onLevelChange={setLevelFilter}
+            onCompetitionChange={setCompetitionFilter}
+            hideLevels={viewMode === 'combined'}
+            ariaLabel="Filter standings"
+          />
+          <div
+            className="rs-filter-chips rs-schedule-sort"
+            role="group"
+            aria-label="Standings layout"
+          >
+            <button
+              type="button"
+              className={`rs-filter-chip${viewMode === 'combined' ? ' rs-filter-chip--selected' : ''}`}
+              aria-pressed={viewMode === 'combined'}
+              onClick={() => setViewModeAndClearTier('combined')}
+            >
+              All teams
+            </button>
+            <button
+              type="button"
+              className={`rs-filter-chip${viewMode === 'by_tier' ? ' rs-filter-chip--selected' : ''}`}
+              aria-pressed={viewMode === 'by_tier'}
+              onClick={() => setViewModeAndClearTier('by_tier')}
+            >
+              By tier
+            </button>
+          </div>
+        </>
       )}
 
       {!hasBase ? (

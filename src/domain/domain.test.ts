@@ -27,6 +27,7 @@ import {
   validateTeamLinkRequestBatch,
 } from '@/domain/teamLinkRequests';
 import {
+  applyMatchForfeitOutcome,
   applySheetFacts,
   cancelMatch,
   confirmTeam,
@@ -50,9 +51,11 @@ import {
   canOfficialRequestMatch,
   isKickoffUpcoming,
   isScheduleUpcoming,
+  isMatchDidNotPlay,
   isMatchFilled,
   isMatchRequestable,
   isPendingRequestActive,
+  matchMatchesCompletedOutcome,
   matchNeedsCrewCoverage,
   MATCH_ASSIGNMENT_FULFILLED_DECLINE_REASON,
   normalizeRequestableSlots,
@@ -100,7 +103,7 @@ import {
   rolePillsForMember,
 } from '@/domain/members';
 import { defaultRoleView, lensesForUser } from '@/app/AppContext';
-import { standingsByDivision } from '@/domain/standings';
+import { standingsByDivision, standingsCombined } from '@/domain/standings';
 import { scheduleTeamEntries, teamContactPeople, conferenceTeamOptions } from '@/domain/teams';
 import { dedupeTeamsForPicker } from '@/domain/teamList';
 import { crewColumnLines } from '@/features/referee/appointments/crewLines';
@@ -151,11 +154,54 @@ describe('match transitions', () => {
   it('reactivateMatch restores cancelled match from workflow state', () => {
     let m = releaseMatch(baseMatch());
     m = confirmTeam(confirmTeam(m, 'home'), 'away');
+    m = assignOfficial(m, 'mo', { uid: 'r1', displayName: 'Ref' });
     m = cancelMatch(m);
     expect(m.status).toBe('cancelled');
+    expect(crewPeople(m.crew.mo)).toHaveLength(0);
     const back = reactivateMatch(m);
     expect(back.status).toBe('team_confirmed');
     expect(back.cancelledAt).toBeUndefined();
+  });
+
+  it('cancel and forfeit clear crew assignments', () => {
+    let m = releaseMatch(baseMatch());
+    m = confirmTeam(confirmTeam(m, 'home'), 'away');
+    m = assignOfficial(m, 'mo', { uid: 'r1', displayName: 'Ref' });
+    expect(crewPeople(m.crew.mo)).toHaveLength(1);
+
+    const cancelled = cancelMatch(m);
+    expect(crewPeople(cancelled.crew.mo)).toHaveLength(0);
+    expect(cancelled.rolesNeeded).toEqual(['mo']);
+
+    const forfeited = applyMatchForfeitOutcome(m, {
+      forfeitTeamId: m.homeTeamId,
+      homeScore: 0,
+      awayScore: 1,
+    });
+    expect(crewPeople(forfeited.crew.mo)).toHaveLength(0);
+    expect(forfeited.forfeitTeamId).toBe(m.homeTeamId);
+  });
+
+  it('completed schedule treats cancelled and forfeit as did-not-play', () => {
+    const released = releaseMatch(baseMatch());
+    const futureCancel = {
+      ...released,
+      kickoffAt: new Date(Date.now() + 3_600_000).toISOString(),
+      status: 'cancelled' as const,
+    };
+    expect(isScheduleUpcoming(futureCancel)).toBe(false);
+    expect(isMatchDidNotPlay(futureCancel)).toBe(true);
+    expect(matchMatchesCompletedOutcome(futureCancel, 'not_played')).toBe(true);
+    expect(matchMatchesCompletedOutcome(futureCancel, 'played')).toBe(false);
+
+    const played = {
+      ...released,
+      kickoffAt: new Date(Date.now() - 3_600_000).toISOString(),
+      homeScore: 2,
+      awayScore: 1,
+    };
+    expect(isMatchDidNotPlay(played)).toBe(false);
+    expect(matchMatchesCompletedOutcome(played, 'played')).toBe(true);
   });
 
   it('reactivateMatch from postponed returns to needs_reconfirmation', () => {
@@ -1521,6 +1567,43 @@ describe('standings', () => {
     expect(groups).toHaveLength(1);
     const alpha = groups[0].rows.find((r) => r.teamId === 'team_a')!;
     expect(alpha).toMatchObject({ played: 1, w: 1, pf: 20, pa: 10 });
+  });
+
+  it('combines cross-tier results into one list per gender', () => {
+    const d1 = {
+      ...baseMatch(),
+      id: 'r1',
+      status: 'locked_confirmed' as const,
+      level: 'Tier 1',
+      gender: 'men' as const,
+      homeTeamId: 'team_a',
+      homeTeamName: 'Alpha',
+      awayTeamId: 'team_b',
+      awayTeamName: 'Beta',
+      homeScore: 20,
+      awayScore: 10,
+    };
+    const d2 = {
+      ...baseMatch(),
+      id: 'r2',
+      status: 'locked_confirmed' as const,
+      level: 'Tier 2',
+      gender: 'men' as const,
+      homeTeamId: 'team_a',
+      homeTeamName: 'Alpha',
+      awayTeamId: 'team_c',
+      awayTeamName: 'Charlie',
+      homeScore: 15,
+      awayScore: 15,
+    };
+    const byTier = standingsByDivision([d1, d2]);
+    expect(byTier).toHaveLength(2);
+
+    const combined = standingsCombined([d1, d2]);
+    expect(combined).toHaveLength(1);
+    expect(combined[0].label).toBe('Men');
+    const alpha = combined[0].rows.find((r) => r.teamId === 'team_a')!;
+    expect(alpha).toMatchObject({ w: 1, t: 1, pf: 35, pa: 25, pd: 10 });
   });
 });
 

@@ -1533,23 +1533,74 @@ export async function saveMatchPlayedForfeitInFirestore(
   );
 }
 
-/** Persist forfeit team + final score (assigner; live mode). */
+/** Persist forfeit team + final score and cleared crew (assigner; live mode). */
 export async function saveMatchForfeitInFirestore(
   orgId: string,
-  matchId: string,
-  input: {
-    forfeitTeamId: string;
-    homeScore: number;
-    awayScore: number;
-  },
+  match: Pick<
+    Match,
+    | 'id'
+    | 'forfeitTeamId'
+    | 'homeScore'
+    | 'awayScore'
+    | 'playedForfeit'
+    | 'crew'
+    | 'cmo'
+    | 'rolesNeeded'
+    | 'assignmentHistoryArchive'
+  >,
 ): Promise<void> {
   await setDoc(
-    doc(requireDb(), 'orgs', orgId, 'matches', matchId),
+    doc(requireDb(), 'orgs', orgId, 'matches', match.id),
     stripUndefined({
-      forfeitTeamId: input.forfeitTeamId,
-      homeScore: input.homeScore,
-      awayScore: input.awayScore,
-      playedForfeit: false,
+      forfeitTeamId: match.forfeitTeamId,
+      homeScore: match.homeScore,
+      awayScore: match.awayScore,
+      playedForfeit: match.playedForfeit ?? false,
+      crew: crewForFirestore(match.crew),
+      rolesNeeded: match.rolesNeeded ?? null,
+      cmo: cmoForFirestore(match.cmo),
+      assignmentHistoryArchive: match.assignmentHistoryArchive?.length
+        ? match.assignmentHistoryArchive.map(({ slot, entry }) => ({
+            slot,
+            entry: firestoreJson(entry),
+          }))
+        : null,
+      updatedAt: new Date().toISOString(),
+    }),
+    { merge: true },
+  );
+}
+
+/** Persist cancel / postpone / reactivate workflow + crew (assigner; live mode). */
+export async function saveMatchWorkflowInFirestore(
+  orgId: string,
+  match: Pick<
+    Match,
+    | 'id'
+    | 'status'
+    | 'crew'
+    | 'cmo'
+    | 'rolesNeeded'
+    | 'assignmentHistoryArchive'
+    | 'cancelledAt'
+    | 'postponedAt'
+  >,
+): Promise<void> {
+  await setDoc(
+    doc(requireDb(), 'orgs', orgId, 'matches', match.id),
+    stripUndefined({
+      status: match.status,
+      crew: crewForFirestore(match.crew),
+      rolesNeeded: match.rolesNeeded ?? null,
+      cmo: cmoForFirestore(match.cmo),
+      assignmentHistoryArchive: match.assignmentHistoryArchive?.length
+        ? match.assignmentHistoryArchive.map(({ slot, entry }) => ({
+            slot,
+            entry: firestoreJson(entry),
+          }))
+        : null,
+      cancelledAt: match.cancelledAt ?? null,
+      postponedAt: match.postponedAt ?? null,
       updatedAt: new Date().toISOString(),
     }),
     { merge: true },

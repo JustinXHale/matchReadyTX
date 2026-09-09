@@ -19,6 +19,7 @@ import { feeOverrideForMatch, matchesForFeeApply } from '@/domain/feeDefaults';
 import { defaultFees, demoGeocode } from '@/domain/economics';
 import { formatMatchKickoff, orgTimeZone } from '@/domain/matchTime';
 import {
+  applyMatchForfeitOutcome,
   applySheetFacts,
   beginChangeProposed,
   cancelMatch,
@@ -4635,15 +4636,7 @@ class DemoStore {
     this.set((s) => ({
       ...s,
       matches: s.matches.map((m) =>
-        m.id === matchId
-          ? {
-              ...m,
-              forfeitTeamId: input.forfeitTeamId,
-              homeScore: input.homeScore,
-              awayScore: input.awayScore,
-              playedForfeit: false,
-            }
-          : m,
+        m.id === matchId ? applyMatchForfeitOutcome(m, input) : m,
       ),
     }));
   }

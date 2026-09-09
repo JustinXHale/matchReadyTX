@@ -130,3 +130,55 @@ export function standingsByDivision(matches: Match[]): StandingGroup[] {
 
   return groups;
 }
+
+/** Merge tier tables into one list per gender (teams that play across tiers). */
+export function standingsCombined(matches: Match[]): StandingGroup[] {
+  const byDivision = standingsByDivision(matches);
+  const byGender = new Map<
+    MatchGender,
+    Map<string, StandingRow>
+  >();
+
+  for (const group of byDivision) {
+    let teams = byGender.get(group.gender);
+    if (!teams) {
+      teams = new Map();
+      byGender.set(group.gender, teams);
+    }
+    for (const row of group.rows) {
+      const existing = teams.get(row.teamId);
+      if (!existing) {
+        teams.set(row.teamId, { ...row });
+        continue;
+      }
+      existing.played += row.played;
+      existing.w += row.w;
+      existing.l += row.l;
+      existing.t += row.t;
+      existing.pf += row.pf;
+      existing.pa += row.pa;
+      existing.pd = existing.pf - existing.pa;
+    }
+  }
+
+  const groups: StandingGroup[] = [];
+  for (const [gender, teams] of byGender) {
+    const rows = [...teams.values()];
+    rows.sort((a, b) => {
+      if (b.w !== a.w) return b.w - a.w;
+      if (b.pd !== a.pd) return b.pd - a.pd;
+      if (b.pf !== a.pf) return b.pf - a.pf;
+      return a.teamName.localeCompare(b.teamName);
+    });
+    groups.push({
+      key: gender,
+      gender,
+      level: '',
+      label: genderLabel(gender),
+      rows,
+    });
+  }
+
+  groups.sort((a, b) => a.gender.localeCompare(b.gender));
+  return groups;
+}

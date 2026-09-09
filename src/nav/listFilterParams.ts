@@ -1,6 +1,10 @@
 import { useCallback } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import type { MemberTab, TeamAdminSort } from '@/domain/members';
+import {
+  parseCompletedOutcomeParam,
+  type CompletedOutcomeFilter,
+} from '@/domain/requests';
 import type { MatchGender } from '@/domain/types';
 
 export function parseGenderParam(raw: string | null): MatchGender | null {
@@ -120,13 +124,27 @@ export function useGlobalScheduleFilterParams() {
     [patch],
   );
 
+  const completedOutcome = parseCompletedOutcomeParam(
+    searchParams.get('outcome'),
+  );
+  const setCompletedOutcome = useCallback(
+    (value: CompletedOutcomeFilter) => {
+      patch((sp) =>
+        patchSearchParam(sp, 'outcome', value === 'all' ? null : value),
+      );
+    },
+    [patch],
+  );
+
   return {
     searchParams,
     ...division,
     sortDir,
     myTeamsOnly,
+    completedOutcome,
     setSortDir,
     setMyTeamsOnly,
+    setCompletedOutcome,
   };
 }
 

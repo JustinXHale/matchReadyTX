@@ -2,14 +2,17 @@ import { Title, EmptyState, EmptyStateBody } from '@patternfly/react-core';
 import { useMemo } from 'react';
 import { Navigate, useParams } from 'react-router-dom';
 import { useApp, useAppHref } from '@/app/AppContext';
-import { isScheduleUpcoming } from '@/domain/requests';
+import {
+  isScheduleUpcoming,
+  matchMatchesCompletedOutcome,
+} from '@/domain/requests';
 import { divisionFilterOptionsFromMatches, matchOnCalendarDate, uniqueMatchCalendarDates } from '@/domain/divisionFilters';
 import {
   competitionsForUser,
   matchInCompetition,
   uniqueDisplayedCompetitions,
 } from '@/domain/competitions';
-import { isTeamMatch, releasedMatches } from '@/domain/visibility';
+import { globalScheduleMatches, isTeamMatch } from '@/domain/visibility';
 import { MatchListRow } from '@/ui/MatchListRow';
 import { MatchCrewTrailing } from '@/ui/MatchCrewTrailing';
 import type { Match } from '@/domain/types';
@@ -55,26 +58,28 @@ export function GlobalSchedulePage() {
     setDateFilter,
     setSortDir,
     setMyTeamsOnly,
+    completedOutcome,
+    setCompletedOutcome,
   } = useGlobalScheduleFilterParams();
 
   const fanFavorites = currentUser?.fanTeamIds;
   const showMyTeamsChip =
     isFanView && Boolean(fanFavorites && fanFavorites.length > 0);
 
-  const allReleased = useMemo(
-    () => releasedMatches(state.matches),
+  const allSchedule = useMemo(
+    () => globalScheduleMatches(state.matches),
     [state.matches],
   );
 
   const paneMatches = useMemo(() => {
     if (!pane) return [] as Match[];
-    return allReleased.filter((m) => {
+    return allSchedule.filter((m) => {
       const upcoming = isScheduleUpcoming(m);
       if (pane === 'upcoming' && !upcoming) return false;
       if (pane === 'completed' && upcoming) return false;
       return true;
     });
-  }, [allReleased, pane]);
+  }, [allSchedule, pane]);
 
   const filterOptions = useMemo(() => {
     const base = divisionFilterOptionsFromMatches(paneMatches, competitionFilter);
@@ -82,13 +87,13 @@ export function GlobalSchedulePage() {
     const competitions = uniqueDisplayedCompetitions([
       ...competitionsForUser(state.org, currentUser),
       ...base.competitions,
-      ...divisionFilterOptionsFromMatches(allReleased).competitions,
+      ...divisionFilterOptionsFromMatches(allSchedule).competitions,
     ]);
     return { ...base, competitions };
   }, [
     paneMatches,
     pane,
-    allReleased,
+    allSchedule,
     competitionFilter,
     state.org,
     currentUser,
@@ -113,6 +118,12 @@ export function GlobalSchedulePage() {
           return false;
         }
         if (!matchOnCalendarDate(m, dateFilter)) return false;
+        if (
+          pane === 'completed' &&
+          !matchMatchesCompletedOutcome(m, completedOutcome)
+        ) {
+          return false;
+        }
         if (myTeamsOnly && fanFavorites && fanFavorites.length > 0) {
           if (!isTeamMatch(m, fanFavorites)) return false;
         }
@@ -131,6 +142,7 @@ export function GlobalSchedulePage() {
     dateFilter,
     pane,
     sortDir,
+    completedOutcome,
     myTeamsOnly,
     fanFavorites,
   ]);
@@ -181,7 +193,7 @@ export function GlobalSchedulePage() {
     return <Navigate to={upcomingHref} replace />;
   }
 
-  const hasBase = allReleased.length > 0;
+  const hasBase = allSchedule.length > 0;
   const emptyTitle =
     pane === 'upcoming' ? 'No upcoming matches' : 'No completed matches';
   const emptyBody =
@@ -240,6 +252,34 @@ export function GlobalSchedulePage() {
             >
               Date descending
             </button>
+            {pane === 'completed' && (
+              <>
+                <button
+                  type="button"
+                  className={`rs-filter-chip${completedOutcome === 'played' ? ' rs-filter-chip--selected' : ''}`}
+                  aria-pressed={completedOutcome === 'played'}
+                  onClick={() =>
+                    setCompletedOutcome(
+                      completedOutcome === 'played' ? 'all' : 'played',
+                    )
+                  }
+                >
+                  Played matches
+                </button>
+                <button
+                  type="button"
+                  className={`rs-filter-chip${completedOutcome === 'not_played' ? ' rs-filter-chip--selected' : ''}`}
+                  aria-pressed={completedOutcome === 'not_played'}
+                  onClick={() =>
+                    setCompletedOutcome(
+                      completedOutcome === 'not_played' ? 'all' : 'not_played',
+                    )
+                  }
+                >
+                  Forfeit / cancelled
+                </button>
+              </>
+            )}
           </div>
         </>
       )}
@@ -255,6 +295,7 @@ export function GlobalSchedulePage() {
             levelFilter ||
             competitionFilter ||
             dateFilter ||
+            (pane === 'completed' && completedOutcome !== 'all') ||
             myTeamsOnly
               ? 'No games match these filters. Clear competition, date, or chips to widen.'
               : emptyBody}

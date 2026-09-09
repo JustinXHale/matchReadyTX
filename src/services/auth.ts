@@ -4,7 +4,6 @@ import {
   getRedirectResult,
   onAuthStateChanged,
   signInWithPopup,
-  signInWithRedirect,
   signOut as firebaseSignOut,
   type AuthProvider,
   type User,
@@ -25,14 +24,6 @@ export function requireAuth() {
   return auth;
 }
 
-/** Rough mobile / iPad detection — used only for popup-blocked fallback. */
-function isMobileClient(): boolean {
-  if (typeof navigator === 'undefined') return false;
-  const ua = navigator.userAgent || '';
-  if (/Android|iPhone|iPad|iPod|Mobile/i.test(ua)) return true;
-  return navigator.maxTouchPoints > 1 && /Macintosh/i.test(ua);
-}
-
 function isPopupBlockedError(err: unknown): boolean {
   const code =
     err && typeof err === 'object' && 'code' in err
@@ -47,10 +38,17 @@ function isPopupBlockedError(err: unknown): boolean {
   );
 }
 
+export function isMissingRedirectStateError(err: unknown): boolean {
+  const message = err instanceof Error ? err.message : String(err);
+  return message.includes('missing initial state');
+}
+
+const POPUP_BLOCKED_HELP =
+  'Sign-in pop-up was blocked. Allow pop-ups for MatchReadyTX, or open this site in Safari or Chrome (not an in-app or private browser), then try again.';
+
 /**
- * Prefer popup everywhere. Redirect loses sessionStorage state on many mobile
- * browsers ("missing initial state") — only use it when the popup is blocked
- * on a phone/tablet.
+ * Popup-only sign-in. Redirect auth loses sessionStorage on many mobile and
+ * privacy browsers ("missing initial state") — see Firebase redirect best practices.
  */
 async function signInWithProvider(
   provider: AuthProvider,
@@ -60,9 +58,8 @@ async function signInWithProvider(
     const result = await signInWithPopup(a, provider);
     return result.user;
   } catch (err) {
-    if (isPopupBlockedError(err) && isMobileClient()) {
-      await signInWithRedirect(a, provider);
-      return null;
+    if (isPopupBlockedError(err)) {
+      throw new Error(POPUP_BLOCKED_HELP);
     }
     throw err;
   }
@@ -76,11 +73,19 @@ export async function signInWithApple(): Promise<User | null> {
   return signInWithProvider(appleProvider);
 }
 
-/** Complete a redirect-based sign-in (no-op when there was no redirect). */
+/** Complete a stale redirect sign-in if present (usually no-op with popup auth). */
 export async function completeRedirectSignIn(): Promise<User | null> {
   if (!isFirebaseConfigured || !auth) return null;
-  const result = await getRedirectResult(auth);
-  return result?.user ?? null;
+  try {
+    const result = await getRedirectResult(auth);
+    return result?.user ?? null;
+  } catch (err) {
+    if (isMissingRedirectStateError(err)) {
+      console.warn('Ignoring stale redirect sign-in state', err);
+      return null;
+    }
+    throw err;
+  }
 }
 
 export async function signOutFirebase(): Promise<void> {
