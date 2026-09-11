@@ -83,6 +83,21 @@ describe('matchCardFooter', () => {
     expect(badges[0]?.side).toBe('away');
   });
 
+  it('omits unconfirmed badges for forfeited matches', () => {
+    const badges = matchUnconfirmedTeamBadges(
+      match({
+        id: 'm1',
+        forfeitTeamId: 'a1',
+        homeScore: 28,
+        awayScore: 0,
+        homeConfirmedAt: undefined,
+        awayConfirmedAt: undefined,
+      }),
+      new Map([['a1', { abbreviation: 'OU', name: 'Oklahoma University' }]]),
+    );
+    expect(badges).toEqual([]);
+  });
+
   it('falls back to initials when abbreviation missing', () => {
     expect(teamDisplayAbbreviation(undefined, 'Texas A&M University')).toBe(
       'TAU',

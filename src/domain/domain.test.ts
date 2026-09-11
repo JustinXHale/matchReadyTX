@@ -31,6 +31,8 @@ import {
   applySheetFacts,
   cancelMatch,
   confirmTeam,
+  displayMatchStatus,
+  matchStatusLabel,
   postponeMatch,
   reactivateMatch,
   releaseMatch,
@@ -251,6 +253,20 @@ describe('crew visibility gate', () => {
     ).toBe(true);
     expect(m.status).toBe('needs_reassignment');
     expect(isCrewVisibleToTeams(m)).toBe(false);
+  });
+
+  it('displayMatchStatus reconciles stale crew_pending when all officials confirmed', () => {
+    let m = releaseMatch(baseMatch());
+    m = confirmTeam(confirmTeam(m, 'home'), 'away');
+    m = assignOfficial(m, 'mo', { uid: 'r1', displayName: 'MO' });
+    m = assignOfficial(m, 'ar1', { uid: 'r2', displayName: 'AR1' });
+    m = assignOfficial(m, 'ar2', { uid: 'r3', displayName: 'AR2' });
+    m = confirmOfficialSlot(m, 'mo');
+    m = confirmOfficialSlot(m, 'ar1');
+    m = confirmOfficialSlot(m, 'ar2');
+    m = { ...m, status: 'crew_pending' };
+    expect(displayMatchStatus(m)).toBe('crew_confirmed');
+    expect(matchStatusLabel(m)).toBe('Crew confirmed');
   });
 
   it('adds multiple empty MO blocks via Add role', () => {

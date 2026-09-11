@@ -10,11 +10,7 @@ import {
 import { matchInCompetition } from '@/domain/competitions';
 import { applyMatchScope } from '@/domain/visibility';
 import { orgTimeZone } from '@/domain/matchTime';
-import {
-  MatchMonthSections,
-  PastScheduleMatchesDisclosure,
-  SchedulePastOnlyHint,
-} from '@/ui/ScheduleMatchListLayout';
+import { ScheduleMatchListWithPast } from '@/ui/ScheduleMatchListLayout';
 import { useScheduleListSections } from '@/ui/useScheduleListSections';
 import { MatchListRow } from '@/ui/MatchListRow';
 import { MatchCrewTrailing } from '@/ui/MatchCrewTrailing';
@@ -186,28 +182,17 @@ export function AppointmentsPage() {
             </ul>
           )}
 
-          <SchedulePastOnlyHint
-            show={showPastCollapsed && upcomingByMonth.length === 0}
-          />
-          <MatchMonthSections
-            groups={upcomingByMonth}
+          <ScheduleMatchListWithPast
+            upcomingByMonth={upcomingByMonth}
+            pastByMonth={pastByMonth}
+            pastCount={pastCount}
+            showPastCollapsed={showPastCollapsed}
             renderMatchRow={(m) => (
               <li key={m.id}>
                 <AppointmentRow match={m} userId={currentUser.uid} />
               </li>
             )}
           />
-          {showPastCollapsed ? (
-            <PastScheduleMatchesDisclosure
-              groups={pastByMonth}
-              count={pastCount}
-              renderMatchRow={(m) => (
-                <li key={m.id}>
-                  <AppointmentRow match={m} userId={currentUser.uid} />
-                </li>
-              )}
-            />
-          ) : null}
         </>
       )}
     </div>

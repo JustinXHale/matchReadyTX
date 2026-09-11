@@ -8,7 +8,8 @@ import {
 } from '@patternfly/react-core';
 import { useApp } from '@/app/AppContext';
 import { namedOfficialsNeedingAvailability } from '@/domain/crew';
-import { statusLabel } from '@/domain/matchTransitions';
+import { matchHasForfeitOutcome } from '@/domain/matchCardFooter';
+import { matchStatusLabel } from '@/domain/matchTransitions';
 import {
   compareKickoffAsc,
   divisionFilterOptionsFromMatches,
@@ -47,11 +48,7 @@ import {
 } from '@/nav/listFilterParams';
 import { MatchListRow } from '@/ui/MatchListRow';
 import { orgTimeZone } from '@/domain/matchTime';
-import {
-  MatchMonthSections,
-  PastScheduleMatchesDisclosure,
-  SchedulePastOnlyHint,
-} from '@/ui/ScheduleMatchListLayout';
+import { ScheduleMatchListWithPast } from '@/ui/ScheduleMatchListLayout';
 import { useScheduleListSections } from '@/ui/useScheduleListSections';
 
 const SCHEDULER_SCHEDULE_PATH = '/scheduler/schedule';
@@ -253,7 +250,9 @@ export function SchedulerSchedulePage() {
             back={scheduleBack}
             meta={
               <>
-                <span className="rs-pill">{statusLabel(m.status)}</span>
+                {!matchHasForfeitOutcome(m) ? (
+                  <span className="rs-pill">{matchStatusLabel(m)}</span>
+                ) : null}
                 {doubleBookedNames.length > 0 ? (
                   <span className="rs-pill rs-pill--warn">Double-booked</span>
                 ) : null}
@@ -363,22 +362,13 @@ export function SchedulerSchedulePage() {
           </EmptyStateBody>
         </EmptyState>
       ) : (
-        <>
-          <SchedulePastOnlyHint
-            show={showPastCollapsed && upcomingByMonth.length === 0}
-          />
-          <MatchMonthSections
-            groups={upcomingByMonth}
-            renderMatchRow={renderScheduleMatchRow}
-          />
-          {showPastCollapsed ? (
-            <PastScheduleMatchesDisclosure
-              groups={pastByMonth}
-              count={pastCount}
-              renderMatchRow={renderScheduleMatchRow}
-            />
-          ) : null}
-        </>
+        <ScheduleMatchListWithPast
+          upcomingByMonth={upcomingByMonth}
+          pastByMonth={pastByMonth}
+          pastCount={pastCount}
+          showPastCollapsed={showPastCollapsed}
+          renderMatchRow={renderScheduleMatchRow}
+        />
       )}
 
       <AssignOfficialModal

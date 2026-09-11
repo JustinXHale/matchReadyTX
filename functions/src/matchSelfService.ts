@@ -172,10 +172,16 @@ export async function runMatchSelfService(opts: {
 
   if (action === 'confirm') {
     crew[found.slot][found.index] = confirmRow(row, uid, at);
-    if (found.slot === 'mo') status = 'mo_confirmed';
+    if (found.slot === 'mo') {
+      status = 'mo_confirmed';
+    } else if (
+      crewPeople(crew.mo).some((a) => String(a.status ?? '') === 'confirmed')
+    ) {
+      status = 'mo_confirmed';
+    }
     if (
       allPeopleConfirmed(crew) &&
-      ['mo_confirmed', 'crew_confirmed', 'locked_confirmed'].includes(status)
+      crewPeople(crew.mo).some((a) => String(a.status ?? '') === 'confirmed')
     ) {
       status = 'crew_confirmed';
     }

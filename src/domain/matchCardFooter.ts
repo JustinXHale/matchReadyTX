@@ -47,7 +47,16 @@ export function teamDisplayAbbreviation(
   return (compact || fallbackName).slice(0, 6).toUpperCase();
 }
 
-export function matchShowsTeamConfirmation(match: Pick<Match, 'status'>): boolean {
+export function matchHasForfeitOutcome(
+  match: Pick<Match, 'forfeitTeamId' | 'playedForfeit'>,
+): boolean {
+  return Boolean(match.forfeitTeamId) || match.playedForfeit === true;
+}
+
+export function matchShowsTeamConfirmation(
+  match: Pick<Match, 'status' | 'forfeitTeamId' | 'playedForfeit'>,
+): boolean {
+  if (matchHasForfeitOutcome(match)) return false;
   return (
     match.status !== 'draft' &&
     match.status !== 'cancelled' &&

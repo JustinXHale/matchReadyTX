@@ -4,7 +4,8 @@ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faUserPlus } from '@fortawesome/free-solid-svg-icons';
 import { useApp } from '@/app/AppContext';
 import { formatMatchKickoff, orgTimeZone } from '@/domain/matchTime';
-import { statusLabel } from '@/domain/matchTransitions';
+import { matchHasForfeitOutcome } from '@/domain/matchCardFooter';
+import { matchStatusLabel } from '@/domain/matchTransitions';
 import {
   openCrewAssignTargets,
   pendingRaiseHandRequestsForMatch,
@@ -85,7 +86,9 @@ export function MatchQueueList({
                 urgent={urgent}
                 back={QUEUES_BACK}
                 meta={
-                  <span className="rs-pill">{statusLabel(m.status)}</span>
+                  !matchHasForfeitOutcome(m) ? (
+                    <span className="rs-pill">{matchStatusLabel(m)}</span>
+                  ) : null
                 }
                 trailing={
                   <div className="rs-queue-action">

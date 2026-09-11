@@ -1,6 +1,7 @@
 import { archiveCrewAssignmentsHistory } from './crew';
 import type { Match, MatchStatus } from './types';
 import {
+  allPartiesConfirmed,
   CREW_SLOTS,
   bothTeamsConfirmed,
   crewPeople,
@@ -255,4 +256,28 @@ export function statusLabel(status: MatchStatus): string {
     postponed: 'Postponed',
   };
   return map[status];
+}
+
+/** User-facing workflow status — reconciles stale match.status with crew confirmations. */
+export function displayMatchStatus(match: Match): MatchStatus {
+  if (
+    match.status === 'cancelled' ||
+    match.status === 'postponed' ||
+    match.status === 'locked_confirmed' ||
+    match.status === 'draft' ||
+    match.status === 'needs_reconfirmation' ||
+    match.status === 'change_proposed' ||
+    match.status === 'needs_reassignment'
+  ) {
+    return match.status;
+  }
+  if (allPartiesConfirmed(match)) return 'crew_confirmed';
+  if (isCrewVisibleToTeams(match) && match.status === 'crew_pending') {
+    return 'mo_confirmed';
+  }
+  return match.status;
+}
+
+export function matchStatusLabel(match: Match): string {
+  return statusLabel(displayMatchStatus(match));
 }

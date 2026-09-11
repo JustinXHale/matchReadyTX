@@ -45,7 +45,37 @@ export function SchedulePastOnlyHint({ show }: { show: boolean }) {
   if (!show) return null;
   return (
     <p className="rs-match-card__meta rs-schedule-past-hint">
-      No upcoming games match these filters. Expand past games below.
+      No upcoming games match these filters. Expand past games above.
     </p>
+  );
+}
+
+export function ScheduleMatchListWithPast<T extends KickoffMatchRef>({
+  upcomingByMonth,
+  pastByMonth,
+  pastCount,
+  showPastCollapsed,
+  renderMatchRow,
+}: {
+  upcomingByMonth: MatchMonthGroup<T>[];
+  pastByMonth: MatchMonthGroup<T>[];
+  pastCount: number;
+  showPastCollapsed: boolean;
+  renderMatchRow: (match: T) => ReactNode;
+}) {
+  return (
+    <>
+      {showPastCollapsed ? (
+        <PastScheduleMatchesDisclosure
+          groups={pastByMonth}
+          count={pastCount}
+          renderMatchRow={renderMatchRow}
+        />
+      ) : null}
+      <SchedulePastOnlyHint
+        show={showPastCollapsed && upcomingByMonth.length === 0}
+      />
+      <MatchMonthSections groups={upcomingByMonth} renderMatchRow={renderMatchRow} />
+    </>
   );
 }

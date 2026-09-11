@@ -33,11 +33,7 @@ import {
   type AvailableRoleFilter,
 } from '@/nav/listFilterParams';
 import { orgTimeZone } from '@/domain/matchTime';
-import {
-  MatchMonthSections,
-  PastScheduleMatchesDisclosure,
-  SchedulePastOnlyHint,
-} from '@/ui/ScheduleMatchListLayout';
+import { ScheduleMatchListWithPast } from '@/ui/ScheduleMatchListLayout';
 import { useScheduleListSections } from '@/ui/useScheduleListSections';
 
 const OPEN_MATCHES_PATH = '/referee/appointments/open';
@@ -420,11 +416,11 @@ export function GlobalRequestPage() {
             </ul>
           )}
 
-          <SchedulePastOnlyHint
-            show={showPastCollapsed && upcomingByMonth.length === 0}
-          />
-          <MatchMonthSections
-            groups={upcomingByMonth}
+          <ScheduleMatchListWithPast
+            upcomingByMonth={upcomingByMonth}
+            pastByMonth={pastByMonth}
+            pastCount={pastCount}
+            showPastCollapsed={showPastCollapsed}
             renderMatchRow={(m) => (
               <li key={m.id}>
                 <MatchListRow
@@ -438,24 +434,6 @@ export function GlobalRequestPage() {
               </li>
             )}
           />
-          {showPastCollapsed ? (
-            <PastScheduleMatchesDisclosure
-              groups={pastByMonth}
-              count={pastCount}
-              renderMatchRow={(m) => (
-                <li key={m.id}>
-                  <MatchListRow
-                    match={m}
-                    to={`/matches/${m.id}?request=1`}
-                    showTime
-                    split="action"
-                    back={requestBack}
-                    trailing={<RaiseHandTrailing match={m} requestBack={requestBack} />}
-                  />
-                </li>
-              )}
-            />
-          ) : null}
         </>
       )}
     </div>

@@ -24,11 +24,7 @@ import {
   useGlobalScheduleFilterParams,
 } from '@/nav/listFilterParams';
 import { orgTimeZone } from '@/domain/matchTime';
-import {
-  MatchMonthSections,
-  PastScheduleMatchesDisclosure,
-  SchedulePastOnlyHint,
-} from '@/ui/ScheduleMatchListLayout';
+import { ScheduleMatchListWithPast } from '@/ui/ScheduleMatchListLayout';
 import { useScheduleListSections } from '@/ui/useScheduleListSections';
 
 type SchedulePane = 'upcoming' | 'completed';
@@ -291,56 +287,30 @@ export function GlobalSchedulePage() {
           </EmptyStateBody>
         </EmptyState>
       ) : (
-        <>
-          <SchedulePastOnlyHint
-            show={showPastCollapsed && upcomingByMonth.length === 0}
-          />
-          <MatchMonthSections
-            groups={upcomingByMonth}
-            renderMatchRow={(m) => (
-              <li key={m.id}>
-                <MatchListRow
-                  match={m}
-                  to={`/matches/${m.id}`}
-                  showTime
-                  split="action"
-                  back={scheduleBack}
-                  trailing={
-                    <MatchCrewTrailing
-                      match={m}
-                      highlightUserId={currentUser?.uid}
-                      back={scheduleBack}
-                    />
-                  }
-                />
-              </li>
-            )}
-          />
-          {showPastCollapsed ? (
-            <PastScheduleMatchesDisclosure
-              groups={pastByMonth}
-              count={pastCount}
-              renderMatchRow={(m) => (
-                <li key={m.id}>
-                  <MatchListRow
+        <ScheduleMatchListWithPast
+          upcomingByMonth={upcomingByMonth}
+          pastByMonth={pastByMonth}
+          pastCount={pastCount}
+          showPastCollapsed={showPastCollapsed}
+          renderMatchRow={(m) => (
+            <li key={m.id}>
+              <MatchListRow
+                match={m}
+                to={`/matches/${m.id}`}
+                showTime
+                split="action"
+                back={scheduleBack}
+                trailing={
+                  <MatchCrewTrailing
                     match={m}
-                    to={`/matches/${m.id}`}
-                    showTime
-                    split="action"
+                    highlightUserId={currentUser?.uid}
                     back={scheduleBack}
-                    trailing={
-                      <MatchCrewTrailing
-                        match={m}
-                        highlightUserId={currentUser?.uid}
-                        back={scheduleBack}
-                      />
-                    }
                   />
-                </li>
-              )}
-            />
-          ) : null}
-        </>
+                }
+              />
+            </li>
+          )}
+        />
       )}
     </>
   );
