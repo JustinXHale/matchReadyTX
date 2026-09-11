@@ -21,6 +21,7 @@ import {
   normalizeGender,
   parseContactRows,
   parseLocationRows,
+  parseProximityColumnsAE,
   parseScheduleRows,
   rowToKickoffIso,
   sanitizeMatchId,
@@ -362,6 +363,14 @@ export async function runSheetSync(opts: {
   const locations = parseLocationRows(
     await readFirstTab(sheets, sheetId, ['Locations', 'locations']),
   );
+  const territoryCities = parseProximityColumnsAE(
+    await readFirstTab(sheets, sheetId, [
+      'proximity',
+      'Proximity',
+      'territories',
+      'Territories',
+    ]),
+  );
   const resolveTeamId = buildTeamIdResolver();
 
   const orgSnap = await db.doc(`orgs/${orgId}`).get();
@@ -698,6 +707,7 @@ export async function runSheetSync(opts: {
     sheetSyncedAt,
     sheetSyncError: FieldValue.delete(),
     ...(mergedMatchLevels.length > 0 ? { matchLevels: mergedMatchLevels } : {}),
+    ...(territoryCities.length > 0 ? { territoryCities } : {}),
     updatedAt: FieldValue.serverTimestamp(),
   });
   await flushBatch();

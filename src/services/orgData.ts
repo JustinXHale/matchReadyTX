@@ -400,6 +400,9 @@ export function orgPatchFromFirestore(
       typeof data.sheetSyncError === 'string'
         ? data.sheetSyncError
         : undefined,
+    territoryCities: Array.isArray(data.territoryCities)
+      ? (data.territoryCities as import('@/domain/types').TerritoryCityMapping[])
+      : undefined,
   };
 }
 

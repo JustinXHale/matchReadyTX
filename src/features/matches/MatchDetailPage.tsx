@@ -38,6 +38,7 @@ import {
 import {
   matchFeeBreakdown,
 } from '@/domain/economics';
+import { formatAssignMatchBlurb } from '@/domain/territory';
 import {
   downloadMatchIcs,
   matchHasCalendarTime,
@@ -2857,15 +2858,22 @@ export function MatchDetailPage() {
           </Title>
         </ModalHeader>
         <ModalBody>
+          <p className="rs-official-picker__match-blurb">
+            {formatAssignMatchBlurb(match, orgTz)}
+          </p>
           <OfficialAssignPicker
             officials={officials}
             matches={state.matches}
+            teams={state.teams}
             availability={state.availability}
             timeZone={orgTz}
             kickoffAt={match.kickoffAt}
             matchId={match.id}
+            match={match}
+            territoryCities={state.org.territoryCities ?? []}
             requests={state.requests}
             currentUserId={currentPickUserId}
+            hideHint
             onPick={pickOfficial}
           />
         </ModalBody>

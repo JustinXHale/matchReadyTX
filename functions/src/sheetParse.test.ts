@@ -5,6 +5,7 @@ import {
   isVenueOnlyLocationRow,
   lookupLocation,
   parseContactRows,
+  parseProximityColumnsAE,
   parseScheduleRows,
   rowToKickoffIso,
   type LocationRow,
@@ -129,6 +130,24 @@ describe('parseScheduleRows match_type', () => {
     ]);
     expect(rows[0]?.match_type).toBe('2nd Side');
     expect(rows[0]?.level).toBe('Tier 1');
+  });
+});
+
+describe('parseProximityColumnsAE', () => {
+  it('reads cities under metro headers in columns A–E only', () => {
+    const rows = parseProximityColumnsAE([
+      ['AUSTIN', 'DALLAS', 'HOUSTON', 'SAN ANTONIO', 'OKLAHOMA'],
+      ['Austin', 'Keller', 'Katy', 'Seguin', 'Norman'],
+    ]);
+    expect(rows).toEqual(
+      expect.arrayContaining([
+        { metro: 'Austin', city: 'Austin' },
+        { metro: 'Dallas', city: 'Keller' },
+        { metro: 'Houston', city: 'Katy' },
+        { metro: 'San Antonio', city: 'Seguin' },
+        { metro: 'Oklahoma', city: 'Norman' },
+      ]),
+    );
   });
 });
 

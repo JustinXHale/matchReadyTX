@@ -163,6 +163,12 @@ export interface Match {
 
 export type MatchGender = 'men' | 'women';
 
+/** City listed under a metro column on the Sheet proximity tab. */
+export type TerritoryCityMapping = {
+  metro: string;
+  city: string;
+};
+
 export const DEFAULT_MATCH_LEVELS = [
   'D1',
   'D2',
@@ -485,6 +491,8 @@ export interface OrgSettings {
   sheetSyncedAt?: string;
   /** Last failed auto/manual Sheet sync or write-back (cleared on success). */
   sheetSyncError?: string;
+  /** City → metro from Sheet proximity tab (columns A–E). */
+  territoryCities?: TerritoryCityMapping[];
 }
 
 export type TeamContactPerson = {

@@ -4,6 +4,51 @@
   color: var(--rs-color-muted);
 }
 
+.rs-official-picker__match-blurb {
+  margin: 0 0 12px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--rs-color-ink);
+  line-height: 1.4;
+}
+
+.rs-official-picker__primary-filters {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--rs-space-sm);
+  align-items: end;
+  margin-bottom: 10px;
+}
+
+.rs-official-picker__primary-filters .pf-v6-c-form__group {
+  margin-bottom: 0;
+  min-width: 0;
+}
+
+.rs-official-picker__primary-filters .pf-v6-c-form-select,
+.rs-official-picker__primary-filters .pf-v6-c-text-input-group,
+.rs-official-picker__primary-filters input {
+  width: 100%;
+}
+
+.rs-official-picker__primary-filters--name-only {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.rs-official-picker__label-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin-top: 4px;
+}
+
+.rs-official-picker__role-pill,
+.rs-official-picker__territory-pill {
+  font-size: 10px;
+  max-width: 100%;
+}
+
 .rs-official-picker__filters-shell {
   display: flex;
   flex-direction: column;
@@ -227,7 +272,6 @@ button.rs-official-picker__games:disabled {
 }
 
 .rs-official-picker__name,
-.rs-official-picker__grade,
 .rs-official-picker__status {
   display: block;
 }
@@ -245,9 +289,7 @@ button.rs-official-picker__games:disabled {
 }
 
 .rs-official-picker__grade {
-  margin: 2px 0 0;
-  font: var(--rs-font-meta);
-  color: var(--rs-color-muted);
+  display: none;
 }
 
 .rs-official-picker__status {

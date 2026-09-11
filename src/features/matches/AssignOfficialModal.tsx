@@ -10,6 +10,7 @@ import {
 } from '@patternfly/react-core';
 import { useApp } from '@/app/AppContext';
 import { orgTimeZone } from '@/domain/matchTime';
+import { formatAssignMatchBlurb } from '@/domain/territory';
 import { OfficialAssignPicker } from '@/features/matches/OfficialAssignPicker';
 import {
   REQUESTABLE_SLOT_LABELS,
@@ -109,16 +110,25 @@ export function AssignOfficialModal({
       </ModalHeader>
       <ModalBody>
         {liveMatch && pickTarget ? (
-          <OfficialAssignPicker
-            officials={officials}
-            matches={state.matches}
-            availability={state.availability}
-            timeZone={orgTz}
-            kickoffAt={liveMatch.kickoffAt}
-            matchId={liveMatch.id}
-            requests={state.requests}
-            onPick={onPick}
-          />
+          <>
+            <p className="rs-official-picker__match-blurb">
+              {formatAssignMatchBlurb(liveMatch, orgTz)}
+            </p>
+            <OfficialAssignPicker
+              officials={officials}
+              matches={state.matches}
+              teams={state.teams}
+              availability={state.availability}
+              timeZone={orgTz}
+              kickoffAt={liveMatch.kickoffAt}
+              matchId={liveMatch.id}
+              match={liveMatch}
+              territoryCities={state.org.territoryCities ?? []}
+              requests={state.requests}
+              hideHint
+              onPick={onPick}
+            />
+          </>
         ) : null}
       </ModalBody>
       <ModalFooter>

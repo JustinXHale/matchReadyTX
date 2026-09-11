@@ -17,6 +17,7 @@ import {
 } from '@/domain/crewDefaults';
 import { feeOverrideForMatch, matchesForFeeApply } from '@/domain/feeDefaults';
 import { defaultFees, demoGeocode } from '@/domain/economics';
+import { DEMO_TERRITORY_CITIES } from '@/domain/territory';
 import { formatMatchKickoff, orgTimeZone } from '@/domain/matchTime';
 import {
   applyMatchForfeitOutcome,
@@ -2767,6 +2768,7 @@ function createInitialState(opts?: { seedDemoQueue?: boolean }): AppState {
       },
       matchLevels: [...DEFAULT_MATCH_LEVELS],
       competitions: [...DEFAULT_COMPETITIONS],
+      territoryCities: [...DEMO_TERRITORY_CITIES],
       sheetId: live ? undefined : 'demo-sheet',
       sheetSyncedAt: live ? undefined : new Date().toISOString(),
     },

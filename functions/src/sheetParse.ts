@@ -567,3 +567,53 @@ export function lookupLocation(
   if (sameAbbr.length === 1) return sameAbbr[0];
   return undefined;
 }
+
+export type TerritoryCityMapping = {
+  metro: string;
+  city: string;
+};
+
+function formatMetroLabel(raw: string): string {
+  return raw
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean)
+    .map((w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
+    .join(' ');
+}
+
+/** Proximity tab: row 1 columns A–E = metros, rows 2+ = cities in each column. */
+export function parseProximityColumnsAE(
+  values: string[][],
+): TerritoryCityMapping[] {
+  if (!values.length) return [];
+  const header = values[0] ?? [];
+  const metros: (string | null)[] = [];
+  for (let col = 0; col < 5; col++) {
+    const raw = String(header[col] ?? '').trim();
+    if (!raw) {
+      metros[col] = null;
+      continue;
+    }
+    const lower = raw.toLowerCase();
+    if (lower === 'metro' || lower === 'city' || lower === 'zip') {
+      metros[col] = null;
+      continue;
+    }
+    metros[col] = formatMetroLabel(raw);
+  }
+  if (!metros.some(Boolean)) return [];
+
+  const out: TerritoryCityMapping[] = [];
+  for (let r = 1; r < values.length; r++) {
+    const row = values[r] ?? [];
+    for (let col = 0; col < 5; col++) {
+      const metro = metros[col];
+      if (!metro) continue;
+      const city = String(row[col] ?? '').trim();
+      if (!city) continue;
+      out.push({ metro, city });
+    }
+  }
+  return out;
+}

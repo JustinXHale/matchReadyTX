@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   FormGroup,
   FormSelect,
@@ -27,12 +27,20 @@ import {
 import { formatMatchKickoff } from '@/domain/matchTime';
 import { gameRequestPreferredSlots } from '@/domain/requests';
 import {
+  buildTerritoryLookup,
+  resolveMatchTerritory,
+  resolveOfficialTerritory,
+  uniqueMetros,
+} from '@/domain/territory';
+import {
   ASSESSED_LEVEL_MAX,
   ASSESSED_LEVEL_MIN,
   REQUESTABLE_SLOT_SHORT,
   type AvailabilityRange,
   type GameRequest,
   type Match,
+  type Team,
+  type TerritoryCityMapping,
   type UserProfile,
 } from '@/domain/types';
 import { RsDateField } from '@/ui/RsDateField';
@@ -61,6 +69,7 @@ const AVAIL_FILTER_LABELS: Record<AssignAvailabilityFilter, string> = {
 
 function buildFilterSummary(opts: {
   query: string;
+  territoryFilter: string;
   levelCap: string;
   availFilter: AssignAvailabilityFilter;
   fromDay: string;
@@ -71,6 +80,7 @@ function buildFilterSummary(opts: {
   const parts: string[] = [];
   const q = opts.query.trim();
   if (q) parts.push(`“${q}”`);
+  if (opts.territoryFilter) parts.push(opts.territoryFilter);
   if (opts.levelCap) parts.push(`Level ${opts.levelCap}+`);
   if (opts.availFilter !== 'all') {
     parts.push(AVAIL_FILTER_LABELS[opts.availFilter]);
@@ -84,27 +94,50 @@ function buildFilterSummary(opts: {
 export function OfficialAssignPicker({
   officials,
   matches,
+  teams = [],
   availability,
   timeZone,
   kickoffAt,
   matchId,
+  match,
+  territoryCities = [],
   requests = [],
   currentUserId,
+  hideHint = false,
   onPick,
 }: {
   officials: UserProfile[];
   matches: Match[];
+  teams?: Team[];
   availability: AvailabilityRange[];
   timeZone: string;
   kickoffAt: string;
   /** When set, enables raise-hand request filter and badges. */
   matchId?: string;
+  /** When set, defaults territory filter to this match’s area. */
+  match?: Match;
+  territoryCities?: TerritoryCityMapping[];
   requests?: GameRequest[];
   currentUserId?: string;
+  hideHint?: boolean;
   onPick: (userId: string) => void;
 }) {
   const season = useMemo(() => rugbySeasonDayRange(timeZone), [timeZone]);
+  const territoryLookup = useMemo(
+    () => buildTerritoryLookup(territoryCities),
+    [territoryCities],
+  );
+  const metroOptions = useMemo(
+    () => uniqueMetros(territoryCities),
+    [territoryCities],
+  );
+  const matchTerritory = useMemo(() => {
+    if (!match || territoryCities.length === 0) return '';
+    return resolveMatchTerritory(match, teams, territoryLookup) ?? '';
+  }, [match, teams, territoryCities.length, territoryLookup]);
+
   const [query, setQuery] = useState('');
+  const [territoryFilter, setTerritoryFilter] = useState('');
   const [levelCap, setLevelCap] = useState('');
   const [availFilter, setAvailFilter] =
     useState<AssignAvailabilityFilter>('all');
@@ -112,6 +145,10 @@ export function OfficialAssignPicker({
   const [toDay, setToDay] = useState(season.to);
   const [expandedUid, setExpandedUid] = useState<string | null>(null);
   const [filtersOpen, setFiltersOpen] = useState(true);
+
+  useEffect(() => {
+    setTerritoryFilter(matchTerritory);
+  }, [matchTerritory, matchId]);
 
   const pendingByUser = useMemo(() => {
     if (!matchId) return new Map<string, GameRequest>();
@@ -140,6 +177,10 @@ export function OfficialAssignPicker({
     .filter((o) => {
       const level = officialEffectiveLevel(o);
       if (!officialMatchesLevelCap(level, cap)) return false;
+      if (territoryFilter) {
+        const metro = resolveOfficialTerritory(o, territoryLookup);
+        if (metro !== territoryFilter) return false;
+      }
       const availStatus = kickoffAvailabilityStatus(
         availability,
         o.uid,
@@ -154,7 +195,8 @@ export function OfficialAssignPicker({
         return false;
       }
       if (!q) return true;
-      const hay = `${memberListName(o)} ${o.displayName} ${level ?? ''} ${officialGradeLabel(o)}`;
+      const territory = resolveOfficialTerritory(o, territoryLookup) ?? '';
+      const hay = `${memberListName(o)} ${o.displayName} ${level ?? ''} ${officialGradeLabel(o)} ${territory} ${o.homeCity ?? ''}`;
       return hay.toLowerCase().includes(q);
     })
     .map((o) => {
@@ -166,6 +208,7 @@ export function OfficialAssignPicker({
       );
       return {
         official: o,
+        territory: resolveOfficialTerritory(o, territoryLookup),
         availStatus,
         location: formatMemberCityState(o),
         games: gameCounts.get(o.uid) ?? { upcoming: 0, total: 0 },
@@ -194,17 +237,29 @@ export function OfficialAssignPicker({
   const filtersActive = useMemo(
     () =>
       query.trim().length > 0 ||
+      (territoryFilter !== '' && territoryFilter !== matchTerritory) ||
       levelCap !== '' ||
       availFilter !== 'all' ||
       fromDay !== season.from ||
       toDay !== season.to,
-    [query, levelCap, availFilter, fromDay, toDay, season.from, season.to],
+    [
+      query,
+      territoryFilter,
+      matchTerritory,
+      levelCap,
+      availFilter,
+      fromDay,
+      toDay,
+      season.from,
+      season.to,
+    ],
   );
 
   const filterSummary = useMemo(
     () =>
       buildFilterSummary({
         query,
+        territoryFilter,
         levelCap,
         availFilter,
         fromDay,
@@ -212,11 +267,21 @@ export function OfficialAssignPicker({
         seasonFrom: season.from,
         seasonTo: season.to,
       }),
-    [query, levelCap, availFilter, fromDay, toDay, season.from, season.to],
+    [
+      query,
+      territoryFilter,
+      levelCap,
+      availFilter,
+      fromDay,
+      toDay,
+      season.from,
+      season.to,
+    ],
   );
 
   const clearFilters = () => {
     setQuery('');
+    setTerritoryFilter(matchTerritory);
     setLevelCap('');
     setAvailFilter('all');
     setFromDay(season.from);
@@ -225,11 +290,46 @@ export function OfficialAssignPicker({
 
   return (
     <>
-      <p className="rs-official-picker__hint">
-        Tap <strong>Assign</strong> to place an official. Tap the games count
-        to preview assignments in the date range — availability is for this
-        kickoff.
-      </p>
+      {!hideHint ? (
+        <p className="rs-official-picker__hint">
+          Tap <strong>Assign</strong> to place an official. Tap the games count
+          to preview assignments in the date range — availability is for this
+          kickoff.
+        </p>
+      ) : null}
+      <div
+        className={
+          metroOptions.length > 0
+            ? 'rs-official-picker__primary-filters'
+            : 'rs-official-picker__primary-filters rs-official-picker__primary-filters--name-only'
+        }
+      >
+        <FormGroup label="Name" fieldId="assign-name-search">
+          <TextInput
+            id="assign-name-search"
+            type="search"
+            value={query}
+            placeholder="Search name"
+            aria-label="Search officials"
+            onChange={(_, v) => setQuery(v)}
+          />
+        </FormGroup>
+        {metroOptions.length > 0 ? (
+          <FormGroup label="Territory" fieldId="assign-territory-filter">
+            <FormSelect
+              id="assign-territory-filter"
+              aria-label="Filter by territory"
+              value={territoryFilter}
+              onChange={(_e, value) => setTerritoryFilter(value)}
+            >
+              <FormSelectOption value="" label="All territories" />
+              {metroOptions.map((metro) => (
+                <FormSelectOption key={metro} value={metro} label={metro} />
+              ))}
+            </FormSelect>
+          </FormGroup>
+        ) : null}
+      </div>
       <div className="rs-official-picker__filters-shell">
         <div className="rs-official-picker__filters-bar">
           <button
@@ -253,13 +353,6 @@ export function OfficialAssignPicker({
         </div>
         {filtersOpen ? (
           <div className="rs-official-picker__filters">
-            <TextInput
-              type="search"
-              value={query}
-              placeholder="Search name"
-              aria-label="Search officials"
-              onChange={(_, v) => setQuery(v)}
-            />
             <div className="rs-insights-official-filters">
               <FormGroup
                 label="Level"
@@ -350,7 +443,7 @@ export function OfficialAssignPicker({
         <p className="rs-match-card__meta">No officials match.</p>
       ) : (
         <ul className="rs-official-picker">
-          {rows.map(({ official: o, location, availStatus, games, request }) => {
+          {rows.map(({ official: o, territory, location, availStatus, games, request }) => {
             const sameDayAssignments = matchId
               ? otherAssignmentsOnSameDay(
                   matches,
@@ -409,8 +502,15 @@ export function OfficialAssignPicker({
                             </span>
                           ) : null}
                         </span>
-                        <span className="rs-official-picker__grade">
-                          {officialGradeLabel(o)}
+                        <span className="rs-official-picker__label-row">
+                          <span className="rs-pill rs-pill--ink rs-official-picker__role-pill">
+                            {officialGradeLabel(o)}
+                          </span>
+                          {territory ? (
+                            <span className="rs-pill rs-pill--quiet rs-official-picker__territory-pill">
+                              {territory}
+                            </span>
+                          ) : null}
                         </span>
                         <span className="rs-official-picker__status">
                           {statusLine}
