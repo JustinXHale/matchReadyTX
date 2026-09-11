@@ -78,3 +78,49 @@ export function formatMatchMonthLabel(
 export function matchMonthKey(iso: string, timeZone?: string | null): string {
   return dayKeyInZone(iso, orgTimeZone(timeZone)).slice(0, 7);
 }
+
+type KickoffMatchRef = { id: string; kickoffAt: string };
+
+export type MatchMonthGroup<T extends KickoffMatchRef = KickoffMatchRef> = {
+  key: string;
+  label: string;
+  matches: T[];
+};
+
+/** Split a sorted list into calendar dates before today vs today onward. */
+export function splitMatchesByToday<T extends KickoffMatchRef>(
+  matches: readonly T[],
+  timeZone?: string | null,
+  now: Date = new Date(),
+): { upcoming: T[]; past: T[] } {
+  const tz = orgTimeZone(timeZone);
+  const todayKey = dayKeyInZone(now, tz);
+  const upcoming: T[] = [];
+  const past: T[] = [];
+  for (const m of matches) {
+    if (dayKeyInZone(m.kickoffAt, tz) < todayKey) past.push(m);
+    else upcoming.push(m);
+  }
+  return { upcoming, past };
+}
+
+/** Group matches into month sections (list should already be kickoff-sorted). */
+export function groupMatchesByMonth<T extends KickoffMatchRef>(
+  matches: readonly T[],
+  timeZone?: string | null,
+): MatchMonthGroup<T>[] {
+  const groups: MatchMonthGroup<T>[] = [];
+  for (const m of matches) {
+    const key = matchMonthKey(m.kickoffAt, timeZone);
+    const last = groups[groups.length - 1];
+    if (last && last.key === key) last.matches.push(m);
+    else {
+      groups.push({
+        key,
+        label: formatMatchMonthLabel(m.kickoffAt, timeZone),
+        matches: [m],
+      });
+    }
+  }
+  return groups;
+}

@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { EmptyState, EmptyStateBody, Title } from '@patternfly/react-core';
+import { EmptyState, EmptyStateBody } from '@patternfly/react-core';
 import { useApp } from '@/app/AppContext';
 import {
   divisionFilterOptionsFromMatches,
@@ -32,11 +32,13 @@ import {
   useAvailableMatchesFilterParams,
   type AvailableRoleFilter,
 } from '@/nav/listFilterParams';
+import { orgTimeZone } from '@/domain/matchTime';
 import {
-  formatMatchMonthLabel,
-  matchMonthKey,
-  orgTimeZone,
-} from '@/domain/matchTime';
+  MatchMonthSections,
+  PastScheduleMatchesDisclosure,
+  SchedulePastOnlyHint,
+} from '@/ui/ScheduleMatchListLayout';
+import { useScheduleListSections } from '@/ui/useScheduleListSections';
 
 const OPEN_MATCHES_PATH = '/referee/appointments/open';
 
@@ -314,22 +316,8 @@ export function GlobalRequestPage() {
     [openGames, roleFilter],
   );
 
-  const byMonth = useMemo(() => {
-    const groups: { key: string; label: string; matches: Match[] }[] = [];
-    for (const m of filteredOpen) {
-      const key = matchMonthKey(m.kickoffAt, timeZone);
-      const last = groups[groups.length - 1];
-      if (last && last.key === key) last.matches.push(m);
-      else {
-        groups.push({
-          key,
-          label: formatMatchMonthLabel(m.kickoffAt, timeZone),
-          matches: [m],
-        });
-      }
-    }
-    return groups;
-  }, [filteredOpen, timeZone]);
+  const { upcomingByMonth, pastByMonth, pastCount, showPastCollapsed } =
+    useScheduleListSections(filteredOpen, timeZone, !dateFilter);
 
   if (!currentUser) return null;
 
@@ -432,27 +420,42 @@ export function GlobalRequestPage() {
             </ul>
           )}
 
-          {byMonth.map((group) => (
-            <section key={group.key} className="rs-month-section">
-              <Title headingLevel="h3" size="md" className="rs-month-heading">
-                {group.label}
-              </Title>
-              <ul className="rs-list">
-                {group.matches.map((m) => (
-                  <li key={m.id}>
-                    <MatchListRow
-                      match={m}
-                      to={`/matches/${m.id}?request=1`}
-                      showTime
-                      split="action"
-                      back={requestBack}
-                      trailing={<RaiseHandTrailing match={m} requestBack={requestBack} />}
-                    />
-                  </li>
-                ))}
-              </ul>
-            </section>
-          ))}
+          <SchedulePastOnlyHint
+            show={showPastCollapsed && upcomingByMonth.length === 0}
+          />
+          <MatchMonthSections
+            groups={upcomingByMonth}
+            renderMatchRow={(m) => (
+              <li key={m.id}>
+                <MatchListRow
+                  match={m}
+                  to={`/matches/${m.id}?request=1`}
+                  showTime
+                  split="action"
+                  back={requestBack}
+                  trailing={<RaiseHandTrailing match={m} requestBack={requestBack} />}
+                />
+              </li>
+            )}
+          />
+          {showPastCollapsed ? (
+            <PastScheduleMatchesDisclosure
+              groups={pastByMonth}
+              count={pastCount}
+              renderMatchRow={(m) => (
+                <li key={m.id}>
+                  <MatchListRow
+                    match={m}
+                    to={`/matches/${m.id}?request=1`}
+                    showTime
+                    split="action"
+                    back={requestBack}
+                    trailing={<RaiseHandTrailing match={m} requestBack={requestBack} />}
+                  />
+                </li>
+              )}
+            />
+          ) : null}
         </>
       )}
     </div>

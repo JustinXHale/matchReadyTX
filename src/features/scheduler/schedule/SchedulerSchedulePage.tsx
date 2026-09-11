@@ -46,11 +46,13 @@ import {
   type SchedulerStatusFilter,
 } from '@/nav/listFilterParams';
 import { MatchListRow } from '@/ui/MatchListRow';
+import { orgTimeZone } from '@/domain/matchTime';
 import {
-  formatMatchMonthLabel,
-  matchMonthKey,
-  orgTimeZone,
-} from '@/domain/matchTime';
+  MatchMonthSections,
+  PastScheduleMatchesDisclosure,
+  SchedulePastOnlyHint,
+} from '@/ui/ScheduleMatchListLayout';
+import { useScheduleListSections } from '@/ui/useScheduleListSections';
 
 const SCHEDULER_SCHEDULE_PATH = '/scheduler/schedule';
 
@@ -212,25 +214,89 @@ export function SchedulerSchedulePage() {
     needsReassignmentPool,
   ]);
 
-  const byMonth = useMemo(() => {
-    const groups: { key: string; label: string; matches: Match[] }[] = [];
-    for (const m of list) {
-      const key = matchMonthKey(m.kickoffAt, timeZone);
-      const last = groups[groups.length - 1];
-      if (last && last.key === key) last.matches.push(m);
-      else {
-        groups.push({
-          key,
-          label: formatMatchMonthLabel(m.kickoffAt, timeZone),
-          matches: [m],
-        });
-      }
-    }
-    return groups;
-  }, [list, timeZone]);
+  const { upcomingByMonth, pastByMonth, pastCount, showPastCollapsed } =
+    useScheduleListSections(list, timeZone, !dateFilter);
 
   const assignmentCount =
     needsOfficialsPool.length + needsReassignmentPool.length;
+
+  const renderScheduleMatchRow = useCallback(
+    (m: Match) => {
+      const raiseHand = pendingRaiseHandRequestsForMatch(
+        state.requests,
+        m.id,
+        m,
+      );
+      const urgent = needsReassignmentPool.some((x) => x.id === m.id);
+      const doubleBookedIds = doubleBookedOfficialIdsForMatch(
+        state.matches,
+        m,
+        timeZone,
+      );
+      const doubleBookedNames = doubleBookedIds
+        .map((uid) => {
+          const user = state.users.find((u) => u.uid === uid);
+          return user ? memberListName(user) : null;
+        })
+        .filter((name): name is string => Boolean(name));
+      return (
+        <li
+          key={m.id}
+          className={raiseHand.length > 0 ? 'rs-coverage-match' : undefined}
+        >
+          <MatchListRow
+            match={m}
+            to={`/matches/${m.id}`}
+            showTime
+            split="action"
+            urgent={urgent}
+            back={scheduleBack}
+            meta={
+              <>
+                <span className="rs-pill">{statusLabel(m.status)}</span>
+                {doubleBookedNames.length > 0 ? (
+                  <span className="rs-pill rs-pill--warn">Double-booked</span>
+                ) : null}
+              </>
+            }
+            trailing={
+              <SchedulerAssignTrailing
+                match={m}
+                back={scheduleBack}
+                highlightUserId={currentUser?.uid}
+                onPick={(target) => setPick({ match: m, target })}
+              />
+            }
+          />
+          {doubleBookedNames.length > 0 ? (
+            <p className="rs-assign-overlap rs-assign-overlap--warn">
+              {doubleBookedNames.join(', ')} assigned to another game this day.
+            </p>
+          ) : null}
+          {raiseHand.length > 0 ? (
+            <CoverageMatchRequesters
+              match={m}
+              requests={raiseHand}
+              matchBack={scheduleBack}
+              onApprove={onApproveRaiseHand}
+              onDecline={onDeclineRaiseHand}
+            />
+          ) : null}
+        </li>
+      );
+    },
+    [
+      state.requests,
+      state.matches,
+      state.users,
+      needsReassignmentPool,
+      timeZone,
+      scheduleBack,
+      currentUser?.uid,
+      onApproveRaiseHand,
+      onDeclineRaiseHand,
+    ],
+  );
 
   const selectStatusFilter = (id: StatusFilter) => {
     setStatusFilter(id);
@@ -297,86 +363,22 @@ export function SchedulerSchedulePage() {
           </EmptyStateBody>
         </EmptyState>
       ) : (
-        byMonth.map((group) => (
-          <section key={group.key} className="rs-month-section">
-            <Title headingLevel="h3" size="md" className="rs-month-heading">
-              {group.label}
-            </Title>
-            <ul className="rs-list">
-              {group.matches.map((m) => {
-                const raiseHand = pendingRaiseHandRequestsForMatch(
-                  state.requests,
-                  m.id,
-                  m,
-                );
-                const urgent = needsReassignmentPool.some((x) => x.id === m.id);
-                const doubleBookedIds = doubleBookedOfficialIdsForMatch(
-                  state.matches,
-                  m,
-                  timeZone,
-                );
-                const doubleBookedNames = doubleBookedIds
-                  .map((uid) => {
-                    const user = state.users.find((u) => u.uid === uid);
-                    return user ? memberListName(user) : null;
-                  })
-                  .filter((name): name is string => Boolean(name));
-                return (
-                  <li
-                    key={m.id}
-                    className={
-                      raiseHand.length > 0 ? 'rs-coverage-match' : undefined
-                    }
-                  >
-                    <MatchListRow
-                      match={m}
-                      to={`/matches/${m.id}`}
-                      showTime
-                      split="action"
-                      urgent={urgent}
-                      back={scheduleBack}
-                      meta={
-                        <>
-                          <span className="rs-pill">{statusLabel(m.status)}</span>
-                          {doubleBookedNames.length > 0 ? (
-                            <span className="rs-pill rs-pill--warn">
-                              Double-booked
-                            </span>
-                          ) : null}
-                        </>
-                      }
-                      trailing={
-                        <SchedulerAssignTrailing
-                          match={m}
-                          back={scheduleBack}
-                          highlightUserId={currentUser?.uid}
-                          onPick={(target) =>
-                            setPick({ match: m, target })
-                          }
-                        />
-                      }
-                    />
-                    {doubleBookedNames.length > 0 ? (
-                      <p className="rs-assign-overlap rs-assign-overlap--warn">
-                        {doubleBookedNames.join(', ')} assigned to another game
-                        this day.
-                      </p>
-                    ) : null}
-                    {raiseHand.length > 0 ? (
-                      <CoverageMatchRequesters
-                        match={m}
-                        requests={raiseHand}
-                        matchBack={scheduleBack}
-                        onApprove={onApproveRaiseHand}
-                        onDecline={onDeclineRaiseHand}
-                      />
-                    ) : null}
-                  </li>
-                );
-              })}
-            </ul>
-          </section>
-        ))
+        <>
+          <SchedulePastOnlyHint
+            show={showPastCollapsed && upcomingByMonth.length === 0}
+          />
+          <MatchMonthSections
+            groups={upcomingByMonth}
+            renderMatchRow={renderScheduleMatchRow}
+          />
+          {showPastCollapsed ? (
+            <PastScheduleMatchesDisclosure
+              groups={pastByMonth}
+              count={pastCount}
+              renderMatchRow={renderScheduleMatchRow}
+            />
+          ) : null}
+        </>
       )}
 
       <AssignOfficialModal

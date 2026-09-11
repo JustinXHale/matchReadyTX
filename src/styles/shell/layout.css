@@ -1237,6 +1237,29 @@ input.rs-filter-search {
   gap: 8px;
 }
 
+.rs-schedule-past {
+  margin-top: 4px;
+}
+
+.rs-schedule-past > summary {
+  color: var(--rs-color-muted);
+  font-size: var(--pf-t--global--font--size--body--sm);
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: none;
+}
+
+.rs-schedule-past__body {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.rs-schedule-past-hint {
+  margin: 0;
+}
+
 .rs-month-heading.pf-v6-c-title,
 .rs-month-heading {
   margin: 0 !important;

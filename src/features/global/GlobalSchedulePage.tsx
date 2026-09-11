@@ -1,4 +1,4 @@
-import { Title, EmptyState, EmptyStateBody } from '@patternfly/react-core';
+import { EmptyState, EmptyStateBody } from '@patternfly/react-core';
 import { useMemo } from 'react';
 import { Navigate, useParams } from 'react-router-dom';
 import { useApp, useAppHref } from '@/app/AppContext';
@@ -23,11 +23,13 @@ import {
   pathWithSearch,
   useGlobalScheduleFilterParams,
 } from '@/nav/listFilterParams';
+import { orgTimeZone } from '@/domain/matchTime';
 import {
-  formatMatchMonthLabel,
-  matchMonthKey,
-  orgTimeZone,
-} from '@/domain/matchTime';
+  MatchMonthSections,
+  PastScheduleMatchesDisclosure,
+  SchedulePastOnlyHint,
+} from '@/ui/ScheduleMatchListLayout';
+import { useScheduleListSections } from '@/ui/useScheduleListSections';
 
 type SchedulePane = 'upcoming' | 'completed';
 
@@ -172,22 +174,9 @@ export function GlobalSchedulePage() {
     ],
   );
 
-  const byMonth = useMemo(() => {
-    const groups: { key: string; label: string; matches: Match[] }[] = [];
-    for (const m of list) {
-      const key = matchMonthKey(m.kickoffAt, timeZone);
-      const last = groups[groups.length - 1];
-      if (last && last.key === key) last.matches.push(m);
-      else {
-        groups.push({
-          key,
-          label: formatMatchMonthLabel(m.kickoffAt, timeZone),
-          matches: [m],
-        });
-      }
-    }
-    return groups;
-  }, [list, timeZone]);
+  const collapsePast = pane === 'upcoming' && !dateFilter;
+  const { upcomingByMonth, pastByMonth, pastCount, showPastCollapsed } =
+    useScheduleListSections(list, timeZone, collapsePast);
 
   if (!pane) {
     return <Navigate to={upcomingHref} replace />;
@@ -302,33 +291,56 @@ export function GlobalSchedulePage() {
           </EmptyStateBody>
         </EmptyState>
       ) : (
-        byMonth.map((group) => (
-          <section key={group.key} className="rs-month-section">
-            <Title headingLevel="h3" size="md" className="rs-month-heading">
-              {group.label}
-            </Title>
-            <ul className="rs-list">
-              {group.matches.map((m) => (
-                  <li key={m.id}>
-                    <MatchListRow
+        <>
+          <SchedulePastOnlyHint
+            show={showPastCollapsed && upcomingByMonth.length === 0}
+          />
+          <MatchMonthSections
+            groups={upcomingByMonth}
+            renderMatchRow={(m) => (
+              <li key={m.id}>
+                <MatchListRow
+                  match={m}
+                  to={`/matches/${m.id}`}
+                  showTime
+                  split="action"
+                  back={scheduleBack}
+                  trailing={
+                    <MatchCrewTrailing
                       match={m}
-                      to={`/matches/${m.id}`}
-                      showTime
-                      split="action"
+                      highlightUserId={currentUser?.uid}
                       back={scheduleBack}
-                      trailing={
-                        <MatchCrewTrailing
-                          match={m}
-                          highlightUserId={currentUser?.uid}
-                          back={scheduleBack}
-                        />
-                      }
                     />
-                  </li>
-                ))}
-            </ul>
-          </section>
-        ))
+                  }
+                />
+              </li>
+            )}
+          />
+          {showPastCollapsed ? (
+            <PastScheduleMatchesDisclosure
+              groups={pastByMonth}
+              count={pastCount}
+              renderMatchRow={(m) => (
+                <li key={m.id}>
+                  <MatchListRow
+                    match={m}
+                    to={`/matches/${m.id}`}
+                    showTime
+                    split="action"
+                    back={scheduleBack}
+                    trailing={
+                      <MatchCrewTrailing
+                        match={m}
+                        highlightUserId={currentUser?.uid}
+                        back={scheduleBack}
+                      />
+                    }
+                  />
+                </li>
+              )}
+            />
+          ) : null}
+        </>
       )}
     </>
   );
