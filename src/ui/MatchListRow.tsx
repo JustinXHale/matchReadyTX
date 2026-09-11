@@ -4,9 +4,14 @@ import {
   orgTimeZone,
 } from '@/domain/matchTime';
 import { matchGameplayFormat } from '@/domain/matchGameplayFormat';
+import {
+  matchCardEventLabel,
+  matchUnconfirmedTeamBadges,
+} from '@/domain/matchCardFooter';
 import { statusLabel } from '@/domain/matchTransitions';
 import { isMatchDidNotPlay } from '@/domain/requests';
 import { genderLabel, type Match } from '@/domain/types';
+import { useMemo } from 'react';
 import type { ReactNode } from 'react';
 import { backState, type BackNav } from '@/nav/backNav';
 import { useApp } from '@/app/AppContext';
@@ -109,6 +114,12 @@ export function MatchListRow({
 }) {
   const { state } = useApp();
   const timeZone = orgTimeZone(state.org.timezone);
+  const teamsById = useMemo(
+    () => new Map(state.teams.map((t) => [t.id, t])),
+    [state.teams],
+  );
+  const eventLabel = matchCardEventLabel(match);
+  const unconfirmedTeams = matchUnconfirmedTeamBadges(match, teamsById);
   const { month, day } = formatCardDate(match.kickoffAt, timeZone);
   const linkState = back ? backState(back) : undefined;
   const scored = !hideScore && hasMatchScore(match);
@@ -241,9 +252,28 @@ export function MatchListRow({
             {formatMatchKickoffTime(match.kickoffAt, timeZone)}
           </p>
         )}
-        {match.title?.trim() ? (
-          <p className="rs-list-row__event-title">{match.title.trim()}</p>
-        ) : null}
+        {(eventLabel || unconfirmedTeams.length > 0) && (
+          <div className="rs-list-row__footer">
+            {eventLabel ? (
+              <p className="rs-list-row__event-title">{eventLabel}</p>
+            ) : null}
+            {unconfirmedTeams.length > 0 ? (
+              <div
+                className="rs-list-row__footer-badges"
+                aria-label="Teams awaiting confirmation"
+              >
+                {unconfirmedTeams.map((badge) => (
+                  <span
+                    key={badge.side}
+                    className="rs-pill rs-pill--urgent rs-list-row__chip"
+                  >
+                    {badge.label}
+                  </span>
+                ))}
+              </div>
+            ) : null}
+          </div>
+        )}
         {meta && <div className="rs-list-row__meta">{meta}</div>}
       </div>
     </>

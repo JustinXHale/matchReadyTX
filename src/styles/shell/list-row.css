@@ -523,10 +523,24 @@
 }
 
 .rs-list-row__event-title {
-  margin: 2px 0 0;
+  margin: 0;
   font-size: 13px;
   font-weight: 700;
   color: var(--rs-color-ink);
+}
+
+.rs-list-row__footer {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 8px;
+  margin-top: 2px;
+}
+
+.rs-list-row__footer-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
 }
 
 .rs-list-row__score {
