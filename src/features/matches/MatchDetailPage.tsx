@@ -40,6 +40,14 @@ import {
 } from '@/domain/economics';
 import { formatAssignMatchBlurb } from '@/domain/territory';
 import {
+  applyMatchDivision,
+  matchDivisionSummaryLabels,
+  parseMatchDivision,
+  tierOptionsFromOrgLevels,
+  type MatchDivisionSelection,
+} from '@/domain/matchDivision';
+import { MatchDivisionPickers } from '@/features/matches/MatchDivisionPickers';
+import {
   downloadMatchIcs,
   matchHasCalendarTime,
 } from '@/domain/matchIcs';
@@ -299,6 +307,38 @@ export function MatchDetailPage() {
   useEffect(() => {
     setTitleDraft(match?.title ?? '');
   }, [id, match?.title]);
+
+  const tierOptions = useMemo(
+    () => tierOptionsFromOrgLevels(state.org.matchLevels),
+    [state.org.matchLevels],
+  );
+  const matchDivision = useMemo(
+    () => (match ? parseMatchDivision(match, tierOptions) : null),
+    [match, tierOptions],
+  );
+  const divisionSummaryLabels = useMemo(
+    () =>
+      match ? matchDivisionSummaryLabels(match, tierOptions, genderLabel) : [],
+    [match, tierOptions],
+  );
+
+  const onMatchDivisionChange = useCallback(
+    (next: MatchDivisionSelection) => {
+      if (!match || !isAssignerView) return;
+      const flags = applyMatchDivision(next);
+      store.setMatchFlags(match.id, flags);
+      if (dataMode === 'live' && isFirebaseConfigured) {
+        void saveMatchEventFlagsInFirestore(defaultOrgId(), match.id, {
+          ...flags,
+          matchType: flags.matchType ?? null,
+          title: match.title ?? null,
+        }).catch((err) => {
+          console.error('saveMatchEventFlagsInFirestore failed', err);
+        });
+      }
+    },
+    [dataMode, isAssignerView, match, store],
+  );
 
   const persistScheduleUrl = useCallback(
     (raw: string) => {
@@ -1382,88 +1422,22 @@ export function MatchDetailPage() {
         <p className="rs-detail__event-title">{match.title.trim()}</p>
       ) : null}
 
-      {isAssigner ? (
-        <div className="rs-detail__top-chips" aria-label="Match division">
-          <label className="rs-filter-chip rs-filter-chip--toggle">
-            <input
-              type="checkbox"
-              checked={match.isTournament === true}
-              onChange={(e) => {
-                const checked = e.target.checked;
-                store.setMatchFlags(match.id, { isTournament: checked });
-                if (dataMode === 'live' && isFirebaseConfigured) {
-                  void saveMatchEventFlagsInFirestore(defaultOrgId(), match.id, {
-                    isTournament: checked,
-                    title: match.title ?? null,
-                  }).catch((err) => {
-                    console.error('saveMatchEventFlagsInFirestore failed', err);
-                  });
-                }
-              }}
-            />
-            Tournament event
-          </label>
-          <div
-            className="rs-slot-picker"
-            role="radiogroup"
-            aria-label="Match gender"
-          >
-            {(['men', 'women'] as const).map((g) => (
-              <button
-                key={g}
-                type="button"
-                role="radio"
-                aria-checked={match.gender === g}
-                className={`rs-filter-chip${
-                  match.gender === g ? ' rs-filter-chip--selected' : ''
-                }`}
-                onClick={() =>
-                  store.setMatchFlags(match.id, { gender: g })
-                }
-              >
-                {genderLabel(g)}
-              </button>
-            ))}
-          </div>
-          <div
-            className="rs-slot-picker"
-            role="radiogroup"
-            aria-label="Match level"
-          >
-            {state.org.matchLevels.map((l) => (
-              <button
-                key={l}
-                type="button"
-                role="radio"
-                aria-checked={match.level === l}
-                className={`rs-filter-chip${
-                  match.level === l ? ' rs-filter-chip--selected' : ''
-                }`}
-                onClick={() => store.setMatchFlags(match.id, { level: l })}
-              >
-                {l}
-              </button>
-            ))}
-          </div>
-          {match.matchType?.trim() ? (
-            <span className="rs-pill rs-pill--quiet">{match.matchType.trim()}</span>
-          ) : null}
-        </div>
+      {isAssigner && matchDivision ? (
+        <MatchDivisionPickers
+          division={matchDivision}
+          tierOptions={tierOptions}
+          onChange={onMatchDivisionChange}
+        />
       ) : (
         <div
           className="rs-label-row rs-detail__game-chips"
           aria-label="Game type"
         >
-          <span className="rs-pill rs-pill--ink">
-            {genderLabel(match.gender)}
-          </span>
-          <span className="rs-pill rs-pill--ink">{match.level}</span>
-          {match.isTournament ? (
-            <span className="rs-pill rs-pill--quiet">Tournament</span>
-          ) : null}
-          {match.matchType?.trim() ? (
-            <span className="rs-pill rs-pill--quiet">{match.matchType.trim()}</span>
-          ) : null}
+          {divisionSummaryLabels.map((label) => (
+            <span key={label} className="rs-pill rs-pill--ink">
+              {label}
+            </span>
+          ))}
         </div>
       )}
 

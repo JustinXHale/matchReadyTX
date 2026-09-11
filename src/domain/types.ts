@@ -173,6 +173,7 @@ export const DEFAULT_MATCH_LEVELS = [
   'D1',
   'D2',
   'D3',
+  'D4',
   'Exhibition',
 ] as const;
 
@@ -481,7 +482,7 @@ export interface OrgSettings {
   defaultInvoiceFees?: FeeTable;
   /** Default bill-to email per competition label. */
   financeBillToEmails?: Partial<Record<string, string>>;
-  /** Admin-managed level options; defaults D1/D2/D3/Exhibition/Tourney */
+  /** Admin-managed level options; defaults D1/D2/D3/D4/Exhibition/Tourney */
   matchLevels: string[];
   /** Default crew roles per competition level (Scheduler → Queues → Crew). */
   defaultCrewByLevel?: Record<string, { roles: RequestableSlot[] }>;

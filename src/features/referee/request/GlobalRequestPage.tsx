@@ -9,7 +9,14 @@ import {
   matchOnCalendarDate,
   uniqueMatchCalendarDates,
 } from '@/domain/divisionFilters';
-import { GAMEPLAY_FORMATS } from '@/domain/matchGameplayFormat';
+import {
+  matchEventTypeLabel,
+  matchFormatChoiceLabel,
+  matchSideChoiceLabel,
+  type MatchEventType,
+  type MatchFormatChoice,
+  type MatchSideChoice,
+} from '@/domain/matchDivision';
 import { GlobalDivisionFilters } from '@/features/global/GlobalDivisionFilters';
 import { RsFilterSelect } from '@/ui/RsFilterSelect';
 import { MatchListRow } from '@/ui/MatchListRow';
@@ -97,12 +104,16 @@ export function GlobalRequestPage() {
     levelFilter,
     competitionFilter,
     formatFilter,
+    eventTypeFilter,
+    sideFilter,
     dateFilter,
     setRoleFilter,
     setGenderFilter,
     setLevelFilter,
     setCompetitionFilter,
     setFormatFilter,
+    setEventTypeFilter,
+    setSideFilter,
     setDateFilter,
   } = useAvailableMatchesFilterParams();
 
@@ -128,8 +139,30 @@ export function GlobalRequestPage() {
   );
 
   const formatSelectOptions = useMemo(
-    () => GAMEPLAY_FORMATS.map((format) => ({ value: format, label: format })),
-    [],
+    () =>
+      filterOptions.formats.map((format) => ({
+        value: format,
+        label: matchFormatChoiceLabel(format),
+      })),
+    [filterOptions.formats],
+  );
+
+  const eventSelectOptions = useMemo(
+    () =>
+      filterOptions.eventTypes.map((eventType) => ({
+        value: eventType,
+        label: matchEventTypeLabel(eventType),
+      })),
+    [filterOptions.eventTypes],
+  );
+
+  const sideSelectOptions = useMemo(
+    () =>
+      filterOptions.sides.map((side) => ({
+        value: side,
+        label: matchSideChoiceLabel(side),
+      })),
+    [filterOptions.sides],
   );
 
   const roleSelectOptions = useMemo(
@@ -142,6 +175,8 @@ export function GlobalRequestPage() {
     level: levelFilter,
     competition: competitionFilter,
     format: formatFilter,
+    eventType: eventTypeFilter,
+    side: sideFilter,
   });
 
   const matchesDivision = (m: Match) =>
@@ -153,6 +188,8 @@ export function GlobalRequestPage() {
         levelFilter,
         competitionFilter,
         formatFilter,
+        eventTypeFilter,
+        sideFilter,
       ));
 
   const availableDates = useMemo(
@@ -167,6 +204,8 @@ export function GlobalRequestPage() {
               levelFilter,
               competitionFilter,
               formatFilter,
+              eventTypeFilter,
+              sideFilter,
             )
           ) {
             return false;
@@ -182,6 +221,8 @@ export function GlobalRequestPage() {
       levelFilter,
       competitionFilter,
       formatFilter,
+      eventTypeFilter,
+      sideFilter,
       roleFilter,
     ],
   );
@@ -218,6 +259,8 @@ export function GlobalRequestPage() {
     levelFilter,
     competitionFilter,
     formatFilter,
+    eventTypeFilter,
+    sideFilter,
     dateFilter,
   ]);
 
@@ -250,6 +293,8 @@ export function GlobalRequestPage() {
     levelFilter,
     competitionFilter,
     formatFilter,
+    eventTypeFilter,
+    sideFilter,
     dateFilter,
   ]);
 
@@ -323,10 +368,34 @@ export function GlobalRequestPage() {
           <RsFilterSelect
             label="Format"
             value={formatFilter}
-            onChange={setFormatFilter}
+            onChange={(next) => setFormatFilter(next as MatchFormatChoice | null)}
             placeholder="All formats"
             options={formatSelectOptions}
           />
+        }
+        pairRow4={
+          <>
+            {filterOptions.eventTypes.length > 0 && (
+              <RsFilterSelect
+                label="Event"
+                value={eventTypeFilter}
+                onChange={(next) =>
+                  setEventTypeFilter(next as MatchEventType | null)
+                }
+                placeholder="All events"
+                options={eventSelectOptions}
+              />
+            )}
+            {filterOptions.sides.length > 0 && (
+              <RsFilterSelect
+                label="Side"
+                value={sideFilter}
+                onChange={(next) => setSideFilter(next as MatchSideChoice | null)}
+                placeholder="All sides"
+                options={sideSelectOptions}
+              />
+            )}
+          </>
         }
       />
 

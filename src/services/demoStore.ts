@@ -4617,6 +4617,7 @@ class DemoStore {
         | 'scheduleUrl'
         | 'isTournament'
         | 'title'
+        | 'matchType'
         | 'playedForfeit'
         | 'forfeitTeamId'
         | 'homeScore'

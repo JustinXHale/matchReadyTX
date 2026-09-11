@@ -84,6 +84,8 @@ export function CrewDefaultsPanel() {
       genders: filterOptions.genders,
       levels: levelOptions.length ? levelOptions : filterOptions.levels,
       formats: filterOptions.formats,
+      eventTypes: filterOptions.eventTypes,
+      sides: filterOptions.sides,
     }),
     [filterOptions, levelOptions],
   );

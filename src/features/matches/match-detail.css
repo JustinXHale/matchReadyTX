@@ -94,16 +94,37 @@
   margin-top: -4px;
 }
 
-.rs-detail__top-chips {
+.rs-match-division {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.rs-match-division__row {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 6px;
+  gap: 6px 8px;
 }
 
-.rs-detail__top-chips .rs-slot-picker {
+.rs-match-division__row--disabled {
+  opacity: 0.55;
+}
+
+.rs-match-division__label {
+  flex: 0 0 3.75rem;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--rs-color-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+
+.rs-match-division__row .rs-slot-picker {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
   margin: 0;
-  display: contents;
 }
 
 .rs-detail-fee-edit {

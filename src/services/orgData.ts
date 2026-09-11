@@ -1487,17 +1487,31 @@ function cmoForFirestore(cmo: Match['cmo']): unknown {
   );
 }
 
-/** Persist tournament flag + event title (assigner; live mode). */
+/** Persist tournament flag, event title, and division fields (assigner; live mode). */
 export async function saveMatchEventFlagsInFirestore(
   orgId: string,
   matchId: string,
-  flags: { isTournament?: boolean; title?: string | null },
+  flags: {
+    isTournament?: boolean;
+    title?: string | null;
+    gender?: Match['gender'];
+    level?: string;
+    matchType?: string | null;
+  },
 ): Promise<void> {
   await setDoc(
     doc(requireDb(), 'orgs', orgId, 'matches', matchId),
     stripUndefined({
       isTournament: flags.isTournament === true,
       title: flags.title?.trim() ? flags.title.trim() : null,
+      gender: flags.gender,
+      level: flags.level?.trim() ? flags.level.trim() : undefined,
+      matchType:
+        flags.matchType === undefined
+          ? undefined
+          : flags.matchType?.trim()
+            ? flags.matchType.trim()
+            : null,
       updatedAt: new Date().toISOString(),
     }),
     { merge: true },

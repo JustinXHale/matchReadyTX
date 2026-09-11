@@ -1,5 +1,11 @@
 import { useCallback } from 'react';
 import { useSearchParams } from 'react-router-dom';
+import type { MatchEventType, MatchFormatChoice, MatchSideChoice } from '@/domain/matchDivision';
+import {
+  parseEventTypeFilterParam,
+  parseFormatFilterParam,
+  parseSideFilterParam,
+} from '@/domain/divisionFilters';
 import type { MemberTab, TeamAdminSort } from '@/domain/members';
 import {
   parseCompletedOutcomeParam,
@@ -166,7 +172,9 @@ export function useAvailableMatchesFilterParams() {
   const division = useDivisionFilterFields(searchParams, patch);
 
   const roleFilter = parseAvailableRoleParam(searchParams.get('role'));
-  const formatFilter = searchParams.get('format') || null;
+  const formatFilter = parseFormatFilterParam(searchParams.get('format'));
+  const eventTypeFilter = parseEventTypeFilterParam(searchParams.get('event'));
+  const sideFilter = parseSideFilterParam(searchParams.get('side'));
 
   const setRoleFilter = useCallback(
     (value: AvailableRoleFilter | null) => {
@@ -175,8 +183,20 @@ export function useAvailableMatchesFilterParams() {
     [patch],
   );
   const setFormatFilter = useCallback(
-    (value: string | null) => {
+    (value: MatchFormatChoice | null) => {
       patch((sp) => patchSearchParam(sp, 'format', value));
+    },
+    [patch],
+  );
+  const setEventTypeFilter = useCallback(
+    (value: MatchEventType | null) => {
+      patch((sp) => patchSearchParam(sp, 'event', value));
+    },
+    [patch],
+  );
+  const setSideFilter = useCallback(
+    (value: MatchSideChoice | null) => {
+      patch((sp) => patchSearchParam(sp, 'side', value));
     },
     [patch],
   );
@@ -186,8 +206,12 @@ export function useAvailableMatchesFilterParams() {
     ...division,
     roleFilter,
     formatFilter,
+    eventTypeFilter,
+    sideFilter,
     setRoleFilter,
     setFormatFilter,
+    setEventTypeFilter,
+    setSideFilter,
   };
 }
 

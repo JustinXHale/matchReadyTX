@@ -33,6 +33,7 @@ export function GlobalDivisionFilters({
   rowEnd,
   pairRow2End,
   pairRow3,
+  pairRow4,
   className,
 }: {
   options: DivisionFilterOptions;
@@ -66,6 +67,8 @@ export function GlobalDivisionFilters({
   pairRow2End?: ReactNode;
   /** First column on row 3 when layout is paired (e.g. format). */
   pairRow3?: ReactNode;
+  /** Full row 4 when layout is paired (e.g. event + side). */
+  pairRow4?: ReactNode;
   className?: string;
 }) {
   const useDropdowns = layout === 'dropdowns' || layout === 'paired';
@@ -130,7 +133,8 @@ export function GlobalDivisionFilters({
       showLevels ||
       showGenders ||
       pairRow2End != null ||
-      pairRow3 != null);
+      pairRow3 != null ||
+      pairRow4 != null);
 
   if (
     !showFilterRow &&
@@ -212,6 +216,9 @@ export function GlobalDivisionFilters({
                 />
               )}
             </div>
+          )}
+          {pairRow4 && (
+            <div className="rs-filter-bar__pair-row">{pairRow4}</div>
           )}
         </>
       ) : (

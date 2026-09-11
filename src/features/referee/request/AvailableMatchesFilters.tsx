@@ -4,7 +4,14 @@ import {
   competitionsEncodeGender,
   type DivisionFilterOptions,
 } from '@/domain/divisionFilters';
-import { GAMEPLAY_FORMATS } from '@/domain/matchGameplayFormat';
+import {
+  matchEventTypeLabel,
+  matchFormatChoiceLabel,
+  matchSideChoiceLabel,
+  type MatchEventType,
+  type MatchFormatChoice,
+  type MatchSideChoice,
+} from '@/domain/matchDivision';
 import { genderLabel, type MatchGender } from '@/domain/types';
 import { RsDateField } from '@/ui/RsDateField';
 import { RsMultiFilterSelect } from '@/ui/RsMultiFilterSelect';
@@ -15,7 +22,9 @@ export type AvailableMatchesFilterState = {
   competitions: string[];
   tiers: string[];
   genders: MatchGender[];
-  formats: string[];
+  formats: MatchFormatChoice[];
+  eventTypes: MatchEventType[];
+  sides: MatchSideChoice[];
   roles: string[];
 };
 
@@ -72,8 +81,10 @@ export function AvailableMatchesFilters({
   const showGenders =
     options.genders.length > 1 &&
     !competitionsEncodeGender(options.competitions);
-  const formatOptions =
-    options.formats.length > 0 ? options.formats : [...GAMEPLAY_FORMATS];
+  const formatOptions: MatchFormatChoice[] =
+    options.formats.length > 0 ? options.formats : ['xvs', '10s', '7s'];
+  const showEventTypes = options.eventTypes.length > 0;
+  const showSides = options.sides.length > 0;
   const showRoleFilter = showRoles && roleOptions.length > 0;
 
   const patch = (partial: Partial<AvailableMatchesFilterState>) => {
@@ -87,6 +98,8 @@ export function AvailableMatchesFilters({
       tiers: [],
       genders: [],
       formats: [],
+      eventTypes: [],
+      sides: [],
       roles: [],
     });
   };
@@ -97,6 +110,8 @@ export function AvailableMatchesFilters({
     filters.tiers.length > 0 ||
     filters.genders.length > 0 ||
     filters.formats.length > 0 ||
+    filters.eventTypes.length > 0 ||
+    filters.sides.length > 0 ||
     filters.roles.length > 0;
 
   const activeFilterCount =
@@ -105,6 +120,8 @@ export function AvailableMatchesFilters({
     filters.tiers.length +
     filters.genders.length +
     filters.formats.length +
+    filters.eventTypes.length +
+    filters.sides.length +
     filters.roles.length;
 
   if (
@@ -112,6 +129,8 @@ export function AvailableMatchesFilters({
     !showTiers &&
     !showGenders &&
     !formatOptions.length &&
+    !showEventTypes &&
+    !showSides &&
     !showRoleFilter &&
     availableDates == null
   ) {
@@ -181,12 +200,40 @@ export function AvailableMatchesFilters({
           label="Format"
           placeholder="All formats"
           selected={filters.formats}
-          onChange={(formats) => patch({ formats })}
+          onChange={(formats) => patch({ formats: formats as MatchFormatChoice[] })}
           options={formatOptions.map((value) => ({
             value,
-            label: value,
+            label: matchFormatChoiceLabel(value),
           }))}
         />
+
+        {showEventTypes && (
+          <RsMultiFilterSelect
+            label="Event"
+            placeholder="All events"
+            selected={filters.eventTypes}
+            onChange={(eventTypes) =>
+              patch({ eventTypes: eventTypes as MatchEventType[] })
+            }
+            options={options.eventTypes.map((value) => ({
+              value,
+              label: matchEventTypeLabel(value),
+            }))}
+          />
+        )}
+
+        {showSides && (
+          <RsMultiFilterSelect
+            label="Side"
+            placeholder="All sides"
+            selected={filters.sides}
+            onChange={(sides) => patch({ sides: sides as MatchSideChoice[] })}
+            options={options.sides.map((value) => ({
+              value,
+              label: matchSideChoiceLabel(value),
+            }))}
+          />
+        )}
 
         {showRoleFilter && (
           <RsMultiFilterSelect
