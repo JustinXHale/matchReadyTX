@@ -378,7 +378,8 @@ export function MobileShell() {
             <span>Sample schedule and members — not your live org.</span>
           </div>
         )}
-        <Outlet key={location.key} />
+        {/* pathname only — search-param updates must not remount (e.g. members search). */}
+        <Outlet key={location.pathname} />
       </PageSection>
       <UpdatePrompt />
       {showChrome && (
