@@ -561,10 +561,12 @@ service cloud.firestore {
         function memberDoc() {
           return get(/databases/$(database)/documents/orgs/$(orgId)/members/$(request.auth.uid)).data;
         }
+        /** Officials lazy-create pending rows via get-then-set; get on a missing doc has resource == null. */
         function canReadMatchReport() {
           return isMember(orgId)
             && (
-              canReadInsights(orgId)
+              resource == null
+              || canReadInsights(orgId)
               || isFinanceStaff(orgId)
               || resource.data.officialId == request.auth.uid
               || resource.data.get('subjectOfficialId', '') == request.auth.uid
@@ -658,7 +660,8 @@ service cloud.firestore {
       match /cardReports/{reportId} {
         allow read: if isMember(orgId)
           && (
-            isAssigner(orgId)
+            resource == null
+            || isAssigner(orgId)
             || isReportAnalytics(orgId)
             || isJudicial(orgId)
             || isTreasurer(orgId)

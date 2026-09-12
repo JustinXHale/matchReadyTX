@@ -208,20 +208,34 @@ export function MatchReportFlowPage({
 
   useEffect(() => {
     if (dataMode !== 'live' || !matchId || isEditing) return;
+    const onEnsureFailed = (err: unknown) => {
+      console.error('ensureMatchReportReady failed', err);
+      const code =
+        err && typeof err === 'object' && 'code' in err
+          ? String((err as { code: string }).code)
+          : '';
+      if (code.includes('permission-denied')) {
+        setError(
+          'Could not open this report — check that your profile is complete and you are signed in, then try again.',
+        );
+        return;
+      }
+      setError(
+        err instanceof Error
+          ? err.message
+          : 'Could not prepare this match report. Try again.',
+      );
+    };
     if (assignerFiling) {
       void ensureMatchReportReadyForAssignee(
         matchId,
         assignerFiling.officialId,
         assignerFiling.slot,
-      ).catch((err) =>
-        console.error('ensureMatchReportReadyForAssignee failed', err),
-      );
+      ).catch(onEnsureFailed);
       return;
     }
     if (!currentUser) return;
-    void ensureMatchReportReady(matchId, currentUser.uid).catch((err) =>
-      console.error('ensureMatchReportReady failed', err),
-    );
+    void ensureMatchReportReady(matchId, currentUser.uid).catch(onEnsureFailed);
   }, [assignerFiling, dataMode, currentUser?.uid, matchId, isEditing]);
 
   useEffect(() => {
