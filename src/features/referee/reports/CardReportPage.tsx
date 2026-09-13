@@ -127,6 +127,7 @@ export function CardReportPage() {
     match ? [emptyCard(match.homeTeamId, match.homeTeamName)] : [],
   );
   const [error, setError] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
 
   if (!currentUser) return null;
 
@@ -303,6 +304,7 @@ export function CardReportPage() {
   };
 
   const submit = async () => {
+    if (submitting) return;
     const incidentsError = validateCardReportIncidents(cards, matchFilmed);
     if (incidentsError) {
       setError(incidentsError);
@@ -315,6 +317,7 @@ export function CardReportPage() {
       .filter((t): t is string => Boolean(t))
       .join('\n\n');
     setError(null);
+    setSubmitting(true);
     try {
       const input = {
         matchId: match.id,
@@ -342,6 +345,8 @@ export function CardReportPage() {
       setError(
         err instanceof Error ? err.message : 'Could not save card report.',
       );
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -735,7 +740,7 @@ export function CardReportPage() {
             >
               Add another card
             </Button>
-            <Button type="submit" variant="primary" isBlock>
+            <Button type="submit" variant="primary" isBlock isDisabled={submitting} isLoading={submitting}>
               Submit card report
             </Button>
           </>

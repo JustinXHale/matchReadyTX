@@ -2359,7 +2359,7 @@ function cardReportToFirestore(
     matchFilmed: report.matchFilmed ?? null,
     homeScore: report.homeScore ?? null,
     awayScore: report.awayScore ?? null,
-    cards: report.cards,
+    cards: firestoreJson(report.cards),
     additionalInfoPrivate: report.additionalInfoPrivate ?? null,
     submittedAt: report.submittedAt ?? null,
     createdAt: report.createdAt,
@@ -2445,7 +2445,9 @@ export function subscribeCardReports(
   if (opts.isGlobal) {
     return onSnapshot(
       col,
+      { includeMetadataChanges: true },
       (snap) => {
+        if (snap.metadata.hasPendingWrites) return;
         const reports = snap.docs
           .map((d) =>
             cardReportFromFirestore(d.id, d.data() as Record<string, unknown>),
@@ -2459,7 +2461,9 @@ export function subscribeCardReports(
 
   return onSnapshot(
     query(col, where('officialId', '==', opts.uid)),
+    { includeMetadataChanges: true },
     (snap) => {
+      if (snap.metadata.hasPendingWrites) return;
       const reports = snap.docs
         .map((d) =>
           cardReportFromFirestore(d.id, d.data() as Record<string, unknown>),
@@ -2503,6 +2507,27 @@ export async function saveCardReportInFirestore(
     doc(requireDb(), 'orgs', orgId, 'cardReports', report.id),
     cardReportToFirestore(orgId, report),
   );
+}
+
+/** Save the MO report and its judicial intake together, or neither. */
+export async function saveCardReportWithCasesInFirestore(
+  orgId: string,
+  report: CardReport,
+  cases: JudicialCase[],
+): Promise<void> {
+  const database = requireDb();
+  const batch = writeBatch(database);
+  batch.set(
+    doc(database, 'orgs', orgId, 'cardReports', report.id),
+    cardReportToFirestore(orgId, report),
+  );
+  for (const c of cases) {
+    batch.set(
+      doc(database, 'orgs', orgId, 'judicialCases', c.id),
+      judicialCaseToFirestore(orgId, c),
+    );
+  }
+  await batch.commit();
 }
 
 /** Lazy-create a pending match report doc when the official opens the flow. */
@@ -3074,4 +3099,3 @@ export async function deleteConferenceInvoiceInFirestore(
     doc(requireDb(), 'orgs', orgId, 'conferenceInvoices', invoiceId),
   );
 }
-

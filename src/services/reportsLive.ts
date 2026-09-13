@@ -1,5 +1,6 @@
 import {
   buildResetMatchReport,
+  cardReportDocId,
   type ArReportPayload,
   type CardReport,
   type CmoReportPayload,
@@ -15,8 +16,7 @@ import {
   deleteMatchReportInFirestore,
   ensurePendingMatchReportInFirestore,
   deleteCardReportInFirestore,
-  saveCardReportInFirestore,
-  saveJudicialCasesInFirestore,
+  saveCardReportWithCasesInFirestore,
   saveMatchReportInFirestore,
 } from '@/services/orgData';
 import { casesFromCardReport } from '@/domain/judicial';
@@ -166,11 +166,16 @@ export async function persistSubmittedCardReport(
     id?: string;
   },
 ): Promise<void> {
-  const report = demoStore.submitCardReport(input);
+  const now = new Date().toISOString();
+  const report: CardReport = {
+    ...input,
+    id: input.id ?? cardReportDocId(input.matchId, input.officialId),
+    status: 'submitted',
+    submittedAt: now,
+    createdAt: now,
+  };
+  await saveCardReportWithCasesInFirestore(
+    defaultOrgId(), report, casesFromCardReport(report, now),
+  );
   demoStore.upsertCardReportLocal(report);
-  await saveCardReportInFirestore(defaultOrgId(), report);
-  const cases = casesFromCardReport(report);
-  if (cases.length > 0) {
-    await saveJudicialCasesInFirestore(defaultOrgId(), cases);
-  }
 }

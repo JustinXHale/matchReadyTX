@@ -687,11 +687,11 @@ service cloud.firestore {
           && request.resource.data.incidentId is string
           && request.resource.data.matchId is string
           && request.resource.data.status in ['recorded', 'pending']
-          && exists(/databases/$(database)/documents/orgs/$(orgId)/cardReports/$(request.resource.data.reportId))
+          && getAfter(/databases/$(database)/documents/orgs/$(orgId)/cardReports/$(request.resource.data.reportId)).data.status == 'submitted'
           && (
             isAssigner(orgId)
             || isJudicial(orgId)
-            || get(/databases/$(database)/documents/orgs/$(orgId)/cardReports/$(request.resource.data.reportId)).data.officialId == request.auth.uid
+            || getAfter(/databases/$(database)/documents/orgs/$(orgId)/cardReports/$(request.resource.data.reportId)).data.officialId == request.auth.uid
           );
         allow update: if (isAssigner(orgId) || isJudicial(orgId))
           && request.resource.data.orgId == orgId
