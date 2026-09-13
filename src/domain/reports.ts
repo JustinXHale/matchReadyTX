@@ -974,7 +974,6 @@ export function syncPendingMatchReports(
     if (match.status === 'cancelled' || match.status === 'draft') continue;
 
     const moIds = moOfficialIdsOnMatch(match);
-    const multiMo = moIds.length > 1;
 
     for (const a of reportAssignees(match)) {
       if (a.slot !== 'cmo') {
@@ -1001,26 +1000,20 @@ export function syncPendingMatchReports(
 
       const legacyKey = cmoReportStorageKey(match.id, a.userId);
       const legacy = byKey.get(legacyKey);
-      if (legacy && multiMo && !legacy.subjectOfficialId) {
+      if (legacy && !legacy.subjectOfficialId) {
         const firstSubject = moIds[0]!;
         byKey.delete(legacyKey);
-        byKey.set(
+        putMatchReportRow(
+          byKey,
           cmoReportStorageKey(match.id, a.userId, firstSubject),
           { ...legacy, subjectOfficialId: firstSubject },
         );
       }
 
       for (const subjectId of moIds) {
-        const key = multiMo
-          ? cmoReportStorageKey(match.id, a.userId, subjectId)
-          : cmoReportStorageKey(match.id, a.userId);
-        if (byKey.has(key)) {
-          const cur = byKey.get(key)!;
-          if (!cur.subjectOfficialId && moIds.length === 1) {
-            byKey.set(key, { ...cur, subjectOfficialId: subjectId });
-          }
-          continue;
-        }
+        // Use the same subject key as existing rows, including single-MO matches.
+        const key = cmoReportStorageKey(match.id, a.userId, subjectId);
+        if (byKey.has(key)) continue;
         const assignee = { ...a, subjectOfficialId: subjectId };
         byKey.set(
           key,

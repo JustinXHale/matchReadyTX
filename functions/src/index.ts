@@ -3,7 +3,8 @@
  * Deploy with Firebase; secrets via Secret Manager.
  */
 import { onRequest, onCall, HttpsError } from 'firebase-functions/v2/https';
-import { onDocumentCreated } from 'firebase-functions/v2/firestore';
+import { onDocumentCreated, onDocumentWritten } from 'firebase-functions/v2/firestore';
+import { syncMatchReportScore } from './matchReportScores';
 import { onSchedule } from 'firebase-functions/v2/scheduler';
 import { defineSecret, defineString } from 'firebase-functions/params';
 import { initializeApp } from 'firebase-admin/app';
@@ -34,6 +35,17 @@ initializeApp();
 const db = getFirestore();
 db.settings({ ignoreUndefinedProperties: true });
 const auth = getAuth();
+
+/** Publish final MO scores to the match so every event card sees them. */
+export const syncSubmittedMatchScore = onDocumentWritten(
+  { document: 'orgs/{orgId}/matchReports/{reportId}', retry: true },
+  async (event) => {
+    const report = event.data?.after.data();
+    if (report?.slot !== 'mo' || report.status !== 'submitted') return;
+    if (typeof report.matchId !== 'string' || !report.matchId || report.matchId.includes('/')) return;
+    await syncMatchReportScore(db, event.params.orgId, report.matchId);
+  },
+);
 
 const googleServiceAccountJson = defineSecret('GOOGLE_SERVICE_ACCOUNT_JSON');
 const resendApiKey = defineSecret('RESEND_API_KEY');

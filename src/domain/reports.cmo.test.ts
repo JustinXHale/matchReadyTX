@@ -90,6 +90,55 @@ describe('multi-MO CMO reports', () => {
     expect(aboutB?.status).toBe('pending');
   });
 
+  it('does not recreate a due CMO report after a single-MO submission', () => {
+    const match = tournamentMatch(['mo-a'], 'cmo-1');
+    const now = new Date('2020-01-01T21:00:00Z').getTime();
+    const pending = syncPendingMatchReports([match], [], now);
+    const submitted: MatchReport = {
+      ...pending.find((r) => r.slot === 'cmo')!,
+      status: 'submitted',
+      submittedAt: new Date(now).toISOString(),
+    };
+
+    const merged = syncPendingMatchReports([match], [submitted], now);
+    expect(merged.filter((r) => r.slot === 'cmo')).toEqual([submitted]);
+    expect(syncPendingMatchReports([match], merged, now)).toEqual(merged);
+  });
+
+  it('does not duplicate single-MO pending reports on repeated sync', () => {
+    const match = tournamentMatch(['mo-a'], 'cmo-1');
+    const now = new Date('2020-01-01T21:00:00Z').getTime();
+    const pending = syncPendingMatchReports([match], [], now);
+    expect(syncPendingMatchReports([match], pending, now)).toEqual(pending);
+  });
+
+  it.each([{ moIds: ['mo-a'] }, { moIds: ['mo-a', 'mo-b'] }])(
+    'preserves a submitted report when migrating a legacy pending for $moIds',
+    ({ moIds }) => {
+      const match = tournamentMatch(moIds, 'cmo-1');
+      const now = new Date('2020-01-01T21:00:00Z').getTime();
+      const pending = syncPendingMatchReports([match], [], now);
+      const submitted: MatchReport = {
+        ...pending.find((r) => r.slot === 'cmo')!,
+        status: 'submitted',
+        submittedAt: new Date(now).toISOString(),
+      };
+      const legacy: MatchReport = {
+        ...submitted,
+        id: 'legacy-cmo',
+        subjectOfficialId: undefined,
+        status: 'pending',
+        submittedAt: undefined,
+      };
+      for (const existing of [[legacy, submitted], [submitted, legacy]]) {
+        const merged = syncPendingMatchReports([match], existing, now);
+        expect(merged.filter((r) => r.slot === 'cmo')).toHaveLength(moIds.length);
+        expect(resolveCmoReportForUserOnMatch(merged, match, 'cmo-1', 'mo-a'))
+          .toEqual(submitted);
+      }
+    },
+  );
+
   it('keeps submitted CMO rows when syncing', () => {
     const match = tournamentMatch(['mo-a', 'mo-b'], 'cmo-1');
     const now = new Date('2020-01-01T21:00:00Z').getTime();
