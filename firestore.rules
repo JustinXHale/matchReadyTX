@@ -53,6 +53,24 @@ service cloud.firestore {
     function crewVisible(matchData) {
       return matchData.get('status', '') in ['mo_confirmed', 'crew_confirmed', 't72_team_pending', 't72_officials_pending', 'locked_confirmed'];
     }
+    function moAssignmentConfirmed(entry) {
+      return entry is map
+        && entry.get('userId', '') != ''
+        && entry.get('status', '') == 'confirmed';
+    }
+    /** MO confirmed in crew — aligns coach-feedback rules with the app UI. */
+    function moConfirmedOnMatch(matchData) {
+      let mo = matchData.get('crew', {}).get('mo', []);
+      return mo is list && (
+        (mo.size() >= 1 && moAssignmentConfirmed(mo[0]))
+        || (mo.size() >= 2 && moAssignmentConfirmed(mo[1]))
+        || (mo.size() >= 3 && moAssignmentConfirmed(mo[2]))
+        || (mo.size() >= 4 && moAssignmentConfirmed(mo[3]))
+      );
+    }
+    function coachFeedbackMatchReady(matchData) {
+      return crewVisible(matchData) || moConfirmedOnMatch(matchData);
+    }
     /** Assigner may patch profile + society-managed fields on an org member. */
     function assignerMemberPatch() {
       return request.resource.data.diff(resource.data).affectedKeys()
@@ -446,7 +464,7 @@ service cloud.firestore {
             && get(matchPath()).data.awayTeamId == request.resource.data.awayTeamId
             && get(matchPath()).data.kickoffAt == request.resource.data.kickoffAt
             && !(get(matchPath()).data.status in ['cancelled', 'draft', 'postponed'])
-            && crewVisible(get(matchPath()).data)
+            && coachFeedbackMatchReady(get(matchPath()).data)
             && (
               (
                 coachFeedbackScope() == 'crew'

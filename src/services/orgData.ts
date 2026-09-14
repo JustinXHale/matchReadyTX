@@ -34,7 +34,7 @@ import {
   matchesForFeeApply,
 } from '@/domain/feeDefaults';
 import { normalizeRequestableSlots } from '@/domain/requests';
-import { releaseMatch } from '@/domain/matchTransitions';
+import { inferWorkflowStatus, releaseMatch } from '@/domain/matchTransitions';
 import {
   type CardReport,
   type CardIncident,
@@ -1644,13 +1644,22 @@ export async function saveMatchCrewAssignment(
   orgId: string,
   match: Pick<
     Match,
-    'id' | 'crew' | 'status' | 'cmo' | 'rolesNeeded' | 'assignmentHistoryArchive'
+    | 'id'
+    | 'crew'
+    | 'status'
+    | 'cmo'
+    | 'rolesNeeded'
+    | 'assignmentHistoryArchive'
+    | 'homeConfirmedAt'
+    | 'awayConfirmedAt'
+    | 'releasedAt'
   >,
 ): Promise<void> {
   const { setDoc } = await import('firebase/firestore');
+  const status = inferWorkflowStatus(match as Match);
   const payload = stripUndefined({
     crew: crewForFirestore(match.crew),
-    status: match.status,
+    status,
     rolesNeeded: match.rolesNeeded ?? null,
     cmo: cmoForFirestore(match.cmo),
     assignmentHistoryArchive: match.assignmentHistoryArchive?.length
