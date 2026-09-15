@@ -25,6 +25,7 @@ import {
   runMatchSelfService,
   type MatchSelfServiceAction,
 } from './matchSelfService';
+import { runSyncMatchReadyAssignments } from './matchCalendarImport';
 import {
   enqueueMail,
   processMailDocument,
@@ -460,6 +461,30 @@ export const matchSelfService = onCall(async (request) => {
     side: side || undefined,
     reason: reason || undefined,
   });
+});
+
+/**
+ * Match Calendar import: return confirmed MatchReady assignments for the caller.
+ * Body: { force?: boolean } — force bypasses client throttle only; server rate limit still applies.
+ */
+export const syncMatchReadyAssignments = onCall(async (request) => {
+  if (!request.auth?.uid) {
+    throw new HttpsError('unauthenticated', 'Sign in required');
+  }
+  const data = request.data;
+  if (data !== undefined && data !== null) {
+    if (typeof data !== 'object' || Array.isArray(data)) {
+      throw new HttpsError('invalid-argument', 'Invalid payload.');
+    }
+    const allowed = new Set(['force']);
+    for (const key of Object.keys(data as Record<string, unknown>)) {
+      if (!allowed.has(key)) {
+        throw new HttpsError('invalid-argument', `Unknown field: ${key}`);
+      }
+    }
+  }
+
+  return runSyncMatchReadyAssignments(db, request.auth.uid);
 });
 
 /**

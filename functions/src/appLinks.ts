@@ -16,3 +16,10 @@ export const SCHEDULER_TEAM_LINKS_PATH =
 export function schedulerTeamLinksUrl(): string {
   return `${appOrigin()}${SCHEDULER_TEAM_LINKS_PATH}`;
 }
+
+/** Absolute URL to a match detail page in the MatchReadyTX PWA. */
+export function matchAppUrl(matchId: string): string {
+  const origin = appOrigin();
+  const path = `/matches/${encodeURIComponent(matchId)}`;
+  return origin ? `${origin}${path}` : path;
+}
