@@ -26,6 +26,7 @@ import {
   type MatchSelfServiceAction,
 } from './matchSelfService';
 import { runSyncMatchReadyAssignments } from './matchCalendarImport';
+import { runGetMatchCalendarPlatformInsights } from './matchCalendarPlatformInsights';
 import {
   enqueueMail,
   processMailDocument,
@@ -55,6 +56,14 @@ const sheetWebhookSecret = defineSecret('SHEET_WEBHOOK_SECRET');
 const resendFromEmail = defineString('RESEND_FROM_EMAIL', {
   default: 'MatchReadyTX <onboarding@resend.dev>',
 });
+const matchCalendarPlatformAdminUids = defineString(
+  'MATCH_CALENDAR_PLATFORM_ADMIN_UIDS',
+  { default: '' },
+);
+const matchCalendarPlatformAdminEmails = defineString(
+  'MATCH_CALENDAR_PLATFORM_ADMIN_EMAILS',
+  { default: '' },
+);
 
 async function assertAssigner(uid: string, orgId: string): Promise<void> {
   const member = await db.doc(`orgs/${orgId}/members/${uid}`).get();
@@ -486,6 +495,44 @@ export const syncMatchReadyAssignments = onCall(async (request) => {
 
   return runSyncMatchReadyAssignments(db, request.auth.uid);
 });
+
+/**
+ * Match Calendar platform operator view: member list + aggregated insights.
+ * Caller must be listed in MATCH_CALENDAR_PLATFORM_ADMIN_UIDS or
+ * MATCH_CALENDAR_PLATFORM_ADMIN_EMAILS (comma-separated function env).
+ */
+export const getMatchCalendarPlatformInsights = onCall(
+  {
+    timeoutSeconds: 120,
+    memory: '512MiB',
+  },
+  async (request) => {
+    if (!request.auth?.uid) {
+      throw new HttpsError('unauthenticated', 'Sign in required');
+    }
+    if (request.data !== undefined && request.data !== null) {
+      if (typeof request.data !== 'object' || Array.isArray(request.data)) {
+        throw new HttpsError('invalid-argument', 'Invalid payload.');
+      }
+      if (Object.keys(request.data as Record<string, unknown>).length > 0) {
+        throw new HttpsError('invalid-argument', 'No request fields are supported.');
+      }
+    }
+
+    const auth = getAuth();
+    const caller = await auth.getUser(request.auth.uid);
+    return runGetMatchCalendarPlatformInsights(
+      db,
+      auth,
+      request.auth.uid,
+      caller.email,
+      {
+        uids: matchCalendarPlatformAdminUids.value(),
+        emails: matchCalendarPlatformAdminEmails.value(),
+      },
+    );
+  },
+);
 
 /**
  * Onboarding / profile: request Team Admin access for one or more teams.
