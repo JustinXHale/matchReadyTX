@@ -32,11 +32,13 @@ import {
   resolveOfficialTerritory,
   uniqueMetros,
 } from '@/domain/territory';
+import { OUTSIDE_APPOINTMENT_LABEL } from '@/domain/placeholderAssignment';
 import {
   ASSESSED_LEVEL_MAX,
   ASSESSED_LEVEL_MIN,
   REQUESTABLE_SLOT_SHORT,
   type AvailabilityRange,
+  type CrewSlot,
   type GameRequest,
   type Match,
   type Team,
@@ -105,6 +107,8 @@ export function OfficialAssignPicker({
   currentUserId,
   hideHint = false,
   onPick,
+  onPickOutsideAppointment,
+  outsideAppointmentSlot,
 }: {
   officials: UserProfile[];
   matches: Match[];
@@ -121,6 +125,9 @@ export function OfficialAssignPicker({
   currentUserId?: string;
   hideHint?: boolean;
   onPick: (userId: string) => void;
+  /** When set, shows a shortcut to mark the slot as an outside appointment. */
+  onPickOutsideAppointment?: () => void;
+  outsideAppointmentSlot?: CrewSlot;
 }) {
   const season = useMemo(() => rugbySeasonDayRange(timeZone), [timeZone]);
   const territoryLookup = useMemo(
@@ -439,6 +446,22 @@ export function OfficialAssignPicker({
           </div>
         ) : null}
       </div>
+      {onPickOutsideAppointment && outsideAppointmentSlot ? (
+        <div className="rs-official-picker__outside">
+          <button
+            type="button"
+            className="rs-official-picker__outside-btn"
+            onClick={onPickOutsideAppointment}
+          >
+            <span className="rs-official-picker__outside-label">
+              {OUTSIDE_APPOINTMENT_LABEL}
+            </span>
+            <span className="rs-official-picker__outside-hint">
+              Covered by another assigner or organization — no society official
+            </span>
+          </button>
+        </div>
+      ) : null}
       {rows.length === 0 ? (
         <p className="rs-match-card__meta">No officials match.</p>
       ) : (

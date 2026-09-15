@@ -37,7 +37,17 @@ import {
   reactivateMatch,
   releaseMatch,
 } from '@/domain/matchTransitions';
-import { assignOfficial, collectAssignmentHistory, confirmOfficialSlot, markUnavailableAndRelease } from '@/domain/crew';
+import {
+  assignOfficial,
+  assignOutsideAppointment,
+  collectAssignmentHistory,
+  confirmOfficialSlot,
+  markUnavailableAndRelease,
+} from '@/domain/crew';
+import {
+  OUTSIDE_APPOINTMENT_LABEL,
+  OUTSIDE_APPOINTMENT_USER_ID,
+} from '@/domain/placeholderAssignment';
 import { withCrewBlockRemoved } from '@/domain/crewSize';
 import { emptyCrew, crewBlocks, crewPeople, emptyCrewBlocks, emptyAssignment, hasInsightsAccessRole, isCrewVisibleToTeams, type Match, type OrgSettings, type Team, type UserProfile, type RequestableSlot } from '@/domain/types';
 import {
@@ -151,6 +161,17 @@ describe('match transitions', () => {
     expect(m.homeConfirmedAt).toBeTruthy();
     m = confirmTeam(m, 'away');
     expect(m.status).toBe('team_confirmed');
+  });
+
+  it('assignOutsideAppointment fills a slot as confirmed without a society member', () => {
+    let m = releaseMatch(baseMatch());
+    m = confirmTeam(confirmTeam(m, 'home'), 'away');
+    m = assignOutsideAppointment(m, 'mo');
+    const mo = crewPeople(m.crew.mo)[0];
+    expect(mo?.userId).toBe(OUTSIDE_APPOINTMENT_USER_ID);
+    expect(mo?.userName).toBe(OUTSIDE_APPOINTMENT_LABEL);
+    expect(mo?.status).toBe('confirmed');
+    expect(['mo_confirmed', 'crew_confirmed']).toContain(m.status);
   });
 
   it('reactivateMatch restores cancelled match from workflow state', () => {

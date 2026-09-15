@@ -1,3 +1,7 @@
+import {
+  OUTSIDE_APPOINTMENT_LABEL,
+  OUTSIDE_APPOINTMENT_USER_ID,
+} from '@/domain/placeholderAssignment';
 import type {
   CrewAssignment,
   CrewSlot,
@@ -81,6 +85,59 @@ export function assignOfficial(
     matchStatus = 'crew_pending';
   }
   return { ...match, crew, status: matchStatus };
+}
+
+/**
+ * Mark a crew slot as covered by an outside official (not in the society).
+ * Confirmed immediately — no email, no official self-service.
+ */
+export function assignOutsideAppointment(
+  match: Match,
+  slot: CrewSlot,
+  assignmentId?: string,
+): Match {
+  const existing = match.crew[slot] ?? [];
+  const fillId =
+    assignmentId ?? emptyCrewBlocks(existing)[0]?.id ?? null;
+
+  let assignment: CrewAssignment = {
+    id: fillId ?? newAssignmentId(),
+    slot,
+    userId: OUTSIDE_APPOINTMENT_USER_ID,
+    userName: OUTSIDE_APPOINTMENT_LABEL,
+    status: 'confirmed',
+    confirmedAt: new Date().toISOString(),
+    history: fillId
+      ? (existing.find((a) => a.id === fillId)?.history ?? [])
+      : [],
+  };
+  assignment = appendHistory(assignment, {
+    at: new Date().toISOString(),
+    userId: OUTSIDE_APPOINTMENT_USER_ID,
+    userName: OUTSIDE_APPOINTMENT_LABEL,
+    action: 'assigned',
+    reason: 'Outside appointment (no society official)',
+  });
+
+  let nextList: CrewAssignment[];
+  if (fillId && existing.some((a) => a.id === fillId)) {
+    nextList = existing.map((a) => (a.id === fillId ? assignment : a));
+  } else {
+    nextList = [...existing, assignment];
+  }
+
+  const crew = { ...match.crew, [slot]: nextList };
+  let status = match.status;
+  if (slot === 'mo') {
+    status = 'mo_confirmed';
+  }
+  const allFilledConfirmed = CREW_SLOTS.every((s) =>
+    crewPeople(crew[s]).every((a) => a.status === 'confirmed'),
+  );
+  if (allFilledConfirmed && isCrewVisibleToTeams({ ...match, crew })) {
+    status = 'crew_confirmed';
+  }
+  return { ...match, crew, status };
 }
 
 export function confirmOfficialSlot(

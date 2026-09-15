@@ -82,6 +82,7 @@ import {
   namedOfficialsNeedingAvailability,
 } from '@/domain/crew';
 import { availableCrewRolesToAdd, roleHasAssignee } from '@/domain/crewSize';
+import { isOutsideAppointmentUserId } from '@/domain/placeholderAssignment';
 import { IconDateInput } from '@/ui/IconDateInput';
 import {
   canOfficialRequestMatch,
@@ -762,6 +763,24 @@ export function MatchDetailPage() {
             );
           });
         }
+      }
+    }
+    setPickTarget(null);
+  };
+
+  const pickOutsideAppointment = () => {
+    if (!pickTarget || !isCrewSlot(pickTarget.slot)) return;
+    store.assignOutsideAppointment(
+      match.id,
+      pickTarget.slot,
+      pickTarget.assignmentId,
+    );
+    if (dataMode === 'live' && isFirebaseConfigured) {
+      const next = store.getState().matches.find((m) => m.id === match.id);
+      if (next) {
+        void saveMatchCrewAssignment(defaultOrgId(), next).catch((err) =>
+          console.error('Failed to save outside appointment', err),
+        );
       }
     }
     setPickTarget(null);
@@ -2894,6 +2913,16 @@ export function MatchDetailPage() {
             currentUserId={currentPickUserId}
             hideHint
             onPick={pickOfficial}
+            onPickOutsideAppointment={
+              pickTarget && isCrewSlot(pickTarget.slot)
+                ? pickOutsideAppointment
+                : undefined
+            }
+            outsideAppointmentSlot={
+              pickTarget && isCrewSlot(pickTarget.slot)
+                ? pickTarget.slot
+                : undefined
+            }
           />
         </ModalBody>
         <ModalFooter>
@@ -2907,6 +2936,7 @@ export function MatchDetailPage() {
           )}
           {isAssigner &&
             currentPickUserId &&
+            !isOutsideAppointmentUserId(currentPickUserId) &&
             dataMode === 'live' &&
             isFirebaseConfigured && (
             <Button
@@ -2922,7 +2952,10 @@ export function MatchDetailPage() {
                   : 'Resend email'}
             </Button>
           )}
-          {currentPickUserId && pickTarget && pickTarget.slot !== 'cmo' && (
+          {currentPickUserId &&
+            pickTarget &&
+            pickTarget.slot !== 'cmo' &&
+            !isOutsideAppointmentUserId(currentPickUserId) && (
             <Button
               type="button"
               variant="link"

@@ -23,6 +23,10 @@ import { persistCrewAssignmentAndEmail } from '@/services/liveAssignment';
 import { defaultOrgId, saveMatchCrewAssignment } from '@/services/orgData';
 import { isFirebaseConfigured } from '@/services/firebase';
 
+function isCrewSlotValue(slot: RequestableSlot): slot is CrewSlot {
+  return slot !== 'cmo';
+}
+
 export type CrewPickTarget = {
   slot: RequestableSlot;
   assignmentId?: string;
@@ -94,6 +98,24 @@ export function AssignOfficialModal({
     onClose();
   };
 
+  const pickOutsideAppointment = () => {
+    if (!liveMatch || !pickTarget || !isCrewSlotValue(pickTarget.slot)) return;
+    store.assignOutsideAppointment(
+      liveMatch.id,
+      pickTarget.slot,
+      pickTarget.assignmentId,
+    );
+    if (dataMode === 'live' && isFirebaseConfigured) {
+      const next = store.getState().matches.find((m) => m.id === liveMatch.id);
+      if (next) {
+        void saveMatchCrewAssignment(defaultOrgId(), next).catch((err) =>
+          console.error('Failed to save outside appointment', err),
+        );
+      }
+    }
+    onClose();
+  };
+
   return (
     <Modal
       variant={ModalVariant.small}
@@ -127,6 +149,14 @@ export function AssignOfficialModal({
               requests={state.requests}
               hideHint
               onPick={onPick}
+              onPickOutsideAppointment={
+                isCrewSlotValue(pickTarget.slot)
+                  ? pickOutsideAppointment
+                  : undefined
+              }
+              outsideAppointmentSlot={
+                isCrewSlotValue(pickTarget.slot) ? pickTarget.slot : undefined
+              }
             />
           </>
         ) : null}

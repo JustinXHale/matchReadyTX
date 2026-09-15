@@ -6,6 +6,7 @@ import {
   type CardReport,
   type MatchReport,
 } from '@/domain/reports';
+import { isOutsideAppointmentUserId } from '@/domain/placeholderAssignment';
 import type {
   Match,
   OfficialPayment,
@@ -299,7 +300,7 @@ function collectAssignments(match: Match): {
   const out: { userId: string; userName: string; slot: RequestableSlot }[] = [];
   for (const slot of ['mo', 'ar1', 'ar2', 'no4'] as const) {
     for (const a of crewPeople(match.crew[slot])) {
-      if (a.userId) {
+      if (a.userId && !isOutsideAppointmentUserId(a.userId)) {
         out.push({
           userId: a.userId,
           userName: a.userName ?? 'Official',

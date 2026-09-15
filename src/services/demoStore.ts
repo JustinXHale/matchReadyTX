@@ -1,6 +1,7 @@
 import { csvRowToKickoffIso, parseScheduleCsv, type CsvMatchRow } from '@/domain/csvImport';
 import {
   assignOfficial,
+  assignOutsideAppointment,
   archiveCrewAssignmentsHistory,
   confirmOfficialSlot,
   markUnavailableAndRelease,
@@ -4323,6 +4324,21 @@ class DemoStore {
         ),
       );
     }
+  }
+
+  /** Assigner marks slot as covered by an outside official (no society member). */
+  assignOutsideAppointment(
+    matchId: string,
+    slot: CrewSlot,
+    assignmentId?: string,
+  ): void {
+    this.set((s) => ({
+      ...s,
+      matches: s.matches.map((m) => {
+        if (m.id !== matchId) return m;
+        return assignOutsideAppointment(m, slot, assignmentId);
+      }),
+    }));
   }
 
   /** Assigner clears one assignee (resets to empty block). */

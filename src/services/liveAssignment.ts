@@ -1,3 +1,4 @@
+import { isOutsideAppointmentUserId } from '@/domain/placeholderAssignment';
 import {
   CREW_SLOT_LABELS,
   REQUESTABLE_SLOT_LABELS,
@@ -66,7 +67,13 @@ function otherAssignees(
 ): { role: string; name: string }[] {
   const out: { role: string; name: string }[] = [];
   for (const { slot, assignment } of allActiveAssignments(match)) {
-    if (!assignment.userId || assignment.userId === excludeUserId) continue;
+    if (
+      !assignment.userId ||
+      assignment.userId === excludeUserId ||
+      isOutsideAppointmentUserId(assignment.userId)
+    ) {
+      continue;
+    }
     if (!assignment.userName?.trim()) continue;
     out.push({ role: CREW_SLOT_LABELS[slot], name: assignment.userName.trim() });
   }
@@ -142,7 +149,11 @@ function matchLinkHtml(match: Match): string {
 <p style="color:#666;font-size:13px;">If you are not signed in, you will be asked to log in first, then taken to the match.</p>`;
 }
 function canNotify(userId: string): boolean {
-  return isFirebaseConfigured && !userId.startsWith('u_');
+  return (
+    isFirebaseConfigured &&
+    !userId.startsWith('u_') &&
+    !isOutsideAppointmentUserId(userId)
+  );
 }
 
 /** Send (or resend) the assignment confirmation email — no Firestore write. */

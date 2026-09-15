@@ -166,9 +166,11 @@ export function confirmedAssignmentForUser(
     match.crew && typeof match.crew === 'object'
       ? (match.crew as Record<string, unknown>)
       : {};
+  const outsideId = '__outside_appointment__';
   for (const slot of CREW_SLOTS) {
     for (const row of slotList(crew, slot)) {
-      if (String(row.userId ?? '') !== uid) continue;
+      const rowUid = String(row.userId ?? '');
+      if (!rowUid || rowUid === outsideId || rowUid !== uid) continue;
       if (String(row.status ?? '') === 'confirmed') return { slot };
     }
   }
