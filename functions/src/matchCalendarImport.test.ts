@@ -103,6 +103,42 @@ describe('matchCalendarImport mapping', () => {
     ).toBe('cancelled');
   });
 
+  it('does not treat releasedAt as cancelled (published to officials)', () => {
+    const released = baseMatch({
+      releasedAt: '2026-09-01T12:00:00.000Z',
+      status: 'locked_confirmed',
+    });
+    expect(
+      inferCalendarStatus(
+        released,
+        '2026-10-15T19:00:00.000Z',
+        Date.parse('2026-10-01T00:00:00.000Z'),
+      ),
+    ).toBe('upcoming');
+    expect(mapMatchToAssignmentDto('lonestar', 'm1', released, 'user-1', org)).not.toBeNull();
+  });
+
+  it('skips cancelled and postponed matches entirely', () => {
+    expect(
+      mapMatchToAssignmentDto(
+        'lonestar',
+        'm1',
+        baseMatch({ status: 'cancelled', cancelledAt: '2026-09-01' }),
+        'user-1',
+        org,
+      ),
+    ).toBeNull();
+    expect(
+      mapMatchToAssignmentDto(
+        'lonestar',
+        'm1',
+        baseMatch({ status: 'postponed', postponedAt: '2026-09-01' }),
+        'user-1',
+        org,
+      ),
+    ).toBeNull();
+  });
+
   it('formats location and infers match types', () => {
     expect(formatMatchLocation('Field 1', 'Field 1')).toBe('Field 1');
     expect(inferCalendarMatchType({ isTournament: true })).toBe('tournament');

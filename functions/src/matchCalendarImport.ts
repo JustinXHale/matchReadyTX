@@ -133,19 +133,24 @@ export function inferCalendarMatchType(
   return 'xvs';
 }
 
+export function isMatchReadyImportExcluded(
+  match: Record<string, unknown>,
+): boolean {
+  const workflow = String(match.status ?? '').trim();
+  return (
+    workflow === 'cancelled' ||
+    workflow === 'postponed' ||
+    Boolean(match.cancelledAt) ||
+    Boolean(match.postponedAt)
+  );
+}
+
 export function inferCalendarStatus(
   match: Record<string, unknown>,
   kickoffAt: string,
   now = Date.now(),
 ): CalendarMatchStatus {
-  const workflow = String(match.status ?? '').trim();
-  if (
-    workflow === 'cancelled' ||
-    workflow === 'postponed' ||
-    Boolean(match.cancelledAt) ||
-    Boolean(match.postponedAt) ||
-    Boolean(match.releasedAt)
-  ) {
+  if (isMatchReadyImportExcluded(match)) {
     return 'cancelled';
   }
   const kickoffMs = Date.parse(kickoffAt);
@@ -189,6 +194,8 @@ export function mapMatchToAssignmentDto(
   org: OrgContext,
   now = Date.now(),
 ): MatchReadyAssignmentDto | null {
+  if (isMatchReadyImportExcluded(match)) return null;
+
   const assignment = confirmedAssignmentForUser(match, uid);
   if (!assignment) return null;
 
