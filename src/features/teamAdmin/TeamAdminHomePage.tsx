@@ -511,10 +511,9 @@ export function TeamAdminHomePage() {
 
       <Link
         to={requestFixtureHref}
-        className="rs-fab"
-        aria-label="Request a new fixture"
+        className="rs-fab rs-fab--labeled"
       >
-        <span aria-hidden>+</span>
+        Request Match &amp; Referee
       </Link>
     </div>
   );
