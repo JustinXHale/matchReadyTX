@@ -66,7 +66,11 @@ import {
 import { seedDemoJudicialSeason } from '@/services/demoJudicialSeason';
 import { createDraftInvoice } from '@/domain/invoiceBuilder';
 import { buildAssignmentPayableRows } from '@/domain/paymentReadiness';
-import { matchFromFixtureRequest, newAppMatchId } from '@/domain/fixtureRequests';
+import {
+  isOtherOpponentTeamId,
+  matchFromFixtureRequest,
+  newAppMatchId,
+} from '@/domain/fixtureRequests';
 import {
   coachFeedbackDocId,
   coachFeedbackScopeForMatch,
@@ -4835,6 +4839,7 @@ class DemoStore {
     requesterTeamId: string;
     side: 'home' | 'away';
     opponentTeamId: string;
+    opponentTeamName?: string;
     kickoffAt: string;
     venueName: string;
     venueAddress: string;
@@ -4850,16 +4855,33 @@ class DemoStore {
     if (!user.teamIds.includes(input.requesterTeamId)) return null;
     if (input.requesterTeamId === input.opponentTeamId) return null;
     const myTeam = this.state.teams.find((t) => t.id === input.requesterTeamId);
-    const opp = this.state.teams.find((t) => t.id === input.opponentTeamId);
-    if (!myTeam || !opp) return null;
+    if (!myTeam) return null;
+    const otherOpponent = isOtherOpponentTeamId(input.opponentTeamId);
+    const opp = otherOpponent
+      ? null
+      : this.state.teams.find((t) => t.id === input.opponentTeamId);
+    if (!otherOpponent && !opp) return null;
+    if (otherOpponent && !input.opponentTeamName?.trim()) return null;
     if (!input.venueName.trim() || !input.venueAddress.trim()) return null;
     if (!input.kickoffAt || Number.isNaN(new Date(input.kickoffAt).getTime())) {
       return null;
     }
     if (!input.level.trim()) return null;
 
-    const homeTeam = input.side === 'home' ? myTeam : opp;
-    const awayTeam = input.side === 'home' ? opp : myTeam;
+    const opponentId = otherOpponent ? input.opponentTeamId : opp!.id;
+    const opponentName = otherOpponent
+      ? input.opponentTeamName!.trim()
+      : teamDisplayAbbreviation(opp!, opp!.name);
+    const homeTeamId = input.side === 'home' ? myTeam.id : opponentId;
+    const awayTeamId = input.side === 'home' ? opponentId : myTeam.id;
+    const homeTeamName =
+      input.side === 'home'
+        ? teamDisplayAbbreviation(myTeam, myTeam.name)
+        : opponentName;
+    const awayTeamName =
+      input.side === 'home'
+        ? opponentName
+        : teamDisplayAbbreviation(myTeam, myTeam.name);
     const req: FixtureRequest = {
       id: id('fr'),
       orgId: this.state.org.id,
@@ -4867,11 +4889,11 @@ class DemoStore {
       requesterName: user.displayName,
       requesterTeamId: input.requesterTeamId,
       side: input.side,
-      opponentTeamId: input.opponentTeamId,
-      homeTeamId: homeTeam.id,
-      awayTeamId: awayTeam.id,
-      homeTeamName: teamDisplayAbbreviation(homeTeam, homeTeam.name),
-      awayTeamName: teamDisplayAbbreviation(awayTeam, awayTeam.name),
+      opponentTeamId: opponentId,
+      homeTeamId,
+      awayTeamId,
+      homeTeamName,
+      awayTeamName,
       kickoffAt: input.kickoffAt,
       venueName: input.venueName.trim(),
       venueAddress: input.venueAddress.trim(),

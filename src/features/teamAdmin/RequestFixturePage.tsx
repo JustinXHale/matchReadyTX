@@ -11,12 +11,16 @@ import {
 } from '@patternfly/react-core';
 import { useNavigate } from 'react-router-dom';
 import { useApp, useAppHref } from '@/app/AppContext';
+import { OTHER_OPPONENT_TEAM_ID } from '@/domain/fixtureRequests';
 import type { MatchGender } from '@/domain/types';
 import { isFirebaseConfigured } from '@/services/firebase';
 import {
   createFixtureRequestInFirestore,
   defaultOrgId,
 } from '@/services/orgData';
+
+const REFEREE_TRAVEL_NOTE =
+  '*might be required for matches more than 5 hours outside Dallas, Houston, Austin, San Antonio.';
 
 function toLocalDateValue(d: Date): string {
   const y = d.getFullYear();
@@ -62,6 +66,7 @@ export function RequestFixturePage() {
   );
   const [side, setSide] = useState<'home' | 'away'>('home');
   const [opponentTeamId, setOpponentTeamId] = useState('');
+  const [opponentTeamName, setOpponentTeamName] = useState('');
   const [date, setDate] = useState(() => toLocalDateValue(defaultKick));
   const [time, setTime] = useState(() => toLocalTimeValue(defaultKick));
   const [venueName, setVenueName] = useState('');
@@ -74,6 +79,8 @@ export function RequestFixturePage() {
   const [housingProvided, setHousingProvided] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+
+  const otherOpponent = opponentTeamId === OTHER_OPPONENT_TEAM_ID;
 
   const opponents = useMemo(
     () => state.teams.filter((t) => t.id !== requesterTeamId),
@@ -116,6 +123,10 @@ export function RequestFixturePage() {
       setError('Select your team and an opponent.');
       return;
     }
+    if (otherOpponent && !opponentTeamName.trim()) {
+      setError('Enter the opponent name.');
+      return;
+    }
     if (!venueName.trim() || !venueAddress.trim()) {
       setError('Venue name and address are required.');
       return;
@@ -132,6 +143,7 @@ export function RequestFixturePage() {
         requesterTeamId,
         side,
         opponentTeamId,
+        opponentTeamName: otherOpponent ? opponentTeamName.trim() : undefined,
         kickoffAt,
         venueName: venueName.trim(),
         venueAddress: venueAddress.trim(),
@@ -187,122 +199,155 @@ export function RequestFixturePage() {
         added to the Sheet and released for team confirmation.
       </p>
 
-      <FormGroup label="Your team" isRequired fieldId="fr-my-team">
-        <FormSelect
-          id="fr-my-team"
-          value={requesterTeamId}
-          onChange={(_e, v) => {
-            setRequesterTeamId(v);
-            if (opponentTeamId === v) setOpponentTeamId('');
-          }}
-          aria-label="Your team"
-        >
-          {myTeams.map((t) => (
-            <FormSelectOption key={t.id} value={t.id} label={t.name} />
-          ))}
-        </FormSelect>
-      </FormGroup>
+      <div className="rs-form-row rs-form-row--2">
+        <FormGroup label="Your team" isRequired fieldId="fr-my-team">
+          <FormSelect
+            id="fr-my-team"
+            value={requesterTeamId}
+            onChange={(_e, v) => {
+              setRequesterTeamId(v);
+              if (opponentTeamId === v) {
+                setOpponentTeamId('');
+                setOpponentTeamName('');
+              }
+            }}
+            aria-label="Your team"
+          >
+            {myTeams.map((t) => (
+              <FormSelectOption key={t.id} value={t.id} label={t.name} />
+            ))}
+          </FormSelect>
+        </FormGroup>
 
-      <FormGroup label="Your side" isRequired fieldId="fr-side">
-        <FormSelect
-          id="fr-side"
-          value={side}
-          onChange={(_e, v) => setSide(v === 'away' ? 'away' : 'home')}
-          aria-label="Home or Away"
-        >
-          <FormSelectOption value="home" label="Home" />
-          <FormSelectOption value="away" label="Away" />
-        </FormSelect>
-      </FormGroup>
+        <FormGroup label="Your side" isRequired fieldId="fr-side">
+          <FormSelect
+            id="fr-side"
+            value={side}
+            onChange={(_e, v) => setSide(v === 'away' ? 'away' : 'home')}
+            aria-label="Home or Away"
+          >
+            <FormSelectOption value="home" label="Home" />
+            <FormSelectOption value="away" label="Away" />
+          </FormSelect>
+        </FormGroup>
+      </div>
 
-      <FormGroup label="Opponent" isRequired fieldId="fr-opponent">
-        <FormSelect
-          id="fr-opponent"
-          value={opponentTeamId}
-          onChange={(_e, v) => setOpponentTeamId(v)}
-          aria-label="Opponent team"
-        >
-          <FormSelectOption value="" label="Select opponent…" />
-          {opponents.map((t) => (
-            <FormSelectOption key={t.id} value={t.id} label={t.name} />
-          ))}
-        </FormSelect>
-      </FormGroup>
+      <div
+        className={
+          otherOpponent ? 'rs-form-row rs-form-row--2' : 'rs-fixture-form__opponent'
+        }
+      >
+        <FormGroup label="Opponent" isRequired fieldId="fr-opponent">
+          <FormSelect
+            id="fr-opponent"
+            value={opponentTeamId}
+            onChange={(_e, v) => {
+              setOpponentTeamId(v);
+              if (v !== OTHER_OPPONENT_TEAM_ID) setOpponentTeamName('');
+            }}
+            aria-label="Opponent team"
+          >
+            <FormSelectOption value="" label="Select opponent…" />
+            {opponents.map((t) => (
+              <FormSelectOption key={t.id} value={t.id} label={t.name} />
+            ))}
+            <FormSelectOption value={OTHER_OPPONENT_TEAM_ID} label="Other…" />
+          </FormSelect>
+        </FormGroup>
 
-      <FormGroup label="Date" isRequired fieldId="fr-date">
-        <TextInput
-          id="fr-date"
-          type="date"
-          value={date}
-          onChange={(_e, v) => setDate(v)}
-        />
-      </FormGroup>
+        {otherOpponent ? (
+          <FormGroup label="Opponent name" isRequired fieldId="fr-opponent-name">
+            <TextInput
+              id="fr-opponent-name"
+              value={opponentTeamName}
+              onChange={(_e, v) => setOpponentTeamName(v)}
+              placeholder="Club or school name"
+              aria-label="Opponent name"
+            />
+          </FormGroup>
+        ) : null}
+      </div>
 
-      <FormGroup label="Kickoff time" isRequired fieldId="fr-time">
-        <TextInput
-          id="fr-time"
-          type="time"
-          value={time}
-          onChange={(_e, v) => setTime(v)}
-        />
-      </FormGroup>
+      <div className="rs-form-row rs-form-row--2">
+        <FormGroup label="Date" isRequired fieldId="fr-date">
+          <TextInput
+            id="fr-date"
+            type="date"
+            value={date}
+            onChange={(_e, v) => setDate(v)}
+          />
+        </FormGroup>
 
-      <FormGroup label="Venue name" isRequired fieldId="fr-venue">
-        <TextInput
-          id="fr-venue"
-          value={venueName}
-          onChange={(_e, v) => setVenueName(v)}
-          placeholder="Field or complex name"
-        />
-      </FormGroup>
+        <FormGroup label="Kickoff time" isRequired fieldId="fr-time">
+          <TextInput
+            id="fr-time"
+            type="time"
+            value={time}
+            onChange={(_e, v) => setTime(v)}
+          />
+        </FormGroup>
+      </div>
 
-      <FormGroup label="Venue address" isRequired fieldId="fr-address">
-        <TextInput
-          id="fr-address"
-          value={venueAddress}
-          onChange={(_e, v) => setVenueAddress(v)}
-          placeholder="Street, city, state, ZIP"
-        />
-      </FormGroup>
+      <div className="rs-form-row rs-form-row--2">
+        <FormGroup label="Venue name" isRequired fieldId="fr-venue">
+          <TextInput
+            id="fr-venue"
+            value={venueName}
+            onChange={(_e, v) => setVenueName(v)}
+            placeholder="Field or complex name"
+          />
+        </FormGroup>
 
-      <FormGroup label="Competition" fieldId="fr-competition">
-        <FormSelect
-          id="fr-competition"
-          value={competition}
-          onChange={(_e, v) => setCompetition(v)}
-          aria-label="Competition"
-        >
-          <FormSelectOption value="" label="None" />
-          {competitions.map((c) => (
-            <FormSelectOption key={c} value={c} label={c} />
-          ))}
-        </FormSelect>
-      </FormGroup>
+        <FormGroup label="Venue address" isRequired fieldId="fr-address">
+          <TextInput
+            id="fr-address"
+            value={venueAddress}
+            onChange={(_e, v) => setVenueAddress(v)}
+            placeholder="Street, city, state, ZIP"
+          />
+        </FormGroup>
+      </div>
 
-      <FormGroup label="Level" isRequired fieldId="fr-level">
-        <FormSelect
-          id="fr-level"
-          value={level}
-          onChange={(_e, v) => setLevel(v)}
-          aria-label="Level"
-        >
-          {levels.map((l) => (
-            <FormSelectOption key={l} value={l} label={l} />
-          ))}
-        </FormSelect>
-      </FormGroup>
+      <div className="rs-form-row rs-form-row--3">
+        <FormGroup label="Competition" fieldId="fr-competition">
+          <FormSelect
+            id="fr-competition"
+            value={competition}
+            onChange={(_e, v) => setCompetition(v)}
+            aria-label="Competition"
+          >
+            <FormSelectOption value="" label="None" />
+            {competitions.map((c) => (
+              <FormSelectOption key={c} value={c} label={c} />
+            ))}
+          </FormSelect>
+        </FormGroup>
 
-      <FormGroup label="Gender" isRequired fieldId="fr-gender">
-        <FormSelect
-          id="fr-gender"
-          value={gender}
-          onChange={(_e, v) => setGender(v === 'women' ? 'women' : 'men')}
-          aria-label="Gender"
-        >
-          <FormSelectOption value="men" label="Men" />
-          <FormSelectOption value="women" label="Women" />
-        </FormSelect>
-      </FormGroup>
+        <FormGroup label="Level" isRequired fieldId="fr-level">
+          <FormSelect
+            id="fr-level"
+            value={level}
+            onChange={(_e, v) => setLevel(v)}
+            aria-label="Level"
+          >
+            {levels.map((l) => (
+              <FormSelectOption key={l} value={l} label={l} />
+            ))}
+          </FormSelect>
+        </FormGroup>
+
+        <FormGroup label="Gender" isRequired fieldId="fr-gender">
+          <FormSelect
+            id="fr-gender"
+            value={gender}
+            onChange={(_e, v) => setGender(v === 'women' ? 'women' : 'men')}
+            aria-label="Gender"
+          >
+            <FormSelectOption value="men" label="Men" />
+            <FormSelectOption value="women" label="Women" />
+          </FormSelect>
+        </FormGroup>
+      </div>
 
       <FormGroup label="Notes" fieldId="fr-notes">
         <TextArea
@@ -314,18 +359,20 @@ export function RequestFixturePage() {
         />
       </FormGroup>
 
-      <Checkbox
-        id="fr-flight"
-        label="Flight provided"
-        isChecked={flightProvided}
-        onChange={(_e, checked) => setFlightProvided(checked)}
-      />
-      <Checkbox
-        id="fr-housing"
-        label="Lodging provided"
-        isChecked={housingProvided}
-        onChange={(_e, checked) => setHousingProvided(checked)}
-      />
+      <div className="rs-fixture-form__travel">
+        <Checkbox
+          id="fr-flight"
+          label={`Flight provided for referee (${REFEREE_TRAVEL_NOTE})`}
+          isChecked={flightProvided}
+          onChange={(_e, checked) => setFlightProvided(checked)}
+        />
+        <Checkbox
+          id="fr-housing"
+          label={`Lodging provided for referee (${REFEREE_TRAVEL_NOTE})`}
+          isChecked={housingProvided}
+          onChange={(_e, checked) => setHousingProvided(checked)}
+        />
+      </div>
 
       {error && (
         <p className="rs-match-card__meta" role="alert">

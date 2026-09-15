@@ -89,3 +89,30 @@
 .rs-team-admin-home {
   padding-bottom: calc(var(--rs-bottom-clearance) + 72px);
 }
+
+.rs-fixture-form .pf-v6-c-form__group,
+.rs-fixture-form .pf-v6-c-form__group-label {
+  margin-block-end: 0;
+}
+
+.rs-fixture-form__travel {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.rs-fixture-form__travel .pf-v6-c-check__label,
+.rs-fixture-form__travel .pf-v6-c-check label {
+  line-height: 1.35;
+}
+
+@media (max-width: 520px) {
+  .rs-fixture-form .rs-form-row--2,
+  .rs-fixture-form .rs-form-row--3 {
+    grid-template-columns: 1fr;
+  }
+
+  .rs-fixture-form .rs-form-row--3 > :first-child {
+    grid-column: auto;
+  }
+}

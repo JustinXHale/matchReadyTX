@@ -1,4 +1,4 @@
-export const PUBLIC_CONTACT_EMAIL = 'justinxhale@gmail.com';
+export const PUBLIC_CONTACT_EMAIL = 'rabbitholeapps26@gmail.com';
 
 /** Prefilled when users tap the footer contact link. */
 export const PUBLIC_CONTACT_EMAIL_SUBJECT = 'match ready ATX';

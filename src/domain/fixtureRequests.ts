@@ -4,6 +4,13 @@ import {
   type Match,
 } from '@/domain/types';
 
+/** Opponent not in the org roster — name stored on home/away team fields. */
+export const OTHER_OPPONENT_TEAM_ID = '__other__';
+
+export function isOtherOpponentTeamId(teamId: string): boolean {
+  return teamId === OTHER_OPPONENT_TEAM_ID;
+}
+
 /** Build a released match from an approved fixture request (requester side pre-confirmed). */
 export function matchFromFixtureRequest(
   req: FixtureRequest,

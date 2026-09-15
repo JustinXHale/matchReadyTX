@@ -187,7 +187,7 @@ export const PRIVACY_POLICY_SECTIONS: PrivacyPolicySection[] = [
   {
     title: 'Contact Us',
     paragraphs: [
-      'If You have questions about this Privacy Policy, contact Us by email at justinxhale@gmail.com.',
+      'If You have questions about this Privacy Policy, contact Us by email at rabbitholeapps26@gmail.com.',
     ],
   },
 ];
