@@ -18,6 +18,7 @@ import {
 import { feeOverrideForMatch, matchesForFeeApply } from '@/domain/feeDefaults';
 import { defaultFees, demoGeocode } from '@/domain/economics';
 import { DEMO_TERRITORY_CITIES } from '@/domain/territory';
+import { teamDisplayAbbreviation } from '@/domain/matchCardFooter';
 import { formatMatchKickoff, orgTimeZone } from '@/domain/matchTime';
 import {
   applyMatchForfeitOutcome,
@@ -4869,8 +4870,8 @@ class DemoStore {
       opponentTeamId: input.opponentTeamId,
       homeTeamId: homeTeam.id,
       awayTeamId: awayTeam.id,
-      homeTeamName: homeTeam.name,
-      awayTeamName: awayTeam.name,
+      homeTeamName: teamDisplayAbbreviation(homeTeam, homeTeam.name),
+      awayTeamName: teamDisplayAbbreviation(awayTeam, awayTeam.name),
       kickoffAt: input.kickoffAt,
       venueName: input.venueName.trim(),
       venueAddress: input.venueAddress.trim(),

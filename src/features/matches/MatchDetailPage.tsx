@@ -100,6 +100,11 @@ import {
 } from '@/domain/matchScheduleUrl';
 import { backState, useAppBack } from '@/nav/backNav';
 import {
+  formatTeamDisplayLabel,
+  matchTeamDisplayNames,
+  type TeamDisplayLabel,
+} from '@/domain/matchCardFooter';
+import {
   matchDetailHeaderReportLinks,
   matchDetailReportActions,
 } from '@/features/referee/reports/reportLinks';
@@ -124,6 +129,17 @@ type CrewPickTarget = {
   /** Filled CMO userId (contact / clear). */
   cmoUserId?: string;
 };
+
+function TeamDisplayName({ label }: { label: TeamDisplayLabel }) {
+  return (
+    <>
+      {label.name}
+      {label.abbreviation ? (
+        <span className="rs-detail__team-abbr"> ({label.abbreviation})</span>
+      ) : null}
+    </>
+  );
+}
 
 /** Team row confirm chip — Confirmed is green; Unconfirmed / Change Proposed stay red. */
 function teamConfirmChip(
@@ -248,6 +264,14 @@ export function MatchDetailPage() {
   } = useApp();
   const orgTz = orgTimeZone(state.org.timezone);
   const match = state.matches.find((m) => m.id === id);
+  const teamsById = useMemo(
+    () => new Map(state.teams.map((t) => [t.id, t])),
+    [state.teams],
+  );
+  const teamNames = useMemo(
+    () => (match ? matchTeamDisplayNames(match, teamsById) : null),
+    [match, teamsById],
+  );
   const homeBack = useMemo(() => roleHomeBack(roleView), [roleView]);
   const { goBack, backLabel } = useAppBack(homeBack);
   const [reason, setReason] = useState('');
@@ -411,13 +435,13 @@ export function MatchDetailPage() {
     return uniqueEmails([
       ...resolveTeamContact(
         match.homeTeamId,
-        match.homeTeamName,
+        teamNames?.home.name ?? match.homeTeamName,
         state.teams,
         state.users,
       ).emails,
       ...resolveTeamContact(
         match.awayTeamId,
-        match.awayTeamName,
+        teamNames?.away.name ?? match.awayTeamName,
         state.teams,
         state.users,
       ).emails,
@@ -617,9 +641,9 @@ export function MatchDetailPage() {
     (isHomeAdmin && Boolean(match.homeConfirmedAt)) ||
     (isAwayAdmin && Boolean(match.awayConfirmedAt));
   const otherTeamName = isHomeAdmin
-    ? match.awayTeamName
+    ? (teamNames ? formatTeamDisplayLabel(teamNames.away) : match.awayTeamName)
     : isAwayAdmin
-      ? match.homeTeamName
+      ? (teamNames ? formatTeamDisplayLabel(teamNames.home) : match.homeTeamName)
       : null;
   const waitingOnOtherTeam =
     Boolean(myTeamConfirmed) &&
@@ -651,7 +675,10 @@ export function MatchDetailPage() {
 
   const openTeamContact = (side: 'home' | 'away') => {
     const teamId = side === 'home' ? match.homeTeamId : match.awayTeamId;
-    const teamName = side === 'home' ? match.homeTeamName : match.awayTeamName;
+    const teamName =
+      side === 'home'
+        ? (teamNames?.home.name ?? match.homeTeamName)
+        : (teamNames?.away.name ?? match.awayTeamName);
     setPersonContact(
       resolveTeamContact(teamId, teamName, state.teams, state.users),
     );
@@ -922,7 +949,7 @@ export function MatchDetailPage() {
     store.setTeamDetailsConfirmed(match.id, side, !confirmed);
   };
 
-  const emailSubject = `${match.homeTeamName} vs ${match.awayTeamName} — ${formatMatchKickoff(match.kickoffAt, orgTz)}`;
+  const emailSubject = `${teamNames ? formatTeamDisplayLabel(teamNames.home) : match.homeTeamName} vs ${teamNames ? formatTeamDisplayLabel(teamNames.away) : match.awayTeamName} — ${formatMatchKickoff(match.kickoffAt, orgTz)}`;
 
   const emailsForScope = (scope: EmailScope): string[] => {
     if (scope === 'teams') return teamEmails;
@@ -1355,11 +1382,21 @@ export function MatchDetailPage() {
       <div className="rs-detail__title-row" ref={titleRowRef}>
         <Title headingLevel="h2" className="rs-detail__title">
           <span className="rs-detail__home">
-            <span className="rs-detail__ha">(H)</span> {match.homeTeamName}
+            <span className="rs-detail__ha">(H)</span>{' '}
+            {teamNames ? (
+              <TeamDisplayName label={teamNames.home} />
+            ) : (
+              match.homeTeamName
+            )}
           </span>
           <span className="rs-detail__vs">vs</span>
           <span className="rs-detail__away">
-            <span className="rs-detail__ha">(A)</span> {match.awayTeamName}
+            <span className="rs-detail__ha">(A)</span>{' '}
+            {teamNames ? (
+              <TeamDisplayName label={teamNames.away} />
+            ) : (
+              match.awayTeamName
+            )}
           </span>
         </Title>
         {(headerReportLinks.length > 0 || isAssigner) && (
@@ -1466,8 +1503,8 @@ export function MatchDetailPage() {
           <span className="rs-pill rs-pill--urgent">
             Forfeit —{' '}
             {match.forfeitTeamId === match.homeTeamId
-              ? match.homeTeamName
-              : match.awayTeamName}
+              ? (teamNames ? formatTeamDisplayLabel(teamNames.home) : match.homeTeamName)
+              : (teamNames ? formatTeamDisplayLabel(teamNames.away) : match.awayTeamName)}
           </span>
         ) : null}
         {shouldShowCrewStatusChips(match) &&
@@ -2138,11 +2175,15 @@ export function MatchDetailPage() {
                 type="button"
                 className="rs-detail-people__team-main"
                 onClick={() => openTeamContact('home')}
-                aria-label={`Contact ${match.homeTeamName}`}
+                aria-label={`Contact ${teamNames ? formatTeamDisplayLabel(teamNames.home) : match.homeTeamName}`}
               >
                 <span className="rs-detail-people__slot">Home</span>
                 <span className="rs-detail-people__name">
-                  {match.homeTeamName}
+                  {teamNames ? (
+                    <TeamDisplayName label={teamNames.home} />
+                  ) : (
+                    match.homeTeamName
+                  )}
                 </span>
               </button>
               {(() => {
@@ -2181,11 +2222,15 @@ export function MatchDetailPage() {
                 type="button"
                 className="rs-detail-people__team-main"
                 onClick={() => openTeamContact('away')}
-                aria-label={`Contact ${match.awayTeamName}`}
+                aria-label={`Contact ${teamNames ? formatTeamDisplayLabel(teamNames.away) : match.awayTeamName}`}
               >
                 <span className="rs-detail-people__slot">Away</span>
                 <span className="rs-detail-people__name">
-                  {match.awayTeamName}
+                  {teamNames ? (
+                    <TeamDisplayName label={teamNames.away} />
+                  ) : (
+                    match.awayTeamName
+                  )}
                 </span>
               </button>
               {(() => {

@@ -1,8 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import {
+  formatTeamDisplayLabel,
   matchCardEventLabel,
+  matchTeamDisplayNames,
   matchUnconfirmedTeamBadges,
   teamDisplayAbbreviation,
+  teamDisplayLabel,
 } from '@/domain/matchCardFooter';
 import type { Match } from '@/domain/types';
 import { emptyCrew } from '@/domain/types';
@@ -102,5 +105,42 @@ describe('matchCardFooter', () => {
     expect(teamDisplayAbbreviation(undefined, 'Texas A&M University')).toBe(
       'TAU',
     );
+  });
+
+  it('shows full roster name with abbreviation beside it', () => {
+    const teams = new Map([
+      ['h1', { abbreviation: 'SHSU', name: 'Sam Houston State University' }],
+      ['a1', { abbreviation: 'BAYLOR', name: 'Baylor University' }],
+    ]);
+    expect(
+      matchTeamDisplayNames(
+        match({
+          id: 'm1',
+          homeTeamId: 'h1',
+          awayTeamId: 'a1',
+          homeTeamName: 'Sam Houston State University',
+          awayTeamName: 'Baylor University',
+        }),
+        teams,
+      ),
+    ).toEqual({
+      home: { name: 'Sam Houston State University', abbreviation: 'SHSU' },
+      away: { name: 'Baylor University', abbreviation: 'BAYLOR' },
+    });
+    expect(formatTeamDisplayLabel({ name: 'Baylor University', abbreviation: 'BAYLOR' })).toBe(
+      'Baylor University (BAYLOR)',
+    );
+  });
+
+  it('resolves full name when match doc stores sheet abbreviation only', () => {
+    expect(
+      teamDisplayLabel(
+        { abbreviation: 'SHSU', name: 'Sam Houston State University' },
+        'SHSU',
+      ),
+    ).toEqual({
+      name: 'Sam Houston State University',
+      abbreviation: 'SHSU',
+    });
   });
 });

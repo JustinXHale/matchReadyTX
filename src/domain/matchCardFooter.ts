@@ -47,6 +47,42 @@ export function teamDisplayAbbreviation(
   return (compact || fallbackName).slice(0, 6).toUpperCase();
 }
 
+export type TeamDisplayLabel = {
+  name: string;
+  abbreviation: string | null;
+};
+
+/** Full roster name with sheet abbreviation when available. */
+export function teamDisplayLabel(
+  team: Pick<Team, 'abbreviation' | 'name'> | undefined,
+  storedName: string,
+): TeamDisplayLabel {
+  const stored = storedName.trim();
+  const name = team?.name?.trim() || stored;
+  const abbrRaw = team?.abbreviation?.trim();
+  if (!abbrRaw) return { name, abbreviation: null };
+  const abbreviation = abbrRaw.toUpperCase();
+  if (name.toUpperCase() === abbreviation) return { name, abbreviation: null };
+  return { name, abbreviation };
+}
+
+export function formatTeamDisplayLabel(label: TeamDisplayLabel): string {
+  return label.abbreviation
+    ? `${label.name} (${label.abbreviation})`
+    : label.name;
+}
+
+/** Match/event labels — full team name with roster abbreviation beside it. */
+export function matchTeamDisplayNames(
+  match: Pick<Match, 'homeTeamId' | 'awayTeamId' | 'homeTeamName' | 'awayTeamName'>,
+  teamsById: ReadonlyMap<string, Pick<Team, 'abbreviation' | 'name'>>,
+): { home: TeamDisplayLabel; away: TeamDisplayLabel } {
+  return {
+    home: teamDisplayLabel(teamsById.get(match.homeTeamId), match.homeTeamName),
+    away: teamDisplayLabel(teamsById.get(match.awayTeamId), match.awayTeamName),
+  };
+}
+
 export function matchHasForfeitOutcome(
   match: Pick<Match, 'forfeitTeamId' | 'playedForfeit'>,
 ): boolean {

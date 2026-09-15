@@ -498,6 +498,12 @@
   flex: 1 1 auto;
 }
 
+.rs-list-row__team-abbr {
+  font-weight: 600;
+  color: var(--rs-color-muted);
+  letter-spacing: 0.03em;
+}
+
 .rs-list-row__ha {
   flex: 0 0 auto;
   font-weight: 700;

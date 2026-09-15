@@ -6,6 +6,7 @@ import {
   type Firestore,
 } from 'firebase-admin/firestore';
 import { logger } from 'firebase-functions';
+import { sheetTeamLabelForWrite } from './approveFixtureRequest';
 import {
   buildCrewFieldsForLevel,
   hasStockCrewInFirestore,
@@ -597,8 +598,8 @@ export async function runSheetSync(opts: {
       kickoffAt,
       venueName,
       venueAddress,
-      homeTeamName: homeTeam?.name ?? row.home_team,
-      awayTeamName: awayTeam?.name ?? row.away_team,
+      homeTeamName: sheetTeamLabelForWrite(homeTeam, row.home_team),
+      awayTeamName: sheetTeamLabelForWrite(awayTeam, row.away_team),
     };
     const sheetTitle = (row.title ?? '').trim();
     const sheetMatchType = (row.match_type ?? '').trim();

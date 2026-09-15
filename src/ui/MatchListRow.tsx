@@ -5,8 +5,11 @@ import {
 } from '@/domain/matchTime';
 import { matchGameplayFormat } from '@/domain/matchGameplayFormat';
 import {
+  formatTeamDisplayLabel,
   matchCardEventLabel,
+  matchTeamDisplayNames,
   matchUnconfirmedTeamBadges,
+  type TeamDisplayLabel,
 } from '@/domain/matchCardFooter';
 import { statusLabel } from '@/domain/matchTransitions';
 import { isMatchDidNotPlay } from '@/domain/requests';
@@ -42,11 +45,11 @@ function formatCardDate(
 }
 
 function SideLabel({
-  name,
+  label,
   ha,
   className,
 }: {
-  name: string;
+  label: TeamDisplayLabel;
   ha: 'H' | 'A';
   className: string;
 }) {
@@ -55,7 +58,12 @@ function SideLabel({
       <span className="rs-list-row__ha" aria-hidden>
         ({ha})
       </span>
-      <span className={className}>{name}</span>
+      <span className={className}>
+        {label.name}
+        {label.abbreviation ? (
+          <span className="rs-list-row__team-abbr"> ({label.abbreviation})</span>
+        ) : null}
+      </span>
     </span>
   );
 }
@@ -118,6 +126,12 @@ export function MatchListRow({
     () => new Map(state.teams.map((t) => [t.id, t])),
     [state.teams],
   );
+  const { home: homeTeam, away: awayTeam } = useMemo(
+    () => matchTeamDisplayNames(match, teamsById),
+    [match, teamsById],
+  );
+  const homeTeamName = formatTeamDisplayLabel(homeTeam);
+  const awayTeamName = formatTeamDisplayLabel(awayTeam);
   const eventLabel = matchCardEventLabel(match);
   const unconfirmedTeams = matchUnconfirmedTeamBadges(match, teamsById);
   const { month, day } = formatCardDate(match.kickoffAt, timeZone);
@@ -135,12 +149,12 @@ export function MatchListRow({
         className="rs-list-row__teams rs-list-row__teams--inline"
         aria-label={
           scored
-            ? `Home ${match.homeTeamName} ${match.homeScore}, away ${match.awayTeamName} ${match.awayScore}`
-            : `Home ${match.homeTeamName}, away ${match.awayTeamName}`
+            ? `Home ${homeTeamName} ${match.homeScore}, away ${awayTeamName} ${match.awayScore}`
+            : `Home ${homeTeamName}, away ${awayTeamName}`
         }
       >
         <SideLabel
-          name={match.homeTeamName}
+          label={homeTeam}
           ha="H"
           className="rs-list-row__inline-home"
         />
@@ -159,7 +173,7 @@ export function MatchListRow({
         </span>
         <span className="rs-list-row__inline-away-wrap">
           <SideLabel
-            name={match.awayTeamName}
+            label={awayTeam}
             ha="A"
             className="rs-list-row__inline-away"
           />
@@ -170,13 +184,13 @@ export function MatchListRow({
         className="rs-list-row__teams"
         aria-label={
           scored
-            ? `Home ${match.homeTeamName} ${match.homeScore}, away ${match.awayTeamName} ${match.awayScore}`
-            : `Home ${match.homeTeamName}, away ${match.awayTeamName}`
+            ? `Home ${homeTeamName} ${match.homeScore}, away ${awayTeamName} ${match.awayScore}`
+            : `Home ${homeTeamName}, away ${awayTeamName}`
         }
       >
         <span className="rs-list-row__side">
           <SideLabel
-            name={match.homeTeamName}
+            label={homeTeam}
             ha="H"
             className="rs-list-row__home"
           />
@@ -188,7 +202,7 @@ export function MatchListRow({
         </span>
         <span className="rs-list-row__side">
           <SideLabel
-            name={match.awayTeamName}
+            label={awayTeam}
             ha="A"
             className="rs-list-row__away"
           />

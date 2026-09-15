@@ -212,7 +212,18 @@ service cloud.firestore {
           && assignerMemberPatch()
           && assignerAssessedLevelOk())
       );
-      allow delete: if false;
+      allow delete: if signedIn() && request.auth.uid == uid;
+
+      /** Match Calendar — owner-scoped personal records (separate from MatchReady org data). */
+      match /matchCalendar/{docId} {
+        allow read, write: if signedIn() && request.auth.uid == uid;
+      }
+      match /matches/{matchId} {
+        allow read, write: if signedIn() && request.auth.uid == uid;
+      }
+      match /tournaments/{tournamentId} {
+        allow read, write: if signedIn() && request.auth.uid == uid;
+      }
     }
 
     /** Outbound email queue — Admin SDK / Cloud Functions only. */
