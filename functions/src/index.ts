@@ -13,6 +13,7 @@ import { getFirestore } from 'firebase-admin/firestore';
 import { logger } from 'firebase-functions';
 import { FieldValue } from 'firebase-admin/firestore';
 import { runSheetSync } from './syncSheet';
+import { effectiveContactEmailFromUserData } from './contactEmail';
 import { runApproveFixtureRequest } from './approveFixtureRequest';
 import { runProposalWriteback } from './proposalWriteback';
 import {
@@ -649,9 +650,9 @@ export const notifyUser = onCall(async (request) => {
   const user = await db.doc(`users/${uid}`).get();
   if (!user.exists) throw new HttpsError('not-found', 'User not found');
   const data = user.data()!;
-  const email = String(data.email ?? '').trim();
+  const email = effectiveContactEmailFromUserData(data);
   if (!email) {
-    throw new HttpsError('failed-precondition', 'User has no email');
+    throw new HttpsError('failed-precondition', 'User has no contact email');
   }
 
   // Only self-notify or assigner notifying an org member.
@@ -721,9 +722,11 @@ export const sendTestEmail = onCall(async (request) => {
   await assertAssigner(request.auth.uid, orgId);
 
   const user = await db.doc(`users/${request.auth.uid}`).get();
-  const email = String(user.data()?.email ?? '').trim();
+  const email = effectiveContactEmailFromUserData(
+    user.data() as Record<string, unknown>,
+  );
   if (!email) {
-    throw new HttpsError('failed-precondition', 'Your profile has no email');
+    throw new HttpsError('failed-precondition', 'Your profile has no contact email');
   }
 
   const subject =

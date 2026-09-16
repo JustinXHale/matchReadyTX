@@ -15,6 +15,7 @@ import {
   Title,
 } from '@patternfly/react-core';
 import { useApp, useAppHref } from '@/app/AppContext';
+import { effectiveContactEmail } from '@/domain/contactEmail';
 import {
   fanFavoriteLabel,
   formatMemberAddress,
@@ -826,11 +827,19 @@ export function MemberDetailPage() {
                 <dd>{listName}</dd>
               </div>
               <div>
-                <dt>Email</dt>
+                <dt>Contact email</dt>
                 <dd>
-                  <a href={`mailto:${user.email}`}>{user.email}</a>
+                  <a href={`mailto:${effectiveContactEmail(user)}`}>
+                    {effectiveContactEmail(user)}
+                  </a>
                 </dd>
               </div>
+              {user.contactEmailSameAsSignIn === false && (
+                <div>
+                  <dt>Sign-in email</dt>
+                  <dd className="rs-match-card__meta">{user.email}</dd>
+                </div>
+              )}
               {user.phone ? (
                 <div>
                   <dt>Phone</dt>

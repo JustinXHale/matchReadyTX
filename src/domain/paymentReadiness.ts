@@ -1,3 +1,4 @@
+import { effectiveContactEmail } from '@/domain/contactEmail';
 import { matchEconomicsForUser } from '@/domain/economics';
 import {
   moOfficialIdsOnMatch,
@@ -405,7 +406,10 @@ export function buildAssignmentPayableRows(
         cardReportRequired: reportStatus.cardReportRequired,
         readiness,
         payment,
-        defaultPaymentContact: user?.email?.trim() || user?.phone?.trim() || '',
+        defaultPaymentContact:
+          (user ? effectiveContactEmail(user) : '') ||
+          user?.phone?.trim() ||
+          '',
         officialHomeCity: formatOfficialHomeCity(user),
       });
     }

@@ -51,6 +51,7 @@ import {
   downloadMatchIcs,
   matchHasCalendarTime,
 } from '@/domain/matchIcs';
+import { effectiveContactEmail } from '@/domain/contactEmail';
 import { mapsDirectionsUrl } from '@/services/maps';
 import { matchAppUrl } from '@/services/appLinks';
 import {
@@ -209,7 +210,7 @@ function resolveTeamContact(
     subtitle: 'Team contact',
     emails: uniqueEmails([
       ...(team?.contactEmails ?? []),
-      ...admins.map((a) => a.email),
+      ...admins.map((a) => effectiveContactEmail(a)),
     ]),
     phones: uniqueEmails([
       ...(team?.contactPhones ?? []),
@@ -230,7 +231,9 @@ function resolveCrewContact(
     id: userId,
     name: user?.displayName ?? userName ?? 'Official',
     subtitle: CREW_SLOT_LABELS[slot],
-    emails: uniqueEmails(user?.email ? [user.email] : []),
+    emails: uniqueEmails(
+      user ? [effectiveContactEmail(user)] : [],
+    ),
     phones: uniqueEmails(user?.phone ? [user.phone] : []),
   };
 }
@@ -253,7 +256,9 @@ function resolveCmoContact(
     id: cmo.userId,
     name: user?.displayName ?? cmo.userName ?? 'CMO',
     subtitle: 'Coaching Match Official',
-    emails: uniqueEmails(user?.email ? [user.email] : []),
+    emails: uniqueEmails(
+      user ? [effectiveContactEmail(user)] : [],
+    ),
     phones: uniqueEmails(user?.phone ? [user.phone] : []),
   };
 }

@@ -15,6 +15,10 @@ import {
 import { useNavigate } from 'react-router-dom';
 import { useApp } from '@/app/AppContext';
 import {
+  effectiveContactEmail,
+  isUsableContactEmail,
+} from '@/domain/contactEmail';
+import {
   applyFanXorRoleToggle,
   hasCompleteHomeAddress,
   readFileAsDataUrl,
@@ -61,7 +65,16 @@ export function ProfilePage() {
 
   const [firstName, setFirstName] = useState(currentUser?.firstName ?? '');
   const [lastName, setLastName] = useState(currentUser?.lastName ?? '');
-  const email = currentUser?.email ?? '';
+  const signInEmail = currentUser?.email ?? '';
+  const [contactSameAsSignIn, setContactSameAsSignIn] = useState(
+    () => currentUser?.contactEmailSameAsSignIn !== false,
+  );
+  const [contactEmail, setContactEmail] = useState(() => {
+    if (currentUser?.contactEmailSameAsSignIn === false) {
+      return currentUser.contactEmail?.trim() || currentUser.email?.trim() || '';
+    }
+    return currentUser?.email?.trim() ?? '';
+  });
   const [phone, setPhone] = useState(currentUser?.phone ?? '');
   const [homeStreet, setHomeStreet] = useState(
     currentUser?.homeStreet ?? '',
@@ -178,10 +191,13 @@ export function ProfilePage() {
     !roleFan ||
     fanFavoriteChoice !== 'other' ||
     Boolean(fanTeamOther.trim());
+  const contactEmailOk =
+    contactSameAsSignIn || isUsableContactEmail(contactEmail);
   const canSave =
     Boolean(firstName.trim()) &&
     Boolean(lastName.trim()) &&
-    Boolean(email.trim()) &&
+    Boolean(signInEmail.trim()) &&
+    contactEmailOk &&
     rolesOk &&
     fanFavoriteOk &&
     (fanOnly
@@ -246,7 +262,11 @@ export function ProfilePage() {
     const patch: Parameters<typeof store.updateProfile>[1] = {
       firstName: firstName.trim(),
       lastName: lastName.trim(),
-      email: email.trim(),
+      email: signInEmail.trim(),
+      contactEmailSameAsSignIn: contactSameAsSignIn,
+      contactEmail: contactSameAsSignIn
+        ? undefined
+        : contactEmail.trim() || undefined,
       phone: fanOnly ? '' : phone.trim(),
       // SMS deferred — keep false until we ship SMS again.
       smsOptIn: false,
@@ -509,10 +529,10 @@ export function ProfilePage() {
           </FormGroup>
         </div>
         <div className="rs-form-row rs-form-row--2">
-          <FormGroup label="Email">
+          <FormGroup label="Sign-in email">
             <TextInput
               type="email"
-              value={email}
+              value={signInEmail}
               isDisabled
               readOnly
               autoComplete="email"
@@ -532,8 +552,43 @@ export function ProfilePage() {
         <FormHelperText>
           <HelperText>
             <HelperTextItem>
-              Email comes from your Google or Apple sign-in. Alerts go to email
-              for now.
+              Sign-in email comes from Google or Apple and cannot be changed
+              here.
+            </HelperTextItem>
+          </HelperText>
+        </FormHelperText>
+        <Checkbox
+          id="pf-contact-same"
+          label="Contact email is the same as sign-in email"
+          isChecked={contactSameAsSignIn}
+          onChange={(_e, checked) => {
+            setContactSameAsSignIn(checked);
+            if (checked) {
+              setContactEmail(signInEmail);
+            }
+          }}
+        />
+        {!contactSameAsSignIn && (
+          <FormGroup label="Contact email" isRequired fieldId="pf-contact-email">
+            <TextInput
+              id="pf-contact-email"
+              type="email"
+              value={contactEmail}
+              onChange={(_e, v) => setContactEmail(v)}
+              autoComplete="email"
+              validated={contactEmailOk ? 'default' : 'error'}
+            />
+          </FormGroup>
+        )}
+        <FormHelperText>
+          <HelperText>
+            <HelperTextItem>
+              {contactSameAsSignIn
+                ? `Assignments and society alerts go to ${effectiveContactEmail({
+                    email: signInEmail,
+                    contactEmailSameAsSignIn: true,
+                  })}.`
+                : 'Use a personal email you check if Apple Hide My Email or relay addresses do not reach you.'}
             </HelperTextItem>
           </HelperText>
         </FormHelperText>

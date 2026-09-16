@@ -1,5 +1,6 @@
 import type { Firestore } from 'firebase-admin/firestore';
 import { logger } from 'firebase-functions';
+import { effectiveContactEmailFromUserData } from './contactEmail';
 import { enqueueMail } from './sendMail';
 
 const CREW_SLOTS = ['mo', 'ar1', 'ar2', 'no4'] as const;
@@ -214,7 +215,9 @@ export async function fulfillRaiseHandsOnAssignmentConfirm(opts: {
   for (const uid of [...new Set(notifyUserIds)]) {
     try {
       const userSnap = await db.doc(`users/${uid}`).get();
-      const email = String(userSnap.data()?.email ?? '').trim();
+      const email = effectiveContactEmailFromUserData(
+        userSnap.data() as Record<string, unknown>,
+      );
       if (!email) continue;
       await enqueueMail(opts.db, {
         to: email,

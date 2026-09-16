@@ -48,6 +48,7 @@ export function profileFromAuthUser(
       user.email ||
       'Member',
     email: user.email ?? '',
+    contactEmailSameAsSignIn: true,
     phone: '',
     smsOptIn: null,
     homeStreet: '',
@@ -84,6 +85,12 @@ export function profileFromFirestore(
         'Member',
     ),
     email: String(data.email ?? ''),
+    contactEmailSameAsSignIn:
+      data.contactEmailSameAsSignIn === false ? false : true,
+    contactEmail:
+      typeof data.contactEmail === 'string' && data.contactEmail.trim()
+        ? data.contactEmail.trim()
+        : undefined,
     phone: String(data.phone ?? ''),
     smsOptIn:
       data.smsOptIn === true || data.smsOptIn === false
@@ -221,6 +228,11 @@ export async function saveFirebaseProfile(
     preferredName: next.preferredName,
     displayName: next.displayName,
     email: next.email,
+    contactEmailSameAsSignIn: next.contactEmailSameAsSignIn !== false,
+    contactEmail:
+      next.contactEmailSameAsSignIn === false
+        ? next.contactEmail?.trim() || null
+        : null,
     phone: next.phone,
     smsOptIn: next.smsOptIn,
     homeStreet: next.homeStreet,

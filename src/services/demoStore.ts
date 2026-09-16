@@ -42,6 +42,7 @@ import {
   raiseHandsToFulfillOnAssignmentConfirm,
   resolveRaiseHandApprovalSlot,
 } from '@/domain/requests';
+import { effectiveContactEmail } from '@/domain/contactEmail';
 import {
   applyContactRowsToTeams,
   linkTeamAdminsByEmail,
@@ -3255,7 +3256,7 @@ class DemoStore {
         id: id('n'),
         at: new Date().toISOString(),
         channel: 'email',
-        to: user.email,
+        to: effectiveContactEmail(user),
         subject,
         body,
         event,
@@ -3723,11 +3724,25 @@ class DemoStore {
         ) {
           delete next.fanTeamOther;
         }
+        if (next.contactEmailSameAsSignIn !== false) {
+          next.contactEmailSameAsSignIn = true;
+          delete next.contactEmail;
+        } else if (
+          Object.prototype.hasOwnProperty.call(patch, 'contactEmail') &&
+          !next.contactEmail?.trim()
+        ) {
+          delete next.contactEmail;
+        }
         next.profileComplete = isProfileComplete(next);
         return next;
       }),
     }));
-    if (patch.email !== undefined || patch.roles !== undefined) {
+    if (
+      patch.email !== undefined ||
+      patch.contactEmail !== undefined ||
+      patch.contactEmailSameAsSignIn !== undefined ||
+      patch.roles !== undefined
+    ) {
       this.relinkTeamAdmins();
     }
   }
@@ -5291,13 +5306,14 @@ class DemoStore {
           continue;
         }
 
-        const onContacts = emailMatchesTeamContacts(user.email, team);
+        const contact = effectiveContactEmail(user);
+        const onContacts = emailMatchesTeamContacts(contact, team);
         const req: TeamLinkRequest = {
           id: id('tlr'),
           orgId: s.org.id,
           requesterUserId: userId,
           requesterName: user.displayName,
-          requesterEmail: user.email,
+          requesterEmail: contact,
           teamId,
           teamName: team.name,
           status: onContacts ? 'approved' : 'pending',
@@ -5321,10 +5337,10 @@ class DemoStore {
           teams = teams.map((t) => {
             if (t.id !== teamId) return t;
             const emails = t.contactEmails.map((e) => e.toLowerCase());
-            if (emails.includes(user.email.trim().toLowerCase())) return t;
+            if (emails.includes(contact.trim().toLowerCase())) return t;
             return {
               ...t,
-              contactEmails: [...t.contactEmails, user.email.trim()],
+              contactEmails: [...t.contactEmails, contact.trim()],
             };
           });
           autoApproved.push(teamId);

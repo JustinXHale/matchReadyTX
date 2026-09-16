@@ -91,7 +91,7 @@ service cloud.firestore {
       return request.resource.data.diff(resource.data).affectedKeys()
         .hasOnly([
           'uid', 'firstName', 'lastName', 'preferredName', 'displayName',
-          'email', 'phone', 'smsOptIn',
+          'email', 'contactEmail', 'contactEmailSameAsSignIn', 'phone', 'smsOptIn',
           'homeStreet', 'homeUnit', 'homeCity', 'homeRegion', 'homePostalCode',
           'homeAddress', 'homeLat', 'homeLng',
           'roles', 'teamIds', 'fanTeamIds', 'fanTeamOther',

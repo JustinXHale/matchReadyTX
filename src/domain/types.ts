@@ -307,7 +307,12 @@ export interface UserProfile {
   preferredName?: string;
   /** Derived join of first (or preferred) + last for crews / history UI. */
   displayName: string;
+  /** Sign-in email from Google / Apple (read-only in profile UI). */
   email: string;
+  /** When false, `contactEmail` is used for mail and Contacts matching. */
+  contactEmailSameAsSignIn?: boolean;
+  /** Reachable email when different from Apple relay / sign-in address. */
+  contactEmail?: string;
   phone: string;
   /** Explicit Yes/No — required; SMS only when true */
   smsOptIn: boolean | null;

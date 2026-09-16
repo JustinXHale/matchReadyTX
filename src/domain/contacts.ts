@@ -1,3 +1,4 @@
+import { effectiveContactEmail } from '@/domain/contactEmail';
 import type { Team, UserProfile } from './types';
 
 export type ContactRow = {
@@ -65,7 +66,8 @@ export function linkTeamAdminsByEmail(
 
   return users.map((u) => {
     if (!u.roles.includes('teamAdmin')) return u;
-    const linked = emailToTeamIds.get(normalizeEmail(u.email)) ?? [];
+    const linked =
+      emailToTeamIds.get(normalizeEmail(effectiveContactEmail(u))) ?? [];
     if (linked.length === 0) return u;
     const teamIds = [...u.teamIds];
     let changed = false;

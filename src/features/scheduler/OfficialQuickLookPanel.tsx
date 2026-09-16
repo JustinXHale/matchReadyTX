@@ -6,6 +6,7 @@ import {
   memberListName,
   officialEffectiveLevel,
 } from '@/domain/members';
+import { effectiveContactEmail } from '@/domain/contactEmail';
 import type { UserProfile } from '@/domain/types';
 import { AvailabilityMonthCalendar } from '@/features/availability/AvailabilityMonthCalendar';
 import { OfficialInsightsPanel } from '@/features/scheduler/OfficialInsightsPanel';
@@ -108,8 +109,10 @@ export function OfficialQuickLookPanel({
                 <p className="rs-official-quicklook__name">
                   {memberListName(user)}
                 </p>
-                {user.email && (
-                  <p className="rs-match-card__meta">{user.email}</p>
+                {effectiveContactEmail(user) && (
+                  <p className="rs-match-card__meta">
+                    {effectiveContactEmail(user)}
+                  </p>
                 )}
               </div>
             </div>

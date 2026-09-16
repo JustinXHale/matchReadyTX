@@ -1,6 +1,7 @@
 /**
  * Team Admin club-link requests: submit (auto-approve via Contacts) + review.
  */
+import { effectiveContactEmailFromUserData } from './contactEmail';
 import { google } from 'googleapis';
 import { FieldValue, type Firestore } from 'firebase-admin/firestore';
 import { HttpsError } from 'firebase-functions/v2/https';
@@ -260,7 +261,9 @@ async function notifyReviewers(opts: {
 
   for (const uid of uids) {
     const user = await db.doc(`users/${uid}`).get();
-    const email = String(user.data()?.email ?? '').trim();
+    const email = effectiveContactEmailFromUserData(
+      user.data() as Record<string, unknown>,
+    );
     if (!email) continue;
     try {
       await enqueueMail(db, {
@@ -415,7 +418,7 @@ export async function runSubmitTeamLinkRequests(opts: {
     throw new HttpsError('not-found', 'User profile not found.');
   }
   const user = userSnap.data()!;
-  const email = normEmail(String(user.email ?? ''));
+  const email = normEmail(effectiveContactEmailFromUserData(user));
   const name =
     String(user.displayName ?? '').trim() ||
     `${user.firstName ?? ''} ${user.lastName ?? ''}`.trim() ||
