@@ -1,3 +1,4 @@
+import { COMPLIANCE_HOLD_SOCIETY_NAME } from '@/domain/complianceHold';
 import { isOutsideAppointmentUserId } from '@/domain/placeholderAssignment';
 import { CREW_SLOTS, crewPeople, type Match, type UserProfile } from '@/domain/types';
 import { formatMatchKickoff } from '@/domain/matchTime';
@@ -50,8 +51,8 @@ export async function notifyComplianceHoldChange(opts: {
     ? `Match on hold: ${fixture}`
     : `Match hold removed: ${fixture}`;
   const body = locked
-    ? `This match (${when} at ${match.venueName}) has been placed on hold until teams are compliant.\n\n${message}`
-    : `The compliance hold has been removed for ${fixture} (${when} at ${match.venueName}).`;
+    ? `This match (${when} at ${match.venueName}) has been placed on hold by ${COMPLIANCE_HOLD_SOCIETY_NAME} until teams are compliant.\n\n${message}`
+    : `The compliance hold has been removed for ${fixture} (${when} at ${match.venueName}) by ${COMPLIANCE_HOLD_SOCIETY_NAME}.`;
 
   const uids = notifyUidsForMatch(match, users);
   for (const uid of uids) {

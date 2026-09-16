@@ -7,6 +7,8 @@ import type { ComplianceHold } from '@/domain/types';
 type Props = {
   hold: ComplianceHold;
   eventTitle?: string;
+  /** Date + fixture, e.g. Saturday, Sept. 16, 2027 Home v Away */
+  fixtureLine?: string;
   /** `card` = list row; `detail` = match detail page */
   variant?: 'card' | 'detail';
 };
@@ -14,6 +16,7 @@ type Props = {
 export function ComplianceHoldOverlay({
   hold,
   eventTitle,
+  fixtureLine,
   variant = 'card',
 }: Props) {
   const contact = complianceHoldContactLine(hold);
@@ -46,6 +49,9 @@ export function ComplianceHoldOverlay({
             </>
           ) : null}
         </p>
+        {fixtureLine?.trim() ? (
+          <p className="rs-compliance-hold-overlay__fixture">{fixtureLine.trim()}</p>
+        ) : null}
       </div>
     </div>
   );

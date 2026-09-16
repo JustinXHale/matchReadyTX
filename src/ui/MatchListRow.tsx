@@ -12,6 +12,7 @@ import {
   type TeamDisplayLabel,
 } from '@/domain/matchCardFooter';
 import {
+  complianceHoldFixtureLine,
   isComplianceHeld,
   shouldShowComplianceHoldUi,
 } from '@/domain/complianceHold';
@@ -310,6 +311,10 @@ export function MatchListRow({
         <ComplianceHoldOverlay
           hold={match.complianceHold}
           eventTitle={eventLabel ?? match.title}
+          fixtureLine={complianceHoldFixtureLine(match, timeZone, {
+            home: homeTeamName,
+            away: awayTeamName,
+          })}
           variant="card"
         />
       ) : null}

@@ -171,6 +171,7 @@ export type ComplianceHold = {
   lockedByName: string;
   lockedByEmail?: string;
   lockedByPhone?: string;
+  lockedByContactChannels?: string;
   message: string;
 };
 

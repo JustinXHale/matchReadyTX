@@ -1603,7 +1603,7 @@ function seedMatches(): Match[] {
     return applyComplianceHold(
       base,
       assignerDemo,
-      defaultComplianceHoldMessage(assignerDemo),
+      defaultComplianceHoldMessage(base, assignerDemo),
     );
   });
 }

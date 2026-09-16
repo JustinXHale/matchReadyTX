@@ -96,6 +96,7 @@ import { persistCrewAssignmentAndEmail, persistCrewUnassignmentAndEmail, resendC
 import {
   applyComplianceHold,
   defaultComplianceHoldMessage,
+  complianceHoldFixtureLine,
   isComplianceHeld,
   shouldShowComplianceHoldUi,
 } from '@/domain/complianceHold';
@@ -1313,7 +1314,7 @@ export function MatchDetailPage() {
       return;
     }
     if (action === 'compliance_hold') {
-      setComplianceHoldDraft(defaultComplianceHoldMessage(currentUser));
+      setComplianceHoldDraft(defaultComplianceHoldMessage(match, currentUser));
       setShowComplianceHoldModal(true);
       return;
     }
@@ -1535,6 +1536,14 @@ export function MatchDetailPage() {
           <ComplianceHoldOverlay
             hold={match.complianceHold}
             eventTitle={match.title}
+            fixtureLine={complianceHoldFixtureLine(match, orgTz, {
+              home: teamNames
+                ? formatTeamDisplayLabel(teamNames.home)
+                : match.homeTeamName,
+              away: teamNames
+                ? formatTeamDisplayLabel(teamNames.away)
+                : match.awayTeamName,
+            })}
             variant="detail"
           />
         ) : null}
@@ -3452,7 +3461,7 @@ export function MatchDetailPage() {
               id="compliance-hold-message"
               value={complianceHoldDraft}
               onChange={(_, v) => setComplianceHoldDraft(v)}
-              rows={5}
+              rows={18}
               resizeOrientation="vertical"
               aria-label="Compliance hold message"
             />

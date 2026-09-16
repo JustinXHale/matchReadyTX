@@ -47,6 +47,13 @@
   margin: 0 0.35em;
 }
 
+.rs-compliance-hold-overlay__fixture {
+  margin: 4px 0 0;
+  font-weight: 600;
+  line-height: 1.35;
+  color: #fff;
+}
+
 /* List card */
 .rs-list-row--compliance-locked .rs-list-row__main {
   position: relative;
@@ -89,6 +96,10 @@
   font-size: 15px;
 }
 
+.rs-compliance-hold-overlay--card .rs-compliance-hold-overlay__fixture {
+  font-size: 14px;
+}
+
 /* Match detail */
 .rs-detail__hold-wrap {
   position: relative;
@@ -126,4 +137,8 @@
 
 .rs-compliance-hold-overlay--detail .rs-compliance-hold-overlay__contact {
   font-size: 16px;
+}
+
+.rs-compliance-hold-overlay--detail .rs-compliance-hold-overlay__fixture {
+  font-size: 15px;
 }

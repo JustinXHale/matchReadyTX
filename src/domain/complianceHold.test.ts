@@ -1,9 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import {
+  COMPLIANCE_HOLD_CONTACT,
+  COMPLIANCE_HOLD_SOCIETY_NAME,
   applyComplianceHold,
   clearComplianceHold,
   complianceHoldCardLabel,
   complianceHoldContactLine,
+  complianceHoldFixtureLine,
   defaultComplianceHoldMessage,
   isComplianceHeld,
   shouldShowComplianceHoldUi,
@@ -42,24 +45,29 @@ describe('complianceHold', () => {
     expect(isComplianceHeld(baseMatch())).toBe(false);
   });
 
-  it('uses default message when blank', () => {
+  it('uses TRRA default template when blank', () => {
     const held = applyComplianceHold(baseMatch(), {
       uid: 'u1',
       displayName: 'Alex Assigner',
       email: 'alex@example.com',
       phone: '555-0100',
     }, '   ');
-    expect(held.complianceHold?.message).toContain('Alex Assigner');
-    expect(held.complianceHold?.message).toContain('alex@example.com');
+    expect(held.complianceHold?.message).toContain('MATCH ON HOLD');
+    expect(held.complianceHold?.message).toContain(COMPLIANCE_HOLD_SOCIETY_NAME);
+    expect(held.complianceHold?.message).toContain('OFFICIAL NOTICE');
+    expect(held.complianceHold?.message).toContain('Justin X. Hale');
+    expect(held.complianceHold?.message).toContain('justinxhale@gmail.com');
+    expect(held.complianceHold?.lockedByName).toBe(COMPLIANCE_HOLD_CONTACT.name);
   });
 
-  it('builds default message with contact fallback', () => {
-    const msg = defaultComplianceHoldMessage({
-      displayName: 'Scheduler',
-      email: '',
-      phone: '',
+  it('builds default message with team placeholders', () => {
+    const msg = defaultComplianceHoldMessage(baseMatch(), {
+      displayName: 'Alex Assigner',
     });
-    expect(msg).toContain('the assigner');
+    expect(msg).toContain('Home FC vs Away FC');
+    expect(msg).toContain(COMPLIANCE_HOLD_SOCIETY_NAME);
+    expect(msg).toContain('justinxhale@gmail.com');
+    expect(msg).toContain('WhatsApp or GroupMe');
   });
 
   it('clears hold', () => {
@@ -87,6 +95,22 @@ describe('complianceHold', () => {
     expect(shouldShowComplianceHoldUi('judicial')).toBe(false);
   });
 
+  it('formats fixture line with date and teams', () => {
+    const line = complianceHoldFixtureLine(
+      {
+        ...baseMatch(),
+        kickoffAt: '2027-09-18T19:00:00.000Z',
+        homeTeamName: 'Austin RFC',
+        awayTeamName: 'Dallas RFC',
+      },
+      'America/Chicago',
+    );
+    expect(line).toContain('Saturday');
+    expect(line).toContain('Sep.');
+    expect(line).toContain('2027');
+    expect(line).toContain('Austin RFC v Dallas RFC');
+  });
+
   it('formats contact line from hold fields', () => {
     const held = applyComplianceHold(baseMatch(), {
       uid: 'u1',
@@ -95,7 +119,7 @@ describe('complianceHold', () => {
       phone: '555-0100',
     }, 'On hold');
     expect(complianceHoldContactLine(held.complianceHold!)).toBe(
-      'alex@example.com · 555-0100',
+      'justinxhale@gmail.com · (979) 703-0894 · WhatsApp or GroupMe',
     );
   });
 });

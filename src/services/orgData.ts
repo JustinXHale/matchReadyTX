@@ -318,6 +318,11 @@ function parseComplianceHold(raw: unknown): Match['complianceHold'] {
       typeof data.lockedByPhone === 'string' && data.lockedByPhone.trim()
         ? data.lockedByPhone.trim()
         : undefined,
+    lockedByContactChannels:
+      typeof data.lockedByContactChannels === 'string' &&
+      data.lockedByContactChannels.trim()
+        ? data.lockedByContactChannels.trim()
+        : undefined,
     message,
   };
 }
@@ -1664,6 +1669,7 @@ export async function saveComplianceHoldInFirestore(
             lockedByName: hold.lockedByName,
             lockedByEmail: hold.lockedByEmail ?? null,
             lockedByPhone: hold.lockedByPhone ?? null,
+            lockedByContactChannels: hold.lockedByContactChannels ?? null,
             message: hold.message,
           }
         : null,
