@@ -1,10 +1,17 @@
 import { describe, expect, it } from 'vitest';
 import {
+  isResolvableTeamDocId,
   resolveScheduleLocationForWrite,
   sheetTeamLabelForWrite,
 } from './approveFixtureRequest';
 
 describe('approveFixtureRequest sheet labels', () => {
+  it('skips Firestore team lookup for Other opponent sentinel', () => {
+    expect(isResolvableTeamDocId('__other__')).toBe(false);
+    expect(isResolvableTeamDocId('tamucc')).toBe(true);
+    expect(isResolvableTeamDocId('')).toBe(false);
+  });
+
   it('prefers team abbreviation over full name for Schedule columns', () => {
     expect(
       sheetTeamLabelForWrite(

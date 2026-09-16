@@ -4,6 +4,7 @@ import { Button, Title } from '@patternfly/react-core';
 import { useApp } from '@/app/AppContext';
 import {
   AR_COMFORT_QUESTION,
+  ROUND_TRIP_MILES_LABEL,
   CARD_CONFERENCE_LABELS,
   CMO_SCALE_KEYS,
   CMO_SCALE_LABELS,
@@ -168,6 +169,9 @@ export function MatchReportViewPage() {
         <SubmittedPerformanceReportView mo={mo} match={match} />
       ) : mo ? (
         <>
+          {mo.roundTripMiles != null && (
+            <Field label={ROUND_TRIP_MILES_LABEL}>{mo.roundTripMiles} mi</Field>
+          )}
           {mo.tournamentMatch ? (
             <Field label="Tournament match">
               Score and card counts were not recorded — multiple games in a
@@ -217,6 +221,9 @@ export function MatchReportViewPage() {
 
       {ar && (
         <>
+          {ar.roundTripMiles != null && (
+            <Field label={ROUND_TRIP_MILES_LABEL}>{ar.roundTripMiles} mi</Field>
+          )}
           <Field label={AR_COMFORT_QUESTION}>
             {ar.stillComfortable === 'yes'
               ? 'Yes'

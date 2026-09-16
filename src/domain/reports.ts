@@ -105,6 +105,23 @@ export const MATCH_FEEDBACK_LABEL = 'Feedback on the match';
 export const AR_COMFORT_QUESTION =
   "Were you comfortable serving as an assistant referee at this match's level?";
 
+export const ROUND_TRIP_MILES_LABEL = 'Round trip miles driven';
+
+/** Parse optional self-reported mileage from a report form input. */
+export function roundTripMilesFromInput(
+  raw: string,
+): { value?: number } | { error: string } {
+  const trimmed = raw.trim();
+  if (!trimmed) return { value: undefined };
+  const n = Number(trimmed);
+  if (!Number.isFinite(n) || n < 0) {
+    return {
+      error: 'Enter round trip miles as zero or greater, or leave blank.',
+    };
+  }
+  return { value: n };
+}
+
 export type CrewAttendanceSlot = CrewSlot | 'cmo';
 
 export interface CrewAttendanceEntry {
@@ -221,6 +238,8 @@ export interface MoReportPayload {
   cmoDidNotAttend?: boolean;
   /** Tournament day — score and card counts are not collected. */
   tournamentMatch?: boolean;
+  /** Self-reported round-trip driving distance for mileage. */
+  roundTripMiles?: number;
   /** Section 2 — Snapshot self assessment */
   gameTemperature?: number;
   controlAndFlow?: number;
@@ -243,6 +262,8 @@ export interface MoReportPayload {
 }
 
 export interface ArReportPayload {
+  /** Self-reported round-trip driving distance for mileage. */
+  roundTripMiles?: number;
   stillComfortable: 'yes' | 'no' | '';
   keyIncidents?: string;
   note?: string;

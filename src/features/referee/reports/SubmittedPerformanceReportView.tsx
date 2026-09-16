@@ -3,6 +3,7 @@ import { Title } from '@patternfly/react-core';
 import {
   BREAKDOWN_REWARD_OPTIONS,
   MATCH_FEEDBACK_LABEL,
+  ROUND_TRIP_MILES_LABEL,
   type MoReportPayload,
 } from '@/domain/reports';
 import type { Match } from '@/domain/types';
@@ -89,6 +90,9 @@ export function SubmittedPerformanceReportView({
         <Field label="Match date">{mo.matchDate}</Field>
         <Field label="Format">{mo.format}</Field>
         <Field label="Division">{mo.division}</Field>
+        {mo.roundTripMiles != null && (
+          <Field label={ROUND_TRIP_MILES_LABEL}>{mo.roundTripMiles} mi</Field>
+        )}
         {mo.tournamentMatch ? (
           <Field label="Tournament match">
             Score and card counts were not recorded — multiple games in a

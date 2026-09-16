@@ -142,6 +142,16 @@ export function resolveScheduleLocationForWrite(opts: {
   return venue || 'TBD';
 }
 
+/** Sentinel from Team Admin "Other…" opponent — not a Firestore doc id. */
+export const OTHER_OPPONENT_TEAM_ID = '__other__';
+
+export function isResolvableTeamDocId(teamId: string): boolean {
+  const id = teamId.trim();
+  if (!id || id === OTHER_OPPONENT_TEAM_ID) return false;
+  // Firestore reserves ids that start and end with "__".
+  return !(id.startsWith('__') && id.endsWith('__'));
+}
+
 function teamFromSnap(snap: DocumentSnapshot): SheetTeamRow | null {
   if (!snap.exists) return null;
   const d = snap.data()!;
@@ -150,6 +160,15 @@ function teamFromSnap(snap: DocumentSnapshot): SheetTeamRow | null {
     abbreviation:
       typeof d.abbreviation === 'string' ? d.abbreviation : undefined,
   };
+}
+
+async function loadTeamForWrite(
+  db: Firestore,
+  orgId: string,
+  teamId: string,
+): Promise<SheetTeamRow | null> {
+  if (!isResolvableTeamDocId(teamId)) return null;
+  return teamFromSnap(await db.doc(`orgs/${orgId}/teams/${teamId}`).get());
 }
 
 async function readTab(
@@ -410,12 +429,10 @@ export async function runApproveFixtureRequest(opts: {
   const sheets = sheetsClient(serviceAccountJson);
   const gender = req.gender === 'women' ? 'women' : 'men';
 
-  const [homeSnap, awaySnap] = await Promise.all([
-    db.doc(`orgs/${orgId}/teams/${req.homeTeamId}`).get(),
-    db.doc(`orgs/${orgId}/teams/${req.awayTeamId}`).get(),
+  const [homeTeam, awayTeam] = await Promise.all([
+    loadTeamForWrite(db, orgId, req.homeTeamId),
+    loadTeamForWrite(db, orgId, req.awayTeamId),
   ]);
-  const homeTeam = teamFromSnap(homeSnap);
-  const awayTeam = teamFromSnap(awaySnap);
   const homeSheet = sheetTeamLabelForWrite(homeTeam, req.homeTeamName);
   const awaySheet = sheetTeamLabelForWrite(awayTeam, req.awayTeamName);
   const locationsRows = await readTab(sheets, sheetId, 'Locations');

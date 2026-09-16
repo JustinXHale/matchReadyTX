@@ -16,6 +16,7 @@ import {
   isQuickReportLocked,
   matchHasAssignedCmo,
   MATCH_FEEDBACK_LABEL,
+  roundTripMilesFromInput,
   pendingCrewReportForAssignee,
   submittedCrewReportForAssignee,
   totalCardsFromMoPayload,
@@ -40,6 +41,7 @@ import {
   formatCrewAttendanceNote,
 } from '@/features/referee/reports/CrewAttendanceFields';
 import {
+  RoundTripMilesField,
   TeamScoreCard,
   TournamentMatchCheckbox,
   tournamentMoScorePayload,
@@ -192,6 +194,10 @@ export function MatchReportFlowPage({
   const [lightFeedback, setLightFeedback] = useState(
     () => savedMo?.lightFeedback ?? '',
   );
+  const [roundTripMiles, setRoundTripMiles] = useState(() => {
+    const miles = savedMo?.roundTripMiles ?? savedAr?.roundTripMiles;
+    return miles != null ? String(miles) : '';
+  });
   const [crewAttendance, setCrewAttendance] = useState<CrewAttendanceEntry[]>(
     () =>
       match
@@ -270,8 +276,14 @@ export function MatchReportFlowPage({
       setCrewAttendance(attendanceForReportForm(match, mo.crewAttendance));
       setCrewAbsenceNote(mo.crewAbsenceNote ?? '');
       setCrewIssuesNote(mo.crewIssuesNote ?? '');
+      if (mo.roundTripMiles != null) {
+        setRoundTripMiles(String(mo.roundTripMiles));
+      }
     }
     if (ar) {
+      if (ar.roundTripMiles != null) {
+        setRoundTripMiles(String(ar.roundTripMiles));
+      }
       setStillComfortable(ar.stillComfortable);
       setArIncidents(ar.keyIncidents ?? '');
       setArNote(ar.note ?? '');
@@ -479,6 +491,12 @@ export function MatchReportFlowPage({
     setSubmitting(true);
 
     try {
+      const mileage = roundTripMilesFromInput(roundTripMiles);
+      if ('error' in mileage) {
+        setError(mileage.error);
+        return;
+      }
+
       if (resolvedKind === 'ar_basic') {
         if (!stillComfortable) {
           setError(
@@ -492,6 +510,7 @@ export function MatchReportFlowPage({
           return;
         }
         const arPayload: ArReportPayload = {
+          roundTripMiles: mileage.value,
           stillComfortable,
           keyIncidents: arIncidents.trim() || undefined,
           note: arNote.trim() || undefined,
@@ -575,6 +594,7 @@ export function MatchReportFlowPage({
           refereeTeamNote: formatCrewAttendanceNote(crewAttendance) || undefined,
           cmoDidNotAttend: hasCmo && resolvedKind === 'mo_quick' ? true : undefined,
           tournamentMatch: isTournament || undefined,
+          roundTripMiles: mileage.value,
         },
         'mo_quick',
       );
@@ -779,6 +799,11 @@ export function MatchReportFlowPage({
               checked={isTournament}
               onChange={setIsTournament}
             />
+            <RoundTripMilesField
+              id="quick-miles"
+              value={roundTripMiles}
+              onChange={setRoundTripMiles}
+            />
             <TeamScoreCard
               teamName={match.homeTeamName}
               side="home"
@@ -825,6 +850,11 @@ export function MatchReportFlowPage({
 
         {kind === 'ar_basic' && (
           <>
+            <RoundTripMilesField
+              id="ar-miles"
+              value={roundTripMiles}
+              onChange={setRoundTripMiles}
+            />
             <FormGroup label={AR_COMFORT_QUESTION} isRequired>
               <Radio
                 id="ar-yes"

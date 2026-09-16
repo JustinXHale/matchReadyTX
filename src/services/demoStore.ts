@@ -2197,6 +2197,7 @@ function seedMatchReports(matches: Match[]): MatchReport[] {
         ],
         crewIssuesNote: 'None — demo Scheduler-only note.',
         lightFeedback: 'Solid outing; card report filed for both yellows.',
+        roundTripMiles: 142,
       },
     });
   }
@@ -2229,6 +2230,7 @@ function seedMatchReports(matches: Match[]): MatchReport[] {
         yellowCards: 2,
         redCards: 0,
         lightFeedback: 'Two yellows; card report still needed from MO.',
+        roundTripMiles: 68,
       },
     });
   }

@@ -11,6 +11,7 @@ import {
   BREAKDOWN_REWARD_OPTIONS,
   attendanceForReportForm,
   MATCH_FEEDBACK_LABEL,
+  roundTripMilesFromInput,
   type BreakdownReward,
   type CrewAttendanceEntry,
   type MatchFormat,
@@ -24,6 +25,7 @@ import {
 import { isTournamentMatch } from '@/domain/matchScheduleUrl';
 import { CrewAttendanceFields, formatCrewAttendanceNote } from '@/features/referee/reports/CrewAttendanceFields';
 import {
+  RoundTripMilesField,
   TeamScoreCard,
   TournamentMatchCheckbox,
   tournamentMoScorePayload,
@@ -118,6 +120,9 @@ export function PerformanceReportForm({
   const [isTournament, setIsTournament] = useState(() =>
     initial?.tournamentMatch ?? isTournamentMatch(match),
   );
+  const [roundTripMiles, setRoundTripMiles] = useState(() =>
+    initial?.roundTripMiles != null ? String(initial.roundTripMiles) : '',
+  );
 
   const [gameTemperature, setGameTemperature] = useState<number | ''>(
     () => initial?.gameTemperature ?? '',
@@ -182,6 +187,8 @@ export function PerformanceReportForm({
       if (someoneAbsent && !crewAbsenceNote.trim()) {
         return 'Note who did not attend (and anything we should know).';
       }
+      const mileage = roundTripMilesFromInput(roundTripMiles);
+      if ('error' in mileage) return mileage.error;
     }
     if (idx === 1) {
       if (gameTemperature === '') return 'Rate game temperature.';
@@ -233,6 +240,12 @@ export function PerformanceReportForm({
       setError(sectionErrors(incomplete));
       return;
     }
+    const mileage = roundTripMilesFromInput(roundTripMiles);
+    if ('error' in mileage) {
+      setSection(0);
+      setError(mileage.error);
+      return;
+    }
     const hy = Number(homeYellow);
     const hr = Number(homeRed);
     const ay = Number(awayYellow);
@@ -276,6 +289,7 @@ export function PerformanceReportForm({
       lightFeedback: matchFeedback.trim() || undefined,
       cmoDidNotAttend: cmoDidNotAttend || undefined,
       tournamentMatch: isTournament || undefined,
+      roundTripMiles: mileage.value,
     };
     onSubmit(payload);
   };
@@ -366,6 +380,12 @@ export function PerformanceReportForm({
                 ))}
               </div>
             </FormGroup>
+
+            <RoundTripMilesField
+              id="perf-miles"
+              value={roundTripMiles}
+              onChange={setRoundTripMiles}
+            />
 
             <TournamentMatchCheckbox
               id="perf-tournament"

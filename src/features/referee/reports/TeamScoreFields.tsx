@@ -1,9 +1,34 @@
 import { Checkbox, FormGroup, TextInput } from '@patternfly/react-core';
-import type { MoReportPayload } from '@/domain/reports';
+import { ROUND_TRIP_MILES_LABEL, type MoReportPayload } from '@/domain/reports';
 
 export const TOURNAMENT_MATCH_LABEL = 'This is a tournament match';
 export const TOURNAMENT_MATCH_DESCRIPTION =
   'In tournaments you may work multiple games in a day. Check this to skip score and card counts.';
+
+export function RoundTripMilesField({
+  id,
+  value,
+  onChange,
+}: {
+  id: string;
+  value: string;
+  onChange: (value: string) => void;
+}) {
+  return (
+    <FormGroup label={ROUND_TRIP_MILES_LABEL} fieldId={id}>
+      <TextInput
+        id={id}
+        type="number"
+        inputMode="decimal"
+        min={0}
+        step={0.1}
+        value={value}
+        onChange={(_e, v) => onChange(v)}
+        placeholder="e.g. 85"
+      />
+    </FormGroup>
+  );
+}
 
 export function TournamentMatchCheckbox({
   id,

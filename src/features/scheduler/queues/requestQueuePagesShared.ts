@@ -217,9 +217,7 @@ export function useSchedulerRequestActions() {
       console.error('Approve fixture failed', err);
       refresh();
       window.alert(
-        err instanceof Error
-          ? err.message
-          : 'Failed to approve fixture request.',
+        callableErrorMessage(err, 'Failed to approve fixture request.'),
       );
     } finally {
       setFixtureBusyId(null);
