@@ -1,6 +1,6 @@
 import { isOutsideAppointmentUserId } from '@/domain/placeholderAssignment';
 import { CREW_SLOTS, crewPeople, type Match, type UserProfile } from '@/domain/types';
-import { formatMatchKickoff, orgTimeZone } from '@/domain/matchTime';
+import { formatMatchKickoff } from '@/domain/matchTime';
 import { callNotifyUser } from '@/services/notify';
 import { isFirebaseConfigured } from '@/services/firebase';
 

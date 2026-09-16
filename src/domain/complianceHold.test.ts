@@ -6,27 +6,25 @@ import {
   defaultComplianceHoldMessage,
   isComplianceHeld,
 } from '@/domain/complianceHold';
-import type { Match } from '@/domain/types';
+import { emptyCrew, type Match } from '@/domain/types';
 
 function baseMatch(): Match {
   return {
     id: 'm1',
+    sheetRowKey: 's1',
     homeTeamId: 'h1',
     awayTeamId: 'a1',
     homeTeamName: 'Home FC',
     awayTeamName: 'Away FC',
     kickoffAt: '2026-09-20T18:00:00.000Z',
     venueName: 'Main Field',
+    venueAddress: 'Austin, TX',
     gender: 'women',
     level: 'D1',
     status: 'crew_pending',
-    crew: {
-      mo: [],
-      ar1: [],
-      ar2: [],
-      ar3: [],
-      ar4: [],
-    },
+    flightProvided: false,
+    housingProvided: false,
+    crew: emptyCrew(),
   };
 }
 
