@@ -270,6 +270,11 @@ export function MatchListRow({
               Forfeit
             </span>
           ) : null}
+          {isComplianceHeld(match) && roleView === 'scheduler' ? (
+            <span className="rs-pill rs-pill--warn rs-list-row__chip">
+              Locked
+            </span>
+          ) : null}
         </div>
         {(match.venueAddress?.trim() || match.venueName?.trim()) ? (
           <p className="rs-list-row__venue">
