@@ -10,8 +10,14 @@
 # Optional Variables:
 #   VITE_DEMO_MODE, VITE_DEFAULT_ORG_ID, VITE_APP_ORIGIN, RESEND_FROM_EMAIL
 #
-# Function secrets (GOOGLE_SERVICE_ACCOUNT_JSON, RESEND_API_KEY) live in
-# Firebase Secret Manager — set once with `firebase functions:secrets:set`.
+# Functions deploy (non-interactive) also needs these in GitHub Actions secrets
+# (same values as Firebase Secret Manager / local functions/.env.matchreadytx):
+#   GOOGLE_SERVICE_ACCOUNT_JSON
+#   RESEND_API_KEY
+#   SHEET_WEBHOOK_SECRET
+# Optional (comma-separated platform admins for Match Calendar) — secret or variable:
+#   MATCH_CALENDAR_PLATFORM_ADMIN_UIDS
+#   MATCH_CALENDAR_PLATFORM_ADMIN_EMAILS
 name: Deploy
 
 on:
@@ -65,17 +71,42 @@ jobs:
           VITE_RECAPTCHA_ENTERPRISE_SITE_KEY: ${{ secrets.VITE_RECAPTCHA_ENTERPRISE_SITE_KEY || vars.VITE_RECAPTCHA_ENTERPRISE_SITE_KEY }}
           VITE_APP_BUILD: ${{ github.run_number }}
 
-      # Non-interactive Functions deploy needs project dotenv for defineString params.
-      # Secrets stay in Secret Manager (already set locally); do not put them here.
+      # Non-interactive Functions deploy needs all defineSecret/defineString values
+      # in functions/.env.matchreadytx (firebase-tools reads this at deploy time).
       - name: Write Functions project env
+        env:
+          GOOGLE_SERVICE_ACCOUNT_JSON: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_JSON }}
+          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+          SHEET_WEBHOOK_SECRET: ${{ secrets.SHEET_WEBHOOK_SECRET }}
         run: |
           FROM_EMAIL='${{ vars.RESEND_FROM_EMAIL }}'
           if [ -z "$FROM_EMAIL" ]; then
             FROM_EMAIL='MatchReadyTX <onboarding@resend.dev>'
           fi
           APP_ORIGIN='${{ vars.VITE_APP_ORIGIN || 'https://matchreadytx.web.app' }}'
-          printf 'RESEND_FROM_EMAIL=%s\nAPP_ORIGIN=%s\n' "$FROM_EMAIL" "$APP_ORIGIN" > functions/.env.matchreadytx
-          echo "Wrote functions/.env.matchreadytx (RESEND_FROM_EMAIL, APP_ORIGIN)"
+          ADMIN_UIDS='${{ secrets.MATCH_CALENDAR_PLATFORM_ADMIN_UIDS || vars.MATCH_CALENDAR_PLATFORM_ADMIN_UIDS }}'
+          ADMIN_EMAILS='${{ secrets.MATCH_CALENDAR_PLATFORM_ADMIN_EMAILS || vars.MATCH_CALENDAR_PLATFORM_ADMIN_EMAILS }}'
+          missing=()
+          for name in GOOGLE_SERVICE_ACCOUNT_JSON RESEND_API_KEY SHEET_WEBHOOK_SECRET; do
+            if [ -z "${!name}" ]; then
+              missing+=("$name")
+            fi
+          done
+          if [ "${#missing[@]}" -gt 0 ]; then
+            echo "::error::Missing GitHub Actions secrets required for Functions deploy: ${missing[*]}"
+            echo "Add them under Settings → Secrets and variables → Actions (same values as firebase functions:secrets:set)."
+            exit 1
+          fi
+          {
+            printf 'RESEND_FROM_EMAIL=%s\n' "$FROM_EMAIL"
+            printf 'APP_ORIGIN=%s\n' "$APP_ORIGIN"
+            printf 'MATCH_CALENDAR_PLATFORM_ADMIN_UIDS=%s\n' "$ADMIN_UIDS"
+            printf 'MATCH_CALENDAR_PLATFORM_ADMIN_EMAILS=%s\n' "$ADMIN_EMAILS"
+            printf 'GOOGLE_SERVICE_ACCOUNT_JSON=%s\n' "$GOOGLE_SERVICE_ACCOUNT_JSON"
+            printf 'RESEND_API_KEY=%s\n' "$RESEND_API_KEY"
+            printf 'SHEET_WEBHOOK_SECRET=%s\n' "$SHEET_WEBHOOK_SECRET"
+          } > functions/.env.matchreadytx
+          echo "Wrote functions/.env.matchreadytx for non-interactive deploy"
 
       - name: Deploy to Firebase
         run: npx firebase-tools@13 deploy --only hosting,firestore,functions --project matchreadytx --non-interactive --force
