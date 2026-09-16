@@ -12,9 +12,10 @@ import {
   type TeamDisplayLabel,
 } from '@/domain/matchCardFooter';
 import {
-  complianceHoldCardLabel,
   isComplianceHeld,
+  shouldShowComplianceHoldUi,
 } from '@/domain/complianceHold';
+import { ComplianceHoldOverlay } from '@/ui/ComplianceHoldOverlay';
 import { statusLabel } from '@/domain/matchTransitions';
 import { isMatchDidNotPlay } from '@/domain/requests';
 import { genderLabel, type Match } from '@/domain/types';
@@ -124,7 +125,7 @@ export function MatchListRow({
   warn?: boolean;
   back?: BackNav;
 }) {
-  const { state, isAssignerView } = useApp();
+  const { state, roleView } = useApp();
   const timeZone = orgTimeZone(state.org.timezone);
   const teamsById = useMemo(
     () => new Map(state.teams.map((t) => [t.id, t])),
@@ -219,10 +220,18 @@ export function MatchListRow({
       </p>
     );
 
-  const complianceLocked = isComplianceHeld(match) && !isAssignerView;
+  const complianceLocked =
+    isComplianceHeld(match) && shouldShowComplianceHoldUi(roleView);
 
   const main = (
     <>
+      <div
+        className={
+          complianceLocked
+            ? 'rs-list-row__main-inner rs-list-row__main-inner--dimmed'
+            : 'rs-list-row__main-inner'
+        }
+      >
       <div className="rs-list-row__date" aria-hidden>
         <span className="rs-list-row__month">{month}</span>
         <span className="rs-list-row__day">{day}</span>
@@ -296,12 +305,13 @@ export function MatchListRow({
         )}
         {meta && <div className="rs-list-row__meta">{meta}</div>}
       </div>
-      {complianceLocked ? (
-        <div className="rs-list-row__compliance-overlay" role="status">
-          <span className="rs-list-row__compliance-label">
-            {complianceHoldCardLabel()}
-          </span>
-        </div>
+      </div>
+      {complianceLocked && match.complianceHold ? (
+        <ComplianceHoldOverlay
+          hold={match.complianceHold}
+          eventTitle={eventLabel ?? match.title}
+          variant="card"
+        />
       ) : null}
     </>
   );

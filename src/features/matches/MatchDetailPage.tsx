@@ -95,10 +95,11 @@ import { openGroupMailto, uniqueEmails } from '@/services/mailto';
 import { persistCrewAssignmentAndEmail, persistCrewUnassignmentAndEmail, resendCrewAssignmentEmail } from '@/services/liveAssignment';
 import {
   applyComplianceHold,
-  complianceHoldCardLabel,
   defaultComplianceHoldMessage,
   isComplianceHeld,
+  shouldShowComplianceHoldUi,
 } from '@/domain/complianceHold';
+import { ComplianceHoldOverlay } from '@/ui/ComplianceHoldOverlay';
 import { notifyComplianceHoldChange } from '@/services/complianceHoldNotify';
 import { defaultOrgId, clearMatchForfeitInFirestore, createGameRequestInFirestore, patchGameRequestContentInFirestore, saveComplianceHoldInFirestore, saveMatchCrewAssignment, saveMatchEventFlagsInFirestore, saveMatchForfeitInFirestore, saveMatchPlayedForfeitInFirestore, saveMatchScheduleUrlInFirestore, saveMatchWorkflowInFirestore, callMatchSelfService } from '@/services/orgData';
 import { isFirebaseConfigured } from '@/services/firebase';
@@ -552,7 +553,8 @@ export function MatchDetailPage() {
 
   const isAssigner = isAssignerView;
   const complianceHeld = isComplianceHeld(match);
-  const showComplianceLockedView = complianceHeld && !isAssigner;
+  const showComplianceLockedView =
+    complianceHeld && shouldShowComplianceHoldUi(roleView);
   const showTournamentSchedule = isTournamentMatch(match);
   const showMatchEconomics = canSeeMatchFees({
     hasAssignerRole,
@@ -1522,30 +1524,26 @@ export function MatchDetailPage() {
         )}
       </div>
 
-      {showComplianceLockedView ? (
-        <>
-          {match.title?.trim() ? (
-            <p className="rs-detail__event-title">{match.title.trim()}</p>
-          ) : null}
-          <section
-            className="rs-detail-card rs-detail-card--compliance-hold"
-            aria-labelledby="compliance-hold-heading"
-          >
-            <div className="rs-detail-card__head">
-              <h3
-                id="compliance-hold-heading"
-                className="rs-detail-section__label"
-              >
-                Match on hold
-              </h3>
-              <span className="rs-pill rs-pill--urgent">Locked</span>
-            </div>
-            <p className="rs-detail-note">{complianceHoldCardLabel()}</p>
-            <p className="rs-detail-note">{match.complianceHold?.message}</p>
-          </section>
-        </>
-      ) : (
-        <>
+      <div
+        className={
+          showComplianceLockedView
+            ? 'rs-detail__hold-wrap rs-detail__hold-wrap--locked'
+            : 'rs-detail__hold-wrap'
+        }
+      >
+        {showComplianceLockedView && match.complianceHold ? (
+          <ComplianceHoldOverlay
+            hold={match.complianceHold}
+            eventTitle={match.title}
+            variant="detail"
+          />
+        ) : null}
+        <div
+          className={
+            showComplianceLockedView ? 'rs-detail__hold-underlay' : undefined
+          }
+          aria-hidden={showComplianceLockedView || undefined}
+        >
       {complianceHeld && isAssigner ? (
         <Alert
           className="rs-detail__compliance-banner"
@@ -2756,8 +2754,8 @@ export function MatchDetailPage() {
           )}
         </section>
       )}
-        </>
-      )}
+        </div>
+      </div>
 
       {!showComplianceLockedView && showAcceptDecline && mySlot && (
         <div className="rs-detail-sticky rs-detail-sticky--split">

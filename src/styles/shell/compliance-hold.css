@@ -1,0 +1,129 @@
+.rs-compliance-hold-overlay {
+  color: #fff;
+  background: #000;
+}
+
+.rs-compliance-hold-overlay__content {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-width: 28rem;
+  margin: 0 auto;
+  text-align: center;
+}
+
+.rs-compliance-hold-overlay__event {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 1.35;
+  color: #fff;
+}
+
+.rs-compliance-hold-overlay__headline {
+  margin: 0;
+  font-weight: 800;
+  line-height: 1.3;
+  letter-spacing: 0.01em;
+  color: #fff;
+}
+
+.rs-compliance-hold-overlay__message {
+  margin: 0;
+  font-weight: 500;
+  line-height: 1.45;
+  color: #fff;
+  white-space: pre-wrap;
+}
+
+.rs-compliance-hold-overlay__contact {
+  margin: 0;
+  font-weight: 600;
+  line-height: 1.4;
+  color: #fff;
+}
+
+.rs-compliance-hold-overlay__contact-sep {
+  margin: 0 0.35em;
+}
+
+/* List card */
+.rs-list-row--compliance-locked .rs-list-row__main {
+  position: relative;
+}
+
+.rs-list-row__main-inner {
+  display: flex;
+  flex: 1 1 auto;
+  min-width: 0;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.rs-list-row--compliance-locked .rs-list-row__main-inner--dimmed {
+  filter: grayscale(1);
+  opacity: 0.22;
+  user-select: none;
+}
+
+.rs-list-row--compliance-locked .rs-list-row__card-link {
+  position: relative;
+}
+
+.rs-list-row--compliance-locked .rs-compliance-hold-overlay--card {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 14px 16px;
+  pointer-events: none;
+}
+
+.rs-compliance-hold-overlay--card .rs-compliance-hold-overlay__headline {
+  font-size: 17px;
+}
+
+.rs-compliance-hold-overlay--card .rs-compliance-hold-overlay__contact {
+  font-size: 15px;
+}
+
+/* Match detail */
+.rs-detail__hold-wrap {
+  position: relative;
+}
+
+.rs-detail__hold-wrap--locked .rs-detail__hold-underlay {
+  filter: grayscale(1);
+  opacity: 0.18;
+  pointer-events: none;
+  user-select: none;
+}
+
+.rs-compliance-hold-overlay--detail {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px 20px;
+  min-height: 240px;
+}
+
+.rs-compliance-hold-overlay--detail .rs-compliance-hold-overlay__event {
+  font-size: 18px;
+}
+
+.rs-compliance-hold-overlay--detail .rs-compliance-hold-overlay__headline {
+  font-size: 22px;
+}
+
+.rs-compliance-hold-overlay--detail .rs-compliance-hold-overlay__message {
+  font-size: 16px;
+}
+
+.rs-compliance-hold-overlay--detail .rs-compliance-hold-overlay__contact {
+  font-size: 16px;
+}

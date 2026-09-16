@@ -3,8 +3,10 @@ import {
   applyComplianceHold,
   clearComplianceHold,
   complianceHoldCardLabel,
+  complianceHoldContactLine,
   defaultComplianceHoldMessage,
   isComplianceHeld,
+  shouldShowComplianceHoldUi,
 } from '@/domain/complianceHold';
 import { emptyCrew, type Match } from '@/domain/types';
 
@@ -75,5 +77,25 @@ describe('complianceHold', () => {
   it('exposes assertive card label', () => {
     expect(complianceHoldCardLabel()).toContain('Locked by assigner');
     expect(complianceHoldCardLabel()).toContain('compliant');
+  });
+
+  it('shows lock UI only on team admin, referee, and fan lenses', () => {
+    expect(shouldShowComplianceHoldUi('teamAdmin')).toBe(true);
+    expect(shouldShowComplianceHoldUi('referee')).toBe(true);
+    expect(shouldShowComplianceHoldUi('fan')).toBe(true);
+    expect(shouldShowComplianceHoldUi('scheduler')).toBe(false);
+    expect(shouldShowComplianceHoldUi('judicial')).toBe(false);
+  });
+
+  it('formats contact line from hold fields', () => {
+    const held = applyComplianceHold(baseMatch(), {
+      uid: 'u1',
+      displayName: 'Alex',
+      email: 'alex@example.com',
+      phone: '555-0100',
+    }, 'On hold');
+    expect(complianceHoldContactLine(held.complianceHold!)).toBe(
+      'alex@example.com · 555-0100',
+    );
   });
 });

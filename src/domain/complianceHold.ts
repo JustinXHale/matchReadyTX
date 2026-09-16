@@ -8,9 +8,30 @@ export function isComplianceHeld(
   return Boolean(match.complianceHold?.lockedAt);
 }
 
+/** Schedule/detail lock UI — team admin, referee, and fan lenses only. */
+export function shouldShowComplianceHoldUi(
+  roleView: 'referee' | 'teamAdmin' | 'fan' | 'scheduler' | 'judicial' | 'finance',
+): boolean {
+  return (
+    roleView === 'teamAdmin' ||
+    roleView === 'referee' ||
+    roleView === 'fan'
+  );
+}
+
 /** Short assertive label for schedule cards. */
 export function complianceHoldCardLabel(): string {
   return 'Locked by assigner · On hold until teams are compliant';
+}
+
+/** Email / phone line for overlay copy. */
+export function complianceHoldContactLine(
+  hold: Pick<ComplianceHold, 'lockedByEmail' | 'lockedByPhone'>,
+): string | null {
+  const parts = [hold.lockedByEmail?.trim(), hold.lockedByPhone?.trim()].filter(
+    Boolean,
+  ) as string[];
+  return parts.length > 0 ? parts.join(' · ') : null;
 }
 
 export function defaultComplianceHoldMessage(

@@ -9,6 +9,7 @@ import {
 import {
   applyComplianceHold,
   clearComplianceHold,
+  defaultComplianceHoldMessage,
 } from '@/domain/complianceHold';
 import {
   withCrewBlockRemoved,
@@ -142,6 +143,9 @@ function isLiveDataMode(): boolean {
 
 /** Match used for multi-volunteer raise-hand demo on Coverage. */
 export const DEMO_CROWD_RAISE_HAND_MATCH_ID = 'm_g01';
+
+/** Pre-seeded compliance hold for schedule + detail overlay demos. */
+export const DEMO_COMPLIANCE_HOLD_MATCH_ID = 'm_hold01';
 
 type LiveSnapshotExpect =
   | 'assignment_confirmed'
@@ -1004,6 +1008,31 @@ function seedMatches(): Match[] {
       crew: emptyCrew(),
     },
     {
+      id: DEMO_COMPLIANCE_HOLD_MATCH_ID,
+      sheetRowKey: 'sheet-m_hold01',
+      status: 'pending_team_review',
+      kickoffAt: kickAt(7, 16),
+      venueName: 'Westlake Fields',
+      venueAddress: 'Austin, TX',
+      venueLat: austin.lat,
+      venueLng: austin.lng,
+      homeTeamId: 'team_austin',
+      homeTeamName: 'Austin RFC',
+      awayTeamId: 'team_dallas',
+      awayTeamName: 'Dallas RFC',
+      competition: 'Club',
+      level: 'D1',
+      gender: 'women',
+      notes: 'Demo: locked until both clubs are compliant.',
+      flightProvided: false,
+      housingProvided: false,
+      homeConfirmedAt: undefined,
+      awayConfirmedAt: undefined,
+      releasedAt: released,
+      rolesNeeded: ['mo', 'ar1', 'ar2'],
+      crew: buildCrew({ mo: 'riley', ar1: 'casey', ar2: 'alex' }),
+    },
+    {
       id: 'm_tc02',
       sheetRowKey: 'sheet-m_tc02',
       status: 'pending_team_review',
@@ -1537,6 +1566,7 @@ function seedMatches(): Match[] {
     m_g01: 'Midseason',
     m_g02: 'Conference play',
     m_tc01: 'Team review',
+    [DEMO_COMPLIANCE_HOLD_MATCH_ID]: 'Compliance hold demo',
     m_res01: 'Playoff',
     m_res02: 'Conference final',
     m_res_tourney: '7s tournament day',
@@ -1552,15 +1582,30 @@ function seedMatches(): Match[] {
       'https://drive.google.com/file/d/10FoWp82ciP3yyXMdnhky3BI4JQ6-wgvC/view?usp=drive_link',
   };
 
-  return all.map((m) => ({
-    ...m,
-    competition: competitionForGender(m.gender),
-    title: demoTitles[m.id] ?? m.title,
-    level: m.id === 'm_res03' ? 'Exhibition' : m.level,
-    isTournament:
-      m.isTournament === true || m.id === 'm_a08' || m.id === 'm_res_tourney',
-    scheduleUrl: demoScheduleUrls[m.id],
-  }));
+  const assignerDemo = {
+    uid: 'u_assigner',
+    displayName: 'Alex Assigner',
+    email: 'assigner@example.com',
+    phone: '+15551110001',
+  };
+
+  return all.map((m) => {
+    const base: Match = {
+      ...m,
+      competition: competitionForGender(m.gender),
+      title: demoTitles[m.id] ?? m.title,
+      level: m.id === 'm_res03' ? 'Exhibition' : m.level,
+      isTournament:
+        m.isTournament === true || m.id === 'm_a08' || m.id === 'm_res_tourney',
+      scheduleUrl: demoScheduleUrls[m.id],
+    };
+    if (m.id !== DEMO_COMPLIANCE_HOLD_MATCH_ID) return base;
+    return applyComplianceHold(
+      base,
+      assignerDemo,
+      defaultComplianceHoldMessage(assignerDemo),
+    );
+  });
 }
 
 
