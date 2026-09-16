@@ -97,12 +97,17 @@ jobs:
             echo "Add them under Settings → Secrets and variables → Actions (same values as firebase functions:secrets:set)."
             exit 1
           fi
+          # Dotenv must be one KEY=value per line — minify multi-line service account JSON.
+          GOOGLE_SA_JSON=$(printf '%s' "$GOOGLE_SERVICE_ACCOUNT_JSON" | jq -c .) || {
+            echo "::error::GOOGLE_SERVICE_ACCOUNT_JSON is not valid JSON"
+            exit 1
+          }
           {
             printf 'RESEND_FROM_EMAIL=%s\n' "$FROM_EMAIL"
             printf 'APP_ORIGIN=%s\n' "$APP_ORIGIN"
             printf 'MATCH_CALENDAR_PLATFORM_ADMIN_UIDS=%s\n' "$ADMIN_UIDS"
             printf 'MATCH_CALENDAR_PLATFORM_ADMIN_EMAILS=%s\n' "$ADMIN_EMAILS"
-            printf 'GOOGLE_SERVICE_ACCOUNT_JSON=%s\n' "$GOOGLE_SERVICE_ACCOUNT_JSON"
+            printf 'GOOGLE_SERVICE_ACCOUNT_JSON=%s\n' "$GOOGLE_SA_JSON"
             printf 'RESEND_API_KEY=%s\n' "$RESEND_API_KEY"
             printf 'SHEET_WEBHOOK_SECRET=%s\n' "$SHEET_WEBHOOK_SECRET"
           } > functions/.env.matchreadytx
