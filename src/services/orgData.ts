@@ -295,6 +295,30 @@ export function matchFromFirestore(
     ),
     homeScore: typeof data.homeScore === 'number' ? data.homeScore : undefined,
     awayScore: typeof data.awayScore === 'number' ? data.awayScore : undefined,
+    complianceHold: parseComplianceHold(data.complianceHold),
+  };
+}
+
+function parseComplianceHold(raw: unknown): Match['complianceHold'] {
+  if (!raw || typeof raw !== 'object') return undefined;
+  const data = raw as Record<string, unknown>;
+  const lockedAt = String(data.lockedAt ?? '').trim();
+  const lockedByUid = String(data.lockedByUid ?? '').trim();
+  const message = String(data.message ?? '').trim();
+  if (!lockedAt || !lockedByUid || !message) return undefined;
+  return {
+    lockedAt,
+    lockedByUid,
+    lockedByName: String(data.lockedByName ?? 'Assigner').trim() || 'Assigner',
+    lockedByEmail:
+      typeof data.lockedByEmail === 'string' && data.lockedByEmail.trim()
+        ? data.lockedByEmail.trim()
+        : undefined,
+    lockedByPhone:
+      typeof data.lockedByPhone === 'string' && data.lockedByPhone.trim()
+        ? data.lockedByPhone.trim()
+        : undefined,
+    message,
   };
 }
 
@@ -1620,6 +1644,31 @@ export async function saveMatchWorkflowInFirestore(
       postponedAt: match.postponedAt ?? null,
       updatedAt: new Date().toISOString(),
     }),
+    { merge: true },
+  );
+}
+
+/** Persist or clear assigner compliance hold (live mode). */
+export async function saveComplianceHoldInFirestore(
+  orgId: string,
+  matchId: string,
+  hold: Match['complianceHold'] | null,
+): Promise<void> {
+  await setDoc(
+    doc(requireDb(), 'orgs', orgId, 'matches', matchId),
+    {
+      complianceHold: hold
+        ? {
+            lockedAt: hold.lockedAt,
+            lockedByUid: hold.lockedByUid,
+            lockedByName: hold.lockedByName,
+            lockedByEmail: hold.lockedByEmail ?? null,
+            lockedByPhone: hold.lockedByPhone ?? null,
+            message: hold.message,
+          }
+        : null,
+      updatedAt: new Date().toISOString(),
+    },
     { merge: true },
   );
 }

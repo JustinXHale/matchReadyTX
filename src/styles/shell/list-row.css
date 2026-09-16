@@ -201,6 +201,53 @@
   background: color-mix(in srgb, var(--rs-color-warn) 16%, var(--rs-color-surface));
 }
 
+.rs-list-row--compliance-locked {
+  background: var(--rs-color-charcoal);
+  border-color: var(--rs-color-charcoal);
+  color: color-mix(in srgb, var(--rs-color-on-urgent) 72%, transparent);
+}
+
+.rs-list-row--compliance-locked .rs-list-row__main {
+  position: relative;
+  filter: grayscale(0.65);
+  opacity: 0.42;
+  pointer-events: none;
+  user-select: none;
+}
+
+.rs-list-row--compliance-locked .rs-list-row__main:hover,
+.rs-list-row--compliance-locked .rs-list-row__main:focus-visible {
+  background: transparent;
+}
+
+.rs-list-row--compliance-locked .rs-list-row__trailing {
+  border-left-color: color-mix(in srgb, var(--rs-color-charcoal) 85%, var(--rs-color-border));
+  background: var(--rs-color-surface);
+  color: var(--rs-color-ink);
+}
+
+.rs-list-row--compliance-locked .rs-list-row__compliance-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 12px 16px;
+  text-align: center;
+  background: color-mix(in srgb, var(--rs-color-charcoal) 35%, transparent);
+  pointer-events: none;
+}
+
+.rs-list-row--compliance-locked .rs-list-row__compliance-label {
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.35;
+  letter-spacing: 0.01em;
+  color: var(--rs-color-on-urgent);
+  max-width: 28rem;
+}
+
 /* Dark: PF warning tint (no accent outline — distinct from solid red urgent rows) */
 .pf-v6-theme-dark .rs-list-row--warn {
   background: color-mix(

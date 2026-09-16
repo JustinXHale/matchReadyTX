@@ -11,6 +11,10 @@ import {
   matchUnconfirmedTeamBadges,
   type TeamDisplayLabel,
 } from '@/domain/matchCardFooter';
+import {
+  complianceHoldCardLabel,
+  isComplianceHeld,
+} from '@/domain/complianceHold';
 import { statusLabel } from '@/domain/matchTransitions';
 import { isMatchDidNotPlay } from '@/domain/requests';
 import { genderLabel, type Match } from '@/domain/types';
@@ -120,7 +124,7 @@ export function MatchListRow({
   warn?: boolean;
   back?: BackNav;
 }) {
-  const { state } = useApp();
+  const { state, isAssignerView } = useApp();
   const timeZone = orgTimeZone(state.org.timezone);
   const teamsById = useMemo(
     () => new Map(state.teams.map((t) => [t.id, t])),
@@ -215,6 +219,8 @@ export function MatchListRow({
       </p>
     );
 
+  const complianceLocked = isComplianceHeld(match) && !isAssignerView;
+
   const main = (
     <>
       <div className="rs-list-row__date" aria-hidden>
@@ -290,6 +296,13 @@ export function MatchListRow({
         )}
         {meta && <div className="rs-list-row__meta">{meta}</div>}
       </div>
+      {complianceLocked ? (
+        <div className="rs-list-row__compliance-overlay" role="status">
+          <span className="rs-list-row__compliance-label">
+            {complianceHoldCardLabel()}
+          </span>
+        </div>
+      ) : null}
     </>
   );
 
@@ -299,9 +312,15 @@ export function MatchListRow({
     split === 'action' ? 'rs-list-row--action' : '',
     split === 'appt' ? 'rs-list-row--appt' : '',
     aside ? 'rs-list-row--with-aside' : '',
-    urgent ? 'rs-list-row--urgent' : '',
-    !urgent && warn ? 'rs-list-row--warn' : '',
-    !urgent && !warn && isMutedOutcome ? 'rs-list-row--forfeit' : '',
+    complianceLocked ? 'rs-list-row--compliance-locked' : '',
+    !complianceLocked && urgent ? 'rs-list-row--urgent' : '',
+    !complianceLocked && !urgent && warn ? 'rs-list-row--warn' : '',
+    !complianceLocked &&
+    !urgent &&
+    !warn &&
+    isMutedOutcome
+      ? 'rs-list-row--forfeit'
+      : '',
   ]
     .filter(Boolean)
     .join(' ');

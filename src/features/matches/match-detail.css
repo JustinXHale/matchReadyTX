@@ -660,6 +660,20 @@ button.rs-detail-people__confirm:focus-visible {
   letter-spacing: 0.02em;
 }
 
+.rs-detail-card--compliance-hold {
+  border-color: color-mix(in srgb, var(--rs-color-charcoal) 35%, var(--rs-color-border));
+  background: color-mix(in srgb, var(--rs-color-charcoal) 6%, var(--rs-color-surface));
+}
+
+.rs-detail-card--compliance-hold .rs-detail-note {
+  margin-top: var(--rs-space-sm);
+  white-space: pre-wrap;
+}
+
+.rs-detail__compliance-banner {
+  margin-bottom: var(--rs-space-md);
+}
+
 .rs-raise-hand-card {
   position: relative;
   overflow: hidden;

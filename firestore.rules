@@ -287,7 +287,10 @@ service cloud.firestore {
 
         function memberMatchSelfServicePatch() {
           let diff = request.resource.data.diff(resource.data).affectedKeys();
-          return diff.hasOnly(['homeConfirmedAt', 'awayConfirmedAt', 'status', 't72TeamHome', 't72TeamAway', 'updatedAt'])
+          let held = resource.data.get('complianceHold', null) is map
+            && resource.data.complianceHold.keys().hasAny(['lockedAt']);
+          return !held
+            && diff.hasOnly(['homeConfirmedAt', 'awayConfirmedAt', 'status', 't72TeamHome', 't72TeamAway', 'updatedAt'])
             && (
               request.resource.data.status == resource.data.status
               || request.resource.data.status in [

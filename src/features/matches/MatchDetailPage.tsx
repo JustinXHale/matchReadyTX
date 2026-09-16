@@ -93,7 +93,14 @@ import {
 } from '@/domain/requests';
 import { openGroupMailto, uniqueEmails } from '@/services/mailto';
 import { persistCrewAssignmentAndEmail, persistCrewUnassignmentAndEmail, resendCrewAssignmentEmail } from '@/services/liveAssignment';
-import { defaultOrgId, clearMatchForfeitInFirestore, createGameRequestInFirestore, patchGameRequestContentInFirestore, saveMatchCrewAssignment, saveMatchEventFlagsInFirestore, saveMatchForfeitInFirestore, saveMatchPlayedForfeitInFirestore, saveMatchScheduleUrlInFirestore, saveMatchWorkflowInFirestore, callMatchSelfService } from '@/services/orgData';
+import {
+  applyComplianceHold,
+  complianceHoldCardLabel,
+  defaultComplianceHoldMessage,
+  isComplianceHeld,
+} from '@/domain/complianceHold';
+import { notifyComplianceHoldChange } from '@/services/complianceHoldNotify';
+import { defaultOrgId, clearMatchForfeitInFirestore, createGameRequestInFirestore, patchGameRequestContentInFirestore, saveComplianceHoldInFirestore, saveMatchCrewAssignment, saveMatchEventFlagsInFirestore, saveMatchForfeitInFirestore, saveMatchPlayedForfeitInFirestore, saveMatchScheduleUrlInFirestore, saveMatchWorkflowInFirestore, callMatchSelfService } from '@/services/orgData';
 import { isFirebaseConfigured } from '@/services/firebase';
 import {
   isTournamentMatch,
@@ -302,6 +309,8 @@ export function MatchDetailPage() {
   const [coverageAlertSent, setCoverageAlertSent] = useState(false);
   const [assignerConfirm, setAssignerConfirm] =
     useState<AssignerMenuAction | null>(null);
+  const [showComplianceHoldModal, setShowComplianceHoldModal] = useState(false);
+  const [complianceHoldDraft, setComplianceHoldDraft] = useState('');
   const [showForfeitModal, setShowForfeitModal] = useState(false);
   /** In-progress fee edits — keeps empty/partial input from snapping to org default. */
   const [feeDrafts, setFeeDrafts] = useState<
@@ -542,6 +551,8 @@ export function MatchDetailPage() {
   }
 
   const isAssigner = isAssignerView;
+  const complianceHeld = isComplianceHeld(match);
+  const showComplianceLockedView = complianceHeld && !isAssigner;
   const showTournamentSchedule = isTournamentMatch(match);
   const showMatchEconomics = canSeeMatchFees({
     hasAssignerRole,
@@ -585,6 +596,7 @@ export function MatchDetailPage() {
   const canProposeChange =
     (isHomeAdmin || isAwayAdmin) &&
     !pendingProposal &&
+    !complianceHeld &&
     match.status !== 'cancelled' &&
     match.status !== 'postponed' &&
     match.status !== 'draft' &&
@@ -620,6 +632,7 @@ export function MatchDetailPage() {
     requestSelectedSlots.every((s) => requestSlots.includes(s));
 
   const needsOfficialConfirm =
+    !complianceHeld &&
     isOfficialView &&
     Boolean(mySlot) &&
     (myAssignment?.status === 'official' ||
@@ -630,6 +643,7 @@ export function MatchDetailPage() {
         myAssignment?.status !== 'confirmed'));
 
   const needsTeamConfirm =
+    !complianceHeld &&
     (isHomeAdmin || isAwayAdmin) &&
     match.status !== 'cancelled' &&
     match.status !== 'postponed' &&
@@ -951,6 +965,7 @@ export function MatchDetailPage() {
 
   const canToggleTeamDetails = (side: 'home' | 'away') => {
     if (match.status === 'change_proposed') return false;
+    if (complianceHeld && !isAssigner) return false;
     // Scheduler can set either side.
     if (isAssigner) return true;
     // Referee (MO) can set either side — only in the Referee/CMO lens.
@@ -1235,13 +1250,69 @@ export function MatchDetailPage() {
         }
         break;
       }
+      case 'remove_compliance_hold': {
+        store.clearComplianceHold(match.id);
+        if (dataMode === 'live' && isFirebaseConfigured) {
+          void saveComplianceHoldInFirestore(defaultOrgId(), match.id, null)
+            .then(() =>
+              notifyComplianceHoldChange({
+                match,
+                users: state.users,
+                timeZone: orgTz,
+                locked: false,
+                message: '',
+              }),
+            )
+            .catch((err) => {
+              console.error('clearComplianceHold failed', err);
+              window.alert(
+                err instanceof Error
+                  ? `Updated locally, but save failed: ${err.message}`
+                  : 'Updated locally, but save failed.',
+              );
+            });
+        }
+        break;
+      }
     }
     setAssignerConfirm(null);
+  };
+
+  const confirmComplianceHold = () => {
+    const message = complianceHoldDraft.trim();
+    const hold = applyComplianceHold(match, currentUser, message).complianceHold;
+    store.setComplianceHold(match.id, message);
+    if (dataMode === 'live' && isFirebaseConfigured && hold) {
+      void saveComplianceHoldInFirestore(defaultOrgId(), match.id, hold)
+        .then(() =>
+          notifyComplianceHoldChange({
+            match: { ...match, complianceHold: hold },
+            users: state.users,
+            timeZone: orgTz,
+            locked: true,
+            message: hold.message,
+          }),
+        )
+        .catch((err) => {
+          console.error('setComplianceHold failed', err);
+          window.alert(
+            err instanceof Error
+              ? `Updated locally, but save failed: ${err.message}`
+              : 'Updated locally, but save failed.',
+          );
+        });
+    }
+    setShowComplianceHoldModal(false);
   };
 
   const onAssignerMenuAction = (action: AssignerMenuAction) => {
     if (action === 'forfeit') {
       setShowForfeitModal(true);
+      return;
+    }
+    if (action === 'compliance_hold') {
+      setComplianceHoldDraft(defaultComplianceHoldMessage(currentUser));
+      setShowComplianceHoldModal(true);
       return;
     }
     setAssignerConfirm(action);
@@ -1450,6 +1521,42 @@ export function MatchDetailPage() {
           </div>
         )}
       </div>
+
+      {showComplianceLockedView ? (
+        <>
+          {match.title?.trim() ? (
+            <p className="rs-detail__event-title">{match.title.trim()}</p>
+          ) : null}
+          <section
+            className="rs-detail-card rs-detail-card--compliance-hold"
+            aria-labelledby="compliance-hold-heading"
+          >
+            <div className="rs-detail-card__head">
+              <h3
+                id="compliance-hold-heading"
+                className="rs-detail-section__label"
+              >
+                Match on hold
+              </h3>
+              <span className="rs-pill rs-pill--urgent">Locked</span>
+            </div>
+            <p className="rs-detail-note">{complianceHoldCardLabel()}</p>
+            <p className="rs-detail-note">{match.complianceHold?.message}</p>
+          </section>
+        </>
+      ) : (
+        <>
+      {complianceHeld && isAssigner ? (
+        <Alert
+          className="rs-detail__compliance-banner"
+          variant="warning"
+          title="Compliance hold active"
+          isInline
+        >
+          Teams and officials cannot confirm or change this match until you
+          remove the hold from the match menu.
+        </Alert>
+      ) : null}
 
       {isAssigner ? (
         <FormGroup fieldId="match-event-title" label="Event title">
@@ -2649,8 +2756,10 @@ export function MatchDetailPage() {
           )}
         </section>
       )}
+        </>
+      )}
 
-      {showAcceptDecline && mySlot && (
+      {!showComplianceLockedView && showAcceptDecline && mySlot && (
         <div className="rs-detail-sticky rs-detail-sticky--split">
           <Button
             variant="primary"
@@ -2676,7 +2785,7 @@ export function MatchDetailPage() {
         </div>
       )}
 
-      {canWithdrawFromAppointment && mySlot && (
+      {!showComplianceLockedView && canWithdrawFromAppointment && mySlot && (
         <div className="rs-detail-sticky">
           <Button
             variant="danger"
@@ -2690,7 +2799,7 @@ export function MatchDetailPage() {
         </div>
       )}
 
-      {showRaiseHandCard && !raiseHandLocked && (
+      {!showComplianceLockedView && showRaiseHandCard && !raiseHandLocked && (
         <div className="rs-detail-sticky">
           <Button
             variant="primary"
@@ -2708,7 +2817,7 @@ export function MatchDetailPage() {
         </div>
       )}
 
-      {stickyPrimary && (
+      {!showComplianceLockedView && stickyPrimary && (
         <div className="rs-detail-sticky">
           <Button variant="primary" isBlock onClick={stickyPrimary.onClick}>
             {stickyPrimary.label}
@@ -2716,7 +2825,7 @@ export function MatchDetailPage() {
         </div>
       )}
 
-      {showReportSticky && reportActions.primary && (
+      {!showComplianceLockedView && showReportSticky && reportActions.primary && (
         <div className="rs-detail-sticky">
           <Button
             variant="primary"
@@ -2751,7 +2860,8 @@ export function MatchDetailPage() {
         </div>
       )}
 
-      {!showReportSticky &&
+      {!showComplianceLockedView &&
+        !showReportSticky &&
         reportActions.cardLink &&
         !showAcceptDecline &&
         !canRequest &&
@@ -3255,6 +3365,8 @@ export function MatchDetailPage() {
               ? coverageAlertSent
                 ? 'Resend coverage alert?'
                 : 'Alert officials?'
+              : assignerConfirm === 'remove_compliance_hold'
+                ? 'Remove compliance hold?'
               : assignerConfirm === 'cancel'
                 ? 'Cancel this match?'
                 : assignerConfirm === 'postpone'
@@ -3272,6 +3384,8 @@ export function MatchDetailPage() {
           <p id="assigner-action-desc" className="rs-modal-lede">
             {assignerConfirm === 'alert_coverage'
               ? 'Send a coverage alert to officials who may be available for open roles on this match.'
+              : assignerConfirm === 'remove_compliance_hold'
+                ? 'Teams and officials will be able to confirm and take action on this match again.'
               : assignerConfirm === 'cancel'
                 ? 'The match will be marked cancelled. You can reactivate it later from the match menu if this was a mistake.'
                 : assignerConfirm === 'postpone'
@@ -3301,6 +3415,8 @@ export function MatchDetailPage() {
               ? coverageAlertSent
                 ? 'Resend alert'
                 : 'Send alert'
+              : assignerConfirm === 'remove_compliance_hold'
+                ? 'Remove hold'
               : assignerConfirm === 'cancel'
                 ? 'Cancel match'
                 : assignerConfirm === 'postpone'
@@ -3312,6 +3428,48 @@ export function MatchDetailPage() {
                     : assignerConfirm === 'clear_forfeit'
                       ? 'Clear forfeit'
                       : 'Reactivate match'}
+          </Button>
+        </ModalFooter>
+      </Modal>
+
+      <Modal
+        variant={ModalVariant.medium}
+        isOpen={showComplianceHoldModal}
+        onClose={() => setShowComplianceHoldModal(false)}
+        aria-labelledby="compliance-hold-modal-title"
+        aria-describedby="compliance-hold-modal-desc"
+      >
+        <ModalHeader>
+          <Title headingLevel="h2" id="compliance-hold-modal-title" size="lg">
+            Lock match until teams are compliant?
+          </Title>
+        </ModalHeader>
+        <ModalBody>
+          <p id="compliance-hold-modal-desc" className="rs-modal-lede">
+            Crew assignments stay in place. Teams and officials cannot confirm
+            or change this match until you remove the hold.
+          </p>
+          <FormGroup label="Message to crew and team admins" fieldId="compliance-hold-message">
+            <TextArea
+              id="compliance-hold-message"
+              value={complianceHoldDraft}
+              onChange={(_, v) => setComplianceHoldDraft(v)}
+              rows={5}
+              resizeOrientation="vertical"
+              aria-label="Compliance hold message"
+            />
+          </FormGroup>
+        </ModalBody>
+        <ModalFooter>
+          <Button variant="link" onClick={() => setShowComplianceHoldModal(false)}>
+            Cancel
+          </Button>
+          <Button
+            variant="primary"
+            onClick={confirmComplianceHold}
+            isDisabled={!complianceHoldDraft.trim()}
+          >
+            Lock match
           </Button>
         </ModalFooter>
       </Modal>

@@ -6,10 +6,13 @@ import {
   MenuToggle,
 } from '@patternfly/react-core';
 import { EllipsisVIcon } from '@patternfly/react-icons';
+import { isComplianceHeld } from '@/domain/complianceHold';
 import type { Match } from '@/domain/types';
 
 export type AssignerMenuAction =
   | 'alert_coverage'
+  | 'compliance_hold'
+  | 'remove_compliance_hold'
   | 'cancel'
   | 'postpone'
   | 'forfeit'
@@ -91,6 +94,15 @@ export function MatchAssignerMenu({
             <DropdownItem onClick={() => closeAnd('postpone')}>
               Postpone match
             </DropdownItem>
+            {isComplianceHeld(match) ? (
+              <DropdownItem onClick={() => closeAnd('remove_compliance_hold')}>
+                Remove compliance hold
+              </DropdownItem>
+            ) : (
+              <DropdownItem onClick={() => closeAnd('compliance_hold')}>
+                Lock until teams are compliant
+              </DropdownItem>
+            )}
             {match.forfeitTeamId ? (
               <DropdownItem onClick={() => closeAnd('clear_forfeit')}>
                 Clear forfeit

@@ -159,9 +159,20 @@ export interface Match {
   /** Final score when reported (from match report). */
   homeScore?: number;
   awayScore?: number;
+  /** Assigner compliance hold — blocks team actions; crew assignments stay in place. */
+  complianceHold?: ComplianceHold;
 }
 
 export type MatchGender = 'men' | 'women';
+
+export type ComplianceHold = {
+  lockedAt: string;
+  lockedByUid: string;
+  lockedByName: string;
+  lockedByEmail?: string;
+  lockedByPhone?: string;
+  message: string;
+};
 
 /** City listed under a metro column on the Sheet proximity tab. */
 export type TerritoryCityMapping = {

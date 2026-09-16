@@ -7,6 +7,10 @@ import {
   markUnavailableAndRelease,
 } from '@/domain/crew';
 import {
+  applyComplianceHold,
+  clearComplianceHold,
+} from '@/domain/complianceHold';
+import {
   withCrewBlockRemoved,
   withCrewRoleAdded,
 } from '@/domain/crewSize';
@@ -102,6 +106,7 @@ import type {
   UserProfile,
 } from '@/domain/types';
 import {
+  CREW_SLOTS,
   DEFAULT_COMPETITIONS,
   DEFAULT_MATCH_LEVELS,
   crewPeople,
@@ -3254,6 +3259,70 @@ class DemoStore {
     for (const u of this.state.users) {
       if (!hasRefereeLensRole(u.roles)) continue;
       this.notify('coverage_alert', u.uid, title, body);
+    }
+  }
+
+  private complianceHoldNotifyUids(match: Match): string[] {
+    const uids = new Set<string>();
+    for (const slot of CREW_SLOTS) {
+      for (const a of crewPeople(match.crew[slot])) {
+        if (a.userId) uids.add(a.userId);
+      }
+    }
+    for (const c of match.cmo ?? []) {
+      if (c.userId) uids.add(c.userId);
+    }
+    for (const u of this.state.users) {
+      if (!u.roles.includes('teamAdmin')) continue;
+      if (
+        u.teamIds.includes(match.homeTeamId) ||
+        u.teamIds.includes(match.awayTeamId)
+      ) {
+        uids.add(u.uid);
+      }
+    }
+    return [...uids];
+  }
+
+  setComplianceHold(matchId: string, message: string): void {
+    const assigner = this.state.users.find(
+      (u) => u.uid === this.state.currentUserId,
+    );
+    if (!assigner) return;
+    let updated: Match | undefined;
+    this.set((s) => ({
+      ...s,
+      matches: s.matches.map((m) => {
+        if (m.id !== matchId) return m;
+        updated = applyComplianceHold(m, assigner, message);
+        return updated;
+      }),
+    }));
+    if (!updated?.complianceHold) return;
+    const fixture = `${updated.homeTeamName} vs ${updated.awayTeamName}`;
+    const title = `Match on hold: ${fixture}`;
+    const body = updated.complianceHold.message;
+    for (const uid of this.complianceHoldNotifyUids(updated)) {
+      this.notify('compliance_hold', uid, title, body);
+    }
+  }
+
+  clearComplianceHold(matchId: string): void {
+    let updated: Match | undefined;
+    this.set((s) => ({
+      ...s,
+      matches: s.matches.map((m) => {
+        if (m.id !== matchId) return m;
+        updated = clearComplianceHold(m);
+        return updated;
+      }),
+    }));
+    if (!updated) return;
+    const fixture = `${updated.homeTeamName} vs ${updated.awayTeamName}`;
+    const title = `Match hold removed: ${fixture}`;
+    const body = `The compliance hold has been removed for ${fixture}.`;
+    for (const uid of this.complianceHoldNotifyUids(updated)) {
+      this.notify('compliance_hold_cleared', uid, title, body);
     }
   }
 
