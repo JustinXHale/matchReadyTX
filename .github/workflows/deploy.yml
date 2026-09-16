@@ -10,11 +10,9 @@
 # Optional Variables:
 #   VITE_DEMO_MODE, VITE_DEFAULT_ORG_ID, VITE_APP_ORIGIN, RESEND_FROM_EMAIL
 #
-# Functions deploy (non-interactive) also needs these in GitHub Actions secrets
-# (same values as Firebase Secret Manager / local functions/.env.matchreadytx):
-#   GOOGLE_SERVICE_ACCOUNT_JSON
-#   RESEND_API_KEY
-#   SHEET_WEBHOOK_SECRET
+# Functions secrets (GOOGLE_SERVICE_ACCOUNT_JSON, RESEND_API_KEY, SHEET_WEBHOOK_SECRET)
+# must already exist in Firebase Secret Manager (`firebase functions:secrets:set`).
+# Do not put those names in functions/.env.* — Cloud Run rejects secret + plaintext overlap.
 # Optional (comma-separated platform admins for Match Calendar) — secret or variable:
 #   MATCH_CALENDAR_PLATFORM_ADMIN_UIDS
 #   MATCH_CALENDAR_PLATFORM_ADMIN_EMAILS
@@ -71,13 +69,9 @@ jobs:
           VITE_RECAPTCHA_ENTERPRISE_SITE_KEY: ${{ secrets.VITE_RECAPTCHA_ENTERPRISE_SITE_KEY || vars.VITE_RECAPTCHA_ENTERPRISE_SITE_KEY }}
           VITE_APP_BUILD: ${{ github.run_number }}
 
-      # Non-interactive Functions deploy needs all defineSecret/defineString values
-      # in functions/.env.matchreadytx (firebase-tools reads this at deploy time).
+      # Only defineString params belong in .env.matchreadytx. defineSecret values
+      # are bound from Secret Manager; duplicating them here fails Cloud Run.
       - name: Write Functions project env
-        env:
-          GOOGLE_SERVICE_ACCOUNT_JSON: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_JSON }}
-          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
-          SHEET_WEBHOOK_SECRET: ${{ secrets.SHEET_WEBHOOK_SECRET }}
         run: |
           FROM_EMAIL='${{ vars.RESEND_FROM_EMAIL }}'
           if [ -z "$FROM_EMAIL" ]; then
@@ -86,32 +80,13 @@ jobs:
           APP_ORIGIN='${{ vars.VITE_APP_ORIGIN || 'https://matchreadytx.web.app' }}'
           ADMIN_UIDS='${{ secrets.MATCH_CALENDAR_PLATFORM_ADMIN_UIDS || vars.MATCH_CALENDAR_PLATFORM_ADMIN_UIDS }}'
           ADMIN_EMAILS='${{ secrets.MATCH_CALENDAR_PLATFORM_ADMIN_EMAILS || vars.MATCH_CALENDAR_PLATFORM_ADMIN_EMAILS }}'
-          missing=()
-          for name in GOOGLE_SERVICE_ACCOUNT_JSON RESEND_API_KEY SHEET_WEBHOOK_SECRET; do
-            if [ -z "${!name}" ]; then
-              missing+=("$name")
-            fi
-          done
-          if [ "${#missing[@]}" -gt 0 ]; then
-            echo "::error::Missing GitHub Actions secrets required for Functions deploy: ${missing[*]}"
-            echo "Add them under Settings → Secrets and variables → Actions (same values as firebase functions:secrets:set)."
-            exit 1
-          fi
-          # Dotenv must be one KEY=value per line — minify multi-line service account JSON.
-          GOOGLE_SA_JSON=$(printf '%s' "$GOOGLE_SERVICE_ACCOUNT_JSON" | jq -c .) || {
-            echo "::error::GOOGLE_SERVICE_ACCOUNT_JSON is not valid JSON"
-            exit 1
-          }
           {
             printf 'RESEND_FROM_EMAIL=%s\n' "$FROM_EMAIL"
             printf 'APP_ORIGIN=%s\n' "$APP_ORIGIN"
             printf 'MATCH_CALENDAR_PLATFORM_ADMIN_UIDS=%s\n' "$ADMIN_UIDS"
             printf 'MATCH_CALENDAR_PLATFORM_ADMIN_EMAILS=%s\n' "$ADMIN_EMAILS"
-            printf 'GOOGLE_SERVICE_ACCOUNT_JSON=%s\n' "$GOOGLE_SA_JSON"
-            printf 'RESEND_API_KEY=%s\n' "$RESEND_API_KEY"
-            printf 'SHEET_WEBHOOK_SECRET=%s\n' "$SHEET_WEBHOOK_SECRET"
           } > functions/.env.matchreadytx
-          echo "Wrote functions/.env.matchreadytx for non-interactive deploy"
+          echo "Wrote functions/.env.matchreadytx (string params only) for non-interactive deploy"
 
       - name: Deploy to Firebase
         run: npx firebase-tools@13 deploy --only hosting,firestore,functions --project matchreadytx --non-interactive --force
