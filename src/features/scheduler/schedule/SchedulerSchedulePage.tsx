@@ -7,6 +7,7 @@ import {
   Title,
 } from '@patternfly/react-core';
 import { useApp } from '@/app/AppContext';
+import { isComplianceHeld } from '@/domain/complianceHold';
 import { namedOfficialsNeedingAvailability } from '@/domain/crew';
 import { matchHasForfeitOutcome } from '@/domain/matchCardFooter';
 import { matchStatusLabel } from '@/domain/matchTransitions';
@@ -63,7 +64,7 @@ const STATUS_FILTERS: { id: StatusFilter; label: string }[] = [
   { id: 'draft', label: 'Draft' },
   { id: 'pending_team_review', label: 'Team review' },
   { id: 'crew_pending', label: 'Crew pending' },
-  { id: 'locked_confirmed', label: 'Locked' },
+  { id: 'compliance_hold', label: 'Locked' },
 ];
 
 function hasOpenCrewSlot(m: Match): boolean {
@@ -107,6 +108,7 @@ function matchesScheduleStatus(
   if (statusFilter === 'needs_assignment') {
     return matchNeedsAssignment(m, needsOfficialsPool, needsReassignmentPool);
   }
+  if (statusFilter === 'compliance_hold') return isComplianceHeld(m);
   if (statusFilter !== 'all' && m.status !== statusFilter) return false;
   return true;
 }
@@ -216,6 +218,10 @@ export function SchedulerSchedulePage() {
 
   const assignmentCount =
     needsOfficialsPool.length + needsReassignmentPool.length;
+  const complianceHoldCount = useMemo(
+    () => state.matches.filter((m) => isComplianceHeld(m)).length,
+    [state.matches],
+  );
 
   const renderScheduleMatchRow = useCallback(
     (m: Match) => {
@@ -344,6 +350,9 @@ export function SchedulerSchedulePage() {
             {f.label}
             {f.id === 'needs_assignment' && assignmentCount > 0
               ? ` (${assignmentCount})`
+              : ''}
+            {f.id === 'compliance_hold' && complianceHoldCount > 0
+              ? ` (${complianceHoldCount})`
               : ''}
           </button>
         ))}

@@ -12,6 +12,11 @@ import {
   saveMatchCrewAssignment,
   updateGameRequestInFirestore,
 } from '@/services/orgData';
+import { applyRaiseHandInterestBatch } from '@/domain/raiseHandInterest';
+import {
+  persistRaiseHandInterestIfLive,
+  syncRaiseHandInterestOnStore,
+} from '@/services/raiseHandInterestPersist';
 
 type RaiseHandStore = {
   getState: () => AppState;
@@ -52,11 +57,22 @@ export async function approveRaiseHandRequest(opts: {
   } else {
     const next = store.getState().matches.find((m) => m.id === before.matchId);
     if (!next) return;
-    await persistCrewAssignmentAndEmail({
+    const saved = await persistCrewAssignmentAndEmail({
       match: next,
       slot: chosen,
       userId: before.userId,
     });
+    if (saved) store.replaceMatch(saved);
+  }
+
+  const approved = store.getState().requests.find((r) => r.id === requestId);
+  if (approved) {
+    const next = syncRaiseHandInterestOnStore(
+      store,
+      before.matchId,
+      approved,
+    );
+    if (next) await persistRaiseHandInterestIfLive(store, next, dataMode);
   }
 
   await updateGameRequestInFirestore(
@@ -88,6 +104,19 @@ export async function declineRaiseHandRequest(opts: {
     requestId,
     { status: 'declined', declineReason: reason },
   );
+
+  const declined = store
+    .getState()
+    .requests.find((r) => r.id === requestId);
+  const match = store.getState().matches.find((m) => m.id === before.matchId);
+  if (declined && match) {
+    const next = syncRaiseHandInterestOnStore(
+      store,
+      before.matchId,
+      declined,
+    );
+    if (next) await persistRaiseHandInterestIfLive(store, next, dataMode);
+  }
 }
 
 /** Persist raise-hand fulfillment after an official confirms their assignment. */
@@ -123,6 +152,15 @@ export async function persistRaiseHandFulfillmentOnAssignmentConfirm(opts: {
       }),
     ),
   ]);
+
+  const touchedIds = new Set([...approveIds, ...declineIds]);
+  const touched = store
+    .getState()
+    .requests.filter((r) => touchedIds.has(r.id));
+  if (touched.length > 0) {
+    const nextMatch = applyRaiseHandInterestBatch(match, touched);
+    await persistRaiseHandInterestIfLive(store, nextMatch, dataMode);
+  }
 }
 
 /** Local + live: close stale raise-hands after assignment confirm. */

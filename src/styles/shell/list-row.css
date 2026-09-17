@@ -59,6 +59,7 @@
 }
 
 .rs-list-row--urgent .rs-list-row__month,
+.rs-list-row--urgent .rs-list-row__weekday,
 .rs-list-row--urgent .rs-list-row__score-sep,
 .rs-list-row--urgent .rs-list-row__venue,
 .rs-list-row--urgent .rs-list-row__time,
@@ -360,6 +361,15 @@
   font-size: 1.2rem;
   font-weight: 700;
   color: var(--rs-color-ink);
+}
+
+.rs-list-row__weekday {
+  margin-top: 2px;
+  font-size: 0.68rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--rs-color-muted);
 }
 
 .rs-list-row__body {

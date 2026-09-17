@@ -11,6 +11,10 @@ import {
   formatMatchKickoffTime,
   DEFAULT_ORG_TIMEZONE,
 } from '@/domain/matchTime';
+import {
+  markAssignmentEmailSent,
+  type AssignmentEmailEvent,
+} from '@/domain/assignmentEmail';
 import { allActiveAssignments } from '@/domain/crew';
 import { defaultOrgId, saveMatchCrewAssignment } from '@/services/orgData';
 import { callNotifyUser } from '@/services/notify';
@@ -199,17 +203,29 @@ ${matchLinkHtml(match)}
   });
 }
 
+async function recordAssignmentEmailSent(
+  match: Match,
+  slot: CrewSlot,
+  userId: string,
+  event: AssignmentEmailEvent,
+): Promise<Match> {
+  const next = markAssignmentEmailSent(match, slot, userId, event);
+  await saveMatchCrewAssignment(defaultOrgId(), next);
+  return next;
+}
+
 /** After local assignCrew: persist to Firestore and email the official (live only). */
 export async function persistCrewAssignmentAndEmail(opts: {
   match: Match;
   slot: CrewSlot;
   userId: string;
-}): Promise<void> {
+}): Promise<Match | void> {
   if (!isFirebaseConfigured) return;
 
   const { match, slot, userId } = opts;
   await saveMatchCrewAssignment(defaultOrgId(), match);
   await sendCrewAssignmentEmail({ match, slot, userId, event: 'assignment' });
+  return recordAssignmentEmailSent(match, slot, userId, 'assignment');
 }
 
 /** Resend assignment confirmation only (Scheduler). */
@@ -217,12 +233,25 @@ export async function resendCrewAssignmentEmail(opts: {
   match: Match;
   slot: RequestableSlot;
   userId: string;
-}): Promise<void> {
+}): Promise<Match | void> {
   if (!isFirebaseConfigured) return;
+  const { match, slot, userId } = opts;
+  if (slot === 'cmo') {
+    await sendCrewAssignmentEmail({
+      match,
+      slot,
+      userId,
+      event: 'assignment_resend',
+    });
+    return;
+  }
   await sendCrewAssignmentEmail({
-    ...opts,
+    match,
+    slot,
+    userId,
     event: 'assignment_resend',
   });
+  return recordAssignmentEmailSent(match, slot as CrewSlot, userId, 'assignment_resend');
 }
 
 /**

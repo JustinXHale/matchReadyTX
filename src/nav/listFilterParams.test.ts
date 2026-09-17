@@ -31,6 +31,15 @@ describe('parseSchedulerStatusParam', () => {
   it('prefers explicit status', () => {
     expect(parseSchedulerStatusParam('open_slots', '1')).toBe('open_slots');
   });
+
+  it('accepts compliance hold filter and legacy locked_confirmed alias', () => {
+    expect(parseSchedulerStatusParam('compliance_hold', null)).toBe(
+      'compliance_hold',
+    );
+    expect(parseSchedulerStatusParam('locked_confirmed', null)).toBe(
+      'compliance_hold',
+    );
+  });
 });
 
 describe('parseAvailableRoleParam', () => {

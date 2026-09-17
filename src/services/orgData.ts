@@ -130,6 +130,15 @@ function normalizeAssignment(
     userName: typeof raw.userName === 'string' ? raw.userName : undefined,
     confirmedAt:
       typeof raw.confirmedAt === 'string' ? raw.confirmedAt : undefined,
+    assignmentNotifiedAt:
+      typeof raw.assignmentNotifiedAt === 'string'
+        ? raw.assignmentNotifiedAt
+        : undefined,
+    assignmentNotifyEvent:
+      raw.assignmentNotifyEvent === 'assignment' ||
+      raw.assignmentNotifyEvent === 'assignment_resend'
+        ? raw.assignmentNotifyEvent
+        : undefined,
     history: Array.isArray(raw.history)
       ? (raw.history as CrewAssignment['history'])
       : [],
@@ -186,6 +195,53 @@ function normalizeAssignmentHistoryArchive(
         action: (e.action as HistoryEntry['action']) || 'released',
         reason: typeof e.reason === 'string' ? e.reason : undefined,
       },
+    });
+  }
+  return rows.length ? rows : undefined;
+}
+
+function normalizeRaiseHandInterest(
+  raw: unknown,
+): Match['raiseHandInterest'] {
+  if (!Array.isArray(raw)) return undefined;
+  const rows: NonNullable<Match['raiseHandInterest']> = [];
+  for (const item of raw) {
+    if (!item || typeof item !== 'object') continue;
+    const rec = item as Record<string, unknown>;
+    const requestId = String(rec.requestId ?? '').trim();
+    const userId = String(rec.userId ?? '').trim();
+    const userName = String(rec.userName ?? '').trim();
+    const requestedAt = String(rec.requestedAt ?? '').trim();
+    if (!requestId || !userId || !userName || !requestedAt) continue;
+    const status = rec.status;
+    if (status !== 'pending' && status !== 'approved' && status !== 'declined') {
+      continue;
+    }
+    const preferredSlots = Array.isArray(rec.preferredSlots)
+      ? rec.preferredSlots.filter(
+          (s): s is RequestableSlot =>
+            s === 'mo' ||
+            s === 'ar1' ||
+            s === 'ar2' ||
+            s === 'no4' ||
+            s === 'cmo',
+        )
+      : [];
+    rows.push({
+      requestId,
+      userId,
+      userName,
+      preferredSlots,
+      note:
+        typeof rec.note === 'string' && rec.note.trim()
+          ? rec.note.trim()
+          : undefined,
+      status,
+      requestedAt,
+      resolvedAt:
+        typeof rec.resolvedAt === 'string' ? rec.resolvedAt : undefined,
+      declineReason:
+        typeof rec.declineReason === 'string' ? rec.declineReason : undefined,
     });
   }
   return rows.length ? rows : undefined;
@@ -296,6 +352,7 @@ export function matchFromFirestore(
     homeScore: typeof data.homeScore === 'number' ? data.homeScore : undefined,
     awayScore: typeof data.awayScore === 'number' ? data.awayScore : undefined,
     complianceHold: parseComplianceHold(data.complianceHold),
+    raiseHandInterest: normalizeRaiseHandInterest(data.raiseHandInterest),
   };
 }
 
@@ -1493,6 +1550,8 @@ function assignmentForFirestore(a: CrewAssignment): Record<string, unknown> {
     userId: a.userId ?? null,
     userName: a.userName ?? null,
     confirmedAt: a.confirmedAt ?? null,
+    assignmentNotifiedAt: a.assignmentNotifiedAt ?? null,
+    assignmentNotifyEvent: a.assignmentNotifyEvent ?? null,
   });
 }
 
@@ -1827,6 +1886,33 @@ export async function saveMatchScheduleFacts(
       kickoffAt: match.kickoffAt,
       venueName: match.venueName,
       venueAddress: match.venueAddress,
+      updatedAt: new Date().toISOString(),
+    }),
+    { merge: true },
+  );
+}
+
+/** Persist raise-hand interest audit rows on the match (live). */
+export async function saveMatchRaiseHandInterest(
+  orgId: string,
+  match: Pick<Match, 'id' | 'raiseHandInterest'>,
+): Promise<void> {
+  await setDoc(
+    doc(requireDb(), 'orgs', orgId, 'matches', match.id),
+    stripUndefined({
+      raiseHandInterest: match.raiseHandInterest?.length
+        ? match.raiseHandInterest.map((row) => ({
+            requestId: row.requestId,
+            userId: row.userId,
+            userName: row.userName,
+            preferredSlots: row.preferredSlots,
+            note: row.note ?? null,
+            status: row.status,
+            requestedAt: row.requestedAt,
+            resolvedAt: row.resolvedAt ?? null,
+            declineReason: row.declineReason ?? null,
+          }))
+        : null,
       updatedAt: new Date().toISOString(),
     }),
     { merge: true },

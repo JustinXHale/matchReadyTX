@@ -51,6 +51,7 @@ import {
   downloadMatchIcs,
   matchHasCalendarTime,
 } from '@/domain/matchIcs';
+import { assignmentEmailNotifyLine } from '@/domain/assignmentEmail';
 import { effectiveContactEmail } from '@/domain/contactEmail';
 import { mapsDirectionsUrl } from '@/services/maps';
 import { matchAppUrl } from '@/services/appLinks';
@@ -103,7 +104,12 @@ import {
 } from '@/domain/complianceHold';
 import { ComplianceHoldOverlay } from '@/ui/ComplianceHoldOverlay';
 import { notifyComplianceHoldChange } from '@/services/complianceHoldNotify';
-import { defaultOrgId, clearMatchForfeitInFirestore, createGameRequestInFirestore, patchGameRequestContentInFirestore, saveComplianceHoldInFirestore, saveMatchCrewAssignment, saveMatchEventFlagsInFirestore, saveMatchForfeitInFirestore, saveMatchPlayedForfeitInFirestore, saveMatchScheduleUrlInFirestore, saveMatchWorkflowInFirestore, callMatchSelfService } from '@/services/orgData';
+import { defaultOrgId, clearMatchForfeitInFirestore, createGameRequestInFirestore, patchGameRequestContentInFirestore, saveComplianceHoldInFirestore, saveMatchCrewAssignment, saveMatchEventFlagsInFirestore, saveMatchForfeitInFirestore, saveMatchPlayedForfeitInFirestore, saveMatchRaiseHandInterest, saveMatchScheduleUrlInFirestore, saveMatchWorkflowInFirestore, callMatchSelfService } from '@/services/orgData';
+import {
+  formatRaiseHandInterestSlots,
+  raiseHandInterestStatusLabel,
+  sortedRaiseHandInterest,
+} from '@/domain/raiseHandInterest';
 import { isFirebaseConfigured } from '@/services/firebase';
 import {
   isTournamentMatch,
@@ -306,9 +312,10 @@ export function MatchDetailPage() {
   const [denyProposalReason, setDenyProposalReason] = useState('');
   const [denyProposalId, setDenyProposalId] = useState<string | null>(null);
   const [pickTarget, setPickTarget] = useState<CrewPickTarget | null>(null);
-  const [resendEmailState, setResendEmailState] = useState<
-    'idle' | 'sending' | 'sent' | 'error'
-  >('idle');
+  type ResendEmailState = 'idle' | 'sending' | 'sent' | 'error';
+  const [resendEmailByKey, setResendEmailByKey] = useState<
+    Record<string, ResendEmailState>
+  >({});
   const [removeBlockTarget, setRemoveBlockTarget] = useState<{
     role: RequestableSlot;
     blockId: string;
@@ -444,6 +451,10 @@ export function MatchDetailPage() {
 
   const assignmentHistory = useMemo(
     () => (match ? collectAssignmentHistory(match) : []),
+    [match],
+  );
+  const raiseHandInterest = useMemo(
+    () => (match ? sortedRaiseHandInterest(match) : []),
     [match],
   );
 
@@ -722,8 +733,13 @@ export function MatchDetailPage() {
     if (person) setPersonContact(person);
   };
 
+  const resendEmailKey = (
+    slot: RequestableSlot,
+    userId: string,
+    blockId: string,
+  ) => `${slot}:${userId}:${blockId}`;
+
   const openCrewPick = (target: CrewPickTarget) => {
-    setResendEmailState('idle');
     setPickTarget(target);
   };
 
@@ -776,7 +792,11 @@ export function MatchDetailPage() {
             match: next,
             slot,
             userId,
-          }).catch((err) => {
+          })
+            .then((saved) => {
+              if (saved) store.replaceMatch(saved);
+            })
+            .catch((err) => {
             console.error('Failed to save/email assignment', err);
             window.alert(
               err instanceof Error
@@ -810,24 +830,47 @@ export function MatchDetailPage() {
 
   const resendAssignmentEmail = () => {
     if (!pickTarget || !currentPickUserId) return;
-    void resendToOfficial(pickTarget.slot, currentPickUserId);
+    const blockId = pickTarget.assignmentId ?? pickTarget.slot;
+    void resendToOfficial(pickTarget.slot, currentPickUserId, blockId);
   };
 
-  const resendToOfficial = (slot: RequestableSlot, userId: string) => {
+  const resendToOfficial = (
+    slot: RequestableSlot,
+    userId: string,
+    blockId: string,
+  ) => {
+    const key = resendEmailKey(slot, userId, blockId);
+    if (dataMode === 'demo') {
+      if (slot === 'cmo') return;
+      setResendEmailByKey((prev) => ({ ...prev, [key]: 'sending' }));
+      const next = store.resendAssignmentEmail(
+        match.id,
+        slot as CrewSlot,
+        userId,
+      );
+      setResendEmailByKey((prev) => ({
+        ...prev,
+        [key]: next ? 'sent' : 'error',
+      }));
+      return;
+    }
     if (dataMode !== 'live' || !isFirebaseConfigured) {
       window.alert('Resend email is only available in Live mode.');
       return;
     }
-    setResendEmailState('sending');
+    setResendEmailByKey((prev) => ({ ...prev, [key]: 'sending' }));
     void resendCrewAssignmentEmail({
       match,
       slot,
       userId,
     })
-      .then(() => setResendEmailState('sent'))
+      .then((next) => {
+        if (next) store.replaceMatch(next);
+        setResendEmailByKey((prev) => ({ ...prev, [key]: 'sent' }));
+      })
       .catch((err) => {
         console.error('Failed to resend assignment email', err);
-        setResendEmailState('error');
+        setResendEmailByKey((prev) => ({ ...prev, [key]: 'error' }));
         window.alert(
           err instanceof Error
             ? `Could not resend email: ${err.message}`
@@ -1443,6 +1486,12 @@ export function MatchDetailPage() {
       if (created) {
         try {
           await createGameRequestInFirestore(defaultOrgId(), match.id, created);
+          const withInterest = store
+            .getState()
+            .matches.find((m) => m.id === match.id);
+          if (withInterest) {
+            await saveMatchRaiseHandInterest(defaultOrgId(), withInterest);
+          }
         } catch (err) {
           console.error('Raise-hand request failed', err);
           store.withdrawRequest(reqId, currentUser.uid);
@@ -2461,6 +2510,9 @@ export function MatchDetailPage() {
                       status: a.userId
                         ? crewSlotStatusLabel(a.status)
                         : 'Open',
+                      notifyLine: a.userId
+                        ? assignmentEmailNotifyLine(a, orgTz)
+                        : null,
                       assignmentId: a.id,
                     }));
 
@@ -2525,7 +2577,12 @@ export function MatchDetailPage() {
                             {filled ? (b.userName ?? 'Official') : 'Open'}
                           </span>
                           <span className="rs-detail-people__status">
-                            {b.status}
+                            <span>{b.status}</span>
+                            {'notifyLine' in b && b.notifyLine ? (
+                              <span className="rs-detail-people__notified">
+                                {b.notifyLine}
+                              </span>
+                            ) : null}
                           </span>
                         </button>
                       ) : (
@@ -2545,13 +2602,20 @@ export function MatchDetailPage() {
                           className="rs-detail-people__resend"
                           aria-label={`Resend assignment email to ${b.userName ?? 'official'}`}
                           title="Resend MatchReadyTX assignment email"
-                          disabled={resendEmailState === 'sending'}
+                          disabled={
+                            resendEmailByKey[
+                              resendEmailKey(slot, b.userId, b.blockId)
+                            ] === 'sending'
+                          }
                           onClick={() => {
-                            setResendEmailState('idle');
-                            resendToOfficial(slot, b.userId!);
+                            resendToOfficial(slot, b.userId!, b.blockId);
                           }}
                         >
-                          Resend
+                          {resendEmailByKey[
+                            resendEmailKey(slot, b.userId, b.blockId)
+                          ] === 'sent'
+                            ? 'Sent'
+                            : 'Resend'}
                         </button>
                       )}
                       {canRemove && (
@@ -2675,6 +2739,35 @@ export function MatchDetailPage() {
                     <div className="rs-match-card__meta">
                       {entry.userName} · {new Date(entry.at).toLocaleString()}
                       {entry.reason ? ` · ${entry.reason}` : ''}
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </details>
+          <details className="rs-detail-tools rs-match-history-details">
+            <summary id="raise-hand-interest-heading">
+              Raise-hand interest
+            </summary>
+            {raiseHandInterest.length === 0 ? (
+              <p className="rs-match-card__meta">
+                No raise-hand volunteers recorded on this match yet.
+              </p>
+            ) : (
+              <ul className="rs-history-list">
+                {raiseHandInterest.map((row) => (
+                  <li key={row.requestId}>
+                    <strong>
+                      {row.userName} · {formatRaiseHandInterestSlots(row)}
+                    </strong>
+                    <div className="rs-match-card__meta">
+                      {raiseHandInterestStatusLabel(row)} ·{' '}
+                      {new Date(row.requestedAt).toLocaleString()}
+                      {row.resolvedAt
+                        ? ` · closed ${new Date(row.resolvedAt).toLocaleString()}`
+                        : ''}
+                      {row.declineReason ? ` · ${row.declineReason}` : ''}
+                      {row.note ? ` · “${row.note}”` : ''}
                     </div>
                   </li>
                 ))}
@@ -3059,17 +3152,41 @@ export function MatchDetailPage() {
           {isAssigner &&
             currentPickUserId &&
             !isOutsideAppointmentUserId(currentPickUserId) &&
-            dataMode === 'live' &&
-            isFirebaseConfigured && (
+            ((dataMode === 'live' && isFirebaseConfigured) ||
+              dataMode === 'demo') && (
             <Button
               type="button"
               variant="secondary"
-              isDisabled={resendEmailState === 'sending'}
+              isDisabled={
+                pickTarget.assignmentId
+                  ? resendEmailByKey[
+                      resendEmailKey(
+                        pickTarget.slot,
+                        currentPickUserId,
+                        pickTarget.assignmentId,
+                      )
+                    ] === 'sending'
+                  : false
+              }
               onClick={resendAssignmentEmail}
             >
-              {resendEmailState === 'sending'
+              {pickTarget.assignmentId &&
+              resendEmailByKey[
+                resendEmailKey(
+                  pickTarget.slot,
+                  currentPickUserId,
+                  pickTarget.assignmentId,
+                )
+              ] === 'sending'
                 ? 'Sending…'
-                : resendEmailState === 'sent'
+                : pickTarget.assignmentId &&
+                    resendEmailByKey[
+                      resendEmailKey(
+                        pickTarget.slot,
+                        currentPickUserId,
+                        pickTarget.assignmentId,
+                      )
+                    ] === 'sent'
                   ? 'Email sent'
                   : 'Resend email'}
             </Button>

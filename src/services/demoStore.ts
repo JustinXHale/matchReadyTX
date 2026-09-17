@@ -6,6 +6,11 @@ import {
   confirmOfficialSlot,
   markUnavailableAndRelease,
 } from '@/domain/crew';
+import { markAssignmentEmailSent } from '@/domain/assignmentEmail';
+import {
+  syncRaiseHandInterestOnMatch,
+  updateRaiseHandInterestContent,
+} from '@/domain/raiseHandInterest';
 import {
   applyComplianceHold,
   clearComplianceHold,
@@ -2911,6 +2916,14 @@ class DemoStore {
     return this.state;
   }
 
+  /** Replace one match in local state (e.g. after live email metadata write). */
+  replaceMatch(match: Match): void {
+    this.set((s) => ({
+      ...s,
+      matches: s.matches.map((m) => (m.id === match.id ? match : m)),
+    }));
+  }
+
   /** Re-derive pending T+90 report rows from current matches. */
   syncMatchReports(now = Date.now()): void {
     this.set((s) => ({
@@ -4428,11 +4441,16 @@ class DemoStore {
       ...s,
       matches: s.matches.map((m) => {
         if (m.id !== matchId) return m;
-        assignedMatch = assignOfficial(m, slot, user, {
-          viaRequest,
-          internal: !(m.homeConfirmedAt && m.awayConfirmedAt),
-          assignmentId,
-        });
+        assignedMatch = markAssignmentEmailSent(
+          assignOfficial(m, slot, user, {
+            viaRequest,
+            internal: !(m.homeConfirmedAt && m.awayConfirmedAt),
+            assignmentId,
+          }),
+          slot,
+          userId,
+          'assignment',
+        );
         return assignedMatch;
       }),
       requests: viaRequest
@@ -4455,6 +4473,42 @@ class DemoStore {
         ),
       );
     }
+  }
+
+  /** Demo/showcase: log resend + stamp crew row (no Resend API). */
+  resendAssignmentEmail(
+    matchId: string,
+    slot: CrewSlot,
+    userId: string,
+  ): Match | null {
+    const user = this.state.users.find((u) => u.uid === userId);
+    if (!user) return null;
+    let updated: Match | undefined;
+    this.set((s) => ({
+      ...s,
+      matches: s.matches.map((m) => {
+        if (m.id !== matchId) return m;
+        updated = markAssignmentEmailSent(
+          m,
+          slot,
+          userId,
+          'assignment_resend',
+        );
+        return updated;
+      }),
+    }));
+    if (!updated) return null;
+    const role = slot.toUpperCase();
+    const fixture = `${updated.homeTeamName} vs ${updated.awayTeamName}`;
+    queueMicrotask(() =>
+      this.notify(
+        'assignment_resend',
+        userId,
+        `Assigned: ${fixture}`,
+        `You've been assigned as ${role} for ${fixture}. (Resent)`,
+      ),
+    );
+    return updated;
   }
 
   /** Assigner marks slot as covered by an outside official (no society member). */
@@ -4667,9 +4721,8 @@ class DemoStore {
       });
     }
 
-    this.set((s) => ({
-      ...s,
-      requests: s.requests.map((r) => {
+    this.set((s) => {
+      const updatedRequests = s.requests.map((r) => {
         if (approveIdSet.has(r.id)) {
           return { ...r, status: 'approved' as const };
         }
@@ -4681,8 +4734,22 @@ class DemoStore {
           };
         }
         return r;
-      }),
-    }));
+      });
+      const touched = updatedRequests.filter(
+        (r) =>
+          r.matchId === matchId &&
+          (approveIdSet.has(r.id) || declineIdSet.has(r.id)),
+      );
+      let nextMatch = match;
+      for (const r of touched) {
+        nextMatch = syncRaiseHandInterestOnMatch(nextMatch, r);
+      }
+      return {
+        ...s,
+        requests: updatedRequests,
+        matches: s.matches.map((m) => (m.id === matchId ? nextMatch : m)),
+      };
+    });
 
     for (const req of toNotify) {
       queueMicrotask(() =>
@@ -4964,7 +5031,13 @@ class DemoStore {
       status: 'pending',
       createdAt: new Date().toISOString(),
     };
-    this.set((s) => ({ ...s, requests: [req, ...s.requests] }));
+    this.set((s) => ({
+      ...s,
+      requests: [req, ...s.requests],
+      matches: s.matches.map((m) =>
+        m.id === matchId ? syncRaiseHandInterestOnMatch(m, req) : m,
+      ),
+    }));
     const assigner = this.state.users.find((u) => u.roles.includes('assigner'));
     if (assigner) {
       this.notify(
@@ -5505,6 +5578,16 @@ class DemoStore {
             }
           : r,
       ),
+      matches: s.matches.map((m) =>
+        m.id === req.matchId
+          ? updateRaiseHandInterestContent(
+              m,
+              requestId,
+              slots,
+              patch.note,
+            )
+          : m,
+      ),
     }));
     return true;
   }
@@ -5515,9 +5598,19 @@ class DemoStore {
     if (!req) return;
     if (req.userId !== userId) return;
     if (req.status !== 'pending' && req.status !== 'declined') return;
+    const withdrawn: GameRequest = {
+      ...req,
+      status: 'declined',
+      declineReason: 'Withdrawn by official',
+    };
     this.set((s) => ({
       ...s,
       requests: s.requests.filter((r) => r.id !== requestId),
+      matches: s.matches.map((m) =>
+        m.id === req.matchId
+          ? syncRaiseHandInterestOnMatch(m, withdrawn)
+          : m,
+      ),
     }));
   }
 
@@ -5527,12 +5620,20 @@ class DemoStore {
     this.registerLiveSnapshotGuard(`request:${requestId}`, {
       expect: 'request_declined',
     });
+    const declined: GameRequest = {
+      ...req,
+      status: 'declined',
+      declineReason: reason,
+    };
     this.set((s) => ({
       ...s,
       requests: s.requests.map((r) =>
-        r.id === requestId
-          ? { ...r, status: 'declined', declineReason: reason }
-          : r,
+        r.id === requestId ? declined : r,
+      ),
+      matches: s.matches.map((m) =>
+        m.id === req.matchId
+          ? syncRaiseHandInterestOnMatch(m, declined)
+          : m,
       ),
     }));
     this.notify(
@@ -5585,9 +5686,19 @@ class DemoStore {
           r.id === requestId ? { ...r, status: 'approved' as const } : r,
         ),
       }));
+      const approved = this.state.requests.find((r) => r.id === requestId);
+      const m = this.state.matches.find((x) => x.id === req.matchId);
+      if (approved && m) {
+        this.replaceMatch(syncRaiseHandInterestOnMatch(m, approved));
+      }
       return;
     }
     this.assignCrew(req.matchId, chosen, req.userId, true);
+    const approved = this.state.requests.find((r) => r.id === requestId);
+    const m = this.state.matches.find((x) => x.id === req.matchId);
+    if (approved && m) {
+      this.replaceMatch(syncRaiseHandInterestOnMatch(m, approved));
+    }
   }
 
   cancelOrPostpone(matchId: string, kind: 'cancel' | 'postpone'): void {

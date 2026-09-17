@@ -223,7 +223,7 @@ export type SchedulerStatusFilter =
   | 'draft'
   | 'pending_team_review'
   | 'crew_pending'
-  | 'locked_confirmed';
+  | 'compliance_hold';
 
 const SCHEDULER_STATUS_VALUES = new Set<string>([
   'all',
@@ -233,13 +233,14 @@ const SCHEDULER_STATUS_VALUES = new Set<string>([
   'draft',
   'pending_team_review',
   'crew_pending',
-  'locked_confirmed',
+  'compliance_hold',
 ]);
 
 export function parseSchedulerStatusParam(
   raw: string | null,
   legacyNeeds: string | null,
 ): SchedulerStatusFilter {
+  if (raw === 'locked_confirmed') return 'compliance_hold';
   if (raw && SCHEDULER_STATUS_VALUES.has(raw)) {
     return raw as SchedulerStatusFilter;
   }

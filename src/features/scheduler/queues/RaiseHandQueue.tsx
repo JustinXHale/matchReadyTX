@@ -9,6 +9,7 @@ import {
   type UserProfile,
 } from '@/domain/types';
 import { useOfficialQuickLook } from '@/features/scheduler/officialQuickLookContext';
+import { CoverageMatchCrewSummary } from '@/features/scheduler/queues/CoverageMatchCrewSummary';
 import { useRaiseHandRequestModals } from '@/features/scheduler/queues/useRaiseHandRequestModals';
 import { MatchListRow } from '@/ui/MatchListRow';
 
@@ -118,7 +119,7 @@ function RaiseHandItem({
   }
 
   return (
-    <li>
+    <li className="rs-coverage-match">
       <MatchListRow
         match={match}
         to={`/matches/${request.matchId}`}
@@ -160,6 +161,7 @@ function RaiseHandItem({
           </div>
         }
       />
+      <CoverageMatchCrewSummary match={match} />
     </li>
   );
 }

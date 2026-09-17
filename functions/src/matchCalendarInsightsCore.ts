@@ -1,7 +1,15 @@
 /**
  * Port of Match Calendar `getInsightsSummary` for server-side platform rollups.
- * Keep in sync with Match Calendar `src/features/insights/insightsSummary.ts`.
+ * Keep in sync with Match Calendar `src/features/insights/insightsSummary.ts`
+ * and `matchCalendarFlightDistance.ts` with `src/features/matches/flightDistance.ts`.
  */
+
+import {
+  countFlightSegments,
+  getTotalFlightMiles,
+  type FlightInfoLike,
+} from './matchCalendarFlightDistance';
+import { getTotalFlightMinutes } from './matchCalendarTravelDuration';
 
 export type CountRow = { label: string; count: number };
 export type OrganizationRow = {
@@ -21,7 +29,10 @@ export type InsightsSummary = {
   eventCount: number;
   positions: CountRow[];
   milesDriven: number;
+  drivenTrips: number;
   milesFlown: number;
+  flightSegments: number;
+  flightMinutes: number;
   paid: number;
   expenses: number;
   net: number;
@@ -59,7 +70,7 @@ type MatchLike = {
   paidAmount?: number;
   expectedPay?: number;
   expenses?: Expense[];
-  flight?: TravelSelfPaidInfo;
+  flight?: FlightInfoLike;
   lodging?: TravelSelfPaidInfo;
   groundTravel?: TravelSelfPaidInfo;
 };
@@ -72,6 +83,9 @@ type TournamentLike = {
   expenses?: Expense[];
   settlement?: Partial<MatchLike>;
   matchDefaults?: { competition?: string; payOwedBy?: string };
+  flight?: FlightInfoLike;
+  lodging?: TravelSelfPaidInfo;
+  groundTravel?: TravelSelfPaidInfo;
 };
 
 const MATCH_TYPE_LABELS: Record<string, string> = {
@@ -113,6 +127,15 @@ function resolvePositionLabel(preset?: string, customPosition?: string): string 
   if (preset === 'other') return customPosition?.trim() || 'Other';
   if (preset) return POSITION_LABELS[preset] ?? preset;
   return 'Other';
+}
+
+function eventHasMilesDriven(event: MatchLike): boolean {
+  return (event.expenses ?? []).some(
+    (expense) =>
+      expense.category === 'miles_driven' &&
+      Number.isFinite(expense.miles) &&
+      (expense.miles ?? 0) > 0,
+  );
 }
 
 function counts(labels: string[]): CountRow[] {
@@ -265,6 +288,9 @@ function tournamentEvent(tournament: TournamentLike): MatchLike {
     competition: tournament.matchDefaults?.competition,
     payOwedBy: tournament.matchDefaults?.payOwedBy,
     expenses: tournament.expenses,
+    flight: tournament.flight,
+    lodging: tournament.lodging,
+    groundTravel: tournament.groundTravel,
     ...tournament.settlement,
   };
 }
@@ -295,7 +321,10 @@ export function getInsightsSummary(
   );
 
   let milesDriven = 0;
+  let drivenTrips = 0;
   let milesFlown = 0;
+  let flightSegments = 0;
+  let flightMinutes = 0;
   let paid = 0;
   let expenses = 0;
   const organizations = new Map<string, OrganizationRow>();
@@ -306,6 +335,10 @@ export function getInsightsSummary(
       if (expense.category === 'miles_driven') milesDriven += miles;
       if (expense.category === 'miles_flown') milesFlown += miles;
     }
+    if (eventHasMilesDriven(event)) drivenTrips += 1;
+    milesFlown += getTotalFlightMiles(event.flight) ?? 0;
+    flightSegments += countFlightSegments(event.flight);
+    flightMinutes += getTotalFlightMinutes(event.flight) ?? 0;
     const income = getSettlementPaidTotal(event);
     const costs = getMatchFinanceTotals(event).combinedExpenseTotal;
     paid += income;
@@ -335,7 +368,10 @@ export function getInsightsSummary(
     eventCount: eventTypes.reduce((sum, row) => sum + row.count, 0),
     positions,
     milesDriven,
+    drivenTrips,
     milesFlown,
+    flightSegments,
+    flightMinutes,
     paid,
     expenses,
     net: paid - expenses,
@@ -370,7 +406,10 @@ export function mergeInsightsSummaries(
     eventCount: 0,
     positions: [],
     milesDriven: 0,
+    drivenTrips: 0,
     milesFlown: 0,
+    flightSegments: 0,
+    flightMinutes: 0,
     paid: 0,
     expenses: 0,
     net: 0,
@@ -382,7 +421,10 @@ export function mergeInsightsSummaries(
     merged.eventTypes.push(...summary.eventTypes);
     merged.positions.push(...summary.positions);
     merged.milesDriven += summary.milesDriven;
+    merged.drivenTrips += summary.drivenTrips;
     merged.milesFlown += summary.milesFlown;
+    merged.flightSegments += summary.flightSegments;
+    merged.flightMinutes += summary.flightMinutes;
     merged.paid += summary.paid;
     merged.expenses += summary.expenses;
     merged.topExpenses.push(...summary.topExpenses);

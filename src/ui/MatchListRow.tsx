@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom';
 import {
+  formatMatchCardWeekday,
   formatMatchKickoffTime,
   orgTimeZone,
 } from '@/domain/matchTime';
@@ -141,6 +142,7 @@ export function MatchListRow({
   const eventLabel = matchCardEventLabel(match);
   const unconfirmedTeams = matchUnconfirmedTeamBadges(match, teamsById);
   const { month, day } = formatCardDate(match.kickoffAt, timeZone);
+  const weekday = formatMatchCardWeekday(match.kickoffAt, timeZone);
   const linkState = back ? backState(back) : undefined;
   const scored = !hideScore && hasMatchScore(match);
   const homeScoreLabel = scored ? String(match.homeScore) : '–';
@@ -236,6 +238,9 @@ export function MatchListRow({
       <div className="rs-list-row__date" aria-hidden>
         <span className="rs-list-row__month">{month}</span>
         <span className="rs-list-row__day">{day}</span>
+        {weekday ? (
+          <span className="rs-list-row__weekday">{weekday}</span>
+        ) : null}
       </div>
       <div className="rs-list-row__body">
         <div className="rs-list-row__chips" aria-label="Game type">

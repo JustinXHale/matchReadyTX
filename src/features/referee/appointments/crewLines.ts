@@ -223,6 +223,55 @@ export function crewColumnLines(
   return lines;
 }
 
+function coverageAssignmentLabel(
+  assignment: CrewAssignment,
+): { text: string; pending: boolean } {
+  const name = assignment.userName?.trim();
+  if (assignment.status === 'confirmed') {
+    return { text: name || 'Confirmed', pending: false };
+  }
+  return { text: name ? `${name} (Pending)` : 'Pending', pending: true };
+}
+
+/** One-line crew summary for raise-hand / coverage banners. */
+export function summarizeCoverageCrew(match: Match): string {
+  const needed = new Set(rolesNeededForMatch(match));
+  const parts: string[] = [];
+
+  for (const key of APPOINTMENT_CREW_ORDER) {
+    if (key === 'cmo') {
+      if (!needed.has('cmo')) continue;
+      const list = match.cmo ?? [];
+      const named = list.filter((c) => Boolean(c.userId));
+      const openN = list.filter((c) => !c.userId).length;
+      for (const c of named) {
+        parts.push(`CMO ${c.userName?.trim() || 'Assigned'}`);
+      }
+      if (openN > 0) parts.push(openN > 1 ? `(${openN}) CMO Open` : 'CMO Open');
+      else if (named.length === 0) parts.push('CMO Open');
+      continue;
+    }
+
+    if (!needed.has(key)) continue;
+    const label = crewKeyShortLabel(key);
+    const blocks = crewBlocks(match.crew[key]);
+    const people = blocks.filter((a) => Boolean(a.userId));
+    const openN = blocks.filter((a) => !a.userId && a.status === 'empty').length;
+
+    for (const a of people) {
+      const { text } = coverageAssignmentLabel(a);
+      parts.push(`${label} ${text}`);
+    }
+    if (openN > 0) {
+      parts.push(openN > 1 ? `(${openN}) ${label} Open` : `${label} Open`);
+    } else if (people.length === 0) {
+      parts.push(`${label} Open`);
+    }
+  }
+
+  return parts.join(' · ');
+}
+
 /** Display name(s) for Match Official on this match. */
 export function moDisplayNames(match: Match): string {
   return (

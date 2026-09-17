@@ -61,6 +61,19 @@ export function formatMatchKickoffDate(
   });
 }
 
+/** Short weekday for list-row date column (e.g. Sat). */
+export function formatMatchCardWeekday(
+  iso: string,
+  timeZone?: string | null,
+): string {
+  const d = parseIso(iso);
+  if (!d) return '';
+  return d.toLocaleDateString(undefined, {
+    weekday: 'short',
+    timeZone: orgTimeZone(timeZone),
+  });
+}
+
 export function formatMatchMonthLabel(
   iso: string,
   timeZone?: string | null,

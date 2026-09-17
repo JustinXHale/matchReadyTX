@@ -79,6 +79,9 @@ export interface CrewAssignment {
   userName?: string;
   status: CrewSlotStatus;
   confirmedAt?: string;
+  /** Last successful MatchReadyTX assignment email (live). */
+  assignmentNotifiedAt?: string;
+  assignmentNotifyEvent?: 'assignment' | 'assignment_resend';
   history: HistoryEntry[];
 }
 
@@ -161,6 +164,8 @@ export interface Match {
   awayScore?: number;
   /** Assigner compliance hold — blocks team actions; crew assignments stay in place. */
   complianceHold?: ComplianceHold;
+  /** Raise-hand volunteers — survives after gameRequests leave the pending queue. */
+  raiseHandInterest?: RaiseHandInterestRecord[];
 }
 
 export type MatchGender = 'men' | 'women';
@@ -236,6 +241,19 @@ export interface GameRequest {
   createdAt: string;
   declineReason?: string;
 }
+
+/** Assigner audit — raise-hand volunteers kept on the match after requests close. */
+export type RaiseHandInterestRecord = {
+  requestId: string;
+  userId: string;
+  userName: string;
+  preferredSlots: RequestableSlot[];
+  note?: string;
+  status: GameRequestStatus;
+  requestedAt: string;
+  resolvedAt?: string;
+  declineReason?: string;
+};
 
 /** Per-team request to become Team Admin for a club side. */
 export type TeamLinkRequestStatus = 'pending' | 'approved' | 'denied';

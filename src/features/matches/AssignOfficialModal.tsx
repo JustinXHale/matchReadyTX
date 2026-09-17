@@ -84,7 +84,11 @@ export function AssignOfficialModal({
             match: next,
             slot,
             userId,
-          }).catch((err) => {
+          })
+            .then((saved) => {
+              if (saved) store.replaceMatch(saved);
+            })
+            .catch((err) => {
             console.error('Failed to save/email assignment', err);
             window.alert(
               err instanceof Error

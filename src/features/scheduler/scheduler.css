@@ -12,6 +12,10 @@
   background: var(--rs-color-surface-muted, #f8f8f8);
 }
 
+.rs-coverage-crew {
+  border-style: dashed;
+}
+
 .rs-coverage-requesters__summary-hit {
   display: flex;
   align-items: center;
