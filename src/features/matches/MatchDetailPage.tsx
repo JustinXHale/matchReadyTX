@@ -2489,6 +2489,7 @@ export function MatchDetailPage() {
                   userId?: string;
                   userName?: string;
                   status: string;
+                  notifyLine?: string | null;
                   assignmentId?: string;
                   cmoId?: string;
                   cmoUserId?: string;
@@ -3150,6 +3151,7 @@ export function MatchDetailPage() {
             </Button>
           )}
           {isAssigner &&
+            pickTarget &&
             currentPickUserId &&
             !isOutsideAppointmentUserId(currentPickUserId) &&
             ((dataMode === 'live' && isFirebaseConfigured) ||

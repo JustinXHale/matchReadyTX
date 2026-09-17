@@ -3,7 +3,7 @@ import {
   raiseHandsToFulfillOnAssignmentConfirm,
   resolveRaiseHandApprovalSlot,
 } from '@/domain/requests';
-import type { RequestableSlot } from '@/domain/types';
+import type { Match, RequestableSlot } from '@/domain/types';
 import type { AppState } from '@/services/demoStore';
 import { isFirebaseConfigured } from '@/services/firebase';
 import { persistCrewAssignmentAndEmail } from '@/services/liveAssignment';
@@ -20,6 +20,7 @@ import {
 
 type RaiseHandStore = {
   getState: () => AppState;
+  replaceMatch: (match: Match) => void;
   approveRequest: (id: string, slot?: RequestableSlot) => void;
   declineRequest: (id: string, reason?: string) => void;
   fulfillRaiseHandsOnAssignmentConfirm: (
