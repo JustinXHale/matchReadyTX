@@ -5,7 +5,6 @@ import {
   emptyCrewBlocks,
   rolesNeededForMatch,
   type CrewAssignment,
-  type CrewSlot,
   type Match,
   type RequestableSlot,
 } from '@/domain/types';
