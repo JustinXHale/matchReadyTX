@@ -44,13 +44,12 @@ export function crewSlotLineLabel(assignment: CrewAssignment | undefined): strin
   return 'Pending';
 }
 
+/** Fee crew or CMO slot for this user on the match (appointments list). */
 export function appointmentMySlot(
   match: Match,
   userId: string,
-): CrewSlot | null {
-  const found = assignmentForUser(match, userId);
-  if (!found || found.slot === 'cmo') return null;
-  return found.slot;
+): RequestableSlot | null {
+  return assignmentForUser(match, userId)?.slot ?? null;
 }
 
 /** Assigned to this user but they have not accepted yet. */

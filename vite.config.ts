@@ -31,6 +31,8 @@ export default defineConfig({
         display: 'standalone',
         orientation: 'portrait-primary',
         start_url: '/',
+        // PNG only — Android often fails SVG web-app icons (white square).
+        // Icons must be white mark on opaque black (not transparent).
         icons: [
           {
             src: 'pwa-192.png',
@@ -49,12 +51,6 @@ export default defineConfig({
             sizes: '512x512',
             type: 'image/png',
             purpose: 'maskable',
-          },
-          {
-            src: 'icon.svg',
-            sizes: 'any',
-            type: 'image/svg+xml',
-            purpose: 'any',
           },
         ],
       },
