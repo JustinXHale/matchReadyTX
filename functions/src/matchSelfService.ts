@@ -156,8 +156,62 @@ export async function runMatchSelfService(opts: {
   const patch: Record<string, unknown> = { updatedAt: at };
 
   const slotRaw = String(opts.slot ?? '').trim();
-  const slot = isCrewSlot(slotRaw) ? slotRaw : undefined;
   const assignmentId = String(opts.assignmentId ?? '').trim() || undefined;
+  let status = String(data.status ?? '');
+
+  // CMO confirm/decline — parallel contact array, not fee crew.
+  if (slotRaw === 'cmo') {
+    const cmoRaw = Array.isArray(data.cmo) ? data.cmo : [];
+    const cmoList: CrewRow[] = cmoRaw
+      .filter((x): x is CrewRow => Boolean(x) && typeof x === 'object')
+      .map((row) => ({ ...row }));
+    let cmoIndex = -1;
+    for (let i = 0; i < cmoList.length; i++) {
+      const row = cmoList[i]!;
+      if (String(row.userId ?? '') !== uid) continue;
+      if (assignmentId && String(row.id ?? '') !== assignmentId) continue;
+      cmoIndex = i;
+      break;
+    }
+    if (cmoIndex < 0) {
+      throw new HttpsError(
+        'permission-denied',
+        'You are not assigned to that crew slot.',
+      );
+    }
+    const row = cmoList[cmoIndex]!;
+    if (action === 'confirm') {
+      cmoList[cmoIndex] = confirmRow(row, uid, at);
+    } else if (action === 'decline') {
+      const reason = String(opts.reason ?? '').trim().slice(0, 500);
+      const wasConfirmed = String(row.status ?? '') === 'confirmed';
+      cmoList[cmoIndex] = clearRow(
+        row,
+        uid,
+        at,
+        wasConfirmed ? 'released' : 'declined',
+        reason || undefined,
+      );
+    } else {
+      throw new HttpsError('invalid-argument', 'Unknown action.');
+    }
+    patch.cmo = cmoList;
+    patch.status = status;
+    await matchRef.set(patch, { merge: true });
+    if (action === 'confirm') {
+      await fulfillRaiseHandsOnAssignmentConfirm({
+        db,
+        orgId,
+        matchId,
+        confirmedUserId: uid,
+        matchData: { ...data, cmo: cmoList, status },
+      });
+    }
+    logger.info('matchSelfService cmo', { orgId, matchId, uid, action });
+    return { ok: true, status };
+  }
+
+  const slot = isCrewSlot(slotRaw) ? slotRaw : undefined;
   const crew = cloneCrew(data.crew);
   const found = findOwnAssignment(crew, uid, slot, assignmentId);
   if (!found) {
@@ -167,7 +221,6 @@ export async function runMatchSelfService(opts: {
     );
   }
 
-  let status = String(data.status ?? '');
   const row = crew[found.slot][found.index]!;
 
   if (action === 'confirm') {

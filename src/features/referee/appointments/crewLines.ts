@@ -1,5 +1,6 @@
 import {
   assignmentForUser,
+  cmoAsAssignment,
   crewBlocks,
   crewPeople,
   emptyCrewBlocks,
@@ -160,12 +161,17 @@ export function crewColumnLines(
       const openN = list.filter((c) => !c.userId).length;
       for (const c of named) {
         const isMine = Boolean(highlightUserId && c.userId === highlightUserId);
+        const view = cmoAsAssignment(c);
+        const raw = crewSlotLineLabel(view);
+        const value = redactNames
+          ? view.status === 'confirmed'
+            ? 'Confirmed'
+            : 'Pending'
+          : raw;
         lines.push({
           id: `cmo-${c.id ?? c.userId ?? 'named'}`,
           slotLabel: 'CMO',
-          value: redactNames
-            ? 'Assigned'
-            : (c.userName?.trim() || 'Assigned'),
+          value,
           isMine,
         });
       }
@@ -243,7 +249,8 @@ export function summarizeCoverageCrew(match: Match): string {
       const named = list.filter((c) => Boolean(c.userId));
       const openN = list.filter((c) => !c.userId).length;
       for (const c of named) {
-        parts.push(`CMO ${c.userName?.trim() || 'Assigned'}`);
+        const { text } = coverageAssignmentLabel(cmoAsAssignment(c));
+        parts.push(`CMO ${text}`);
       }
       if (openN > 0) parts.push(openN > 1 ? `(${openN}) CMO Open` : 'CMO Open');
       else if (named.length === 0) parts.push('CMO Open');

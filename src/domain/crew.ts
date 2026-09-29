@@ -3,10 +3,12 @@ import {
   OUTSIDE_APPOINTMENT_USER_ID,
 } from '@/domain/placeholderAssignment';
 import type {
+  CmoContact,
   CrewAssignment,
   CrewSlot,
   HistoryEntry,
   Match,
+  RequestableSlot,
   UserProfile,
 } from './types';
 import {
@@ -15,10 +17,21 @@ import {
   emptyCrewBlocks,
   isCrewVisibleToTeams,
   newAssignmentId,
+  newCmoId,
 } from './types';
 
 function historyId(): string {
   return `h_${Math.random().toString(36).slice(2, 10)}`;
+}
+
+function appendCmoHistory(
+  contact: CmoContact,
+  entry: Omit<HistoryEntry, 'id'>,
+): CmoContact {
+  return {
+    ...contact,
+    history: [...(contact.history ?? []), { ...entry, id: historyId() }],
+  };
 }
 
 export function appendHistory(
@@ -230,9 +243,136 @@ export function markUnavailableAndRelease(
   };
 }
 
+/**
+ * Assign a CMO with the same pending/official status rules as fee crew.
+ * Does not change match-level crew_confirmed gates (MO still unlocks teams).
+ */
+export function assignCmoContact(
+  match: Match,
+  user: Pick<UserProfile, 'uid' | 'displayName'>,
+  opts?: { viaRequest?: boolean; internal?: boolean; cmoId?: string },
+): Match {
+  const existing = match.cmo ?? [];
+  if (existing.some((c) => c.userId === user.uid)) return match;
+
+  const bothConfirmed = Boolean(match.homeConfirmedAt && match.awayConfirmedAt);
+  const status =
+    opts?.internal || !bothConfirmed ? 'pending_internal' : 'official';
+  const action = opts?.viaRequest ? 'assigned_via_request' : 'assigned';
+
+  const fillIdx = opts?.cmoId
+    ? existing.findIndex((c) => c.id === opts.cmoId && !c.userId)
+    : existing.findIndex((c) => !c.userId);
+
+  let contact: CmoContact = {
+    id:
+      (fillIdx >= 0 ? existing[fillIdx]?.id : undefined) ??
+      opts?.cmoId ??
+      newCmoId(),
+    userId: user.uid,
+    userName: user.displayName,
+    status,
+    history:
+      fillIdx >= 0 ? (existing[fillIdx]?.history ?? []) : [],
+  };
+  contact = appendCmoHistory(contact, {
+    at: new Date().toISOString(),
+    userId: user.uid,
+    userName: user.displayName,
+    action,
+  });
+
+  let nextList: CmoContact[];
+  if (fillIdx >= 0) {
+    nextList = existing.map((c, i) => (i === fillIdx ? contact : c));
+  } else {
+    nextList = [...existing, contact];
+  }
+  return { ...match, cmo: nextList };
+}
+
+export function confirmCmoContact(
+  match: Match,
+  cmoId?: string,
+): Match {
+  const list = match.cmo ?? [];
+  const target =
+    (cmoId
+      ? list.find((c) => c.id === cmoId)
+      : list.find((c) => c.userId)) ?? null;
+  if (!target?.userId) return match;
+  const targetKey = target.id ?? target.userId;
+
+  const nextList = list.map((c) => {
+    const key = c.id ?? c.userId;
+    if (key !== targetKey) return c;
+    return appendCmoHistory(
+      {
+        ...c,
+        status: 'confirmed',
+        confirmedAt: new Date().toISOString(),
+      },
+      {
+        at: new Date().toISOString(),
+        userId: c.userId!,
+        userName: c.userName ?? '',
+        action: 'confirmed',
+      },
+    );
+  });
+  return { ...match, cmo: nextList };
+}
+
+/**
+ * Clear a named CMO (decline / assigner release) but keep the capacity block.
+ */
+export function markCmoUnavailableAndRelease(
+  match: Match,
+  reason: string,
+  action:
+    | 'unavailable_on_change'
+    | 'declined'
+    | 't72_no'
+    | 'released' = 'declined',
+  cmoId?: string,
+): Match {
+  const list = match.cmo ?? [];
+  const target =
+    (cmoId
+      ? list.find((c) => c.id === cmoId)
+      : list.find((c) => c.userId)) ?? null;
+  if (!target?.userId) return match;
+
+  const targetKey = target.id ?? target.userId;
+  const emptied = appendCmoHistory(
+    {
+      ...target,
+      userId: undefined,
+      userName: undefined,
+      status: 'empty',
+      confirmedAt: undefined,
+      assignmentNotifiedAt: undefined,
+      assignmentNotifyEvent: undefined,
+    },
+    {
+      at: new Date().toISOString(),
+      userId: target.userId,
+      userName: target.userName ?? '',
+      action,
+      reason,
+    },
+  );
+  const nextList = list.map((c) =>
+    (c.id ?? c.userId) === targetKey ? emptied : c,
+  );
+  return { ...match, cmo: nextList };
+}
+
 /** Slots that still need at least one official to accept / reconfirm. */
-export function namedOfficialsNeedingAvailability(match: Match): CrewSlot[] {
-  return CREW_SLOTS.filter((s) =>
+export function namedOfficialsNeedingAvailability(
+  match: Match,
+): RequestableSlot[] {
+  const fee = CREW_SLOTS.filter((s) =>
     crewPeople(match.crew[s]).some(
       (c) =>
         c.status === 'pending_internal' ||
@@ -240,6 +380,16 @@ export function namedOfficialsNeedingAvailability(match: Match): CrewSlot[] {
         c.status === 'held',
     ),
   );
+  const cmoPending = (match.cmo ?? []).some((c) => {
+    if (!c.userId) return false;
+    const status = c.status;
+    return (
+      status === 'pending_internal' ||
+      status === 'official' ||
+      status === 'held'
+    );
+  });
+  return cmoPending ? [...fee, 'cmo'] : fee;
 }
 
 /** Flat list of active assignments for history / UI rows. */
@@ -258,11 +408,11 @@ export function allActiveAssignments(
 /** Copy assignment history off blocks that are about to be deleted. */
 export function archiveCrewAssignmentsHistory(
   match: Match,
-  slot: CrewSlot,
-  assignments: CrewAssignment[],
+  slot: RequestableSlot,
+  assignments: { history?: HistoryEntry[] }[],
 ): Match {
   const additions = assignments.flatMap((a) =>
-    a.history.map((entry) => ({ slot, entry })),
+    (a.history ?? []).map((entry) => ({ slot, entry })),
   );
   if (additions.length === 0) return match;
   return {
@@ -277,13 +427,18 @@ export function archiveCrewAssignmentsHistory(
 /** All assignment history rows for assigner audit (active blocks + archive). */
 export function collectAssignmentHistory(
   match: Match,
-): { slot: CrewSlot; entry: HistoryEntry }[] {
-  const rows: { slot: CrewSlot; entry: HistoryEntry }[] = [];
+): { slot: RequestableSlot; entry: HistoryEntry }[] {
+  const rows: { slot: RequestableSlot; entry: HistoryEntry }[] = [];
   for (const slot of CREW_SLOTS) {
     for (const assignment of match.crew[slot] ?? []) {
       for (const entry of assignment.history) {
         rows.push({ slot, entry });
       }
+    }
+  }
+  for (const c of match.cmo ?? []) {
+    for (const entry of c.history ?? []) {
+      rows.push({ slot: 'cmo', entry });
     }
   }
   for (const row of match.assignmentHistoryArchive ?? []) {

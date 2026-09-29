@@ -1,16 +1,34 @@
 import { formatMatchKickoffDate, formatMatchKickoffTime, orgTimeZone } from '@/domain/matchTime';
-import type { CrewAssignment, CrewSlot, Match } from '@/domain/types';
+import type {
+  CrewAssignment,
+  Match,
+  RequestableSlot,
+} from '@/domain/types';
 
 export type AssignmentEmailEvent = 'assignment' | 'assignment_resend';
 
-/** Stamp crew row after a successful assignment email send. */
+/** Stamp crew/CMO row after a successful assignment email send. */
 export function markAssignmentEmailSent(
   match: Match,
-  slot: CrewSlot,
+  slot: RequestableSlot,
   userId: string,
   event: AssignmentEmailEvent,
   at = new Date().toISOString(),
 ): Match {
+  if (slot === 'cmo') {
+    return {
+      ...match,
+      cmo: (match.cmo ?? []).map((c) =>
+        c.userId === userId
+          ? {
+              ...c,
+              assignmentNotifiedAt: at,
+              assignmentNotifyEvent: event,
+            }
+          : c,
+      ),
+    };
+  }
   const crew = { ...match.crew };
   crew[slot] = (crew[slot] ?? []).map((a) =>
     a.userId === userId

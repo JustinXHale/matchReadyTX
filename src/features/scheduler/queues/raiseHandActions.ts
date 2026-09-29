@@ -9,7 +9,6 @@ import { isFirebaseConfigured } from '@/services/firebase';
 import { persistCrewAssignmentAndEmail } from '@/services/liveAssignment';
 import {
   defaultOrgId,
-  saveMatchCrewAssignment,
   updateGameRequestInFirestore,
 } from '@/services/orgData';
 import { applyRaiseHandInterestBatch } from '@/domain/raiseHandInterest';
@@ -50,12 +49,7 @@ export async function approveRaiseHandRequest(opts: {
     slot ?? (match ? resolveRaiseHandApprovalSlot(match, before) : undefined);
   if (!chosen) return;
 
-  if (chosen === 'cmo') {
-    const next = store.getState().matches.find((m) => m.id === before.matchId);
-    if (next) {
-      await saveMatchCrewAssignment(defaultOrgId(), next);
-    }
-  } else {
+  {
     const next = store.getState().matches.find((m) => m.id === before.matchId);
     if (!next) return;
     const saved = await persistCrewAssignmentAndEmail({

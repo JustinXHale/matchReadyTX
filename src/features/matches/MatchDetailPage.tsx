@@ -61,6 +61,7 @@ import {
   REQUESTABLE_SLOT_LABELS,
   REQUESTABLE_SLOT_SHORT,
   assignmentForUser,
+  cmoAsAssignment,
   crewBlocks,
   crewPeople,
   crewSlotStatusLabel,
@@ -83,7 +84,7 @@ import {
   collectAssignmentHistory,
   namedOfficialsNeedingAvailability,
 } from '@/domain/crew';
-import { availableCrewRolesToAdd, roleHasAssignee } from '@/domain/crewSize';
+import { availableCrewRolesToAdd } from '@/domain/crewSize';
 import { isOutsideAppointmentUserId } from '@/domain/placeholderAssignment';
 import { IconDateInput } from '@/ui/IconDateInput';
 import {
@@ -316,10 +317,6 @@ export function MatchDetailPage() {
   const [resendEmailByKey, setResendEmailByKey] = useState<
     Record<string, ResendEmailState>
   >({});
-  const [removeBlockTarget, setRemoveBlockTarget] = useState<{
-    role: RequestableSlot;
-    blockId: string;
-  } | null>(null);
   const [coverageAlertSent, setCoverageAlertSent] = useState(false);
   const [assignerConfirm, setAssignerConfirm] =
     useState<AssignerMenuAction | null>(null);
@@ -584,8 +581,7 @@ export function MatchDetailPage() {
     currentUser.roles.includes('teamAdmin') &&
     currentUser.teamIds.includes(match.awayTeamId);
   const myHit = assignmentForUser(match, currentUser.uid);
-  const mySlot =
-    myHit && myHit.slot !== 'cmo' ? (myHit.slot as CrewSlot) : undefined;
+  const mySlot = myHit?.slot;
   const myAssignment = myHit?.assignment ?? null;
   const crewVisible =
     isAssigner || isOfficialView || isCrewVisibleToTeams(match);
@@ -622,7 +618,7 @@ export function MatchDetailPage() {
     match.status !== 'change_proposed';
   const needsAvail =
     mySlot != null &&
-    namedOfficialsNeedingAvailability(match).includes(mySlot);
+    namedOfficialsNeedingAvailability(match).includes(mySlot as RequestableSlot);
   const isOfficial = isOfficialView;
   const pendingRequestRaw = pendingRequestForUser(
     state.requests,
@@ -775,28 +771,21 @@ export function MatchDetailPage() {
     const { slot } = pickTarget;
     if (slot === 'cmo') {
       store.assignCmo(match.id, userId, pickTarget.cmoId);
-      if (dataMode === 'live' && isFirebaseConfigured) {
-        const next = store.getState().matches.find((m) => m.id === match.id);
-        if (next) {
-          void saveMatchCrewAssignment(defaultOrgId(), next).catch((err) =>
-            console.error('Failed to save CMO assignment', err),
-          );
-        }
-      }
     } else {
       store.assignCrew(match.id, slot, userId, false, pickTarget.assignmentId);
-      if (dataMode === 'live' && isFirebaseConfigured) {
-        const next = store.getState().matches.find((m) => m.id === match.id);
-        if (next) {
-          void persistCrewAssignmentAndEmail({
-            match: next,
-            slot,
-            userId,
+    }
+    if (dataMode === 'live' && isFirebaseConfigured) {
+      const next = store.getState().matches.find((m) => m.id === match.id);
+      if (next) {
+        void persistCrewAssignmentAndEmail({
+          match: next,
+          slot,
+          userId,
+        })
+          .then((saved) => {
+            if (saved) store.replaceMatch(saved);
           })
-            .then((saved) => {
-              if (saved) store.replaceMatch(saved);
-            })
-            .catch((err) => {
+          .catch((err) => {
             console.error('Failed to save/email assignment', err);
             window.alert(
               err instanceof Error
@@ -804,7 +793,6 @@ export function MatchDetailPage() {
                 : 'Assigned locally, but email/save failed. Check the console.',
             );
           });
-        }
       }
     }
     setPickTarget(null);
@@ -879,19 +867,17 @@ export function MatchDetailPage() {
       });
   };
 
-  const clearPickSlot = () => {
-    if (!pickTarget) return;
-    const { slot, assignmentId, cmoUserId, cmoId } = pickTarget;
-    const removedUserId =
-      slot === 'cmo'
-        ? cmoUserId
-        : assignmentId
-          ? crewPeople(match.crew[slot as CrewSlot]).find(
-              (a) => a.id === assignmentId,
-            )?.userId
-          : undefined;
-
-    if (slot === 'cmo') store.clearCmo(match.id, cmoUserId, cmoId);
+  /** Clear the named official but keep the open capacity block. */
+  const clearOfficialFromBlock = (
+    slot: RequestableSlot,
+    opts: {
+      assignmentId?: string;
+      cmoId?: string;
+      removedUserId?: string;
+    },
+  ) => {
+    const { assignmentId, cmoId, removedUserId } = opts;
+    if (slot === 'cmo') store.clearCmo(match.id, removedUserId, cmoId);
     else store.unassignCrew(match.id, slot, assignmentId);
 
     if (dataMode === 'live' && isFirebaseConfigured) {
@@ -915,57 +901,49 @@ export function MatchDetailPage() {
         );
       }
     }
+  };
+
+  const clearPickSlot = () => {
+    if (!pickTarget) return;
+    const { slot, assignmentId, cmoUserId, cmoId } = pickTarget;
+    const removedUserId =
+      slot === 'cmo'
+        ? cmoUserId
+        : assignmentId
+          ? crewPeople(match.crew[slot as CrewSlot]).find(
+              (a) => a.id === assignmentId,
+            )?.userId
+          : undefined;
+
+    clearOfficialFromBlock(slot, {
+      assignmentId,
+      cmoId,
+      removedUserId,
+    });
     setPickTarget(null);
   };
 
   const addableRoles = availableCrewRolesToAdd(match);
 
+  /** × on a filled row clears the person; × on an empty row deletes the block. */
   const requestRemoveBlock = (
     role: RequestableSlot,
     blockId: string,
     hasPerson: boolean,
+    personUserId?: string,
   ) => {
     if (hasPerson) {
-      setRemoveBlockTarget({ role, blockId });
+      clearOfficialFromBlock(role, {
+        assignmentId: role === 'cmo' ? undefined : blockId,
+        cmoId: role === 'cmo' ? blockId : undefined,
+        removedUserId: personUserId,
+      });
       return;
     }
     store.removeCrewRole(match.id, role, blockId);
     if (dataMode === 'live' && isFirebaseConfigured) {
       const next = store.getState().matches.find((m) => m.id === match.id);
       if (next) {
-        void saveMatchCrewAssignment(defaultOrgId(), next).catch((err) =>
-          console.error('Failed to save removed crew block', err),
-        );
-      }
-    }
-  };
-
-  const confirmRemoveBlock = () => {
-    if (!removeBlockTarget) return;
-    const { role, blockId } = removeBlockTarget;
-    const removedUserId =
-      role === 'cmo'
-        ? (match.cmo ?? []).find((c) => c.id === blockId)?.userId
-        : crewPeople(match.crew[role]).find((a) => a.id === blockId)?.userId;
-
-    store.removeCrewRole(match.id, role, blockId);
-    setRemoveBlockTarget(null);
-    if (dataMode === 'live' && isFirebaseConfigured) {
-      const next = store.getState().matches.find((m) => m.id === match.id);
-      if (next && removedUserId) {
-        void persistCrewUnassignmentAndEmail({
-          match: next,
-          slot: role,
-          userId: removedUserId,
-        }).catch((err) => {
-          console.error('Failed to save/email unassignment', err);
-          window.alert(
-            err instanceof Error
-              ? `Removed locally, but email/save failed: ${err.message}`
-              : 'Removed locally, but email/save failed. Check the console.',
-          );
-        });
-      } else if (next) {
         void saveMatchCrewAssignment(defaultOrgId(), next).catch((err) =>
           console.error('Failed to save removed crew block', err),
         );
@@ -2457,7 +2435,7 @@ export function MatchDetailPage() {
         mySlot &&
         myAssignment?.status === 'pending_internal' && (
         <p className="rs-detail-note">
-          Tentatively assigned as {CREW_SLOT_LABELS[mySlot]} — confirmation opens
+          Tentatively assigned as {REQUESTABLE_SLOT_LABELS[mySlot]} — confirmation opens
           after both teams confirm match facts.
         </p>
       )}
@@ -2494,15 +2472,23 @@ export function MatchDetailPage() {
                   cmoId?: string;
                   cmoUserId?: string;
                 }[] = isCmo
-                  ? (match.cmo ?? []).map((c, i) => ({
-                      key: c.id ?? `cmo-${c.userId ?? i}`,
-                      blockId: c.id ?? `cmo-${i}`,
-                      userId: c.userId,
-                      userName: c.userName,
-                      status: c.userId ? 'Assigned' : 'Open',
-                      cmoId: c.id,
-                      cmoUserId: c.userId,
-                    }))
+                  ? (match.cmo ?? []).map((c, i) => {
+                      const view = cmoAsAssignment(c);
+                      return {
+                        key: c.id ?? `cmo-${c.userId ?? i}`,
+                        blockId: c.id ?? `cmo-${i}`,
+                        userId: c.userId,
+                        userName: c.userName,
+                        status: c.userId
+                          ? crewSlotStatusLabel(view.status)
+                          : 'Open',
+                        notifyLine: c.userId
+                          ? assignmentEmailNotifyLine(view, orgTz)
+                          : null,
+                        cmoId: c.id,
+                        cmoUserId: c.userId,
+                      };
+                    })
                   : crewBlocks(match.crew[slot]).map((a) => ({
                       key: a.id,
                       blockId: a.id,
@@ -2623,9 +2609,19 @@ export function MatchDetailPage() {
                         <button
                           type="button"
                           className="rs-detail-people__remove"
-                          aria-label={`Remove ${REQUESTABLE_SLOT_LABELS[slot]} block`}
+                          aria-label={
+                            filled
+                              ? `Clear ${b.userName ?? 'official'} from ${REQUESTABLE_SLOT_LABELS[slot]}`
+                              : `Remove ${REQUESTABLE_SLOT_LABELS[slot]} block`
+                          }
+                          title={filled ? 'Clear official' : 'Remove role block'}
                           onClick={() =>
-                            requestRemoveBlock(slot, b.blockId, filled)
+                            requestRemoveBlock(
+                              slot,
+                              b.blockId,
+                              filled,
+                              b.userId,
+                            )
                           }
                         >
                           ×
@@ -2638,8 +2634,9 @@ export function MatchDetailPage() {
             </ul>
             {isAssigner && dataMode === 'live' && isFirebaseConfigured && (
               <p className="rs-detail-note">
-                Tap a name to reassign, or <strong>Resend</strong> to email that
-                official the MatchReadyTX assignment again. The Crew{' '}
+                Tap a name to reassign, <strong>×</strong> to clear an official
+                (slot stays open) or remove an empty role, or{' '}
+                <strong>Resend</strong> to email that official again. The Crew{' '}
                 <strong>Email</strong> button opens your mail app (mailto), not
                 Resend.
               </p>
@@ -2734,7 +2731,7 @@ export function MatchDetailPage() {
                 {assignmentHistory.map(({ slot, entry }) => (
                   <li key={entry.id}>
                     <strong>
-                      {CREW_SLOT_LABELS[slot]} ·{' '}
+                      {REQUESTABLE_SLOT_LABELS[slot]} ·{' '}
                       {entry.action.replace(/_/g, ' ')}
                     </strong>
                     <div className="rs-match-card__meta">
@@ -3233,47 +3230,6 @@ export function MatchDetailPage() {
             onClick={() => setPickTarget(null)}
           >
             Cancel
-          </Button>
-        </ModalFooter>
-      </Modal>
-
-      <Modal
-        variant={ModalVariant.small}
-        isOpen={Boolean(removeBlockTarget)}
-        onClose={() => setRemoveBlockTarget(null)}
-        aria-labelledby="remove-role-title"
-        aria-describedby="remove-role-desc"
-      >
-        <ModalHeader>
-          <Title headingLevel="h2" id="remove-role-title" size="lg">
-            Remove role block?
-          </Title>
-        </ModalHeader>
-        <ModalBody>
-          {removeBlockTarget && (
-            <p id="remove-role-desc" className="rs-modal-lede">
-              Remove this{' '}
-              <strong>
-                {REQUESTABLE_SLOT_LABELS[removeBlockTarget.role]}
-              </strong>{' '}
-              block
-              {roleHasAssignee(match, removeBlockTarget.role)
-                ? ' and clear the assigned official'
-                : ''}
-              ?
-            </p>
-          )}
-        </ModalBody>
-        <ModalFooter>
-          <Button
-            type="button"
-            variant="link"
-            onClick={() => setRemoveBlockTarget(null)}
-          >
-            Keep
-          </Button>
-          <Button type="button" variant="danger" onClick={confirmRemoveBlock}>
-            Remove
           </Button>
         </ModalFooter>
       </Modal>

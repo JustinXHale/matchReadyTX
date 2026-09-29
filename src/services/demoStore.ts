@@ -1,9 +1,12 @@
 import { csvRowToKickoffIso, parseScheduleCsv, type CsvMatchRow } from '@/domain/csvImport';
 import {
+  assignCmoContact,
   assignOfficial,
   assignOutsideAppointment,
   archiveCrewAssignmentsHistory,
+  confirmCmoContact,
   confirmOfficialSlot,
+  markCmoUnavailableAndRelease,
   markUnavailableAndRelease,
 } from '@/domain/crew';
 import { markAssignmentEmailSent } from '@/domain/assignmentEmail';
@@ -184,8 +187,25 @@ function findCrewAssignmentOnMatch(
 }
 
 function serverReflectsMatchGuard(guard: LiveSnapshotGuard, server: Match): boolean {
-  if (guard.expect === 'assignment_assigned' && guard.slot === 'cmo') {
-    return (server.cmo ?? []).some((c) => c.userId === guard.userId);
+  if (guard.slot === 'cmo') {
+    const list = server.cmo ?? [];
+    const row = guard.assignmentId
+      ? list.find((c) => c.id === guard.assignmentId)
+      : list.find((c) => c.userId === guard.userId);
+    switch (guard.expect) {
+      case 'assignment_assigned':
+        return Boolean(
+          (row ?? list.find((c) => c.userId === guard.userId))?.userId,
+        );
+      case 'assignment_confirmed':
+        return Boolean(
+          row && row.userId === guard.userId && row.status === 'confirmed',
+        );
+      case 'assignment_cleared':
+        return !row?.userId || row.status === 'empty';
+      default:
+        return false;
+    }
   }
   const assignment = findCrewAssignmentOnMatch(
     server,
@@ -4546,38 +4566,24 @@ class DemoStore {
   assignCmo(matchId: string, userId: string, cmoId?: string): void {
     const user = this.state.users.find((u) => u.uid === userId);
     if (!user) return;
+    this.registerLiveSnapshotGuard(`match:${matchId}`, {
+      expect: 'assignment_assigned',
+      userId,
+      slot: 'cmo',
+    });
     this.set((s) => ({
       ...s,
       matches: s.matches.map((m) => {
         if (m.id !== matchId) return m;
-        const existing = m.cmo ?? [];
-        if (existing.some((c) => c.userId === user.uid)) return m;
-        const emptyIdx = cmoId
-          ? existing.findIndex((c) => c.id === cmoId && !c.userId)
-          : existing.findIndex((c) => !c.userId);
-        if (emptyIdx >= 0) {
-          const next = existing.map((c, i) =>
-            i === emptyIdx
-              ? {
-                  id: c.id ?? newCmoId(),
-                  userId: user.uid,
-                  userName: user.displayName,
-                }
-              : c,
-          );
-          return { ...m, cmo: next };
-        }
-        return {
-          ...m,
-          cmo: [
-            ...existing,
-            {
-              id: cmoId ?? newCmoId(),
-              userId: user.uid,
-              userName: user.displayName,
-            },
-          ],
-        };
+        return markAssignmentEmailSent(
+          assignCmoContact(m, user, {
+            cmoId,
+            internal: !(m.homeConfirmedAt && m.awayConfirmedAt),
+          }),
+          'cmo',
+          userId,
+          'assignment',
+        );
       }),
     }));
   }
@@ -4589,14 +4595,24 @@ class DemoStore {
         if (m.id !== matchId) return m;
         const list = m.cmo ?? [];
         if (!list.length) return m;
-        const next = list.map((c) => {
-          const hit =
-            (cmoId && c.id === cmoId) ||
-            (userId && c.userId === userId);
-          if (!hit) return c;
-          return { id: c.id ?? newCmoId() };
-        });
-        return { ...m, cmo: next };
+        const target =
+          (cmoId ? list.find((c) => c.id === cmoId) : undefined) ??
+          (userId ? list.find((c) => c.userId === userId) : undefined);
+        if (!target) return m;
+        if (target.userId) {
+          return markCmoUnavailableAndRelease(
+            m,
+            'Cleared by assigner',
+            'released',
+            target.id,
+          );
+        }
+        return {
+          ...m,
+          cmo: list.map((c) =>
+            c.id === target.id ? { id: c.id ?? newCmoId(), status: 'empty' as const, history: c.history ?? [] } : c,
+          ),
+        };
       }),
     }));
   }
@@ -4641,26 +4657,46 @@ class DemoStore {
     }));
   }
 
-  confirmCrewSlot(matchId: string, slot: CrewSlot, assignmentId?: string): void {
+  confirmCrewSlot(
+    matchId: string,
+    slot: RequestableSlot,
+    assignmentId?: string,
+  ): void {
     const match = this.state.matches.find((m) => m.id === matchId);
     if (match) {
-      const list = match.crew[slot] ?? [];
-      const target =
-        (assignmentId
-          ? list.find((a) => a.id === assignmentId)
-          : list.find((a) => a.userId)) ?? null;
-      if (target?.userId) {
-        this.registerLiveSnapshotGuard(`match:${matchId}`, {
-          expect: 'assignment_confirmed',
-          userId: target.userId,
-          slot,
-          assignmentId: target.id,
-        });
+      if (slot === 'cmo') {
+        const target =
+          (assignmentId
+            ? (match.cmo ?? []).find((c) => c.id === assignmentId)
+            : (match.cmo ?? []).find((c) => c.userId)) ?? null;
+        if (target?.userId) {
+          this.registerLiveSnapshotGuard(`match:${matchId}`, {
+            expect: 'assignment_confirmed',
+            userId: target.userId,
+            slot: 'cmo',
+            assignmentId: target.id,
+          });
+        }
+      } else {
+        const list = match.crew[slot] ?? [];
+        const target =
+          (assignmentId
+            ? list.find((a) => a.id === assignmentId)
+            : list.find((a) => a.userId)) ?? null;
+        if (target?.userId) {
+          this.registerLiveSnapshotGuard(`match:${matchId}`, {
+            expect: 'assignment_confirmed',
+            userId: target.userId,
+            slot,
+            assignmentId: target.id,
+          });
+        }
       }
     }
     this.set((s) => {
       const matches = s.matches.map((m) => {
         if (m.id !== matchId) return m;
+        if (slot === 'cmo') return confirmCmoContact(m, assignmentId);
         const next = confirmOfficialSlot(m, slot, assignmentId);
         if (
           slot === 'mo' &&
@@ -4765,7 +4801,7 @@ class DemoStore {
 
   officialUnavailable(
     matchId: string,
-    slot: CrewSlot,
+    slot: RequestableSlot,
     reason: string,
     action:
       | 'unavailable_on_change'
@@ -4776,23 +4812,42 @@ class DemoStore {
   ): void {
     const beforeMatch = this.state.matches.find((m) => m.id === matchId);
     if (beforeMatch) {
-      const list = beforeMatch.crew[slot] ?? [];
-      const target =
-        (assignmentId
-          ? list.find((a) => a.id === assignmentId)
-          : list.find((a) => a.userId)) ?? null;
-      if (target?.userId) {
-        this.registerLiveSnapshotGuard(`match:${matchId}`, {
-          expect: 'assignment_cleared',
-          userId: target.userId,
-          slot,
-          assignmentId: target.id,
-        });
+      if (slot === 'cmo') {
+        const list = beforeMatch.cmo ?? [];
+        const target =
+          (assignmentId
+            ? list.find((c) => c.id === assignmentId)
+            : list.find((c) => c.userId)) ?? null;
+        if (target?.userId) {
+          this.registerLiveSnapshotGuard(`match:${matchId}`, {
+            expect: 'assignment_cleared',
+            userId: target.userId,
+            slot: 'cmo',
+            assignmentId: target.id,
+          });
+        }
+      } else {
+        const list = beforeMatch.crew[slot] ?? [];
+        const target =
+          (assignmentId
+            ? list.find((a) => a.id === assignmentId)
+            : list.find((a) => a.userId)) ?? null;
+        if (target?.userId) {
+          this.registerLiveSnapshotGuard(`match:${matchId}`, {
+            expect: 'assignment_cleared',
+            userId: target.userId,
+            slot,
+            assignmentId: target.id,
+          });
+        }
       }
     }
     this.set((s) => {
       const matches = s.matches.map((m) => {
         if (m.id !== matchId) return m;
+        if (slot === 'cmo') {
+          return markCmoUnavailableAndRelease(m, reason, action, assignmentId);
+        }
         return markUnavailableAndRelease(m, slot, reason, action, assignmentId);
       });
       return { ...s, matches };
@@ -5672,15 +5727,10 @@ class DemoStore {
         ...s,
         matches: s.matches.map((m) => {
           if (m.id !== req.matchId) return m;
-          const existing = m.cmo ?? [];
-          if (existing.some((c) => c.userId === user.uid)) return m;
-          return {
-            ...m,
-            cmo: [
-              ...existing,
-              { userId: user.uid, userName: user.displayName },
-            ],
-          };
+          return assignCmoContact(m, user, {
+            viaRequest: true,
+            internal: !(m.homeConfirmedAt && m.awayConfirmedAt),
+          });
         }),
         requests: s.requests.map((r) =>
           r.id === requestId ? { ...r, status: 'approved' as const } : r,

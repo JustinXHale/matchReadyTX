@@ -90,6 +90,16 @@ export type CmoContact = {
   id?: string;
   userId?: string;
   userName?: string;
+  /**
+   * Same lifecycle as fee-crew assignments. Legacy named rows without
+   * `status` are treated as confirmed (see `effectiveCmoStatus`).
+   */
+  status?: CrewSlotStatus;
+  confirmedAt?: string;
+  /** Last successful MatchReadyTX assignment email (live). */
+  assignmentNotifiedAt?: string;
+  assignmentNotifyEvent?: 'assignment' | 'assignment_resend';
+  history?: HistoryEntry[];
 };
 
 export interface FeeTable {
@@ -156,9 +166,9 @@ export interface Match {
   crew: Record<CrewSlot, CrewAssignment[]>;
   /**
    * Assignment audit rows kept when an assigner removes a crew block entirely
-   * (history on active blocks lives on each CrewAssignment).
+   * (history on active blocks lives on each CrewAssignment / CmoContact).
    */
-  assignmentHistoryArchive?: { slot: CrewSlot; entry: HistoryEntry }[];
+  assignmentHistoryArchive?: { slot: RequestableSlot; entry: HistoryEntry }[];
   /** Final score when reported (from match report). */
   homeScore?: number;
   awayScore?: number;
@@ -661,7 +671,32 @@ export function newCmoId(): string {
 }
 
 export function emptyCmoContact(): CmoContact {
-  return { id: newCmoId() };
+  return { id: newCmoId(), status: 'empty', history: [] };
+}
+
+/**
+ * Effective CMO confirmation status. Named contacts written before status
+ * existed are treated as confirmed so past games do not require re-accept.
+ */
+export function effectiveCmoStatus(c: CmoContact): CrewSlotStatus {
+  if (!c.userId) return c.status ?? 'empty';
+  if (!c.status) return 'confirmed';
+  return c.status;
+}
+
+/** View of a CMO contact as a CrewAssignment-shaped object for shared UI helpers. */
+export function cmoAsAssignment(c: CmoContact): CrewAssignment {
+  return {
+    id: c.id ?? newCmoId(),
+    slot: 'mo',
+    userId: c.userId,
+    userName: c.userName,
+    status: effectiveCmoStatus(c),
+    confirmedAt: c.confirmedAt,
+    assignmentNotifiedAt: c.assignmentNotifiedAt,
+    assignmentNotifyEvent: c.assignmentNotifyEvent,
+    history: c.history ?? [],
+  };
 }
 
 /** Ensure MO has at least one open/filled block when the match uses MO. */
@@ -681,8 +716,9 @@ export function assignmentForUser(
     const a = match.crew[slot]?.find((x) => x.userId === userId);
     if (a) return { slot, assignment: a };
   }
-  if ((match.cmo ?? []).some((c) => c.userId === userId)) {
-    return { slot: 'cmo' };
+  const cmo = (match.cmo ?? []).find((c) => c.userId === userId);
+  if (cmo) {
+    return { slot: 'cmo', assignment: cmoAsAssignment(cmo) };
   }
   return null;
 }

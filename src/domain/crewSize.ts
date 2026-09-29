@@ -51,12 +51,16 @@ export function withCrewBlockRemoved(
 ): Match {
   if (role === 'cmo') {
     const list = match.cmo ?? [];
+    const removed = list.filter((c) => (c.id ?? '') === blockId);
+    let archived = match;
+    if (removed.length) {
+      archived = archiveCrewAssignmentsHistory(archived, 'cmo', removed);
+    }
     const next = list.filter((c) => (c.id ?? '') !== blockId);
-    // Also allow remove by matching empty-without-id at index via id only.
-    const needed = new Set(rolesNeededForMatch({ ...match, cmo: next }));
+    const needed = new Set(rolesNeededForMatch({ ...archived, cmo: next }));
     if (next.length === 0) needed.delete('cmo');
     return {
-      ...match,
+      ...archived,
       cmo: next.length ? next : undefined,
       rolesNeeded: REQUESTABLE_SLOTS.filter((r) => needed.has(r)),
     };

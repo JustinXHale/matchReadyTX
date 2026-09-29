@@ -19,9 +19,13 @@ import {
   type Match,
   type RequestableSlot,
 } from '@/domain/types';
-import { persistCrewAssignmentAndEmail } from '@/services/liveAssignment';
+import {
+  persistCrewAssignmentAndEmail,
+  persistCrewUnassignmentAndEmail,
+} from '@/services/liveAssignment';
 import { defaultOrgId, saveMatchCrewAssignment } from '@/services/orgData';
 import { isFirebaseConfigured } from '@/services/firebase';
+import { crewPeople } from '@/domain/types';
 
 function isCrewSlotValue(slot: RequestableSlot): slot is CrewSlot {
   return slot !== 'cmo';
@@ -61,14 +65,6 @@ export function AssignOfficialModal({
     const { slot } = pickTarget;
     if (slot === 'cmo') {
       store.assignCmo(liveMatch.id, userId, pickTarget.cmoId);
-      if (dataMode === 'live' && isFirebaseConfigured) {
-        const next = store.getState().matches.find((m) => m.id === liveMatch.id);
-        if (next) {
-          void saveMatchCrewAssignment(defaultOrgId(), next).catch((err) =>
-            console.error('Failed to save CMO assignment', err),
-          );
-        }
-      }
     } else {
       store.assignCrew(
         liveMatch.id,
@@ -77,18 +73,19 @@ export function AssignOfficialModal({
         false,
         pickTarget.assignmentId,
       );
-      if (dataMode === 'live' && isFirebaseConfigured) {
-        const next = store.getState().matches.find((m) => m.id === liveMatch.id);
-        if (next) {
-          void persistCrewAssignmentAndEmail({
-            match: next,
-            slot,
-            userId,
+    }
+    if (dataMode === 'live' && isFirebaseConfigured) {
+      const next = store.getState().matches.find((m) => m.id === liveMatch.id);
+      if (next) {
+        void persistCrewAssignmentAndEmail({
+          match: next,
+          slot,
+          userId,
+        })
+          .then((saved) => {
+            if (saved) store.replaceMatch(saved);
           })
-            .then((saved) => {
-              if (saved) store.replaceMatch(saved);
-            })
-            .catch((err) => {
+          .catch((err) => {
             console.error('Failed to save/email assignment', err);
             window.alert(
               err instanceof Error
@@ -96,7 +93,6 @@ export function AssignOfficialModal({
                 : 'Assigned locally, but email/save failed. Check the console.',
             );
           });
-        }
       }
     }
     onClose();
@@ -115,6 +111,49 @@ export function AssignOfficialModal({
         void saveMatchCrewAssignment(defaultOrgId(), next).catch((err) =>
           console.error('Failed to save outside appointment', err),
         );
+      }
+    }
+    onClose();
+  };
+
+  const currentPickUserId = (() => {
+    if (!liveMatch || !pickTarget) return undefined;
+    if (pickTarget.cmoUserId) return pickTarget.cmoUserId;
+    if (pickTarget.assignmentId && isCrewSlotValue(pickTarget.slot)) {
+      return crewPeople(liveMatch.crew[pickTarget.slot]).find(
+        (a) => a.id === pickTarget.assignmentId,
+      )?.userId;
+    }
+    if (pickTarget.slot === 'cmo' && pickTarget.cmoId) {
+      return (liveMatch.cmo ?? []).find((c) => c.id === pickTarget.cmoId)
+        ?.userId;
+    }
+    return undefined;
+  })();
+
+  const clearPickSlot = () => {
+    if (!liveMatch || !pickTarget || !currentPickUserId) return;
+    const { slot, assignmentId, cmoId } = pickTarget;
+    if (slot === 'cmo') {
+      store.clearCmo(liveMatch.id, currentPickUserId, cmoId);
+    } else {
+      store.unassignCrew(liveMatch.id, slot, assignmentId);
+    }
+    if (dataMode === 'live' && isFirebaseConfigured) {
+      const next = store.getState().matches.find((m) => m.id === liveMatch.id);
+      if (next) {
+        void persistCrewUnassignmentAndEmail({
+          match: next,
+          slot,
+          userId: currentPickUserId,
+        }).catch((err) => {
+          console.error('Failed to save/email unassignment', err);
+          window.alert(
+            err instanceof Error
+              ? `Cleared locally, but email/save failed: ${err.message}`
+              : 'Cleared locally, but email/save failed. Check the console.',
+          );
+        });
       }
     }
     onClose();
@@ -166,6 +205,11 @@ export function AssignOfficialModal({
         ) : null}
       </ModalBody>
       <ModalFooter>
+        {currentPickUserId && (
+          <Button type="button" variant="danger" onClick={clearPickSlot}>
+            Clear
+          </Button>
+        )}
         <Button type="button" variant="link" onClick={onClose}>
           Cancel
         </Button>

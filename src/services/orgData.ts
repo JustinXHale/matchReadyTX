@@ -178,7 +178,8 @@ function normalizeAssignmentHistoryArchive(
       slot !== 'mo' &&
       slot !== 'ar1' &&
       slot !== 'ar2' &&
-      slot !== 'no4'
+      slot !== 'no4' &&
+      slot !== 'cmo'
     ) {
       continue;
     }
@@ -247,28 +248,51 @@ function normalizeRaiseHandInterest(
   return rows.length ? rows : undefined;
 }
 
+function normalizeCmoContact(raw: Record<string, unknown>): CmoContact {
+  const statusRaw = raw.status;
+  const status =
+    statusRaw === 'empty' ||
+    statusRaw === 'pending_internal' ||
+    statusRaw === 'official' ||
+    statusRaw === 'confirmed' ||
+    statusRaw === 'held' ||
+    statusRaw === 'declined' ||
+    statusRaw === 'released'
+      ? statusRaw
+      : undefined;
+  return {
+    id: typeof raw.id === 'string' && raw.id ? raw.id : newCmoId(),
+    userId: typeof raw.userId === 'string' ? raw.userId : undefined,
+    userName: typeof raw.userName === 'string' ? raw.userName : undefined,
+    status,
+    confirmedAt:
+      typeof raw.confirmedAt === 'string' ? raw.confirmedAt : undefined,
+    assignmentNotifiedAt:
+      typeof raw.assignmentNotifiedAt === 'string'
+        ? raw.assignmentNotifiedAt
+        : undefined,
+    assignmentNotifyEvent:
+      raw.assignmentNotifyEvent === 'assignment' ||
+      raw.assignmentNotifyEvent === 'assignment_resend'
+        ? raw.assignmentNotifyEvent
+        : undefined,
+    history: Array.isArray(raw.history)
+      ? (raw.history as NonNullable<CmoContact['history']>)
+      : undefined,
+  };
+}
+
 /** Accept legacy single CMO object or array. */
 function normalizeCmo(raw: unknown): CmoContact[] | undefined {
   if (!raw) return undefined;
   if (Array.isArray(raw)) {
     const list = raw
       .filter((x): x is Record<string, unknown> => Boolean(x) && typeof x === 'object')
-      .map((x) => ({
-        id: typeof x.id === 'string' && x.id ? x.id : newCmoId(),
-        userId: typeof x.userId === 'string' ? x.userId : undefined,
-        userName: typeof x.userName === 'string' ? x.userName : undefined,
-      }));
+      .map((x) => normalizeCmoContact(x));
     return list.length ? list : undefined;
   }
   if (typeof raw === 'object') {
-    const o = raw as Record<string, unknown>;
-    return [
-      {
-        id: typeof o.id === 'string' && o.id ? o.id : newCmoId(),
-        userId: typeof o.userId === 'string' ? o.userId : undefined,
-        userName: typeof o.userName === 'string' ? o.userName : undefined,
-      },
-    ];
+    return [normalizeCmoContact(raw as Record<string, unknown>)];
   }
   return undefined;
 }
@@ -1571,6 +1595,11 @@ function cmoForFirestore(cmo: Match['cmo']): unknown {
       id: c.id ?? null,
       userId: c.userId ?? null,
       userName: c.userName ?? null,
+      status: c.status ?? null,
+      confirmedAt: c.confirmedAt ?? null,
+      assignmentNotifiedAt: c.assignmentNotifiedAt ?? null,
+      assignmentNotifyEvent: c.assignmentNotifyEvent ?? null,
+      history: Array.isArray(c.history) ? c.history : [],
     }),
   );
 }

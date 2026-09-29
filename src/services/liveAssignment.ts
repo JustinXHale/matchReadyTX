@@ -2,7 +2,6 @@ import { isOutsideAppointmentUserId } from '@/domain/placeholderAssignment';
 import {
   CREW_SLOT_LABELS,
   REQUESTABLE_SLOT_LABELS,
-  type CrewSlot,
   type Match,
   type RequestableSlot,
 } from '@/domain/types';
@@ -205,7 +204,7 @@ ${matchLinkHtml(match)}
 
 async function recordAssignmentEmailSent(
   match: Match,
-  slot: CrewSlot,
+  slot: RequestableSlot,
   userId: string,
   event: AssignmentEmailEvent,
 ): Promise<Match> {
@@ -214,10 +213,10 @@ async function recordAssignmentEmailSent(
   return next;
 }
 
-/** After local assignCrew: persist to Firestore and email the official (live only). */
+/** After local assignCrew / assignCmo: persist to Firestore and email the official (live only). */
 export async function persistCrewAssignmentAndEmail(opts: {
   match: Match;
-  slot: CrewSlot;
+  slot: RequestableSlot;
   userId: string;
 }): Promise<Match | void> {
   if (!isFirebaseConfigured) return;
@@ -236,22 +235,13 @@ export async function resendCrewAssignmentEmail(opts: {
 }): Promise<Match | void> {
   if (!isFirebaseConfigured) return;
   const { match, slot, userId } = opts;
-  if (slot === 'cmo') {
-    await sendCrewAssignmentEmail({
-      match,
-      slot,
-      userId,
-      event: 'assignment_resend',
-    });
-    return;
-  }
   await sendCrewAssignmentEmail({
     match,
     slot,
     userId,
     event: 'assignment_resend',
   });
-  return recordAssignmentEmailSent(match, slot as CrewSlot, userId, 'assignment_resend');
+  return recordAssignmentEmailSent(match, slot, userId, 'assignment_resend');
 }
 
 /**
