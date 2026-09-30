@@ -6,6 +6,8 @@
   "scripts": {
     "build": "tsc",
     "migrate:tournament-feedback": "npm run build && node lib/migrateTournamentCoachFeedback.js",
+    "migrate:merge-duplicate-teams": "npm run build && node lib/migrateMergeDuplicateTeams.js",
+    "migrate:repair-second-yellow": "npm run build && node lib/migrateRepairSecondYellowCases.js",
     "backfill:match-scores": "npm run build && node lib/backfillMatchReportScores.js",
     "serve": "npm run build && firebase emulators:start --only functions",
     "deploy": "firebase deploy --only functions"

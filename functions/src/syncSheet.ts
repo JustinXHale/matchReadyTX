@@ -19,6 +19,7 @@ import {
   genderFromCompetitionName,
   isVenueOnlyLocationRow,
   lookupLocation,
+  lookupLocationByTeamName,
   normalizeGender,
   parseContactRows,
   parseLocationRows,
@@ -147,13 +148,16 @@ function canonicalizeTeamsByRosterKey(
   for (const team of teamsById.values()) {
     let abbr = (team.abbreviation ?? '').trim().toUpperCase();
     const comp = (team.competition ?? '').trim();
+    const gender = team.gender ?? 'men';
     if (!abbr && comp) {
-      const loc = lookupLocation(
-        locations,
-        team.name,
-        team.gender ?? 'men',
-        comp,
-      );
+      const loc =
+        lookupLocation(locations, team.name, gender, comp) ??
+        lookupLocationByTeamName(locations, team.name, gender, comp);
+      if (loc?.abbreviation) abbr = loc.abbreviation.trim().toUpperCase();
+    }
+    // Full-name-as-abbr (e.g. UNIVERSITY OF HOUSTON) → Locations abbr when possible.
+    if (abbr && abbr.length > 8 && comp) {
+      const loc = lookupLocationByTeamName(locations, team.name || abbr, gender, comp);
       if (loc?.abbreviation) abbr = loc.abbreviation.trim().toUpperCase();
     }
     const canonicalId =
@@ -248,12 +252,20 @@ function rosterTeamKey(abbreviation: string, competition: string): string {
 function buildTeamIdRemap(
   existingTeamDocs: FirebaseFirestore.QueryDocumentSnapshot[],
   teamsById: Map<string, TeamShape>,
+  locations: LocationRow[],
 ): Map<string, string> {
   const newIdByKey = new Map<string, string>();
+  const newIdByNameComp = new Map<string, string>();
   for (const [id, team] of teamsById) {
     const abbr = (team.abbreviation ?? '').trim().toUpperCase();
     const comp = (team.competition ?? '').trim();
     if (abbr && comp) newIdByKey.set(rosterTeamKey(abbr, comp), id);
+    if (comp && team.name.trim()) {
+      newIdByNameComp.set(
+        `${normNameKey(team.name)}|${comp.trim().toLowerCase()}`,
+        id,
+      );
+    }
   }
   const remap = new Map<string, string>();
   for (const doc of existingTeamDocs) {
@@ -264,13 +276,34 @@ function buildTeamIdRemap(
       remap.set(oldId, oldId);
       continue;
     }
-    const abbr = String(data.abbreviation ?? data.name ?? '')
+    const name = String(data.name ?? '').trim();
+    const comp = String(data.competition ?? '').trim();
+    let abbr = String(data.abbreviation ?? '')
       .trim()
       .toUpperCase();
-    const comp = String(data.competition ?? '').trim();
-    if (!abbr || !comp) continue;
-    const newId = newIdByKey.get(rosterTeamKey(abbr, comp));
-    if (newId) remap.set(oldId, newId);
+    const gender =
+      data.gender === 'women' || data.gender === 'men'
+        ? data.gender
+        : genderFromCompetitionName(comp) ?? 'men';
+    if ((!abbr || abbr.length > 8) && name && comp) {
+      const loc =
+        lookupLocation(locations, abbr || name, gender, comp) ??
+        lookupLocationByTeamName(locations, name, gender, comp);
+      if (loc?.abbreviation) abbr = loc.abbreviation.trim().toUpperCase();
+    }
+    if (abbr && comp) {
+      const newId = newIdByKey.get(rosterTeamKey(abbr, comp));
+      if (newId) {
+        remap.set(oldId, newId);
+        continue;
+      }
+    }
+    if (name && comp) {
+      const byName = newIdByNameComp.get(
+        `${normNameKey(name)}|${comp.trim().toLowerCase()}`,
+      );
+      if (byName) remap.set(oldId, byName);
+    }
   }
   return remap;
 }
@@ -484,7 +517,8 @@ export async function runSheetSync(opts: {
       }
       const conf = (c.conference ?? '').trim();
       const gender = genderFromCompetitionName(conf) ?? 'men';
-      const loc = lookupLocation(locations, c.team_name, gender, conf);
+      const loc = lookupLocation(locations, c.team_name, gender, conf)
+        ?? lookupLocationByTeamName(locations, c.team_name, gender, conf);
       if (loc?.abbreviation?.trim() && conf) {
         const id = teamIdFromAbbrevAndCompetition(loc.abbreviation, conf);
         const team = getOrCreateTeam(
@@ -723,7 +757,7 @@ export async function runSheetSync(opts: {
     if (away) keepTeamIds.add(away);
   }
   const existingTeams = await db.collection(`orgs/${orgId}/teams`).get();
-  const teamIdRemap = buildTeamIdRemap(existingTeams.docs, teamsById);
+  const teamIdRemap = buildTeamIdRemap(existingTeams.docs, teamsById, locations);
   for (const [oldId, newId] of canonicalTeamRemap) {
     teamIdRemap.set(oldId, newId);
   }

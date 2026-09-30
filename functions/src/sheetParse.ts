@@ -568,6 +568,37 @@ export function lookupLocation(
   return undefined;
 }
 
+/** Resolve a Locations row by full club name (+ optional competition/gender). */
+export function lookupLocationByTeamName(
+  locations: LocationRow[],
+  teamName: string,
+  gender: 'men' | 'women',
+  competition?: string,
+): LocationRow | undefined {
+  const want = teamName.trim().toLowerCase();
+  if (!want) return undefined;
+  const sameName = locations.filter(
+    (l) =>
+      (l.teamName ?? '').trim().toLowerCase() === want ||
+      (l.abbreviation ?? '').trim().toLowerCase() === want,
+  );
+  if (!sameName.length) return undefined;
+
+  const wantComp = (competition ?? '').trim().toLowerCase();
+  if (wantComp) {
+    const byComp = sameName.find(
+      (l) => (l.competition ?? '').trim().toLowerCase() === wantComp,
+    );
+    if (byComp) return byComp;
+  }
+
+  const byGender = sameName.find((l) => locationGender(l) === gender);
+  if (byGender) return byGender;
+
+  if (sameName.length === 1) return sameName[0];
+  return undefined;
+}
+
 export type TerritoryCityMapping = {
   metro: string;
   city: string;
