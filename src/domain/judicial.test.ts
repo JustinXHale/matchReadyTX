@@ -113,6 +113,44 @@ describe('judicial cases from card reports', () => {
     expect(cases.some((c) => c.color === 'second_yellow_red')).toBe(true);
   });
 
+  it('auto-creates a red when two yellows are filed for the same player', () => {
+    const report = baseReport();
+    report.cards = [
+      {
+        id: 'y1',
+        color: 'yellow',
+        playerName: 'Nine',
+        playerFirstName: '',
+        playerLastName: '',
+        playerJersey: '9',
+        teamId: 't_txcc',
+        teamName: 'TXCC',
+        reason: 'First yellow',
+        lawIds: ['law_9_7_unfair_play'],
+        offenseSummary: 'First yellow',
+      },
+      {
+        id: 'y2',
+        color: 'yellow',
+        playerName: 'Nine',
+        playerFirstName: '',
+        playerLastName: '',
+        playerJersey: '9',
+        teamId: 't_txcc',
+        teamName: 'TXCC',
+        reason: 'Second yellow',
+        lawIds: ['law_9_7_unfair_play'],
+        offenseSummary: 'Second yellow',
+      },
+    ];
+    const cases = casesFromCardReport(report);
+    expect(cases.filter((c) => c.color === 'yellow')).toHaveLength(2);
+    const red = cases.find((c) => c.color === 'second_yellow_red');
+    expect(red).toBeTruthy();
+    expect(red?.linkedCaseIds).toEqual(['y1', 'y2']);
+    expect(red?.status).toBe('pending');
+  });
+
   it('copies jersey onto judicial case snapshot', () => {
     const report = baseReport();
     report.cards[0]!.playerJersey = '10';
@@ -148,6 +186,20 @@ describe('discipline dashboard stats', () => {
     expect(filterCasesForDashboard(cases, 'lonestar_men')).toHaveLength(2);
   });
 
+  it('aggregates schools by teamId and uses canonical roster name', () => {
+    const cases = casesFromCardReport(baseReport()).map((c, i) =>
+      i === 0
+        ? { ...c, teamId: 't_baylor_men', teamName: 'BAYLOR' }
+        : { ...c, teamId: 't_baylor_men', teamName: 'Baylor University' },
+    );
+    const stats = disciplineDashboardStats(cases, [
+      { id: 't_baylor_men', name: 'Baylor University', abbreviation: 'BAYLOR' },
+    ]);
+    expect(stats.bySchool).toHaveLength(1);
+    expect(stats.bySchool[0]?.teamId).toBe('t_baylor_men');
+    expect(stats.bySchool[0]?.teamName).toBe('Baylor University');
+    expect(stats.bySchool[0]?.count).toBe(2);
+  });
   it('sorts schools by count descending and tracks pending reds', () => {
     const cases = seedDemoMenJudicialCases();
     const stats = disciplineDashboardStats(cases);

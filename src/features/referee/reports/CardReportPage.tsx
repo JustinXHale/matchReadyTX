@@ -27,7 +27,6 @@ import {
   type CardConference,
   type CardIncident,
   type CompetitionUnion,
-  type SecondOffense,
 } from '@/domain/reports';
 import {
   PLAYER_POSITION_LABELS,
@@ -62,15 +61,6 @@ function emptyCard(homeId: string, homeName: string): CardIncident {
     lawIds: [],
     offenseSummary: '',
     receivedAnotherCard: false,
-  };
-}
-
-function emptySecondOffense(): SecondOffense {
-  return {
-    color: 'second_yellow_red',
-    approximateTime: '',
-    lawIds: [],
-    summary: '',
   };
 }
 
@@ -269,19 +259,6 @@ export function CardReportPage() {
           ? [...new Set([...current, lawId])]
           : current.filter((id) => id !== lawId);
         return { ...c, lawIds };
-      }),
-    );
-  };
-
-  const toggleSecondLaw = (cardId: string, lawId: CardLawId, on: boolean) => {
-    setCards((list) =>
-      list.map((c) => {
-        if (c.id !== cardId) return c;
-        const second = c.secondOffense ?? emptySecondOffense();
-        const lawIds = on
-          ? [...new Set([...second.lawIds, lawId])]
-          : second.lawIds.filter((id) => id !== lawId);
-        return { ...c, secondOffense: { ...second, lawIds } };
       }),
     );
   };
@@ -617,104 +594,12 @@ export function CardReportPage() {
                     rows={4}
                   />
                 </FormGroup>
-                <FormGroup label="Did this player receive another card?" isRequired>
-                  <Radio
-                    id={`${card.id}-more-yes`}
-                    name={`${card.id}-more`}
-                    label="Yes"
-                    isChecked={card.receivedAnotherCard === true}
-                    onChange={() =>
-                      updateCard(card.id, {
-                        receivedAnotherCard: true,
-                        secondOffense: card.secondOffense ?? emptySecondOffense(),
-                      })
-                    }
-                  />
-                  <Radio
-                    id={`${card.id}-more-no`}
-                    name={`${card.id}-more`}
-                    label="No"
-                    isChecked={card.receivedAnotherCard !== true}
-                    onChange={() =>
-                      updateCard(card.id, {
-                        receivedAnotherCard: false,
-                        secondOffense: undefined,
-                      })
-                    }
-                  />
-                </FormGroup>
-                {card.receivedAnotherCard && card.secondOffense && (
-                  <>
-                    <FormGroup label="Second offense card color" isRequired>
-                      <Radio
-                        id={`${card.id}-2y`}
-                        name={`${card.id}-2color`}
-                        label="2nd Yellow - Red"
-                        isChecked={
-                          card.secondOffense.color === 'second_yellow_red'
-                        }
-                        onChange={() =>
-                          updateCard(card.id, {
-                            secondOffense: {
-                              ...card.secondOffense!,
-                              color: 'second_yellow_red',
-                            },
-                          })
-                        }
-                      />
-                      <Radio
-                        id={`${card.id}-2r`}
-                        name={`${card.id}-2color`}
-                        label="Red"
-                        isChecked={card.secondOffense.color === 'red'}
-                        onChange={() =>
-                          updateCard(card.id, {
-                            secondOffense: {
-                              ...card.secondOffense!,
-                              color: 'red',
-                            },
-                          })
-                        }
-                      />
-                    </FormGroup>
-                    <FormGroup label="Approximate time of the second infraction" isRequired>
-                      <TextInput
-                        value={card.secondOffense.approximateTime}
-                        onChange={(_e, v) =>
-                          updateCard(card.id, {
-                            secondOffense: {
-                              ...card.secondOffense!,
-                              approximateTime: v,
-                            },
-                          })
-                        }
-                      />
-                    </FormGroup>
-                    <FormGroup label="What law was infringed?" isRequired>
-                      <CardLawPicker
-                        id={`${card.id}-2`}
-                        selected={card.secondOffense.lawIds}
-                        onToggle={(lawId, on) =>
-                          toggleSecondLaw(card.id, lawId, on)
-                        }
-                      />
-                    </FormGroup>
-                    <FormGroup label="Second offense summary" isRequired>
-                      <TextArea
-                        value={card.secondOffense.summary}
-                        onChange={(_e, v) =>
-                          updateCard(card.id, {
-                            secondOffense: {
-                              ...card.secondOffense!,
-                              summary: v,
-                            },
-                          })
-                        }
-                        rows={3}
-                      />
-                    </FormGroup>
-                  </>
-                )}
+                <p className="rs-match-card__meta">
+                  If the same player receives a second yellow in this match, use{' '}
+                  <strong>Add another card</strong> and file that yellow
+                  separately. A send-off (red) is created automatically from the
+                  two yellows — you do not write a separate red report.
+                </p>
                 <FormGroup label="Additional information (Scheduler only)">
                   <TextArea
                     value={card.additionalInfoPrivate ?? ''}

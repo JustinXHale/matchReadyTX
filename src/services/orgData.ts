@@ -2855,6 +2855,12 @@ function parseJudicialCase(
       typeof data.ruledByName === 'string' ? data.ruledByName : undefined,
     createdAt,
     updatedAt: typeof data.updatedAt === 'string' ? data.updatedAt : createdAt,
+    linkedCaseIds: Array.isArray(data.linkedCaseIds)
+      ? data.linkedCaseIds.filter((x): x is string => typeof x === 'string')
+      : undefined,
+    sourceCardIds: Array.isArray(data.sourceCardIds)
+      ? data.sourceCardIds.filter((x): x is string => typeof x === 'string')
+      : undefined,
   };
 }
 
@@ -2889,6 +2895,8 @@ function judicialCaseToFirestore(
     ruledByName: c.ruledByName ?? null,
     createdAt: c.createdAt,
     updatedAt: c.updatedAt,
+    linkedCaseIds: c.linkedCaseIds?.length ? c.linkedCaseIds : null,
+    sourceCardIds: c.sourceCardIds?.length ? c.sourceCardIds : null,
   });
 }
 

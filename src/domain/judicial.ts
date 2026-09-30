@@ -50,6 +50,10 @@ export interface JudicialCase {
   ruledByName?: string;
   createdAt: string;
   updatedAt: string;
+  /** Auto red from two yellows — ids of the yellow cases. */
+  linkedCaseIds?: string[];
+  /** Card incident ids that produced this (auto) case. */
+  sourceCardIds?: string[];
 }
 
 export interface JudicialComment {
@@ -175,11 +179,83 @@ export function casesFromCardReport(
   const out: JudicialCase[] = [];
   for (const card of report.cards) {
     out.push(snapshotFromIncident(report, card, nowIso, { second: false }));
+    // Legacy nested second-offense on a single card row.
     if (card.receivedAnotherCard && card.secondOffense) {
       out.push(snapshotFromIncident(report, card, nowIso, { second: true }));
     }
   }
+
+  // Two separate yellow incidents for the same player → auto red (send-off).
+  const yellows = report.cards.filter((c) => c.color === 'yellow');
+  const seenPairs = new Set<string>();
+  for (let i = 0; i < yellows.length; i++) {
+    for (let j = i + 1; j < yellows.length; j++) {
+      const a = yellows[i]!;
+      const b = yellows[j]!;
+      if (!samePlayerIncidents(a, b)) continue;
+      const ids = [a.id, b.id].sort();
+      const pairKey = ids.join('|');
+      if (seenPairs.has(pairKey)) continue;
+      seenPairs.add(pairKey);
+      // Skip if legacy nested second already produced a hearing color for either.
+      const alreadyHasSecond = out.some(
+        (c) =>
+          (c.incidentId === a.id || c.incidentId === b.id) &&
+          isHearingColor(c.color),
+      );
+      if (alreadyHasSecond) continue;
+      out.push(autoSecondYellowRedCase(report, a, b, nowIso));
+    }
+  }
   return out;
+}
+
+function samePlayerIncidents(a: CardIncident, b: CardIncident): boolean {
+  if (a.teamId && b.teamId && a.teamId !== b.teamId) return false;
+  const jerseyA = (a.playerJersey ?? '').trim();
+  const jerseyB = (b.playerJersey ?? '').trim();
+  if (jerseyA && jerseyB && jerseyA === jerseyB) return true;
+  const nameA = normalizePlayerTraceName(displayPlayerName(a));
+  const nameB = normalizePlayerTraceName(displayPlayerName(b));
+  if (nameA && nameB && nameA === nameB) return true;
+  return false;
+}
+
+function autoSecondYellowRedCase(
+  report: CardReport,
+  first: CardIncident,
+  second: CardIncident,
+  nowIso: string,
+): JudicialCase {
+  const ids = [first.id, second.id].sort();
+  const yellowCaseIds = ids.map((id) => judicialCaseId(id, false));
+  const firstName = displayPlayerName(first);
+  const laws = [...new Set([...(first.lawIds ?? []), ...(second.lawIds ?? [])])];
+  return {
+    id: `${ids[0]}_${ids[1]}_syr`,
+    reportId: report.id,
+    incidentId: second.id,
+    matchId: report.matchId,
+    conference: report.conference ?? '',
+    color: 'second_yellow_red',
+    playerFirstName: first.playerFirstName?.trim() ?? '',
+    playerLastName: first.playerLastName?.trim() ?? '',
+    playerName: firstName,
+    playerJersey: first.playerJersey?.trim() || second.playerJersey?.trim(),
+    teamId: first.teamId || second.teamId,
+    teamName: first.teamName || second.teamName,
+    lawIds: laws,
+    offenseSummary:
+      '2nd yellow — send-off. Automatic red from two yellow cards in this match.',
+    matchDate: report.matchDate || undefined,
+    officialId: report.officialId || undefined,
+    officialName: report.officialName || undefined,
+    status: defaultCaseStatus('second_yellow_red'),
+    createdAt: nowIso,
+    updatedAt: nowIso,
+    linkedCaseIds: yellowCaseIds,
+    sourceCardIds: ids,
+  };
 }
 
 export function isRedCardColor(color: JudicialCardColor): boolean {
@@ -314,7 +390,7 @@ export function filterJudicialCases(
     } else if (status !== 'all' && c.status !== status) {
       return false;
     }
-    if (school && c.teamName !== school && c.teamId !== school) return false;
+    if (school && c.teamId !== school && c.teamName !== school) return false;
     if (bucket !== 'all' && trendBucketForLaws(c.lawIds) !== bucket) {
       return false;
     }
@@ -356,6 +432,7 @@ export function judicialCasesQuery(
 
 export function disciplineDashboardStats(
   cases: JudicialCase[],
+  teams?: { id: string; name: string; abbreviation?: string }[],
 ): DisciplineDashboardStats {
   const totalCards = cases.length;
   const yellowCards = cases.filter((c) => c.color === 'yellow').length;
@@ -369,9 +446,15 @@ export function disciplineDashboardStats(
   ).length;
   const redsDismissed = reds.filter((c) => c.status === 'dismissed').length;
 
+  const canonicalName = (c: JudicialCase): string => {
+    const fromRoster = teams?.find((t) => t.id === c.teamId)?.name?.trim();
+    if (fromRoster) return fromRoster;
+    return c.teamName?.trim() || 'Unknown';
+  };
+
   const schoolMap = new Map<string, JudicialSchoolBarStat>();
   for (const c of cases) {
-    const key = c.teamName || c.teamId;
+    const key = c.teamId?.trim() || c.teamName || 'unknown';
     const cur = schoolMap.get(key);
     const isRed = isRedCardColor(c.color);
     if (cur) {
@@ -380,8 +463,8 @@ export function disciplineDashboardStats(
       else cur.yellowCount += 1;
     } else {
       schoolMap.set(key, {
-        teamId: c.teamId,
-        teamName: c.teamName || 'Unknown',
+        teamId: c.teamId || key,
+        teamName: canonicalName(c),
         count: 1,
         yellowCount: isRed ? 0 : 1,
         redCount: isRed ? 1 : 0,

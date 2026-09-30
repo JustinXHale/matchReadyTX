@@ -64,12 +64,13 @@ import {
   cmoAsAssignment,
   crewBlocks,
   crewPeople,
-  crewSlotStatusLabel,
+  crewSlotStatusLabelForAssignment,
   genderLabel,
   hasRefereeLensRole,
   isCrewSlot,
   isCrewVisibleToTeams,
   rolesNeededForMatch,
+  shouldShowAssignmentNotifyLine,
   teamFacingCmoFill,
   teamFacingCrewRoleFill,
   teamFacingCrewShapeLabel,
@@ -2480,11 +2481,12 @@ export function MatchDetailPage() {
                         userId: c.userId,
                         userName: c.userName,
                         status: c.userId
-                          ? crewSlotStatusLabel(view.status)
+                          ? crewSlotStatusLabelForAssignment(view)
                           : 'Open',
-                        notifyLine: c.userId
-                          ? assignmentEmailNotifyLine(view, orgTz)
-                          : null,
+                        notifyLine:
+                          c.userId && shouldShowAssignmentNotifyLine(view)
+                            ? assignmentEmailNotifyLine(view, orgTz)
+                            : null,
                         cmoId: c.id,
                         cmoUserId: c.userId,
                       };
@@ -2495,11 +2497,12 @@ export function MatchDetailPage() {
                       userId: a.userId,
                       userName: a.userName,
                       status: a.userId
-                        ? crewSlotStatusLabel(a.status)
+                        ? crewSlotStatusLabelForAssignment(a)
                         : 'Open',
-                      notifyLine: a.userId
-                        ? assignmentEmailNotifyLine(a, orgTz)
-                        : null,
+                      notifyLine:
+                        a.userId && shouldShowAssignmentNotifyLine(a)
+                          ? assignmentEmailNotifyLine(a, orgTz)
+                          : null,
                       assignmentId: a.id,
                     }));
 
@@ -2556,20 +2559,22 @@ export function MatchDetailPage() {
                           <span className="rs-detail-people__slot">
                             {REQUESTABLE_SLOT_SHORT[slot]}
                           </span>
-                          <span
-                            className={`rs-detail-people__name${
-                              filled ? '' : ' rs-detail-people__name--muted'
-                            }`}
-                          >
-                            {filled ? (b.userName ?? 'Official') : 'Open'}
-                          </span>
-                          <span className="rs-detail-people__status">
-                            <span>{b.status}</span>
+                          <span className="rs-detail-people__main">
+                            <span
+                              className={`rs-detail-people__name${
+                                filled ? '' : ' rs-detail-people__name--muted'
+                              }`}
+                            >
+                              {filled ? (b.userName ?? 'Official') : 'Open'}
+                            </span>
                             {'notifyLine' in b && b.notifyLine ? (
                               <span className="rs-detail-people__notified">
                                 {b.notifyLine}
                               </span>
                             ) : null}
+                          </span>
+                          <span className="rs-detail-people__status">
+                            <span>{b.status}</span>
                           </span>
                         </button>
                       ) : (

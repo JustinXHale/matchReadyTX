@@ -524,6 +524,13 @@ button.rs-detail-people__confirm:focus-visible {
   white-space: nowrap;
 }
 
+.rs-detail-people__main {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
 .rs-detail-people__name--muted {
   font-weight: 500;
   color: var(--rs-color-muted);
@@ -537,13 +544,16 @@ button.rs-detail-people__confirm:focus-visible {
   font-size: 12px;
   color: var(--rs-color-ended);
   text-align: right;
+  max-width: 9.5rem;
+  flex-shrink: 0;
 }
 
 .rs-detail-people__notified {
   font-size: 0.68rem;
   font-weight: 500;
   color: var(--rs-color-muted);
-  line-height: 1.2;
+  line-height: 1.25;
+  white-space: normal;
 }
 
 .rs-detail-email-scope {

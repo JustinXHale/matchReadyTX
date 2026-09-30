@@ -26,22 +26,28 @@ function schoolBarItems(
   schools: ReturnType<typeof disciplineDashboardStats>['bySchool'],
   casesBase: string,
   withSeason: ReturnType<typeof useJudicialSeasonParams>['withSeason'],
+  conference: 'lonestar_men' | 'lonestar_women',
 ) {
-  return schools.map((s) => ({
-    key: s.teamId || s.teamName,
-    label: s.teamName,
-    yellow: s.yellowCount,
-    red: s.redCount,
-    href: `${casesBase}${withSeason({ school: s.teamName })}`,
-    hrefYellow: `${casesBase}${withSeason({
-      school: s.teamName,
-      color: 'yellow',
-    })}`,
-    hrefRed: `${casesBase}${withSeason({
-      school: s.teamName,
-      color: 'red',
-    })}`,
-  }));
+  return schools.map((s) => {
+    const schoolKey = s.teamId || s.teamName;
+    return {
+      key: schoolKey,
+      label: s.teamName,
+      yellow: s.yellowCount,
+      red: s.redCount,
+      href: `${casesBase}${withSeason({ school: schoolKey, conference })}`,
+      hrefYellow: `${casesBase}${withSeason({
+        school: schoolKey,
+        conference,
+        color: 'yellow',
+      })}`,
+      hrefRed: `${casesBase}${withSeason({
+        school: schoolKey,
+        conference,
+        color: 'red',
+      })}`,
+    };
+  });
 }
 
 function officialBarItems(
@@ -72,6 +78,7 @@ function playerBarItems(
   players: ReturnType<typeof disciplineDashboardStats>['byPlayer'],
   casesBase: string,
   withSeason: ReturnType<typeof useJudicialSeasonParams>['withSeason'],
+  conference: 'lonestar_men' | 'lonestar_women',
 ) {
   return players.map((p) => ({
     key: p.traceKey,
@@ -81,27 +88,104 @@ function playerBarItems(
     href: `${casesBase}${withSeason({
       school: p.teamName,
       player: p.playerName,
+      conference,
     })}`,
     hrefYellow: `${casesBase}${withSeason({
       school: p.teamName,
       player: p.playerName,
+      conference,
       color: 'yellow',
     })}`,
     hrefRed: `${casesBase}${withSeason({
       school: p.teamName,
       player: p.playerName,
+      conference,
       color: 'red',
     })}`,
   }));
+}
+
+function ExpandableBars({
+  title,
+  id,
+  emptyLabel,
+  items,
+  totalCount,
+  expanded,
+  setExpanded,
+  ariaLabelTop,
+  ariaLabelAll,
+  noun,
+}: {
+  title: string;
+  id: string;
+  emptyLabel: string;
+  items: ReturnType<typeof schoolBarItems>;
+  totalCount: number;
+  expanded: boolean;
+  setExpanded: (v: boolean) => void;
+  ariaLabelTop: string;
+  ariaLabelAll: string;
+  noun: string;
+}) {
+  const visible = expanded ? items : items.slice(0, TOP_N);
+  return (
+    <section className="rs-detail-card" aria-labelledby={id}>
+      <h2 id={id} className="rs-detail-section__label">
+        {title}
+      </h2>
+      {visible.length === 0 ? (
+        <p className="rs-match-card__meta">{emptyLabel}</p>
+      ) : (
+        <>
+          <JudicialStackedBars
+            ariaLabel={expanded ? ariaLabelAll : ariaLabelTop}
+            items={visible}
+          />
+          {totalCount > TOP_N && (
+            <p className="rs-match-card__meta">
+              {expanded ? (
+                <>
+                  Showing all {totalCount} {noun}.{' '}
+                  <Button
+                    variant="link"
+                    isInline
+                    onClick={() => setExpanded(false)}
+                  >
+                    Show top {TOP_N}
+                  </Button>
+                </>
+              ) : (
+                <>
+                  Showing top {TOP_N} of {totalCount} {noun}.{' '}
+                  <Button
+                    variant="link"
+                    isInline
+                    onClick={() => setExpanded(true)}
+                  >
+                    Show all {totalCount} {noun}
+                  </Button>
+                </>
+              )}
+            </p>
+          )}
+        </>
+      )}
+    </section>
+  );
 }
 
 export function JudicialDashboardPage() {
   const { state } = useApp();
   const casesBase = useAppHref('/judicial/cases');
   const { conference, from, to, patch, withSeason } = useJudicialSeasonParams();
-  const [schoolsExpanded, setSchoolsExpanded] = useState(false);
+  const [schoolsMenExpanded, setSchoolsMenExpanded] = useState(false);
+  const [schoolsWomenExpanded, setSchoolsWomenExpanded] = useState(false);
   const [officialsExpanded, setOfficialsExpanded] = useState(false);
-  const [offendersExpanded, setOffendersExpanded] = useState(false);
+  const [offendersMenExpanded, setOffendersMenExpanded] = useState(false);
+  const [offendersWomenExpanded, setOffendersWomenExpanded] = useState(false);
+
+  const teams = state.teams;
 
   const filtered = useMemo(
     () =>
@@ -113,9 +197,37 @@ export function JudicialDashboardPage() {
     [state.judicialCases, conference, from, to],
   );
   const stats = useMemo(
-    () => disciplineDashboardStats(filtered),
-    [filtered],
+    () => disciplineDashboardStats(filtered, teams),
+    [filtered, teams],
   );
+
+  const menCases = useMemo(
+    () =>
+      filterJudicialCases(state.judicialCases, {
+        conference: 'lonestar_men',
+        from,
+        to,
+      }),
+    [state.judicialCases, from, to],
+  );
+  const womenCases = useMemo(
+    () =>
+      filterJudicialCases(state.judicialCases, {
+        conference: 'lonestar_women',
+        from,
+        to,
+      }),
+    [state.judicialCases, from, to],
+  );
+  const menStats = useMemo(
+    () => disciplineDashboardStats(menCases, teams),
+    [menCases, teams],
+  );
+  const womenStats = useMemo(
+    () => disciplineDashboardStats(womenCases, teams),
+    [womenCases, teams],
+  );
+
   const season = rugbySeasonLabel();
   const conferenceTitle =
     conference === 'all'
@@ -124,15 +236,9 @@ export function JudicialDashboardPage() {
         ? 'Lonestar Men’s Conference'
         : 'Lonestar Women’s Conference';
 
-  const visibleSchools = schoolsExpanded
-    ? stats.bySchool
-    : stats.bySchool.slice(0, TOP_N);
   const visibleOfficials = officialsExpanded
     ? stats.byOfficial
     : stats.byOfficial.slice(0, TOP_N);
-  const visibleOffenders = offendersExpanded
-    ? stats.byPlayer
-    : stats.byPlayer.slice(0, TOP_N);
 
   return (
     <div className="rs-stack rs-judicial-dashboard">
@@ -189,7 +295,8 @@ export function JudicialDashboardPage() {
         </div>
         <p className="rs-match-card__meta">
           Tap a tile, bar segment, or name to open the caseload. Cases live under
-          the Cases tab.
+          the Cases tab. School and offender cards are always split by Lonestar
+          Men / Women.
         </p>
       </div>
 
@@ -229,52 +336,43 @@ export function JudicialDashboardPage() {
       </div>
 
       <div className="rs-judicial-dashboard-row rs-judicial-dashboard-row--2">
-        <section className="rs-detail-card" aria-labelledby="by-school">
-          <h2 id="by-school" className="rs-detail-section__label">
-            Reports by school
-          </h2>
-          {visibleSchools.length === 0 ? (
-            <p className="rs-match-card__meta">No cards yet.</p>
-          ) : (
-            <>
-              <JudicialStackedBars
-                ariaLabel={
-                  schoolsExpanded
-                    ? 'All schools by card count'
-                    : 'Top schools by card count'
-                }
-                items={schoolBarItems(visibleSchools, casesBase, withSeason)}
-              />
-              {stats.bySchool.length > TOP_N && (
-                <p className="rs-match-card__meta">
-                  {schoolsExpanded ? (
-                    <>
-                      Showing all {stats.bySchool.length} schools.{' '}
-                      <Button
-                        variant="link"
-                        isInline
-                        onClick={() => setSchoolsExpanded(false)}
-                      >
-                        Show top {TOP_N}
-                      </Button>
-                    </>
-                  ) : (
-                    <>
-                      Showing top {TOP_N} of {stats.bySchool.length} schools.{' '}
-                      <Button
-                        variant="link"
-                        isInline
-                        onClick={() => setSchoolsExpanded(true)}
-                      >
-                        Show all {stats.bySchool.length} schools
-                      </Button>
-                    </>
-                  )}
-                </p>
-              )}
-            </>
+        <ExpandableBars
+          title="Reports by school — Lonestar Men"
+          id="by-school-men"
+          emptyLabel="No cards yet for Lonestar Men."
+          items={schoolBarItems(
+            menStats.bySchool,
+            casesBase,
+            withSeason,
+            'lonestar_men',
           )}
-        </section>
+          totalCount={menStats.bySchool.length}
+          expanded={schoolsMenExpanded}
+          setExpanded={setSchoolsMenExpanded}
+          ariaLabelTop="Top Lonestar Men schools by card count"
+          ariaLabelAll="All Lonestar Men schools by card count"
+          noun="schools"
+        />
+        <ExpandableBars
+          title="Reports by school — Lonestar Women"
+          id="by-school-women"
+          emptyLabel="No cards yet for Lonestar Women."
+          items={schoolBarItems(
+            womenStats.bySchool,
+            casesBase,
+            withSeason,
+            'lonestar_women',
+          )}
+          totalCount={womenStats.bySchool.length}
+          expanded={schoolsWomenExpanded}
+          setExpanded={setSchoolsWomenExpanded}
+          ariaLabelTop="Top Lonestar Women schools by card count"
+          ariaLabelAll="All Lonestar Women schools by card count"
+          noun="schools"
+        />
+      </div>
+
+      <div className="rs-judicial-dashboard-row rs-judicial-dashboard-row--2">
         <section className="rs-detail-card" aria-labelledby="by-official">
           <h2 id="by-official" className="rs-detail-section__label">
             Cards by match official
@@ -321,9 +419,6 @@ export function JudicialDashboardPage() {
             </>
           )}
         </section>
-      </div>
-
-      <div className="rs-judicial-dashboard-row rs-judicial-dashboard-row--2">
         <section className="rs-detail-card" aria-labelledby="trends">
           <h2 id="trends" className="rs-detail-section__label">
             Disciplinary trends
@@ -344,52 +439,43 @@ export function JudicialDashboardPage() {
             />
           )}
         </section>
-        <section className="rs-detail-card" aria-labelledby="card-offenders">
-          <h2 id="card-offenders" className="rs-detail-section__label">
-            Card offenders
-          </h2>
-          {visibleOffenders.length === 0 ? (
-            <p className="rs-match-card__meta">No players with cards yet.</p>
-          ) : (
-            <>
-              <JudicialStackedBars
-                ariaLabel={
-                  offendersExpanded
-                    ? 'All players by card count'
-                    : 'Top players by card count'
-                }
-                items={playerBarItems(visibleOffenders, casesBase, withSeason)}
-              />
-              {stats.byPlayer.length > TOP_N && (
-                <p className="rs-match-card__meta">
-                  {offendersExpanded ? (
-                    <>
-                      Showing all {stats.byPlayer.length} players.{' '}
-                      <Button
-                        variant="link"
-                        isInline
-                        onClick={() => setOffendersExpanded(false)}
-                      >
-                        Show top {TOP_N}
-                      </Button>
-                    </>
-                  ) : (
-                    <>
-                      Showing top {TOP_N} of {stats.byPlayer.length} players.{' '}
-                      <Button
-                        variant="link"
-                        isInline
-                        onClick={() => setOffendersExpanded(true)}
-                      >
-                        Show all {stats.byPlayer.length} players
-                      </Button>
-                    </>
-                  )}
-                </p>
-              )}
-            </>
+      </div>
+
+      <div className="rs-judicial-dashboard-row rs-judicial-dashboard-row--2">
+        <ExpandableBars
+          title="Card offenders — Lonestar Men"
+          id="card-offenders-men"
+          emptyLabel="No players with cards yet for Lonestar Men."
+          items={playerBarItems(
+            menStats.byPlayer,
+            casesBase,
+            withSeason,
+            'lonestar_men',
           )}
-        </section>
+          totalCount={menStats.byPlayer.length}
+          expanded={offendersMenExpanded}
+          setExpanded={setOffendersMenExpanded}
+          ariaLabelTop="Top Lonestar Men players by card count"
+          ariaLabelAll="All Lonestar Men players by card count"
+          noun="players"
+        />
+        <ExpandableBars
+          title="Card offenders — Lonestar Women"
+          id="card-offenders-women"
+          emptyLabel="No players with cards yet for Lonestar Women."
+          items={playerBarItems(
+            womenStats.byPlayer,
+            casesBase,
+            withSeason,
+            'lonestar_women',
+          )}
+          totalCount={womenStats.byPlayer.length}
+          expanded={offendersWomenExpanded}
+          setExpanded={setOffendersWomenExpanded}
+          ariaLabelTop="Top Lonestar Women players by card count"
+          ariaLabelAll="All Lonestar Women players by card count"
+          noun="players"
+        />
       </div>
 
       <section
@@ -424,7 +510,8 @@ export function JudicialDashboardPage() {
               {stats.upheldReds.map((c) => (
                 <li key={c.id}>
                   <Link to={`${casesBase}/${c.id}`}>
-                    {displayCasePlayer(c)} ({c.teamName}) — {hearingOutcomeLabel(c)}
+                    {displayCasePlayer(c)} ({c.teamName}) —{' '}
+                    {hearingOutcomeLabel(c)}
                   </Link>
                 </li>
               ))}

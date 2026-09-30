@@ -883,6 +883,30 @@ export function crewSlotStatusLabel(status: CrewSlotStatus): string {
   return map[status];
 }
 
+/** Status label that respects whether an assignment email was already sent. */
+export function crewSlotStatusLabelForAssignment(
+  assignment: Pick<CrewAssignment, 'status' | 'assignmentNotifiedAt'>,
+): string {
+  if (assignment.status === 'pending_internal') {
+    return assignment.assignmentNotifiedAt
+      ? 'Pending'
+      : 'Pending (not notified)';
+  }
+  return crewSlotStatusLabel(assignment.status);
+}
+
+/** Show notify timestamp only while the official still needs to confirm. */
+export function shouldShowAssignmentNotifyLine(
+  assignment: Pick<CrewAssignment, 'status' | 'assignmentNotifiedAt'>,
+): boolean {
+  if (!assignment.assignmentNotifiedAt) return false;
+  return (
+    assignment.status === 'pending_internal' ||
+    assignment.status === 'official' ||
+    assignment.status === 'held'
+  );
+}
+
 export function genderLabel(gender: MatchGender): string {
   return gender === 'men' ? 'Men' : 'Women';
 }
