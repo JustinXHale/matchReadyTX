@@ -15,6 +15,7 @@ export type PlatformMember = {
   calendarSeenAt: string | null;
   matchCount: number;
   tournamentCount: number;
+  flightImportEnabled: boolean;
 };
 
 export type PlatformInsightsResult = {
@@ -167,8 +168,9 @@ export async function runGetMatchCalendarPlatformInsights(
   const summaries: InsightsSummary[] = [];
 
   for (const authMember of authMembers) {
-    const [settingsSnap, data] = await Promise.all([
+    const [settingsSnap, flightAccessSnap, data] = await Promise.all([
       db.doc(`users/${authMember.uid}/matchCalendar/settings`).get(),
+      db.doc(`matchCalendarFeatureAccess/${authMember.uid}`).get(),
       loadUserCalendarData(db, authMember.uid),
     ]);
 
@@ -186,6 +188,8 @@ export async function runGetMatchCalendarPlatformInsights(
       calendarSeenAt,
       matchCount: data.matches.length,
       tournamentCount: data.tournaments.length,
+      flightImportEnabled:
+        flightAccessSnap.data()?.flightImportEnabled === true,
     });
 
     if (data.matches.length > 0 || data.tournaments.length > 0) {

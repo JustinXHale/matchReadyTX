@@ -10,7 +10,8 @@
 # Optional Variables:
 #   VITE_DEMO_MODE, VITE_DEFAULT_ORG_ID, VITE_APP_ORIGIN, RESEND_FROM_EMAIL
 #
-# Functions secrets (GOOGLE_SERVICE_ACCOUNT_JSON, RESEND_API_KEY, SHEET_WEBHOOK_SECRET)
+# Functions secrets (GOOGLE_SERVICE_ACCOUNT_JSON, RESEND_API_KEY,
+# SHEET_WEBHOOK_SECRET, AERODATABOX_API_KEY)
 # must already exist in Firebase Secret Manager (`firebase functions:secrets:set`).
 # Do not put those names in functions/.env.* — Cloud Run rejects secret + plaintext overlap.
 # Optional (comma-separated platform admins for Match Calendar) — secret or variable:

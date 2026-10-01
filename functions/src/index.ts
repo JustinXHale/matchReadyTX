@@ -27,7 +27,19 @@ import {
   type MatchSelfServiceAction,
 } from './matchSelfService';
 import { runSyncMatchReadyAssignments } from './matchCalendarImport';
-import { runGetMatchCalendarPlatformInsights } from './matchCalendarPlatformInsights';
+import {
+  assertMatchCalendarPlatformAdmin,
+  runGetMatchCalendarPlatformInsights,
+} from './matchCalendarPlatformInsights';
+import {
+  assertMatchCalendarFlightImportAllowed,
+  isMatchCalendarFlightImportAllowed,
+  searchAeroDataBoxFlights,
+} from './matchCalendarFlightImport';
+import {
+  purgeExpiredMatchCalendarFlightData,
+  syncMatchCalendarFlightExpirations,
+} from './matchCalendarFlightRetention';
 import {
   enqueueMail,
   processMailDocument,
@@ -53,6 +65,7 @@ export const syncSubmittedMatchScore = onDocumentWritten(
 const googleServiceAccountJson = defineSecret('GOOGLE_SERVICE_ACCOUNT_JSON');
 const resendApiKey = defineSecret('RESEND_API_KEY');
 const sheetWebhookSecret = defineSecret('SHEET_WEBHOOK_SECRET');
+const aeroDataBoxApiKey = defineSecret('AERODATABOX_API_KEY');
 /** Verified sender, e.g. MatchReadyTX <noreply@yourdomain.com> */
 const resendFromEmail = defineString('RESEND_FROM_EMAIL', {
   default: 'MatchReadyTX <onboarding@resend.dev>',
@@ -65,7 +78,6 @@ const matchCalendarPlatformAdminEmails = defineString(
   'MATCH_CALENDAR_PLATFORM_ADMIN_EMAILS',
   { default: '' },
 );
-
 async function assertAssigner(uid: string, orgId: string): Promise<void> {
   const member = await db.doc(`orgs/${orgId}/members/${uid}`).get();
   if (!member.exists) {
@@ -532,6 +544,128 @@ export const getMatchCalendarPlatformInsights = onCall(
         emails: matchCalendarPlatformAdminEmails.value(),
       },
     );
+  },
+);
+
+/** Whether the signed-in Match Calendar user may see flight import controls. */
+export const getMatchCalendarFlightImportAccess = onCall(async (request) => {
+  if (!request.auth?.uid) {
+    throw new HttpsError('unauthenticated', 'Sign in required');
+  }
+  return {
+    enabled: await isMatchCalendarFlightImportAllowed(db, request.auth.uid),
+  };
+});
+
+/** Platform-admin control for a member's Match Calendar flight import access. */
+export const setMatchCalendarFlightImportAccess = onCall(async (request) => {
+  if (!request.auth?.uid) {
+    throw new HttpsError('unauthenticated', 'Sign in required');
+  }
+  const data = request.data;
+  if (!data || typeof data !== 'object' || Array.isArray(data)) {
+    throw new HttpsError('invalid-argument', 'Invalid payload.');
+  }
+  const allowed = new Set(['uid', 'enabled']);
+  for (const key of Object.keys(data as Record<string, unknown>)) {
+    if (!allowed.has(key)) {
+      throw new HttpsError('invalid-argument', `Unknown field: ${key}`);
+    }
+  }
+
+  const uid = String((data as Record<string, unknown>).uid ?? '').trim();
+  const enabled = (data as Record<string, unknown>).enabled;
+  if (!uid || uid.length > 128 || uid.includes('/')) {
+    throw new HttpsError('invalid-argument', 'A valid member uid is required.');
+  }
+  if (typeof enabled !== 'boolean') {
+    throw new HttpsError('invalid-argument', 'enabled must be a boolean.');
+  }
+
+  const caller = await auth.getUser(request.auth.uid);
+  assertMatchCalendarPlatformAdmin(request.auth.uid, caller.email, {
+    uids: matchCalendarPlatformAdminUids.value(),
+    emails: matchCalendarPlatformAdminEmails.value(),
+  });
+  await auth.getUser(uid);
+  await db.doc(`matchCalendarFeatureAccess/${uid}`).set(
+    {
+      flightImportEnabled: enabled,
+      updatedAt: FieldValue.serverTimestamp(),
+      updatedBy: request.auth.uid,
+    },
+    { merge: true },
+  );
+
+  return { uid, enabled };
+});
+
+/** Gated AeroDataBox lookup by flight number and local departure date. */
+export const searchMatchCalendarFlights = onCall(
+  { secrets: [aeroDataBoxApiKey], timeoutSeconds: 30 },
+  async (request) => {
+    if (!request.auth?.uid) {
+      throw new HttpsError('unauthenticated', 'Sign in required');
+    }
+    await assertMatchCalendarFlightImportAllowed(db, request.auth.uid);
+
+    const data = request.data;
+    if (!data || typeof data !== 'object' || Array.isArray(data)) {
+      throw new HttpsError('invalid-argument', 'Invalid payload.');
+    }
+    const allowed = new Set(['flightNumber', 'departureDate']);
+    for (const key of Object.keys(data as Record<string, unknown>)) {
+      if (!allowed.has(key)) {
+        throw new HttpsError('invalid-argument', `Unknown field: ${key}`);
+      }
+    }
+
+    const flightNumber = String(
+      (data as Record<string, unknown>).flightNumber ?? '',
+    );
+    const departureDate = String(
+      (data as Record<string, unknown>).departureDate ?? '',
+    );
+    const apiKey = aeroDataBoxApiKey.value();
+    if (!apiKey) {
+      throw new HttpsError(
+        'failed-precondition',
+        'The flight data service is not configured.',
+      );
+    }
+    return searchAeroDataBoxFlights({ apiKey, flightNumber, departureDate });
+  },
+);
+
+export const trackMatchCalendarMatchFlightRetention = onDocumentWritten(
+  'users/{uid}/matches/{recordId}',
+  async (event) => {
+    await syncMatchCalendarFlightExpirations(db, {
+      uid: event.params.uid,
+      kind: 'matches',
+      recordId: event.params.recordId,
+      data: event.data?.after.data(),
+    });
+  },
+);
+
+export const trackMatchCalendarTournamentFlightRetention = onDocumentWritten(
+  'users/{uid}/tournaments/{recordId}',
+  async (event) => {
+    await syncMatchCalendarFlightExpirations(db, {
+      uid: event.params.uid,
+      kind: 'tournaments',
+      recordId: event.params.recordId,
+      data: event.data?.after.data(),
+    });
+  },
+);
+
+export const purgeMatchCalendarFlightData = onSchedule(
+  'every 6 hours',
+  async () => {
+    const purged = await purgeExpiredMatchCalendarFlightData(db);
+    logger.info('Expired Match Calendar flight data purged', { purged });
   },
 );
 
