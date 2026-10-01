@@ -613,7 +613,11 @@ export const searchMatchCalendarFlights = onCall(
     if (!data || typeof data !== 'object' || Array.isArray(data)) {
       throw new HttpsError('invalid-argument', 'Invalid payload.');
     }
-    const allowed = new Set(['flightNumber', 'departureDate']);
+    const allowed = new Set([
+      'flightNumber',
+      'departureDate',
+      'departureAirport',
+    ]);
     for (const key of Object.keys(data as Record<string, unknown>)) {
       if (!allowed.has(key)) {
         throw new HttpsError('invalid-argument', `Unknown field: ${key}`);
@@ -622,10 +626,21 @@ export const searchMatchCalendarFlights = onCall(
 
     const flightNumber = String(
       (data as Record<string, unknown>).flightNumber ?? '',
-    );
+    )
+      .replace(/\s+/g, '')
+      .toUpperCase();
     const departureDate = String(
       (data as Record<string, unknown>).departureDate ?? '',
     );
+    const departureAirport = String(
+      (data as Record<string, unknown>).departureAirport ?? '',
+    );
+    if (!/^(?:[A-Z0-9]{2}|[A-Z]{3})\d{1,4}[A-Z]?$/.test(flightNumber)) {
+      throw new HttpsError(
+        'invalid-argument',
+        'Enter a complete flight number such as DL1073.',
+      );
+    }
     const apiKey = aeroDataBoxApiKey.value();
     if (!apiKey) {
       throw new HttpsError(
@@ -633,7 +648,12 @@ export const searchMatchCalendarFlights = onCall(
         'The flight data service is not configured.',
       );
     }
-    return searchAeroDataBoxFlights({ apiKey, flightNumber, departureDate });
+    return searchAeroDataBoxFlights({
+      apiKey,
+      flightNumber,
+      departureDate,
+      departureAirport,
+    });
   },
 );
 

@@ -97,13 +97,21 @@ export async function searchAeroDataBoxFlights(input: {
   apiKey: string;
   flightNumber: string;
   departureDate: string;
+  departureAirport: string;
 }) {
   const flightNumber = input.flightNumber.replace(/\s+/g, '').toUpperCase();
+  const departureAirport = input.departureAirport.trim().toUpperCase();
   if (!/^[A-Z0-9]{2,10}$/.test(flightNumber)) {
     throw new HttpsError('invalid-argument', 'Enter a valid flight number.');
   }
   if (!/^\d{4}-\d{2}-\d{2}$/.test(input.departureDate)) {
     throw new HttpsError('invalid-argument', 'Enter a valid departure date.');
+  }
+  if (!/^[A-Z]{3}$/.test(departureAirport)) {
+    throw new HttpsError(
+      'invalid-argument',
+      'Enter a valid three-letter departing airport code.',
+    );
   }
   const parsedDate = new Date(`${input.departureDate}T00:00:00Z`);
   if (
@@ -159,9 +167,13 @@ export async function searchAeroDataBoxFlights(input: {
     throw new HttpsError('data-loss', 'The flight data response was invalid.');
   }
 
-  return {
-    flights: body.map((flight, index) =>
+  const flights = body
+    .map((flight, index) =>
       normalizeFlight((flight ?? {}) as AeroFlight, index),
-    ),
-  };
+    )
+    .filter(
+      (flight) => flight.departure.airportCode?.toUpperCase() === departureAirport,
+    );
+
+  return { flights };
 }
