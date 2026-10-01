@@ -17,6 +17,7 @@ type AeroMovement = {
   airport?: AeroAirport;
   scheduledTime?: AeroDateTime;
   revisedTime?: AeroDateTime;
+  gate?: unknown;
 };
 
 type AeroFlight = {
@@ -59,6 +60,7 @@ function normalizeMovement(raw: AeroMovement | undefined) {
   const revisedUtc = text(raw?.revisedTime?.utc);
   const revisedLocal = text(raw?.revisedTime?.local);
   const timeZone = text(raw?.airport?.timeZone);
+  const gate = text(raw?.gate);
 
   return {
     ...(airportCode ? { airportCode } : {}),
@@ -68,6 +70,7 @@ function normalizeMovement(raw: AeroMovement | undefined) {
     ...(revisedUtc ? { revisedUtc } : {}),
     ...(revisedLocal ? { revisedLocal } : {}),
     ...(timeZone ? { timeZone } : {}),
+    ...(gate ? { gate } : {}),
   };
 }
 

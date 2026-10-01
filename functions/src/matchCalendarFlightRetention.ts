@@ -83,6 +83,7 @@ function removeProviderFields(segment: Record<string, unknown>) {
   const {
     airline: _airline,
     departureAirport: _departureAirport,
+    departureGate: _departureGate,
     arrivalAirport: _arrivalAirport,
     departureAt: _departureAt,
     arrivalAt: _arrivalAt,
@@ -91,6 +92,7 @@ function removeProviderFields(segment: Record<string, unknown>) {
   } = segment;
   void _airline;
   void _departureAirport;
+  void _departureGate;
   void _arrivalAirport;
   void _departureAt;
   void _arrivalAt;
