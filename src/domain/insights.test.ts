@@ -260,6 +260,182 @@ describe('insights', () => {
     );
     expect(rows[0]?.cmoFilerIds).toEqual(['cmo-user']);
     expect(rows[0]?.cmoReportCount).toBe(1);
+    expect(rows[0]?.gamesMo).toBe(0);
+    expect(rows[0]?.gamesAr).toBe(0);
+    expect(rows[0]?.cmoReportsFiled).toBe(0);
+    expect(rows[0]?.activityTotal).toBe(0);
+  });
+
+  it('counts past MO/AR assignments and CMO reports filed', () => {
+    const pastKickoff = '2025-06-01T15:00:00.000Z';
+    const futureKickoff = '2099-06-01T15:00:00.000Z';
+    const users: UserProfile[] = [
+      {
+        uid: 'ref1',
+        firstName: 'Ref',
+        lastName: 'One',
+        displayName: 'Ref One',
+        email: 'r@x.com',
+        phone: '1',
+        smsOptIn: false,
+        homeStreet: '1',
+        homeCity: 'A',
+        homeRegion: 'TX',
+        homePostalCode: '1',
+        homeAddress: '1',
+        roles: ['official'],
+        teamIds: [],
+        profileComplete: true,
+        refereeLevel: 7,
+      },
+    ];
+    const matches: Match[] = [
+      {
+        id: 'm-mo',
+        sheetRowKey: 's-mo',
+        status: 'team_confirmed',
+        kickoffAt: pastKickoff,
+        venueName: 'Field',
+        venueAddress: 'Austin, TX',
+        homeTeamId: 'h',
+        awayTeamId: 'a',
+        homeTeamName: 'Home',
+        awayTeamName: 'Away',
+        level: 'D1',
+        gender: 'men',
+        flightProvided: false,
+        housingProvided: false,
+        crew: {
+          ...emptyCrew(),
+          mo: [
+            {
+              id: 'mo1',
+              slot: 'mo',
+              userId: 'ref1',
+              userName: 'Ref',
+              status: 'confirmed',
+              history: [],
+            },
+          ],
+        },
+      },
+      {
+        id: 'm-ar',
+        sheetRowKey: 's-ar',
+        status: 'team_confirmed',
+        kickoffAt: pastKickoff,
+        venueName: 'Field',
+        venueAddress: 'Austin, TX',
+        homeTeamId: 'h',
+        awayTeamId: 'a',
+        homeTeamName: 'Home',
+        awayTeamName: 'Away',
+        level: 'D1',
+        gender: 'men',
+        flightProvided: false,
+        housingProvided: false,
+        crew: {
+          ...emptyCrew(),
+          ar1: [
+            {
+              id: 'ar1',
+              slot: 'ar1',
+              userId: 'ref1',
+              userName: 'Ref',
+              status: 'confirmed',
+              history: [],
+            },
+          ],
+        },
+      },
+      {
+        id: 'm-cmo',
+        sheetRowKey: 's-cmo',
+        status: 'team_confirmed',
+        kickoffAt: pastKickoff,
+        venueName: 'Field',
+        venueAddress: 'Austin, TX',
+        homeTeamId: 'h',
+        awayTeamId: 'a',
+        homeTeamName: 'Home',
+        awayTeamName: 'Away',
+        level: 'D1',
+        gender: 'men',
+        flightProvided: false,
+        housingProvided: false,
+        crew: emptyCrew(),
+        cmo: [
+          {
+            id: 'cmo-a',
+            userId: 'ref1',
+            userName: 'Ref',
+            status: 'confirmed',
+            history: [],
+          },
+        ],
+      },
+      {
+        id: 'm-future',
+        sheetRowKey: 's-fut',
+        status: 'team_confirmed',
+        kickoffAt: futureKickoff,
+        venueName: 'Field',
+        venueAddress: 'Austin, TX',
+        homeTeamId: 'h',
+        awayTeamId: 'a',
+        homeTeamName: 'Home',
+        awayTeamName: 'Away',
+        level: 'D1',
+        gender: 'men',
+        flightProvided: false,
+        housingProvided: false,
+        crew: {
+          ...emptyCrew(),
+          mo: [
+            {
+              id: 'mo-fut',
+              slot: 'mo',
+              userId: 'ref1',
+              userName: 'Ref',
+              status: 'confirmed',
+              history: [],
+            },
+          ],
+        },
+      },
+    ];
+    const rows = officialInsightRows(
+      users,
+      [],
+      [
+        {
+          id: 'filed',
+          matchId: 'm-cmo',
+          officialId: 'ref1',
+          slot: 'cmo',
+          status: 'submitted',
+          dueAt: pastKickoff,
+          kickoffAt: pastKickoff,
+          subjectOfficialId: 'other',
+        },
+        {
+          id: 'draft',
+          matchId: 'm-cmo',
+          officialId: 'ref1',
+          slot: 'cmo',
+          status: 'pending',
+          dueAt: pastKickoff,
+          kickoffAt: pastKickoff,
+          subjectOfficialId: 'other',
+        },
+      ],
+      matches,
+    );
+    expect(rows[0]?.gamesMo).toBe(1);
+    expect(rows[0]?.gamesAr).toBe(1);
+    expect(rows[0]?.cmoReportsFiled).toBe(1);
+    expect(rows[0]?.activityTotal).toBe(3);
+    expect(rows[0]?.cmoReportCount).toBe(0);
   });
 
   it('lists submitted CMO reports only', () => {

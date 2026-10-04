@@ -289,6 +289,11 @@ const InsightsReportsLayout = lazy(() =>
     default: m.InsightsReportsLayout,
   })),
 );
+const InsightsOfficialsLayout = lazy(() =>
+  import('@/features/insights/InsightsOfficialsLayout').then((m) => ({
+    default: m.InsightsOfficialsLayout,
+  })),
+);
 const InsightsOfficialsPage = lazy(() =>
   import('@/features/insights/InsightsOfficialsPage').then((m) => ({
     default: m.InsightsOfficialsPage,
@@ -646,7 +651,16 @@ function FeatureRoutes() {
       <Route element={<RequireInsightsAccess />}>
         <Route element={<InsightsLayout />}>
           <Route path="insights" element={<InsightsOverviewPage />} />
-          <Route path="insights/officials" element={<InsightsOfficialsPage />} />
+          <Route element={<InsightsOfficialsLayout />}>
+            <Route
+              path="insights/officials"
+              element={<InsightsOfficialsPage />}
+            />
+            <Route
+              path="insights/officials/activity"
+              element={<InsightsOfficialsPage />}
+            />
+          </Route>
           <Route
             path="insights/grade/:level"
             element={<InsightsGradeRedirect />}

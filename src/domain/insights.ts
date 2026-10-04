@@ -9,6 +9,7 @@ import type { CardReport, MatchReport } from '@/domain/reports';
 import { totalCardsFromMoPayload } from '@/domain/reports';
 import {
   assignmentForUser,
+  CREW_SLOTS,
   crewPeople,
   type Match,
   type UserProfile,
@@ -33,6 +34,14 @@ export type OfficialInsightRow = {
   cmoRatingAvg: number | null;
   /** CMO filer uids who submitted a coaching report about this official. */
   cmoFilerIds: string[];
+  /** Past center (MO) assignments. */
+  gamesMo: number;
+  /** Past AR1 / AR2 assignments. */
+  gamesAr: number;
+  /** Submitted CMO coaching reports filed by this official. */
+  cmoReportsFiled: number;
+  /** Center + AR + CMO reports filed (appointment-style totals). */
+  activityTotal: number;
 };
 
 const TIER_LABELS: Record<number, string> = {
@@ -130,13 +139,44 @@ export function officialInsightRows(
   }
 
   const cmoBySubject = new Map<string, MatchReport[]>();
+  const cmoFiledByUser = new Map<string, number>();
   for (const r of cmoReports) {
     if (r.status !== 'submitted' || r.slot !== 'cmo') continue;
+    if (r.officialId) {
+      cmoFiledByUser.set(
+        r.officialId,
+        (cmoFiledByUser.get(r.officialId) ?? 0) + 1,
+      );
+    }
     const subject = cmoSubjectOfficialId(r, matchById);
     if (!subject) continue;
     const list = cmoBySubject.get(subject) ?? [];
     list.push(r);
     cmoBySubject.set(subject, list);
+  }
+
+  const now = Date.now();
+  const gamesMoByUser = new Map<string, number>();
+  const gamesArByUser = new Map<string, number>();
+  for (const m of matches) {
+    if (new Date(m.kickoffAt).getTime() >= now) continue;
+    const assignedIds = new Set<string>();
+    for (const slot of CREW_SLOTS) {
+      for (const a of m.crew[slot] ?? []) {
+        if (a.userId) assignedIds.add(a.userId);
+      }
+    }
+    for (const c of m.cmo ?? []) {
+      if (c.userId) assignedIds.add(c.userId);
+    }
+    for (const userId of assignedIds) {
+      const slot = assignmentForUser(m, userId)?.slot;
+      if (slot === 'mo') {
+        gamesMoByUser.set(userId, (gamesMoByUser.get(userId) ?? 0) + 1);
+      } else if (slot === 'ar1' || slot === 'ar2') {
+        gamesArByUser.set(userId, (gamesArByUser.get(userId) ?? 0) + 1);
+      }
+    }
   }
 
   return refs.map((u) => {
@@ -148,6 +188,9 @@ export function officialInsightRows(
     const cmoRatings = cmoRows
       .map((r) => r.cmoPayload?.assessedRating)
       .filter((n): n is number => typeof n === 'number');
+    const gamesMo = gamesMoByUser.get(u.uid) ?? 0;
+    const gamesAr = gamesArByUser.get(u.uid) ?? 0;
+    const cmoReportsFiled = cmoFiledByUser.get(u.uid) ?? 0;
     return {
       userId: u.uid,
       name: u.displayName || `${u.firstName} ${u.lastName}`.trim(),
@@ -162,6 +205,10 @@ export function officialInsightRows(
         ? cmoRatings.reduce((s, v) => s + v, 0) / cmoRatings.length
         : null,
       cmoFilerIds: [...new Set(cmoRows.map((r) => r.officialId))],
+      gamesMo,
+      gamesAr,
+      cmoReportsFiled,
+      activityTotal: gamesMo + gamesAr + cmoReportsFiled,
     };
   });
 }

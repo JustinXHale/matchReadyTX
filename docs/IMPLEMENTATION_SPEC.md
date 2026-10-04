@@ -201,6 +201,8 @@ mail/{mailId}   // outbound queue — Admin SDK only; see docs/EMAIL.md
 | `/scheduler/feedback` | Coach feedback inbox (assigner-only) |
 | `/scheduler/feedback/:id` | Feedback detail |
 | `/insights` | Insights overview (assigner / CMO / reportAnalytics) — pyramid + global stats |
+| `/insights/officials` | Officials roster — CMO rating and team feedback |
+| `/insights/officials/activity` | Officials roster — MO/AR/CMO counts plus total; No MO / No AR filters; sortable columns |
 | `/insights/coach-feedback` | All submitted coach feedback |
 | `/insights/coach-feedback/:id` | Feedback detail (read-only) |
 | `/insights/cmo-reports` | Submitted CMO coaching reports |
