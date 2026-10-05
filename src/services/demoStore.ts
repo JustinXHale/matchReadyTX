@@ -2599,16 +2599,16 @@ function seedOutsideCoachingDemo(): {
     submittedAt: '2026-09-21T00:15:00.000Z',
     cmoPayload: {
       scales: {
-        scrum: 4,
-        breakdown: 3,
-        advantage: 4,
-        gameControl: 4,
-        communication: 3,
-        materiality: 4,
-        positioning: 3,
-        lineout: 3,
-        fitness: 4,
-        bigDecisions: 4,
+        scrum: 4 as const,
+        breakdown: 3 as const,
+        advantage: 4 as const,
+        gameControl: 4 as const,
+        communication: 3 as const,
+        materiality: 4 as const,
+        positioning: 3 as const,
+        lineout: 3 as const,
+        fitness: 4 as const,
+        bigDecisions: 4 as const,
       },
       comments: {},
       matchKind: 'League Match' as const,
@@ -2631,7 +2631,7 @@ function seedOutsideCoachingDemo(): {
       // Referee has not filed yet on Huns — unlock gate demo.
       donePerf,
       doneCmo,
-    ],
+    ] as MatchReport[],
   };
 }
 
