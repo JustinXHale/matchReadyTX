@@ -1,4 +1,121 @@
 
+.rs-form-error-banner {
+  margin: 0;
+  color: var(--rs-color-urgent);
+  font: var(--rs-font-meta);
+}
+
+.rs-report-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.rs-outside-fixture-row {
+  display: grid;
+  gap: var(--rs-space-md, 12px);
+  grid-template-columns: 1fr 1fr 1fr;
+  align-items: start;
+}
+
+@media (max-width: 520px) {
+  .rs-outside-fixture-row {
+    grid-template-columns: 1fr;
+  }
+}
+
+.rs-outside-selected-person {
+  margin: 6px 0 0;
+}
+
+.rs-person-search__toggle {
+  width: 100%;
+  justify-content: space-between;
+}
+
+.rs-person-search__toggle-value {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.rs-person-search__toggle-placeholder {
+  color: var(--rs-color-muted);
+}
+
+.rs-person-search__panel {
+  min-width: min(100vw - 32px, 360px);
+  max-width: 420px;
+}
+
+.rs-person-search__body {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 8px !important;
+  max-height: 320px;
+}
+
+.rs-person-search__filter {
+  margin: 0;
+}
+
+.rs-person-search__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  overflow: auto;
+  max-height: 220px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.rs-person-search__option {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid var(--rs-color-border);
+  border-radius: var(--rs-radius-card);
+  background: var(--rs-color-surface);
+  color: var(--rs-color-ink);
+  text-align: left;
+  cursor: pointer;
+}
+
+.rs-person-search__option:hover,
+.rs-person-search__option--selected {
+  border-color: var(--rs-color-ink);
+  background: color-mix(in srgb, var(--rs-color-ink) 6%, var(--rs-color-surface));
+}
+
+.rs-person-search__name {
+  flex: 1 1 auto;
+  min-width: 0;
+  font: var(--rs-font-body);
+}
+
+.rs-page-title-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.rs-page-title-row .pf-v6-c-title {
+  margin: 0;
+}
+
+.rs-list-row--selected {
+  outline: 2px solid var(--rs-color-primary);
+  outline-offset: -2px;
+}
+
 .rs-report-stub {
   display: flex;
   align-items: flex-start;

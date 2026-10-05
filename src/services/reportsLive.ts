@@ -1,6 +1,7 @@
 import {
   buildResetMatchReport,
   cardReportDocId,
+  MATCH_REPORT_SOURCE_OUTSIDE,
   type ArReportPayload,
   type CardReport,
   type CmoReportPayload,
@@ -9,11 +10,15 @@ import {
   type ReportAssigneeSlot,
   type ReportFormKind,
 } from '@/domain/reports';
+import type { OutsideCoachingSession } from '@/domain/outsideCoaching';
 import type { Match } from '@/domain/types';
 import { demoStore } from '@/services/demoStore';
 import {
+  createOrJoinOutsideSessionInFirestore,
   defaultOrgId,
   deleteMatchReportInFirestore,
+  ensureOutsideCmoInFirestore,
+  ensureOutsidePerformanceInFirestore,
   ensurePendingMatchReportInFirestore,
   deleteCardReportInFirestore,
   saveCardReportWithCasesInFirestore,
@@ -75,16 +80,29 @@ export async function persistSubmittedMatchReport(
   if (!before || before.slot === 'cmo') {
     throw new Error('Match report not found.');
   }
+  const isOutside = before.source === MATCH_REPORT_SOURCE_OUTSIDE;
   const match = demoStore.getState().matches.find((m) => m.id === before.matchId);
-  if (!match) throw new Error('Match not found.');
+  if (!match && !isOutside) throw new Error('Match not found.');
 
-  const fsRow =
-    before.status === 'submitted'
-      ? before
-      : await ensurePendingMatchReportInFirestore(defaultOrgId(), match, {
-          userId: before.officialId,
-          slot: before.slot as ReportAssigneeSlot,
-        });
+  let fsRow = before;
+  if (before.status !== 'submitted') {
+    if (isOutside && before.outsideSessionId) {
+      const session = demoStore
+        .getState()
+        .outsideCoachingSessions.find((s) => s.id === before.outsideSessionId);
+      if (!session) throw new Error('Outside coaching session not found.');
+      fsRow = await ensureOutsidePerformanceInFirestore(
+        defaultOrgId(),
+        session,
+        before.officialId,
+      );
+    } else if (match) {
+      fsRow = await ensurePendingMatchReportInFirestore(defaultOrgId(), match, {
+        userId: before.officialId,
+        slot: before.slot as ReportAssigneeSlot,
+      });
+    }
+  }
 
   demoStore.submitMatchReport(before.id, formKind, payload);
   const submittedAt =
@@ -113,14 +131,28 @@ export async function persistSubmittedCmoReport(
   if (!before || before.slot !== 'cmo') {
     throw new Error('Coaching report not found.');
   }
+  const isOutside = before.source === MATCH_REPORT_SOURCE_OUTSIDE;
   const match = demoStore.getState().matches.find((m) => m.id === before.matchId);
-  if (!match) throw new Error('Match not found.');
+  if (!match && !isOutside) throw new Error('Match not found.');
 
-  const fsRow = await ensurePendingMatchReportInFirestore(defaultOrgId(), match, {
-    userId: before.officialId,
-    slot: 'cmo',
-    subjectOfficialId,
-  });
+  let fsRow = before;
+  if (isOutside && before.outsideSessionId) {
+    const session = demoStore
+      .getState()
+      .outsideCoachingSessions.find((s) => s.id === before.outsideSessionId);
+    if (!session) throw new Error('Outside coaching session not found.');
+    fsRow = await ensureOutsideCmoInFirestore(
+      defaultOrgId(),
+      session,
+      before.officialId,
+    );
+  } else if (match) {
+    fsRow = await ensurePendingMatchReportInFirestore(defaultOrgId(), match, {
+      userId: before.officialId,
+      slot: 'cmo',
+      subjectOfficialId,
+    });
+  }
 
   demoStore.submitCmoReport(before.id, payload, subjectOfficialId);
   const submittedAt = new Date().toISOString();
@@ -136,6 +168,86 @@ export async function persistSubmittedCmoReport(
   };
   demoStore.upsertMatchReportLocal(updated);
   await saveMatchReportInFirestore(defaultOrgId(), updated);
+}
+
+export async function createOrJoinOutsideSessionLive(input: {
+  starterUid: string;
+  refereeId: string;
+  coachId: string;
+  matchDate: string;
+  homeTeamName: string;
+  awayTeamName: string;
+  division?: string;
+}): Promise<OutsideCoachingSession> {
+  const s = demoStore.getState();
+  const session = await createOrJoinOutsideSessionInFirestore(
+    defaultOrgId(),
+    input,
+    s.outsideCoachingSessions,
+    s.matchReports,
+  );
+  demoStore.upsertOutsideSessionLocal(session);
+  return session;
+}
+
+export function createOrJoinOutsideSessionDemo(input: {
+  starterUid: string;
+  refereeId: string;
+  coachId: string;
+  matchDate: string;
+  homeTeamName: string;
+  awayTeamName: string;
+  division?: string;
+}): OutsideCoachingSession {
+  return demoStore.createOrJoinOutsideSession(input);
+}
+
+export async function ensureOutsidePerformanceReady(
+  sessionId: string,
+  uid: string,
+): Promise<void> {
+  const session = demoStore
+    .getState()
+    .outsideCoachingSessions.find((s) => s.id === sessionId);
+  if (!session) return;
+  const report = await ensureOutsidePerformanceInFirestore(
+    defaultOrgId(),
+    session,
+    uid,
+  );
+  demoStore.upsertMatchReportLocal(report);
+}
+
+export function ensureOutsidePerformanceReadyDemo(
+  sessionId: string,
+  uid: string,
+): void {
+  const report = demoStore.ensureOutsidePerformanceLocal(sessionId, uid);
+  if (report) demoStore.upsertMatchReportLocal(report);
+}
+
+export async function ensureOutsideCmoReady(
+  sessionId: string,
+  uid: string,
+): Promise<void> {
+  const session = demoStore
+    .getState()
+    .outsideCoachingSessions.find((s) => s.id === sessionId);
+  if (!session) return;
+  const report = await ensureOutsideCmoInFirestore(
+    defaultOrgId(),
+    session,
+    uid,
+  );
+  demoStore.upsertMatchReportLocal(report);
+}
+
+export function ensureOutsideCmoReadyDemo(
+  sessionId: string,
+  uid: string,
+): void {
+  const report = demoStore.ensureOutsideCmoLocal(sessionId, uid);
+  if (report) demoStore.upsertMatchReportLocal(report);
 }
 
 export async function persistSchedulerDeleteMatchReport(

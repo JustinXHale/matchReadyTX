@@ -586,6 +586,58 @@ service cloud.firestore {
       }
 
       /**
+       * Club/society outside coaching — parent session linking Performance + CMO reports.
+       * Participants create/read/update; Insights readers may read.
+       */
+      match /outsideCoachingSessions/{sessionId} {
+        function outsideSessionCreateOk() {
+          return request.resource.data.orgId == orgId
+            && request.resource.data.id == sessionId
+            && request.resource.data.createdBy == request.auth.uid
+            && request.resource.data.refereeId is string
+            && request.resource.data.coachId is string
+            && request.resource.data.refereeId != request.resource.data.coachId
+            && (
+              request.resource.data.refereeId == request.auth.uid
+              || request.resource.data.coachId == request.auth.uid
+            )
+            && request.resource.data.matchDate is string
+            && request.resource.data.matchDate.size() >= 10
+            && request.resource.data.homeTeamName is string
+            && request.resource.data.homeTeamName.size() > 0
+            && request.resource.data.homeTeamName.size() <= 80
+            && request.resource.data.awayTeamName is string
+            && request.resource.data.awayTeamName.size() > 0
+            && request.resource.data.awayTeamName.size() <= 80
+            && request.resource.data.createdAt is string
+            && request.resource.data.updatedAt is string;
+        }
+        function outsideSessionParticipant() {
+          return resource.data.refereeId == request.auth.uid
+            || resource.data.coachId == request.auth.uid;
+        }
+        allow read: if isMember(orgId)
+          && (
+            resource == null
+            || canReadInsights(orgId)
+            || outsideSessionParticipant()
+          );
+        allow create: if signedIn()
+          && isMember(orgId)
+          && outsideSessionCreateOk();
+        allow update: if signedIn()
+          && isMember(orgId)
+          && outsideSessionParticipant()
+          && request.resource.data.orgId == orgId
+          && request.resource.data.id == resource.data.id
+          && request.resource.data.refereeId == resource.data.refereeId
+          && request.resource.data.coachId == resource.data.coachId
+          && request.resource.data.createdBy == resource.data.createdBy
+          && request.resource.data.createdAt == resource.data.createdAt;
+        allow delete: if isAssigner(orgId);
+      }
+
+      /**
        * Post-match MO / AR / CMO reports (Coaching Reports tab uses slot cmo).
        * Submitted CMO reports are readable by any org member (public profile write-ups).
        */

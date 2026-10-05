@@ -29,6 +29,7 @@ import {
   subscribeLiveOrg,
   subscribeLiveTeams,
   subscribeMatchReports,
+  subscribeOutsideCoachingSessions,
   subscribeOfficialPayments,
 } from '@/services/orgData';
 import { subscribeOrgRoster } from '@/services/orgMembers';
@@ -545,6 +546,16 @@ export function AppProvider({ children }: { children: ReactNode }) {
       },
       (err) => console.error('Match reports subscription failed', err),
     );
+    const unsubOutside = subscribeOutsideCoachingSessions(
+      orgId,
+      { isGlobal: isMatchReportsGlobal, uid },
+      (sessions) => {
+        if (dataModeRef.current !== 'live') return;
+        demoStore.applyLiveOutsideCoachingSessions(sessions);
+        setState(demoStore.getState());
+      },
+      (err) => console.error('Outside coaching sessions subscription failed', err),
+    );
     const unsubCard = subscribeCardReports(
       orgId,
       { isGlobal: isCardReportsGlobal, uid },
@@ -557,6 +568,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     );
     return () => {
       unsubMatch();
+      unsubOutside();
       unsubCard();
     };
   }, [

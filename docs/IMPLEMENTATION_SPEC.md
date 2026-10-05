@@ -99,14 +99,24 @@ orgs/{orgId}/coachFeedback/{feedbackId}   // id = matchId_reportingTeamId
   // One doc per match × reporting side (home and away each may submit).
   // Officials never read. Scheduler inbox shows submitted only.
 
+orgs/{orgId}/outsideCoachingSessions/{sessionId}
+  refereeId, coachId, matchDate (YYYY-MM-DD),
+  homeTeamName, awayTeamName, division?,
+  createdBy, createdAt, updatedAt, orgId
+  // Club/society outside coaching pair (no college schedule match).
+  // Either participant may create; incomplete same pair+date joins existing.
+
 orgs/{orgId}/matchReports/{reportId}   // id = matchReportDocId(matchId, officialId, slot)
   matchId, officialId, slot: mo|ar1|ar2|cmo, formKind?,
   status: pending|submitted, dueAt, kickoffAt, submittedAt?,
   subjectOfficialId? (CMO reports — MO user assessed),
   moPayload? | arPayload? | cmoPayload? (maps),
+  source?: legacy_form|outside, outsideSessionId?,
+  legacyFixture? (display when no live match),
   orgId, createdAt, updatedAt
   // MO/AR post-match forms + CMO coaching reports (slot cmo).
   // Pending rows lazy-created when filer opens flow; not bulk-synced.
+  // Outside: synthetic matchId `outside_{sessionId}`; Performance unlocks CMO view for referee.
 
 orgs/{orgId}/cardReports/{reportId}   // id = cardReportDocId(matchId, officialId)
   matchId, officialId, cards[], competitionUnion, conference?,
@@ -165,7 +175,8 @@ mail/{mailId}   // outbound queue — Admin SDK only; see docs/EMAIL.md
 - Officials: read own assignments + open requestable matches (facts + economics); write own confirm/availability/requests.
 - Assigner: full org read/write for scheduling.
 - **Coach feedback** (`coachFeedback`): assigner, CMO, and `reportAnalytics` read all; Team Admins read/update when `reportingTeamId` is in their `teamIds` (club-owned, one doc per match×side). Org members may read a **submitted** report only when the Scheduler has set `publicOnProfile == true` (shown on the official’s profile; submitter phone/email stay off that view). Create/update binds match facts via `get(matches/…)` (home/away, kickoff, crew-visible status) and requires doc id `matchId_reportingTeamId`. Team Admin writes must not change `publicOnProfile`. Assigners may update only `publicOnProfile` + `updatedAt` on a submitted report.
-- **Match reports** (`matchReports`): filer (`officialId`) read/write own; assigner, CMO, `reportAnalytics`, and finance staff read all; MO may read CMO reports where `subjectOfficialId == auth.uid`. Any org member may read **submitted CMO** reports (`slot == 'cmo'`, `status == 'submitted'`) for public profile write-ups. Pending MO/AR/CMO and all card reports stay private to non-Insights/finance readers. Pending create + submit with shape validation; assigner may **create/submit** MO/AR reports on an official's behalf, **reset** submitted reports to pending (answers cleared), or **delete** any report row.
+- **Outside coaching sessions** (`outsideCoachingSessions`): participants (`refereeId` / `coachId`) create/read/update; Insights readers (assigner / CMO / `reportAnalytics`) may read. Creates require the caller to be referee or coach on the doc; team names length-capped. Links a Performance report (`slot mo`, `source outside`) to a CMO coaching report (`slot cmo`, same `outsideSessionId`). Client UX: referee cannot view the submitted coaching report until their Performance side is submitted.
+- **Match reports** (`matchReports`): filer (`officialId`) read/write own; assigner, CMO, `reportAnalytics`, and finance staff read all; MO may read CMO reports where `subjectOfficialId == auth.uid`. Any org member may read **submitted CMO** reports (`slot == 'cmo'`, `status == 'submitted'`) for public profile write-ups (includes outside/club filings — they appear in Insights). Pending MO/AR/CMO and all card reports stay private to non-Insights/finance readers. Pending create + submit with shape validation; assigner may **create/submit** MO/AR reports on an official's behalf, **reset** submitted reports to pending (answers cleared), or **delete** any report row.
 - **Card reports** (`cardReports`): filer MO read/write own after kickoff; assigner, `reportAnalytics`, `judicial`, and finance staff read all; assigner delete. CMO does not get global card-report read.
 - **`reportAnalytics` role:** Scheduler grants on member profile only (not self-assignable, not in onboarding). Enables Insights for people who are not CMOs. CMO is self-selectable on profile/onboarding and also enables Insights + global read of coach feedback + match reports.
 - **`cmo` role:** Self-selectable on profile and onboarding. Unlocks Referee/CMO lens tools and the Insights tab.
@@ -190,6 +201,9 @@ mail/{mailId}   // outbound queue — Admin SDK only; see docs/EMAIL.md
 | `/referee/request/global` | Open games + raise-hand |
 | `/referee/reports/match` | Match Reports |
 | `/referee/reports/coaching` | Coaching Reports |
+| `/referee/reports/coaching/outside/new` | Create outside (club/society) report |
+| `/referee/reports/coaching/outside/:sessionId/performance` | Outside Performance self-review |
+| `/referee/reports/coaching/outside/:sessionId/coaching` | Outside CMO coaching report |
 | `/global/*` | Schedule / Standings / Teams |
 | `/members` | Society directory (incomplete: Scheduler only) |
 | `/team-admin` | Team Admin Schedule (confirm upcoming) |

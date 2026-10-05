@@ -10,10 +10,12 @@ import {
   CMO_SCALE_LABELS,
   COMPETITION_UNION_LABELS,
   MATCH_FEEDBACK_LABEL,
+  MATCH_REPORT_SOURCE_OUTSIDE,
   displayMatchForArchivedReport,
   displayMatchForCmoReport,
   displayPlayerName,
 } from '@/domain/reports';
+import { isOutsideCmoUnlockedForReferee } from '@/domain/outsideCoaching';
 import { CARD_LAW_LABELS, isCardLawId } from '@/domain/cardLaws';
 import { formatFivePointChoice } from '@/domain/fivePointScale';
 import { crewPeople, REQUESTABLE_SLOT_SHORT } from '@/domain/types';
@@ -23,6 +25,7 @@ import {
   cmoReportViewPath,
   matchReportEditPath,
   matchReportViewPath,
+  outsidePerformancePath,
   COACHING_CMO_BACK,
   MATCH_REPORTS_BACK,
   resolveSubmittedMatchReport,
@@ -386,6 +389,38 @@ export function CmoReportViewPage() {
     state.users.find((u) => u.uid === report.officialId)?.displayName ??
     'CMO';
   const moName = cmoSubjectName(report, match, state.users, moDisplayNames(match));
+
+  if (
+    aboutYou &&
+    report.source === MATCH_REPORT_SOURCE_OUTSIDE &&
+    report.outsideSessionId &&
+    !isOutsideCmoUnlockedForReferee(report.outsideSessionId, state.matchReports)
+  ) {
+    return (
+      <div className="rs-stack">
+        <button type="button" className="rs-detail__back" onClick={goBack}>
+          ← {backLabel}
+        </button>
+        <Title headingLevel="h2" size="lg">
+          Coaching report pending
+        </Title>
+        <p className="rs-match-card__meta">
+          Finish your performance self-review to unlock this coaching report.
+        </p>
+        <Button
+          variant="primary"
+          component={(props) => (
+            <Link
+              {...props}
+              to={outsidePerformancePath(report.outsideSessionId!)}
+            />
+          )}
+        >
+          Finish performance report
+        </Button>
+      </div>
+    );
+  }
 
   return (
     <div className="rs-stack rs-report-view">

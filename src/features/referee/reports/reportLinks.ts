@@ -71,6 +71,22 @@ export function matchReportViewPath(
   return `/referee/reports/match/${matchId}/view${qs ? `?${qs}` : ''}`;
 }
 
+export function createOutsideReportPath(as: 'referee' | 'coach'): string {
+  return `/referee/reports/coaching/outside/new?as=${as}`;
+}
+
+export function outsidePerformancePath(sessionId: string): string {
+  return `/referee/reports/coaching/outside/${sessionId}/performance`;
+}
+
+export function outsideCmoPath(sessionId: string): string {
+  return `/referee/reports/coaching/outside/${sessionId}/coaching`;
+}
+
+export function outsideCmoViewPath(sessionId: string): string {
+  return `/referee/reports/coaching/outside/${sessionId}/coaching/view`;
+}
+
 export function cmoReportPath(
   matchId: string,
   subjectOfficialId?: string,

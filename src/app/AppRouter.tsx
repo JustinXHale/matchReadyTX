@@ -152,6 +152,28 @@ const CmoReportPage = lazy(() =>
     default: m.CmoReportPage,
   })),
 );
+const CreateOutsideReportPage = lazy(() =>
+  import('@/features/referee/reports/CreateOutsideReportPage').then((m) => ({
+    default: m.CreateOutsideReportPage,
+  })),
+);
+const OutsidePerformanceReportPage = lazy(() =>
+  import('@/features/referee/reports/OutsidePerformanceReportPage').then(
+    (m) => ({
+      default: m.OutsidePerformanceReportPage,
+    }),
+  ),
+);
+const OutsideCmoReportPage = lazy(() =>
+  import('@/features/referee/reports/OutsideCmoReportPage').then((m) => ({
+    default: m.OutsideCmoReportPage,
+  })),
+);
+const OutsideCmoReportViewPage = lazy(() =>
+  import('@/features/referee/reports/OutsideCmoReportViewPage').then((m) => ({
+    default: m.OutsideCmoReportViewPage,
+  })),
+);
 const CardReportPage = lazy(() =>
   import('@/features/referee/reports/CardReportPage').then((m) => ({
     default: m.CardReportPage,
@@ -625,6 +647,22 @@ function FeatureRoutes() {
           <Route path="coaching" element={<CoachingReportsPage />} />
           <Route path="coaching/cmo" element={<CoachingReportsPage />} />
           <Route path="coaching/mine" element={<CoachingReportsPage />} />
+          <Route
+            path="coaching/outside/new"
+            element={<CreateOutsideReportPage />}
+          />
+          <Route
+            path="coaching/outside/:sessionId/performance"
+            element={<OutsidePerformanceReportPage />}
+          />
+          <Route
+            path="coaching/outside/:sessionId/coaching/view"
+            element={<OutsideCmoReportViewPage />}
+          />
+          <Route
+            path="coaching/outside/:sessionId/coaching"
+            element={<OutsideCmoReportPage />}
+          />
           <Route
             path="coaching/:matchId/view"
             element={<CmoReportViewPage />}

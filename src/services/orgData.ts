@@ -48,13 +48,23 @@ import {
   type ReportAssigneeSlot,
   type ReportFormKind,
   type SecondOffense,
+  MATCH_REPORT_SOURCE_LEGACY_FORM,
+  MATCH_REPORT_SOURCE_OUTSIDE,
   parseLegacyCmoFixture,
   buildPendingReport,
   defaultMatchReportDocIdForAssignee,
   moOfficialIdOnMatch,
   moOfficialIdsOnMatch,
   reportDueAt,
+  type MatchReportSource,
 } from '@/domain/reports';
+import {
+  buildOutsideCmoPending,
+  buildOutsidePerformancePending,
+  findOpenOutsideSession,
+  parseOutsideCoachingSession,
+  type OutsideCoachingSession,
+} from '@/domain/outsideCoaching';
 import {
   isCardLawId,
   isPlayerPosition,
@@ -2432,9 +2442,19 @@ export function matchReportFromFirestore(
       data.cmoPayload && typeof data.cmoPayload === 'object'
         ? (data.cmoPayload as CmoReportPayload)
         : undefined,
-    source: data.source === 'legacy_form' ? 'legacy_form' : undefined,
+    source: parseMatchReportSource(data.source),
+    outsideSessionId:
+      typeof data.outsideSessionId === 'string' && data.outsideSessionId
+        ? data.outsideSessionId
+        : undefined,
     legacyFixture: parseLegacyCmoFixture(data.legacyFixture),
   };
+}
+
+function parseMatchReportSource(raw: unknown): MatchReportSource | undefined {
+  if (raw === MATCH_REPORT_SOURCE_LEGACY_FORM) return MATCH_REPORT_SOURCE_LEGACY_FORM;
+  if (raw === MATCH_REPORT_SOURCE_OUTSIDE) return MATCH_REPORT_SOURCE_OUTSIDE;
+  return undefined;
 }
 
 export function cardReportFromFirestore(
@@ -2513,10 +2533,221 @@ function matchReportToFirestore(
     arPayload: firestoreJson(report.arPayload),
     cmoPayload: firestoreJson(report.cmoPayload),
     source: report.source ?? null,
+    outsideSessionId: report.outsideSessionId ?? null,
     legacyFixture: firestoreJson(report.legacyFixture),
     updatedAt: new Date().toISOString(),
     createdAt: report.submittedAt ?? new Date().toISOString(),
   });
+}
+
+function outsideSessionToFirestore(
+  orgId: string,
+  session: OutsideCoachingSession,
+): Record<string, unknown> {
+  return stripUndefined({
+    orgId,
+    id: session.id,
+    refereeId: session.refereeId,
+    coachId: session.coachId,
+    matchDate: session.matchDate,
+    homeTeamName: session.homeTeamName,
+    awayTeamName: session.awayTeamName,
+    division: session.division ?? null,
+    createdBy: session.createdBy,
+    createdAt: session.createdAt,
+    updatedAt: session.updatedAt,
+  });
+}
+
+/** Subscribe to outside coaching sessions for a participant (or all for Insights). */
+export function subscribeOutsideCoachingSessions(
+  orgId: string,
+  opts: { isGlobal: boolean; uid: string },
+  onData: (sessions: OutsideCoachingSession[]) => void,
+  onError?: (err: Error) => void,
+): Unsubscribe {
+  const database = requireDb();
+  const col = collection(database, 'orgs', orgId, 'outsideCoachingSessions');
+
+  if (opts.isGlobal) {
+    return onSnapshot(
+      col,
+      (snap) => {
+        const sessions = snap.docs
+          .map((d) =>
+            parseOutsideCoachingSession(
+              d.id,
+              d.data() as Record<string, unknown>,
+            ),
+          )
+          .filter((s): s is OutsideCoachingSession => s != null);
+        onData(sessions);
+      },
+      (err) => onError?.(err),
+    );
+  }
+
+  let asReferee: OutsideCoachingSession[] = [];
+  let asCoach: OutsideCoachingSession[] = [];
+
+  const emit = () => {
+    const byId = new Map<string, OutsideCoachingSession>();
+    for (const s of [...asReferee, ...asCoach]) byId.set(s.id, s);
+    onData([...byId.values()]);
+  };
+
+  const unsubRef = onSnapshot(
+    query(col, where('refereeId', '==', opts.uid)),
+    (snap) => {
+      asReferee = snap.docs
+        .map((d) =>
+          parseOutsideCoachingSession(
+            d.id,
+            d.data() as Record<string, unknown>,
+          ),
+        )
+        .filter((s): s is OutsideCoachingSession => s != null);
+      emit();
+    },
+    (err) => onError?.(err),
+  );
+  const unsubCoach = onSnapshot(
+    query(col, where('coachId', '==', opts.uid)),
+    (snap) => {
+      asCoach = snap.docs
+        .map((d) =>
+          parseOutsideCoachingSession(
+            d.id,
+            d.data() as Record<string, unknown>,
+          ),
+        )
+        .filter((s): s is OutsideCoachingSession => s != null);
+      emit();
+    },
+    (err) => onError?.(err),
+  );
+
+  return () => {
+    unsubRef();
+    unsubCoach();
+  };
+}
+
+export async function createOrJoinOutsideSessionInFirestore(
+  orgId: string,
+  input: {
+    starterUid: string;
+    refereeId: string;
+    coachId: string;
+    matchDate: string;
+    homeTeamName: string;
+    awayTeamName: string;
+    division?: string;
+  },
+  knownSessions: OutsideCoachingSession[],
+  knownReports: MatchReport[],
+): Promise<OutsideCoachingSession> {
+  const matchDate = input.matchDate.trim().slice(0, 10);
+  const homeTeamName = input.homeTeamName.trim();
+  const awayTeamName = input.awayTeamName.trim();
+  if (!matchDate || !homeTeamName || !awayTeamName) {
+    throw new Error('Match date and both team names are required.');
+  }
+  if (input.refereeId === input.coachId) {
+    throw new Error('Referee and coach must be different people.');
+  }
+  if (
+    input.starterUid !== input.refereeId &&
+    input.starterUid !== input.coachId
+  ) {
+    throw new Error('You must be the referee or the coach on this session.');
+  }
+
+  const existing = findOpenOutsideSession(
+    knownSessions,
+    input.refereeId,
+    input.coachId,
+    matchDate,
+    knownReports,
+  );
+  if (existing) return existing;
+
+  const now = new Date().toISOString();
+  const ref = doc(collection(requireDb(), 'orgs', orgId, 'outsideCoachingSessions'));
+  const session: OutsideCoachingSession = {
+    id: ref.id,
+    refereeId: input.refereeId,
+    coachId: input.coachId,
+    matchDate,
+    homeTeamName,
+    awayTeamName,
+    ...(input.division?.trim() ? { division: input.division.trim() } : {}),
+    createdBy: input.starterUid,
+    createdAt: now,
+    updatedAt: now,
+  };
+  await setDoc(ref, outsideSessionToFirestore(orgId, session));
+  return session;
+}
+
+export async function ensureOutsidePerformanceInFirestore(
+  orgId: string,
+  session: OutsideCoachingSession,
+  uid: string,
+): Promise<MatchReport> {
+  if (uid !== session.refereeId) {
+    throw new Error('Only the referee can open the outside performance report.');
+  }
+  const pending = buildOutsidePerformancePending(session);
+  const ref = doc(requireDb(), 'orgs', orgId, 'matchReports', pending.id);
+  const snap = await getDoc(ref);
+  if (snap.exists()) {
+    const parsed = matchReportFromFirestore(
+      pending.id,
+      snap.data() as Record<string, unknown>,
+    );
+    if (parsed) return parsed;
+    throw new Error('Match report exists but could not be read.');
+  }
+  await setDoc(ref, matchReportToFirestore(orgId, pending));
+  return pending;
+}
+
+export async function ensureOutsideCmoInFirestore(
+  orgId: string,
+  session: OutsideCoachingSession,
+  uid: string,
+): Promise<MatchReport> {
+  if (uid !== session.coachId) {
+    throw new Error('Only the coach can open the outside coaching report.');
+  }
+  const pending = buildOutsideCmoPending(session);
+  const ref = doc(requireDb(), 'orgs', orgId, 'matchReports', pending.id);
+  const snap = await getDoc(ref);
+  if (snap.exists()) {
+    const parsed = matchReportFromFirestore(
+      pending.id,
+      snap.data() as Record<string, unknown>,
+    );
+    if (parsed) return parsed;
+    throw new Error('Match report exists but could not be read.');
+  }
+  await setDoc(ref, matchReportToFirestore(orgId, pending));
+  return pending;
+}
+
+export async function getOutsideSessionFromFirestore(
+  orgId: string,
+  sessionId: string,
+): Promise<OutsideCoachingSession | null> {
+  const snap = await getDoc(
+    doc(requireDb(), 'orgs', orgId, 'outsideCoachingSessions', sessionId),
+  );
+  if (!snap.exists()) return null;
+  return parseOutsideCoachingSession(
+    snap.id,
+    snap.data() as Record<string, unknown>,
+  );
 }
 
 function cardReportToFirestore(

@@ -568,7 +568,10 @@ export function cardReportDocId(matchId: string, officialId: string): string {
 }
 
 export const MATCH_REPORT_SOURCE_LEGACY_FORM = 'legacy_form' as const;
-export type MatchReportSource = typeof MATCH_REPORT_SOURCE_LEGACY_FORM;
+export const MATCH_REPORT_SOURCE_OUTSIDE = 'outside' as const;
+export type MatchReportSource =
+  | typeof MATCH_REPORT_SOURCE_LEGACY_FORM
+  | typeof MATCH_REPORT_SOURCE_OUTSIDE;
 
 /** Placeholder officialId on legacy CMO imports when the CMO has no app account yet. */
 export const LEGACY_UNLINKED_OFFICIAL_PREFIX = 'legacy_unlinked_';
@@ -607,8 +610,13 @@ export interface MatchReport {
   moPayload?: MoReportPayload;
   arPayload?: ArReportPayload;
   cmoPayload?: CmoReportPayload;
-  /** One-shot archive import — never treated as due work. */
+  /**
+   * Archive import (`legacy_form`) or club/society outside coaching (`outside`).
+   * Neither is auto-synced from the college schedule.
+   */
   source?: MatchReportSource;
+  /** Links Performance + CMO rows for an outside coaching session. */
+  outsideSessionId?: string;
   legacyFixture?: LegacyCmoFixture;
 }
 
@@ -663,7 +671,11 @@ export function displayMatchForCmoReport(
 ): Match | undefined {
   const live = matches.find((m) => m.id === report.matchId);
   if (live) return live;
-  if (report.source !== MATCH_REPORT_SOURCE_LEGACY_FORM && !report.legacyFixture) {
+  const isFixtureOnly =
+    report.source === MATCH_REPORT_SOURCE_LEGACY_FORM ||
+    report.source === MATCH_REPORT_SOURCE_OUTSIDE ||
+    Boolean(report.legacyFixture);
+  if (!isFixtureOnly) {
     return undefined;
   }
   const teams = report.legacyFixture ?? {
@@ -673,6 +685,7 @@ export function displayMatchForCmoReport(
   };
   const moUserId =
     report.slot === 'mo' ? report.officialId : report.subjectOfficialId;
+  const isOutside = report.source === MATCH_REPORT_SOURCE_OUTSIDE;
   return {
     id: report.matchId,
     sheetRowKey: report.matchId,
@@ -685,9 +698,9 @@ export function displayMatchForCmoReport(
     homeTeamName: teams.homeTeamName,
     awayTeamName: teams.awayTeamName,
     competition: teams.matchLevel,
-    level: teams.matchLevel?.trim() || 'Archive',
+    level: teams.matchLevel?.trim() || (isOutside ? 'Outside' : 'Archive'),
     gender: inferMatchGenderFromLevel(teams.matchLevel),
-    matchType: '2025 archive',
+    matchType: isOutside ? 'Outside game' : '2025 archive',
     flightProvided: false,
     housingProvided: false,
     crew: {

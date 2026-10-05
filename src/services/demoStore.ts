@@ -73,6 +73,12 @@ import {
   syncPendingMatchReports,
 } from '@/domain/reports';
 import {
+  buildOutsideCmoPending,
+  buildOutsidePerformancePending,
+  findOpenOutsideSession,
+  type OutsideCoachingSession,
+} from '@/domain/outsideCoaching';
+import {
   casesFromCardReport,
   type JudicialCase,
   type JudicialComment,
@@ -1654,6 +1660,8 @@ export interface AppState {
   notifications: NotificationLogEntry[];
   officialAlerts: OfficialAlert[];
   matchReports: MatchReport[];
+  /** Club/society outside coaching pairs (not college schedule). */
+  outsideCoachingSessions: OutsideCoachingSession[];
   cardReports: CardReport[];
   judicialCases: JudicialCase[];
   judicialComments: Record<string, JudicialComment[]>;
@@ -2528,6 +2536,105 @@ function seedJudicialCases(_reports: CardReport[]): JudicialCase[] {
   return seedDemoJudicialSeason().cases;
 }
 
+/** Demo club/society outside coaching — Riley (ref) + Casey (CMO). */
+function seedOutsideCoachingDemo(): {
+  sessions: OutsideCoachingSession[];
+  reports: MatchReport[];
+} {
+  const pendingSession: OutsideCoachingSession = {
+    id: 'ocs_demo_huns',
+    refereeId: 'u_ref1',
+    coachId: 'u_ref2',
+    matchDate: '2026-10-04',
+    homeTeamName: 'Austin Huns',
+    awayTeamName: 'Dallas Harlequins',
+    division: 'Men’s club',
+    createdBy: 'u_ref2',
+    createdAt: '2026-10-04T20:00:00.000Z',
+    updatedAt: '2026-10-04T20:00:00.000Z',
+  };
+  const doneSession: OutsideCoachingSession = {
+    id: 'ocs_demo_done',
+    refereeId: 'u_ref1',
+    coachId: 'u_ref2',
+    matchDate: '2026-09-20',
+    homeTeamName: 'Austin Blacks',
+    awayTeamName: 'Houston Athletic',
+    division: 'Men’s club',
+    createdBy: 'u_ref1',
+    createdAt: '2026-09-20T22:00:00.000Z',
+    updatedAt: '2026-09-21T01:00:00.000Z',
+  };
+  const donePerf = {
+    ...buildOutsidePerformancePending(doneSession),
+    status: 'submitted' as const,
+    submittedAt: '2026-09-20T23:30:00.000Z',
+    moPayload: {
+      homePoints: 24,
+      awayPoints: 17,
+      yellowCards: 1,
+      redCards: 0,
+      homeYellowCards: 1,
+      homeRedCards: 0,
+      awayYellowCards: 0,
+      awayRedCards: 0,
+      refereeName: 'Riley Official',
+      matchDate: '2026-09-20',
+      format: '15s' as const,
+      division: 'Men’s club',
+      homeTeamName: 'Austin Blacks',
+      awayTeamName: 'Houston Athletic',
+      gameTemperature: 3,
+      controlAndFlow: 4,
+      todayIPerformed: 'Steady night; managed a hot breakdown well.',
+      typeOfMoment: 'Breakdown',
+      decidedAndWhy: 'Played advantage then came back for offside.',
+      setPieceChallenge: 'Scrum engagement timing.',
+      advantageUse: 4,
+    },
+  };
+  const doneCmo = {
+    ...buildOutsideCmoPending(doneSession),
+    status: 'submitted' as const,
+    submittedAt: '2026-09-21T00:15:00.000Z',
+    cmoPayload: {
+      scales: {
+        scrum: 4,
+        breakdown: 3,
+        advantage: 4,
+        gameControl: 4,
+        communication: 3,
+        materiality: 4,
+        positioning: 3,
+        lineout: 3,
+        fitness: 4,
+        bigDecisions: 4,
+      },
+      comments: {},
+      matchKind: 'League Match' as const,
+      gameTemperature: 3,
+      contestBalance: 3,
+      attendedInPerson: 'yes' as const,
+      keep: 'Calm communication under pressure.',
+      start: 'Earlier materiality at the breakdown.',
+      stop: 'Over-coaching players after whistle.',
+      overallComment: 'Solid club outing — ready for a step up.',
+      assessedRating: 5,
+      gradingConfidence: 4,
+      gradingRationale: 'Consistent with D2 club expectations.',
+    },
+  };
+  return {
+    sessions: [pendingSession, doneSession],
+    reports: [
+      buildOutsideCmoPending(pendingSession),
+      // Referee has not filed yet on Huns — unlock gate demo.
+      donePerf,
+      doneCmo,
+    ],
+  };
+}
+
 function seedCoachingReports(): CoachingReportStub[] {
   const now = Date.now();
   return [
@@ -2647,6 +2754,7 @@ function emptyLiveQueueState(): Pick<
   | 'notifications'
   | 'officialAlerts'
   | 'matchReports'
+  | 'outsideCoachingSessions'
   | 'cardReports'
   | 'judicialCases'
   | 'judicialComments'
@@ -2668,6 +2776,7 @@ function emptyLiveQueueState(): Pick<
     notifications: [],
     officialAlerts: [],
     matchReports: [],
+    outsideCoachingSessions: [],
     cardReports: [],
     judicialCases: [],
     judicialComments: {},
@@ -2781,7 +2890,11 @@ function createInitialState(opts?: { seedDemoQueue?: boolean }): AppState {
           },
         ],
         officialAlerts: seedOfficialAlerts(),
-        matchReports: seedMatchReports(seeded.matches),
+        matchReports: (() => {
+          const outside = seedOutsideCoachingDemo();
+          return [...seedMatchReports(seeded.matches), ...outside.reports];
+        })(),
+        outsideCoachingSessions: seedOutsideCoachingDemo().sessions,
         cardReports: seedCardReports(seeded.matches),
         judicialCases: seedJudicialCases(seedCardReports(seeded.matches)),
         judicialComments: {},
@@ -2968,8 +3081,109 @@ class DemoStore {
     }));
   }
 
+  applyLiveOutsideCoachingSessions(sessions: OutsideCoachingSession[]): void {
+    this.set((s) => ({ ...s, outsideCoachingSessions: sessions }));
+  }
+
   applyLiveCardReports(cardReports: CardReport[]): void {
     this.set((s) => ({ ...s, cardReports }));
+  }
+
+  upsertOutsideSessionLocal(session: OutsideCoachingSession): void {
+    this.set((s) => ({
+      ...s,
+      outsideCoachingSessions: [
+        ...s.outsideCoachingSessions.filter((x) => x.id !== session.id),
+        session,
+      ],
+    }));
+  }
+
+  createOrJoinOutsideSession(input: {
+    starterUid: string;
+    refereeId: string;
+    coachId: string;
+    matchDate: string;
+    homeTeamName: string;
+    awayTeamName: string;
+    division?: string;
+  }): OutsideCoachingSession {
+    const matchDate = input.matchDate.trim().slice(0, 10);
+    const homeTeamName = input.homeTeamName.trim();
+    const awayTeamName = input.awayTeamName.trim();
+    if (!matchDate || !homeTeamName || !awayTeamName) {
+      throw new Error('Match date and both team names are required.');
+    }
+    if (input.refereeId === input.coachId) {
+      throw new Error('Referee and coach must be different people.');
+    }
+    if (
+      input.starterUid !== input.refereeId &&
+      input.starterUid !== input.coachId
+    ) {
+      throw new Error('You must be the referee or the coach on this session.');
+    }
+    const existing = findOpenOutsideSession(
+      this.state.outsideCoachingSessions,
+      input.refereeId,
+      input.coachId,
+      matchDate,
+      this.state.matchReports,
+    );
+    if (existing) return existing;
+
+    const now = new Date().toISOString();
+    const session: OutsideCoachingSession = {
+      id: id('ocs'),
+      refereeId: input.refereeId,
+      coachId: input.coachId,
+      matchDate,
+      homeTeamName,
+      awayTeamName,
+      ...(input.division?.trim() ? { division: input.division.trim() } : {}),
+      createdBy: input.starterUid,
+      createdAt: now,
+      updatedAt: now,
+    };
+    this.upsertOutsideSessionLocal(session);
+    return session;
+  }
+
+  ensureOutsidePerformanceLocal(
+    sessionId: string,
+    uid: string,
+  ): MatchReport | null {
+    const session = this.state.outsideCoachingSessions.find(
+      (s) => s.id === sessionId,
+    );
+    if (!session || uid !== session.refereeId) return null;
+    const existing = this.state.matchReports.find(
+      (r) =>
+        r.outsideSessionId === sessionId &&
+        r.slot === 'mo' &&
+        r.officialId === uid,
+    );
+    if (existing) return existing;
+    const pending = buildOutsidePerformancePending(session);
+    this.upsertMatchReportLocal(pending);
+    return pending;
+  }
+
+  ensureOutsideCmoLocal(sessionId: string, uid: string): MatchReport | null {
+    const session = this.state.outsideCoachingSessions.find(
+      (s) => s.id === sessionId,
+    );
+    if (!session || uid !== session.coachId) return null;
+    const existing = this.state.matchReports.find(
+      (r) =>
+        r.outsideSessionId === sessionId &&
+        r.slot === 'cmo' &&
+        r.officialId === uid,
+    );
+    if (existing) return existing;
+    const pending = buildOutsideCmoPending(session);
+    this.upsertMatchReportLocal(pending);
+    return pending;
   }
 
   upsertMatchReportLocal(report: MatchReport): void {

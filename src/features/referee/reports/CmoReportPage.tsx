@@ -29,6 +29,10 @@ import {
   type CmoReportPayload,
   type CmoScaleKey,
 } from '@/domain/reports';
+import {
+  resolveMatchForReports,
+  sessionIdFromOutsideMatchId,
+} from '@/domain/outsideCoaching';
 import { isFivePointValue, type FivePointChoice, type FivePointValue } from '@/domain/fivePointScale';
 import { crewPeople, type Match } from '@/domain/types';
 import { moDisplayNames } from '@/features/referee/appointments/crewLines';
@@ -40,6 +44,8 @@ import { RefereeLevelChart } from '@/ui/RefereeLevelChart';
 import { ScaleRatingCards } from '@/ui/ScaleRatingCards';
 import {
   ensureCmoReportReady,
+  ensureOutsideCmoReady,
+  ensureOutsideCmoReadyDemo,
   persistSubmittedCmoReport,
 } from '@/services/reportsLive';
 import { useScrollReportToTopOnChange } from '@/features/referee/reports/scrollReportToTop';
@@ -103,7 +109,12 @@ export function CmoReportPage() {
   const { currentUser, state, store, dataMode } = useApp();
   const navigate = useNavigate();
 
-  const match = state.matches.find((m) => m.id === matchId);
+  const match = resolveMatchForReports(
+    matchId,
+    state.matches,
+    state.outsideCoachingSessions,
+  );
+  const outsideSessionId = sessionIdFromOutsideMatchId(matchId);
   const moIds = useMemo(
     () => (match ? moOfficialIdsOnMatch(match) : []),
     [match],
@@ -114,6 +125,16 @@ export function CmoReportPage() {
   const report = useMemo(() => {
     if (!currentUser || !matchId || !match || !effectiveSubjectId) {
       return undefined;
+    }
+    if (outsideSessionId) {
+      const hit = state.matchReports.find(
+        (r) =>
+          r.outsideSessionId === outsideSessionId &&
+          r.slot === 'cmo' &&
+          r.officialId === currentUser.uid &&
+          r.status === 'pending',
+      );
+      return hit;
     }
     const hit = resolveCmoReportForUserOnMatch(
       state.matchReports,
@@ -127,6 +148,7 @@ export function CmoReportPage() {
     matchId,
     match,
     effectiveSubjectId,
+    outsideSessionId,
     state.matchReports,
   ]);
 
@@ -167,15 +189,32 @@ export function CmoReportPage() {
   const [done, setDone] = useState(false);
 
   useEffect(() => {
-    if (dataMode !== 'live' || !currentUser || !matchId || !effectiveSubjectId) {
+    if (!currentUser || !matchId || !effectiveSubjectId) {
       return;
     }
+    if (outsideSessionId) {
+      if (dataMode === 'live') {
+        void ensureOutsideCmoReady(outsideSessionId, currentUser.uid).catch(
+          (err) => console.error('ensureOutsideCmoReady failed', err),
+        );
+      } else {
+        ensureOutsideCmoReadyDemo(outsideSessionId, currentUser.uid);
+      }
+      return;
+    }
+    if (dataMode !== 'live') return;
     void ensureCmoReportReady(
       matchId,
       currentUser.uid,
       effectiveSubjectId,
     ).catch((err) => console.error('ensureCmoReportReady failed', err));
-  }, [dataMode, currentUser?.uid, matchId, effectiveSubjectId]);
+  }, [
+    dataMode,
+    currentUser?.uid,
+    matchId,
+    effectiveSubjectId,
+    outsideSessionId,
+  ]);
 
   const toggleComplexity = (opt: CmoComplexityFactor, checked: boolean) => {
     setComplexityFactors((prev) =>
