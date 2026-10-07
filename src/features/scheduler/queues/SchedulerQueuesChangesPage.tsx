@@ -1,5 +1,19 @@
-import { useMemo } from 'react';
-import { EmptyState, EmptyStateBody } from '@patternfly/react-core';
+import { useMemo, useState } from 'react';
+import {
+  Button,
+  Checkbox,
+  EmptyState,
+  EmptyStateBody,
+  FormGroup,
+  FormHelperText,
+  Modal,
+  ModalBody,
+  ModalFooter,
+  ModalHeader,
+  ModalVariant,
+  TextArea,
+  Title,
+} from '@patternfly/react-core';
 import { useApp } from '@/app/AppContext';
 import { compareKickoffAsc } from '@/domain/divisionFilters';
 import type { Match } from '@/domain/types';
@@ -33,6 +47,12 @@ export function SchedulerQueuesChangesPage() {
     availableDatesFromMatches,
   } = useWorkDivisionFilters(state);
 
+  const [dismissProposalId, setDismissProposalId] = useState<string | null>(
+    null,
+  );
+  const [dismissReason, setDismissReason] = useState('');
+  const [dismissRequireReconfirm, setDismissRequireReconfirm] = useState(true);
+
   const pool = useMemo(
     () => proposalsAwaitingAck(state.proposals),
     [state.proposals],
@@ -62,6 +82,36 @@ export function SchedulerQueuesChangesPage() {
     });
   }, [pool, state.matches, filterMatch]);
 
+  const dismissTarget = dismissProposalId
+    ? state.proposals.find((p) => p.id === dismissProposalId)
+    : undefined;
+
+  const openDismiss = (proposalId: string) => {
+    const p = state.proposals.find((x) => x.id === proposalId);
+    setDismissProposalId(proposalId);
+    setDismissReason('');
+    setDismissRequireReconfirm(Boolean(p?.kickoffAt));
+  };
+
+  const closeDismiss = () => {
+    setDismissProposalId(null);
+    setDismissReason('');
+    setDismissRequireReconfirm(true);
+  };
+
+  const confirmDismiss = () => {
+    if (!dismissProposalId || !currentUser?.uid || !dismissReason.trim()) {
+      return;
+    }
+    store.dismissProposalAsAssigner(
+      dismissProposalId,
+      currentUser.uid,
+      dismissReason.trim(),
+      { requireOfficialsReconfirm: dismissRequireReconfirm },
+    );
+    closeDismiss();
+  };
+
   if (!filtersActive && proposals.length === 0) {
     return (
       <EmptyState titleText="No pending changes" headingLevel="h3">
@@ -75,8 +125,10 @@ export function SchedulerQueuesChangesPage() {
   return (
     <>
       <p className="rs-match-card__meta">
-        Change proposals that still need assigner review or apply. Acknowledge
-        only dismisses from your queue; apply updates the match and Sheet.
+        Change proposals that still need assigner review or apply. Apply updates
+        the match and Sheet; deny closes the proposal (use when you already
+        handled it offline). Acknowledge only dismisses from your queue without
+        closing the proposal.
       </p>
 
       <GlobalDivisionFilters
@@ -121,8 +173,82 @@ export function SchedulerQueuesChangesPage() {
           onApply={(id) =>
             store.applyProposalAsAssigner(id, currentUser?.uid)
           }
+          onDismiss={openDismiss}
         />
       </QueueSection>
+
+      <Modal
+        variant={ModalVariant.small}
+        isOpen={Boolean(dismissProposalId)}
+        onClose={closeDismiss}
+        aria-labelledby="dismiss-proposal-title"
+        aria-describedby="dismiss-proposal-desc"
+      >
+        <ModalHeader>
+          <Title headingLevel="h2" id="dismiss-proposal-title" size="lg">
+            Deny this change?
+          </Title>
+        </ModalHeader>
+        <ModalBody>
+          <p id="dismiss-proposal-desc" className="rs-modal-lede">
+            Use this when you already updated the Sheet offline, or when the
+            change should not proceed. A message is required for the proposing
+            team
+            {dismissTarget?.proposedByName
+              ? ` (${dismissTarget.proposedByName})`
+              : ''}
+            .
+          </p>
+          <form
+            id="dismiss-proposal-form"
+            onSubmit={(e) => {
+              e.preventDefault();
+              confirmDismiss();
+            }}
+          >
+            <FormGroup
+              label="Message"
+              isRequired
+              fieldId="dismiss-proposal-reason"
+            >
+              <TextArea
+                id="dismiss-proposal-reason"
+                value={dismissReason}
+                onChange={(_e, v) => setDismissReason(v)}
+                rows={3}
+                isRequired
+                aria-required
+                placeholder="e.g. Kickoff moved to 7:00 PM — please reconfirm."
+              />
+            </FormGroup>
+            <FormGroup fieldId="dismiss-require-reconfirm">
+              <Checkbox
+                id="dismiss-require-reconfirm"
+                label="Require officials to reconfirm"
+                isChecked={dismissRequireReconfirm}
+                onChange={(_e, checked) => setDismissRequireReconfirm(checked)}
+              />
+              <FormHelperText>
+                Holds confirmed appointments and sends your message to the
+                assigned crew.
+              </FormHelperText>
+            </FormGroup>
+          </form>
+        </ModalBody>
+        <ModalFooter>
+          <Button type="button" variant="link" onClick={closeDismiss}>
+            Cancel
+          </Button>
+          <Button
+            type="submit"
+            form="dismiss-proposal-form"
+            variant="danger"
+            isDisabled={!dismissReason.trim() || !currentUser?.uid}
+          >
+            Deny change
+          </Button>
+        </ModalFooter>
+      </Modal>
     </>
   );
 }

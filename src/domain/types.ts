@@ -229,7 +229,7 @@ export interface ChangeProposal {
   otherTeamDeniedAt?: string;
   otherTeamDeniedByUserId?: string;
   otherTeamDeniedByName?: string;
-  /** Required when the other team denies. */
+  /** Required when the other team denies or the assigner dismisses/withdraws. */
   denyReason?: string;
   assignerAckAt?: string;
   assignerAckByUserId?: string;

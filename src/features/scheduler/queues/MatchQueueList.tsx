@@ -177,12 +177,14 @@ export function ProposalQueueList({
   emptyText,
   onAcknowledge,
   onApply,
+  onDismiss,
 }: {
   proposals: ChangeProposal[];
   matches: Match[];
   emptyText: string;
   onAcknowledge: (proposalId: string) => void;
   onApply: (proposalId: string) => void;
+  onDismiss?: (proposalId: string) => void;
 }) {
   const { state } = useApp();
   const timeZone = orgTimeZone(state.org.timezone);
@@ -257,6 +259,21 @@ export function ProposalQueueList({
                       }}
                     >
                       Apply change
+                    </Button>
+                  )}
+                  {awaitingApply && onDismiss && (
+                    <Button
+                      size="sm"
+                      variant="link"
+                      isDanger
+                      isInline
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        onDismiss(p.id);
+                      }}
+                    >
+                      Deny change
                     </Button>
                   )}
                   {awaitingAck && (

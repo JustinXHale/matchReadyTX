@@ -3,6 +3,7 @@ import './match-detail.css';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import {
   Button,
+  Checkbox,
   Title,
   TextArea,
   FormGroup,
@@ -313,6 +314,10 @@ export function MatchDetailPage() {
   const [showDenyProposal, setShowDenyProposal] = useState(false);
   const [denyProposalReason, setDenyProposalReason] = useState('');
   const [denyProposalId, setDenyProposalId] = useState<string | null>(null);
+  const [denyProposalMode, setDenyProposalMode] = useState<'team' | 'assigner'>(
+    'team',
+  );
+  const [denyRequireReconfirm, setDenyRequireReconfirm] = useState(true);
   const [pickTarget, setPickTarget] = useState<CrewPickTarget | null>(null);
   type ResendEmailState = 'idle' | 'sending' | 'sent' | 'error';
   const [resendEmailByKey, setResendEmailByKey] = useState<
@@ -599,7 +604,10 @@ export function MatchDetailPage() {
     const latest = [...state.proposals]
       .filter((p) => p.matchId === match.id)
       .sort((a, b) => b.createdAt.localeCompare(a.createdAt))[0];
-    return latest?.status === 'rejected_by_other_team' ? latest : undefined;
+    return latest?.status === 'rejected_by_other_team' ||
+      latest?.status === 'withdrawn'
+      ? latest
+      : undefined;
   })();
   const acceptedProposal = (() => {
     const latest = [...state.proposals]
@@ -1146,11 +1154,23 @@ export function MatchDetailPage() {
     setShowProposeModal(false);
   };
 
-  const openDenyProposal = () => {
+  const openDenyProposal = (mode: 'team' | 'assigner' = 'team') => {
     if (!pendingProposal) return;
     setDenyProposalId(pendingProposal.id);
     setDenyProposalReason('');
+    setDenyProposalMode(mode);
+    setDenyRequireReconfirm(
+      mode === 'assigner' && Boolean(pendingProposal.kickoffAt),
+    );
     setShowDenyProposal(true);
+  };
+
+  const closeDenyProposal = () => {
+    setShowDenyProposal(false);
+    setDenyProposalReason('');
+    setDenyProposalId(null);
+    setDenyProposalMode('team');
+    setDenyRequireReconfirm(true);
   };
 
   const confirmDenyProposal = () => {
@@ -1164,10 +1184,14 @@ export function MatchDetailPage() {
       )?.value?.trim() ||
       '';
     if (!proposalId || !reason) return;
-    store.denyProposalOtherTeam(proposalId, currentUser.uid, reason);
-    setShowDenyProposal(false);
-    setDenyProposalReason('');
-    setDenyProposalId(null);
+    if (denyProposalMode === 'assigner') {
+      store.dismissProposalAsAssigner(proposalId, currentUser.uid, reason, {
+        requireOfficialsReconfirm: denyRequireReconfirm,
+      });
+    } else {
+      store.denyProposalOtherTeam(proposalId, currentUser.uid, reason);
+    }
+    closeDenyProposal();
   };
 
   const confirmAssignerAction = () => {
@@ -1718,7 +1742,7 @@ export function MatchDetailPage() {
               : ''}
             . The other team must accept before this becomes the schedule.
             {isAssigner
-              ? ' Apply updates the match and Sheet for everyone (you don’t need in-app team accept if you confirmed offline). Acknowledge only dismisses this from your queue.'
+              ? ' Apply updates the match and Sheet for everyone (you don’t need in-app team accept if you confirmed offline). Deny closes this proposal without Sheet write-back — use when you already applied offline, and optionally require officials to reconfirm. Acknowledge only dismisses this from your queue.'
               : ''}
           </p>
           <div className="rs-proposal-compare">
@@ -1836,7 +1860,11 @@ export function MatchDetailPage() {
                 >
                   Accept change
                 </Button>
-                <Button variant="link" isDanger onClick={openDenyProposal}>
+                <Button
+                  variant="link"
+                  isDanger
+                  onClick={() => openDenyProposal('team')}
+                >
                   Deny
                 </Button>
               </div>
@@ -1862,6 +1890,13 @@ export function MatchDetailPage() {
               >
                 Apply change
               </Button>
+              <Button
+                variant="link"
+                isDanger
+                onClick={() => openDenyProposal('assigner')}
+              >
+                Deny change
+              </Button>
               {!pendingProposal.assignerAckAt && (
                 <Button
                   variant="link"
@@ -1882,7 +1917,8 @@ export function MatchDetailPage() {
             pendingProposal.assignerAckAt && (
               <p className="rs-detail-note">
                 You acknowledged this proposal. Apply change when you’re ready to
-                update the match and Sheet.
+                update the match and Sheet, or deny if you already handled it
+                offline.
               </p>
             )}
           {isAssigner && state.org.sheetSyncError && (
@@ -1905,16 +1941,24 @@ export function MatchDetailPage() {
                 id="proposal-denied-heading"
                 className="rs-detail-section__label"
               >
-                Change denied
+                {deniedProposal.status === 'withdrawn'
+                  ? 'Change dismissed'
+                  : 'Change denied'}
               </h3>
-              <span className="rs-pill rs-pill--urgent">Denied</span>
+              <span className="rs-pill rs-pill--urgent">
+                {deniedProposal.status === 'withdrawn' ? 'Dismissed' : 'Denied'}
+              </span>
             </div>
             <p className="rs-detail-note">
               A proposal from{' '}
               <strong>
                 {proposalTeamName(deniedProposal.proposedByTeamId)}
               </strong>{' '}
-              was denied. Schedule facts were not changed.
+              was{' '}
+              {deniedProposal.status === 'withdrawn'
+                ? 'dismissed by the scheduler'
+                : 'denied'}
+              . Schedule facts were not changed by this action.
             </p>
             {deniedProposal.denyReason && (
               <blockquote className="rs-proposal-deny-reason">
@@ -1936,6 +1980,16 @@ export function MatchDetailPage() {
                   {formatActivityAt(deniedProposal.otherTeamDeniedAt)}
                 </li>
               )}
+              {deniedProposal.status === 'withdrawn' &&
+                deniedProposal.assignerAckAt && (
+                  <li>
+                    Dismissed
+                    {deniedProposal.assignerAckByName
+                      ? ` by ${deniedProposal.assignerAckByName}`
+                      : ' by scheduler'}{' '}
+                    · {formatActivityAt(deniedProposal.assignerAckAt)}
+                  </li>
+                )}
             </ul>
           </section>
         )}
@@ -3242,11 +3296,7 @@ export function MatchDetailPage() {
       <Modal
         variant={ModalVariant.small}
         isOpen={showDenyProposal}
-        onClose={() => {
-          setShowDenyProposal(false);
-          setDenyProposalId(null);
-          setDenyProposalReason('');
-        }}
+        onClose={closeDenyProposal}
         aria-labelledby="deny-proposal-title"
         aria-describedby="deny-proposal-desc"
       >
@@ -3257,8 +3307,9 @@ export function MatchDetailPage() {
         </ModalHeader>
         <ModalBody>
           <p id="deny-proposal-desc" className="rs-modal-lede">
-            Tell the proposing team why you can&apos;t accept these details.
-            A message is required.
+            {denyProposalMode === 'assigner'
+              ? 'Use this when you already updated the Sheet offline, or when the change should not proceed. A message is required for the proposing team.'
+              : 'Tell the proposing team why you can’t accept these details. A message is required.'}
           </p>
           <form
             id="deny-proposal-form"
@@ -3279,20 +3330,31 @@ export function MatchDetailPage() {
                 rows={3}
                 isRequired
                 aria-required
+                placeholder={
+                  denyProposalMode === 'assigner'
+                    ? 'e.g. Kickoff moved to 7:00 PM — please reconfirm.'
+                    : undefined
+                }
               />
             </FormGroup>
+            {denyProposalMode === 'assigner' && (
+              <FormGroup fieldId="deny-require-reconfirm">
+                <Checkbox
+                  id="deny-require-reconfirm"
+                  label="Require officials to reconfirm"
+                  isChecked={denyRequireReconfirm}
+                  onChange={(_e, checked) => setDenyRequireReconfirm(checked)}
+                />
+                <FormHelperText>
+                  Holds confirmed appointments and sends your message to the
+                  assigned crew.
+                </FormHelperText>
+              </FormGroup>
+            )}
           </form>
         </ModalBody>
         <ModalFooter>
-          <Button
-            type="button"
-            variant="link"
-            onClick={() => {
-              setShowDenyProposal(false);
-              setDenyProposalId(null);
-              setDenyProposalReason('');
-            }}
-          >
+          <Button type="button" variant="link" onClick={closeDenyProposal}>
             Cancel
           </Button>
           <Button

@@ -144,6 +144,7 @@ import {
   createChangeProposalInFirestore,
   defaultOrgId,
   saveMatchTeamConfirmation,
+  saveMatchWorkflowInFirestore,
   updateChangeProposalInFirestore,
 } from '@/services/orgData';
 
@@ -4389,6 +4390,143 @@ class DemoStore {
     }
   }
 
+  /**
+   * Assigner closes a pending proposal without Sheet write-back (e.g. already
+   * applied offline). Optionally holds crew and asks officials to reconfirm.
+   */
+  dismissProposalAsAssigner(
+    proposalId: string,
+    userId: string,
+    reason: string,
+    opts?: { requireOfficialsReconfirm?: boolean },
+  ): void {
+    const trimmed = (reason ?? '').trim();
+    if (!trimmed) return;
+    const user = this.state.users.find((u) => u.uid === userId);
+    const at = new Date().toISOString();
+    const existing = this.state.proposals.find((x) => x.id === proposalId);
+    if (!existing || existing.status !== 'pending') return;
+
+    const requireReconfirm = Boolean(opts?.requireOfficialsReconfirm);
+    let updatedMatch: Match | undefined;
+
+    this.set((s) => ({
+      ...s,
+      proposals: s.proposals.map((x) =>
+        x.id === proposalId
+          ? {
+              ...x,
+              status: 'withdrawn' as const,
+              denyReason: trimmed,
+              assignerAckAt: x.assignerAckAt ?? at,
+              assignerAckByUserId: x.assignerAckByUserId ?? userId,
+              assignerAckByName: x.assignerAckByName ?? user?.displayName,
+            }
+          : x,
+      ),
+      matches: s.matches.map((m) => {
+        if (m.id !== existing.matchId) return m;
+        if (requireReconfirm) {
+          updatedMatch = markNeedsReconfirmation(m);
+          return updatedMatch;
+        }
+        const nextStatus =
+          m.homeConfirmedAt && m.awayConfirmedAt
+            ? ('team_confirmed' as const)
+            : ('pending_team_review' as const);
+        updatedMatch = { ...m, status: nextStatus };
+        return updatedMatch;
+      }),
+    }));
+
+    if (isLiveDataMode()) {
+      void updateChangeProposalInFirestore(
+        defaultOrgId(),
+        existing.matchId,
+        proposalId,
+        {
+          status: 'withdrawn',
+          denyReason: trimmed,
+          assignerAckAt: existing.assignerAckAt ?? at,
+          assignerAckByUserId: existing.assignerAckByUserId ?? userId,
+          assignerAckByName: existing.assignerAckByName ?? user?.displayName,
+        },
+      ).catch((err) =>
+        console.error('updateChangeProposalInFirestore failed', err),
+      );
+      const nextMatch =
+        updatedMatch ??
+        this.state.matches.find((m) => m.id === existing.matchId);
+      if (nextMatch) {
+        if (requireReconfirm) {
+          void saveMatchWorkflowInFirestore(defaultOrgId(), nextMatch).catch(
+            (err) =>
+              console.error('saveMatchWorkflowInFirestore failed', err),
+          );
+        }
+        void saveMatchTeamConfirmation(defaultOrgId(), nextMatch).catch((err) =>
+          console.error('saveMatchTeamConfirmation failed', err),
+        );
+      }
+    }
+
+    for (const u of this.state.users) {
+      if (
+        u.roles.includes('teamAdmin') &&
+        u.teamIds.includes(existing.proposedByTeamId)
+      ) {
+        this.notify(
+          'change_proposed',
+          u.uid,
+          'Change proposal dismissed',
+          `${user?.displayName ?? 'Scheduler'}: ${trimmed}`,
+        );
+      }
+    }
+
+    if (requireReconfirm) {
+      const match =
+        updatedMatch ??
+        this.state.matches.find((m) => m.id === existing.matchId);
+      if (match) {
+        this.notifyOfficialsReconfirm(match, trimmed);
+      }
+    }
+  }
+
+  /** Hold assigned crew and notify them to reconfirm (custom reason). */
+  requireOfficialsReconfirm(
+    matchId: string,
+    reason: string,
+    _userId?: string,
+  ): void {
+    const trimmed = (reason ?? '').trim();
+    if (!trimmed) return;
+    let updatedMatch: Match | undefined;
+    this.set((s) => ({
+      ...s,
+      matches: s.matches.map((m) => {
+        if (m.id !== matchId) return m;
+        updatedMatch = markNeedsReconfirmation(m);
+        return updatedMatch;
+      }),
+    }));
+    const match =
+      updatedMatch ?? this.state.matches.find((m) => m.id === matchId);
+    if (!match) return;
+
+    if (isLiveDataMode()) {
+      void saveMatchWorkflowInFirestore(defaultOrgId(), match).catch((err) =>
+        console.error('saveMatchWorkflowInFirestore failed', err),
+      );
+      void saveMatchTeamConfirmation(defaultOrgId(), match).catch((err) =>
+        console.error('saveMatchTeamConfirmation failed', err),
+      );
+    }
+
+    this.notifyOfficialsReconfirm(match, trimmed);
+  }
+
   acknowledgeProposal(proposalId: string, userId?: string): void {
     const user = userId
       ? this.state.users.find((u) => u.uid === userId)
@@ -4427,7 +4565,11 @@ class DemoStore {
   /** Apply proposal facts to the match + Sheet (assigner authority — in-app team accept optional). */
   applyProposalAsAssigner(proposalId: string, userId?: string): void {
     const existing = this.state.proposals.find((x) => x.id === proposalId);
-    if (!existing || existing.status === 'rejected_by_other_team') {
+    if (
+      !existing ||
+      existing.status === 'rejected_by_other_team' ||
+      existing.status === 'withdrawn'
+    ) {
       return;
     }
     const user = userId
@@ -4504,7 +4646,13 @@ class DemoStore {
 
   private applyProposalFactsLocally(proposalId: string): void {
     const p = this.state.proposals.find((x) => x.id === proposalId);
-    if (!p || p.status === 'rejected_by_other_team') return;
+    if (
+      !p ||
+      p.status === 'rejected_by_other_team' ||
+      p.status === 'withdrawn'
+    ) {
+      return;
+    }
 
     let appliedMatch: Match | undefined;
     this.set((s) => ({
@@ -4577,10 +4725,11 @@ class DemoStore {
     }
   }
 
-  private notifyOfficialsReconfirmAfterProposal(
-    match: Match,
-    p: ChangeProposal,
-  ): void {
+  private notifyOfficialsReconfirm(match: Match, reason?: string): void {
+    const detail = (reason ?? '').trim();
+    const body = detail
+      ? `${match.homeTeamName} vs ${match.awayTeamName}: ${detail}`
+      : `${match.homeTeamName} vs ${match.awayTeamName} changed — confirm or decline the new details.`;
     for (const slot of ['mo', 'ar1', 'ar2', 'no4'] as CrewSlot[]) {
       for (const c of crewPeople(match.crew[slot])) {
         if (c.userId) {
@@ -4588,11 +4737,19 @@ class DemoStore {
             'availability_check',
             c.userId,
             'Reconfirm your appointment',
-            `${match.homeTeamName} vs ${match.awayTeamName} changed — confirm or decline the new details.`,
+            body,
           );
         }
       }
     }
+  }
+
+  private notifyOfficialsReconfirmAfterProposal(
+    match: Match,
+    p: ChangeProposal,
+    reason?: string,
+  ): void {
+    this.notifyOfficialsReconfirm(match, reason);
     for (const u of this.state.users) {
       if (
         u.roles.includes('teamAdmin') &&

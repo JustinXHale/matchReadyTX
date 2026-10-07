@@ -92,10 +92,13 @@ export async function runProposalWriteback(
       'Assigner must apply or acknowledge the proposal before write-back.',
     );
   }
-  if (proposal.status === 'rejected_by_other_team') {
+  if (
+    proposal.status === 'rejected_by_other_team' ||
+    proposal.status === 'withdrawn'
+  ) {
     throw new HttpsError(
       'failed-precondition',
-      'Proposal was denied — cannot write back.',
+      'Proposal was denied or withdrawn — cannot write back.',
     );
   }
 
