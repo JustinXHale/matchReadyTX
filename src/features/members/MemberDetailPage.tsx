@@ -7,6 +7,9 @@ import {
   EmptyState,
   EmptyStateBody,
   FormGroup,
+  FormHelperText,
+  HelperText,
+  HelperTextItem,
   Modal,
   ModalBody,
   ModalFooter,
@@ -15,7 +18,11 @@ import {
   Title,
 } from '@patternfly/react-core';
 import { useApp, useAppHref } from '@/app/AppContext';
-import { effectiveContactEmail } from '@/domain/contactEmail';
+import {
+  effectiveContactEmail,
+  isApplePrivateRelayEmail,
+  isUsableContactEmail,
+} from '@/domain/contactEmail';
 import {
   fanFavoriteLabel,
   formatMemberAddress,
@@ -91,6 +98,8 @@ const FALLBACK_BACK: BackNav = { to: '/about/members', label: 'Members' };
 type EditDraft = {
   firstName: string;
   lastName: string;
+  contactEmailSameAsSignIn: boolean;
+  contactEmail: string;
   phone: string;
   smsOptIn: boolean | null;
   homeStreet: string;
@@ -118,6 +127,7 @@ type EditDraft = {
 type EditFieldKey =
   | 'firstName'
   | 'lastName'
+  | 'contactEmail'
   | 'roles'
   | 'phone'
   | 'birthday'
@@ -147,6 +157,19 @@ function validateMemberEditDraft(
       message: 'First and last name are required.',
       fields,
     };
+  }
+
+  if (!draft.contactEmailSameAsSignIn) {
+    if (
+      !isUsableContactEmail(draft.contactEmail) ||
+      isApplePrivateRelayEmail(draft.contactEmail)
+    ) {
+      return {
+        message:
+          'Enter a valid personal contact email (not an Apple Hide My Email address).',
+        fields: ['contactEmail'],
+      };
+    }
   }
 
   const hasRole =
@@ -231,9 +254,14 @@ function validateMemberEditDraft(
 }
 
 function draftFromUser(user: UserProfile): EditDraft {
+  const sameAsSignIn = user.contactEmailSameAsSignIn !== false;
   return {
     firstName: user.firstName ?? '',
     lastName: user.lastName ?? '',
+    contactEmailSameAsSignIn: sameAsSignIn,
+    contactEmail: sameAsSignIn
+      ? user.email?.trim() ?? ''
+      : user.contactEmail?.trim() || user.email?.trim() || '',
     phone: user.phone ?? '',
     smsOptIn: user.smsOptIn,
     homeStreet: user.homeStreet ?? '',
@@ -660,6 +688,10 @@ export function MemberDetailPage() {
       ...user,
       firstName,
       lastName,
+      contactEmailSameAsSignIn: editDraft.contactEmailSameAsSignIn,
+      contactEmail: editDraft.contactEmailSameAsSignIn
+        ? undefined
+        : editDraft.contactEmail.trim() || undefined,
       phone: fanOnly ? '' : editDraft.phone.trim(),
       smsOptIn: false,
       birthday: needsRef
@@ -832,9 +864,16 @@ export function MemberDetailPage() {
                   <a href={`mailto:${effectiveContactEmail(user)}`}>
                     {effectiveContactEmail(user)}
                   </a>
+                  {isApplePrivateRelayEmail(effectiveContactEmail(user)) && (
+                    <div className="rs-match-card__meta">
+                      Apple Hide My Email — assignment mail may not deliver.
+                      {canManage ? ' Edit to set a personal contact email.' : ''}
+                    </div>
+                  )}
                 </dd>
               </div>
-              {user.contactEmailSameAsSignIn === false && (
+              {(user.contactEmailSameAsSignIn === false ||
+                isApplePrivateRelayEmail(user.email)) && (
                 <div>
                   <dt>Sign-in email</dt>
                   <dd className="rs-match-card__meta">{user.email}</dd>
@@ -972,7 +1011,7 @@ export function MemberDetailPage() {
               </FormGroup>
             </div>
             <div className="rs-form-row rs-form-row--2">
-              <FormGroup label="Email">
+              <FormGroup label="Sign-in email">
                 <TextInput value={user.email} isDisabled readOnly />
               </FormGroup>
               {!editFanOnly && (
@@ -989,6 +1028,60 @@ export function MemberDetailPage() {
                 </FormGroup>
               )}
             </div>
+            <FormHelperText>
+              <HelperText>
+                <HelperTextItem>
+                  Sign-in email comes from Google or Apple and cannot be changed
+                  here.
+                </HelperTextItem>
+              </HelperText>
+            </FormHelperText>
+            <Checkbox
+              id="member-contact-same"
+              label="Contact email is the same as sign-in email"
+              isChecked={editDraft.contactEmailSameAsSignIn}
+              onChange={(_e, checked) => {
+                patchDraft({
+                  contactEmailSameAsSignIn: checked,
+                  contactEmail: checked
+                    ? user.email
+                    : editDraft.contactEmail || user.email,
+                });
+              }}
+            />
+            {!editDraft.contactEmailSameAsSignIn && (
+              <FormGroup
+                label="Contact email"
+                isRequired
+                fieldId="member-contact-email"
+                className={fieldErrorClass('contactEmail')}
+              >
+                <TextInput
+                  id="member-contact-email"
+                  type="email"
+                  value={editDraft.contactEmail}
+                  onChange={(_e, v) => patchDraft({ contactEmail: v })}
+                  autoComplete="email"
+                  validated={
+                    isUsableContactEmail(editDraft.contactEmail) &&
+                    !isApplePrivateRelayEmail(editDraft.contactEmail)
+                      ? 'default'
+                      : 'error'
+                  }
+                />
+              </FormGroup>
+            )}
+            <FormHelperText>
+              <HelperText>
+                <HelperTextItem>
+                  {editDraft.contactEmailSameAsSignIn
+                    ? isApplePrivateRelayEmail(user.email)
+                      ? 'This Apple Hide My Email address often fails assignment delivery. Uncheck above and enter a personal email.'
+                      : `Assignments and society alerts go to ${user.email}.`
+                    : 'Use a personal email they check — not an Apple Hide My Email / relay address.'}
+                </HelperTextItem>
+              </HelperText>
+            </FormHelperText>
             <FormGroup
               label="Roles"
               isRequired

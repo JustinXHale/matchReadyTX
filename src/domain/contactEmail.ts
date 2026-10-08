@@ -21,3 +21,8 @@ export function isUsableContactEmail(raw: string): boolean {
   const domain = e.slice(at + 1);
   return domain.includes('.') && !/\s/.test(e);
 }
+
+/** Apple Hide My Email / Sign in with Apple relay — often fails assignment delivery. */
+export function isApplePrivateRelayEmail(raw: string): boolean {
+  return normalizeEmail(raw).endsWith('@privaterelay.appleid.com');
+}

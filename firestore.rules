@@ -76,6 +76,7 @@ service cloud.firestore {
       return request.resource.data.diff(resource.data).affectedKeys()
         .hasOnly([
           'firstName', 'lastName', 'preferredName', 'displayName',
+          'contactEmail', 'contactEmailSameAsSignIn',
           'phone', 'smsOptIn',
           'homeStreet', 'homeUnit', 'homeCity', 'homeRegion', 'homePostalCode',
           'homeAddress', 'homeLat', 'homeLng',
@@ -389,6 +390,19 @@ service cloud.firestore {
                 && request.resource.data.diff(resource.data).affectedKeys()
                   .hasOnly([
                     'assignerAckAt', 'assignerAckByUserId', 'assignerAckByName', 'updatedAt'
+                  ])
+                && request.resource.data.assignerAckByUserId == request.auth.uid
+              )
+              || (
+                isAssigner(orgId)
+                && request.resource.data.status == 'withdrawn'
+                && request.resource.data.denyReason is string
+                && request.resource.data.denyReason.size() > 0
+                && request.resource.data.diff(resource.data).affectedKeys()
+                  .hasOnly([
+                    'status', 'denyReason',
+                    'assignerAckAt', 'assignerAckByUserId', 'assignerAckByName',
+                    'updatedAt'
                   ])
                 && request.resource.data.assignerAckByUserId == request.auth.uid
               )

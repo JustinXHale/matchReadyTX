@@ -4418,9 +4418,10 @@ class DemoStore {
               ...x,
               status: 'withdrawn' as const,
               denyReason: trimmed,
-              assignerAckAt: x.assignerAckAt ?? at,
-              assignerAckByUserId: x.assignerAckByUserId ?? userId,
-              assignerAckByName: x.assignerAckByName ?? user?.displayName,
+              // Record who dismissed (rules require assignerAckByUserId == auth uid).
+              assignerAckAt: at,
+              assignerAckByUserId: userId,
+              assignerAckByName: user?.displayName,
             }
           : x,
       ),
@@ -4440,34 +4441,50 @@ class DemoStore {
     }));
 
     if (isLiveDataMode()) {
+      const orgId = defaultOrgId();
+      const proposalPatch = {
+        status: 'withdrawn' as const,
+        denyReason: trimmed,
+        assignerAckAt: at,
+        assignerAckByUserId: userId,
+        assignerAckByName: user?.displayName,
+      };
       void updateChangeProposalInFirestore(
-        defaultOrgId(),
+        orgId,
         existing.matchId,
         proposalId,
-        {
-          status: 'withdrawn',
-          denyReason: trimmed,
-          assignerAckAt: existing.assignerAckAt ?? at,
-          assignerAckByUserId: existing.assignerAckByUserId ?? userId,
-          assignerAckByName: existing.assignerAckByName ?? user?.displayName,
-        },
-      ).catch((err) =>
-        console.error('updateChangeProposalInFirestore failed', err),
-      );
-      const nextMatch =
-        updatedMatch ??
-        this.state.matches.find((m) => m.id === existing.matchId);
-      if (nextMatch) {
-        if (requireReconfirm) {
-          void saveMatchWorkflowInFirestore(defaultOrgId(), nextMatch).catch(
-            (err) =>
-              console.error('saveMatchWorkflowInFirestore failed', err),
-          );
-        }
-        void saveMatchTeamConfirmation(defaultOrgId(), nextMatch).catch((err) =>
-          console.error('saveMatchTeamConfirmation failed', err),
-        );
-      }
+        proposalPatch,
+      )
+        .then(() => {
+          const nextMatch =
+            updatedMatch ??
+            this.state.matches.find((m) => m.id === existing.matchId);
+          if (!nextMatch) return;
+          const saves: Promise<unknown>[] = [
+            saveMatchTeamConfirmation(orgId, nextMatch),
+          ];
+          if (requireReconfirm) {
+            saves.push(saveMatchWorkflowInFirestore(orgId, nextMatch));
+          }
+          return Promise.all(saves);
+        })
+        .catch((err) => {
+          console.error('dismissProposalAsAssigner persist failed', err);
+          // Roll back optimistic withdraw so UI matches Firestore.
+          this.set((s) => ({
+            ...s,
+            proposals: s.proposals.map((x) =>
+              x.id === proposalId ? existing : x,
+            ),
+          }));
+          const message =
+            err instanceof Error
+              ? err.message
+              : 'Could not dismiss the proposal. Check permissions and try again.';
+          if (typeof window !== 'undefined') {
+            window.alert(message);
+          }
+        });
     }
 
     for (const u of this.state.users) {

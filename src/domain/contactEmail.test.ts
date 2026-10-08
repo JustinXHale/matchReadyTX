@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { effectiveContactEmail, isUsableContactEmail } from '@/domain/contactEmail';
+import {
+  effectiveContactEmail,
+  isApplePrivateRelayEmail,
+  isUsableContactEmail,
+} from '@/domain/contactEmail';
 
 describe('contactEmail', () => {
   it('defaults to sign-in email when same-as-sign-in is unset', () => {
@@ -33,5 +37,12 @@ describe('contactEmail', () => {
   it('validates contact email shape', () => {
     expect(isUsableContactEmail('coach@yahoo.com')).toBe(true);
     expect(isUsableContactEmail('not-an-email')).toBe(false);
+  });
+
+  it('detects Apple private relay addresses', () => {
+    expect(isApplePrivateRelayEmail('hz68y7mkh5@privaterelay.appleid.com')).toBe(
+      true,
+    );
+    expect(isApplePrivateRelayEmail('coach@yahoo.com')).toBe(false);
   });
 });
