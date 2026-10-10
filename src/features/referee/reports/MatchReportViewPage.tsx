@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { Button, Title } from '@patternfly/react-core';
-import { useApp } from '@/app/AppContext';
+import { useApp, useAppHref } from '@/app/AppContext';
 import {
   AR_COMFORT_QUESTION,
   ROUND_TRIP_MILES_LABEL,
@@ -34,6 +34,7 @@ import {
 import { backState, useAppBack } from '@/nav/backNav';
 import { SubmittedPerformanceReportView } from '@/features/referee/reports/SubmittedPerformanceReportView';
 import { MatchListRow } from '@/ui/MatchListRow';
+import { ReportAdminMenu } from '@/features/referee/reports/ReportAdminMenu';
 
 function Field({
   label,
@@ -56,6 +57,7 @@ export function MatchReportViewPage() {
   const [params] = useSearchParams();
   const { currentUser, state, isAssignerView } = useApp();
   const navigate = useNavigate();
+  const matchHref = useAppHref(`/matches/${matchId}`);
   const { goBack, backLabel } = useAppBack(MATCH_REPORTS_BACK);
 
   const report = resolveSubmittedMatchReport(state.matchReports, matchId, {
@@ -118,9 +120,19 @@ export function MatchReportViewPage() {
       >
         ← {backLabel}
       </button>
-      <Title headingLevel="h2" size="lg">
-        Match report ({kindLabel})
-      </Title>
+      <div className="rs-report-view__title-row">
+        <Title headingLevel="h2" size="lg">
+          Match report ({kindLabel})
+        </Title>
+        {isAssignerView && (
+          <ReportAdminMenu
+            kind="match"
+            report={report}
+            match={match}
+            onFinished={() => navigate(matchHref, { replace: true })}
+          />
+        )}
+      </div>
       <MatchListRow
         match={match}
         showTime={report.source !== 'legacy_form'}
@@ -270,8 +282,9 @@ export function CmoReportViewPage() {
   const [searchParams] = useSearchParams();
   const subjectOfficialId = searchParams.get('subjectOfficialId') ?? undefined;
   const filerOfficialId = searchParams.get('officialId') ?? undefined;
-  const { currentUser, state } = useApp();
+  const { currentUser, state, isAssignerView } = useApp();
   const navigate = useNavigate();
+  const matchHref = useAppHref(`/matches/${matchId}`);
   const { goBack, backLabel } = useAppBack(COACHING_CMO_BACK);
 
   if (!currentUser) return null;
@@ -431,13 +444,23 @@ export function CmoReportViewPage() {
       >
         ← {backLabel}
       </button>
-      <Title headingLevel="h2" size="lg">
-        {youFiled
-          ? 'CMO report you filed'
-          : aboutYou
-            ? 'Coaching report about you'
-            : 'CMO coaching report'}
-      </Title>
+      <div className="rs-report-view__title-row">
+        <Title headingLevel="h2" size="lg">
+          {youFiled
+            ? 'CMO report you filed'
+            : aboutYou
+              ? 'Coaching report about you'
+              : 'CMO coaching report'}
+        </Title>
+        {isAssignerView && (
+          <ReportAdminMenu
+            kind="match"
+            report={report}
+            match={match}
+            onFinished={() => navigate(matchHref, { replace: true })}
+          />
+        )}
+      </div>
       <p className="rs-match-card__meta">
         {youFiled
           ? `You filed this as CMO · about ${moName} (Match Official)`
@@ -532,6 +555,8 @@ export function CardReportViewBody({
   matchId: string;
 }) {
   const { state, isAssignerView } = useApp();
+  const navigate = useNavigate();
+  const matchHref = useAppHref(`/matches/${matchId}`);
   const match = state.matches.find((m) => m.id === matchId);
   const report = state.cardReports.find(
     (c) => c.matchId === matchId && c.status === 'submitted',
@@ -540,6 +565,16 @@ export function CardReportViewBody({
 
   return (
     <div className="rs-stack rs-report-view">
+      {isAssignerView && (
+        <div className="rs-report-view__admin-row">
+          <span className="rs-match-card__meta">Submitted card report</span>
+          <ReportAdminMenu
+            kind="card"
+            report={report}
+            onFinished={() => navigate(matchHref, { replace: true })}
+          />
+        </div>
+      )}
       <MatchListRow match={match} showTime />
       <Field label="Official">{report.officialName}</Field>
       <Field label="Email">{report.officialEmail}</Field>

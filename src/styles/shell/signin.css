@@ -90,10 +90,14 @@
   border-color: var(--rs-color-signin-google-border);
 }
 
-.rs-social-btn--google:hover:not(:disabled),
+.rs-social-btn--google:hover:not(:disabled) {
+  background: var(--rs-color-signin-google-bg-hover);
+}
+
 .rs-social-btn--google:focus-visible {
   background: var(--rs-color-signin-google-bg-hover);
-  outline: none;
+  outline: 2px solid var(--rs-color-focus-ring);
+  outline-offset: 2px;
 }
 
 .rs-social-btn--apple {
@@ -107,10 +111,14 @@
   color: var(--rs-color-signin-apple-text);
 }
 
-.rs-social-btn--apple:hover:not(:disabled),
+.rs-social-btn--apple:hover:not(:disabled) {
+  background: var(--rs-color-signin-apple-bg-hover);
+}
+
 .rs-social-btn--apple:focus-visible {
   background: var(--rs-color-signin-apple-bg-hover);
-  outline: none;
+  outline: 2px solid var(--rs-color-focus-ring);
+  outline-offset: 2px;
 }
 
 .pf-v6-theme-dark .rs-social-btn--apple {
@@ -121,6 +129,16 @@
 .pf-v6-theme-dark .rs-social-btn--apple:focus-visible {
   background: var(--rs-color-signin-apple-bg-hover);
   border-color: var(--rs-color-signin-apple-text);
+}
+
+.pf-v6-theme-dark .rs-social-btn--apple:focus-visible {
+  outline-color: var(--rs-color-focus-ring);
+}
+
+.rs-signin__provider.pf-v6-c-button:focus-visible,
+.rs-signin__demo .pf-v6-c-button:focus-visible {
+  outline: 2px solid var(--rs-color-focus-ring);
+  outline-offset: 2px;
 }
 
 .rs-social-btn__spinner {
@@ -194,10 +212,14 @@
   cursor: pointer;
 }
 
-.rs-signin__onboard-link button:hover,
+.rs-signin__onboard-link button:hover {
+  color: var(--rs-color-ink);
+}
+
 .rs-signin__onboard-link button:focus-visible {
   color: var(--rs-color-ink);
-  outline: none;
+  outline: 2px solid var(--rs-color-focus-ring);
+  outline-offset: 2px;
 }
 
 .rs-signin__demo {

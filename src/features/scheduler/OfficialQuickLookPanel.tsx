@@ -51,6 +51,9 @@ export function OfficialQuickLookPanel({
     [state.availability, user.uid],
   );
   const cityState = formatMemberCityState(user);
+  const contactEmail = effectiveContactEmail(user);
+  const phone = user.phone?.trim() ?? '';
+  const phoneHref = phone ? `tel:${phone.replace(/[^\d+]/g, '')}` : '';
   const profileBack: BackNav =
     matchBack ?? {
       to: `${location.pathname}${location.search}`,
@@ -108,36 +111,28 @@ export function OfficialQuickLookPanel({
               <div>
                 <p className="rs-official-quicklook__name">
                   {memberListName(user)}
+                  {cityState && (
+                    <span className="rs-official-quicklook__location">
+                      {' '}({cityState})
+                    </span>
+                  )}
                 </p>
-                {effectiveContactEmail(user) && (
-                  <p className="rs-match-card__meta">
-                    {effectiveContactEmail(user)}
+                {(contactEmail || phone) && (
+                  <p className="rs-official-quicklook__contact">
+                    {contactEmail && (
+                      <a href={`mailto:${contactEmail}`}>{contactEmail}</a>
+                    )}
+                    {contactEmail && phone && <span aria-hidden="true">|</span>}
+                    {phone && <a href={phoneHref}>{phone}</a>}
                   </p>
                 )}
+                <p className="rs-official-quicklook__credentials">
+                  <span>Level {levelLabel(user)}</span>
+                  <span aria-hidden="true">|</span>
+                  <span>Started {formatBegan(user.refereeingSince)}</span>
+                </p>
               </div>
             </div>
-            <dl className="rs-ref-profile__facts">
-              <div>
-                <dt>Level</dt>
-                <dd>{levelLabel(user)}</dd>
-              </div>
-              <div>
-                <dt>Started refereeing</dt>
-                <dd>{formatBegan(user.refereeingSince)}</dd>
-              </div>
-              {cityState && (
-                <div>
-                  <dt>Location</dt>
-                  <dd>{cityState}</dd>
-                </div>
-              )}
-              {user.phone?.trim() && (
-                <div>
-                  <dt>Phone</dt>
-                  <dd>{user.phone.trim()}</dd>
-                </div>
-              )}
-            </dl>
             <Link
               className="rs-official-quicklook__link"
               to={memberHref}

@@ -9,9 +9,11 @@ import {
   ModalHeader,
   ModalVariant,
 } from '@patternfly/react-core';
+import { Button as MuiButton, Stack, Typography } from '@mui/material';
 import { useMemo, useState } from 'react';
 import { flushSync } from 'react-dom';
 import { useApp } from '@/app/AppContext';
+import { RefereeCard } from '@/components/RefereeCard';
 import {
   compareKickoffAsc,
   divisionFilterOptionsFromMatches,
@@ -20,7 +22,6 @@ import {
 } from '@/domain/divisionFilters';
 import { matchInCompetition } from '@/domain/competitions';
 import { GlobalDivisionFilters } from '@/features/global/GlobalDivisionFilters';
-import { MatchListRow } from '@/ui/MatchListRow';
 import type { GameRequest, Match, MatchGender } from '@/domain/types';
 import { REQUESTABLE_SLOT_SHORT } from '@/domain/types';
 import {
@@ -50,7 +51,7 @@ function daysPending(iso: string): number {
   return Math.max(0, Math.floor(ms / (24 * 60 * 60 * 1000)));
 }
 
-function RequestStatusTrailing({
+function RequestAside({
   request,
   onRemove,
 }: {
@@ -59,40 +60,48 @@ function RequestStatusTrailing({
 }) {
   const declined = request.status === 'declined';
   const pendingDays = daysPending(request.createdAt);
-  const declineReason = request.declineReason?.trim();
+  const slots = gameRequestPreferredSlots(request);
 
   return (
-    <button
-      type="button"
-      className="rs-raise-hand-col rs-request-remove-hit rs-request-status-trailing"
-      aria-label={declined ? 'Dismiss declined request' : 'Remove request'}
-      onClick={(e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        onRemove();
+    <Stack
+      spacing={0.5}
+      sx={{
+        p: 1,
+        justifyContent: 'center',
+        alignItems: 'stretch',
+        minWidth: 88,
       }}
     >
-      {declined ? (
-        <span className="rs-pill rs-appt-crew__mine">Declined</span>
-      ) : (
-        <span className="rs-pill rs-pill--warn">Pending {pendingDays}d</span>
-      )}
-      {gameRequestPreferredSlots(request).map((slot) => (
-        <span key={slot} className="rs-pill rs-pill--ink">
+      {!declined ? (
+        <Typography variant="caption" color="text.secondary" textAlign="center">
+          {pendingDays}d
+        </Typography>
+      ) : null}
+      {slots.map((slot) => (
+        <Typography
+          key={slot}
+          variant="caption"
+          fontWeight={700}
+          textAlign="center"
+        >
           {REQUESTABLE_SLOT_SHORT[slot]}
-        </span>
+        </Typography>
       ))}
-      {declined && (
-        <span className="rs-request-status-trailing__reason">
-          {declineReason
-            ? `Declined: ${declineReason}`
-            : 'Declined by the assigner.'}
-        </span>
-      )}
-      <span className="rs-request-remove-hit__label">
+      <MuiButton
+        type="button"
+        variant="text"
+        color={declined ? 'error' : 'inherit'}
+        onClick={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          onRemove();
+        }}
+        aria-label={declined ? 'Dismiss declined request' : 'Remove request'}
+        sx={{ minHeight: 48, minWidth: 72, px: 1 }}
+      >
         {declined ? 'Dismiss' : 'Remove'}
-      </span>
-    </button>
+      </MuiButton>
+    </Stack>
   );
 }
 
@@ -266,15 +275,15 @@ export function PendingRequestsPage() {
                 <ul className="rs-list">
                   {group.items.map(({ request, match }) => (
                     <li key={request.id}>
-                      <MatchListRow
+                      <RefereeCard
                         match={match}
+                        userId={currentUser!.uid}
+                        request={request}
                         to={`/matches/${match.id}`}
                         showTime
-                        split="action"
-                        urgent={request.status === 'declined'}
                         back={PENDING_BACK}
-                        trailing={
-                          <RequestStatusTrailing
+                        aside={
+                          <RequestAside
                             request={request}
                             onRemove={() =>
                               setPendingRemoval({ request, match })

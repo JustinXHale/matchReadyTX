@@ -4,6 +4,7 @@
  */
 @import './base.css';
 @import './brand-masthead.css';
+@import './app-shell.css';
 @import './layout.css';
 @import './detail-shared.css';
 @import './onboard-widgets.css';

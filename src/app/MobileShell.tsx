@@ -1,50 +1,20 @@
-import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
-import { useEffect, useState, type ReactNode } from 'react';
-import {
-  Button,
-  Masthead,
-  MastheadMain,
-  MastheadBrand,
-  MastheadContent,
-  Page,
-  PageSection,
-  FormSelect,
-  FormSelectOption,
-} from '@patternfly/react-core';
-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import {
-  faCircleInfo,
-  faClipboardList,
-  faChartLine,
-  faEarthAmericas,
-  faGavel,
-  faFileInvoiceDollar,
-  faUser,
-  faUsers,
-} from '@fortawesome/free-solid-svg-icons';
-import { ROLE_HOME, ROLE_VIEW_LABELS, useApp, type RoleView } from '@/app/AppContext';
+import { Outlet, useLocation, useNavigate } from 'react-router-dom';
+import { useEffect, useState } from 'react';
+import { ROLE_HOME, useApp, type RoleView } from '@/app/AppContext';
 import { resolveRoleSwitchTarget } from '@/nav/roleSwitchNav';
-import { appBuildLabel } from '@/app/appBuild';
-import { stripDemoPrefix, withDemoPrefix, isDemoPath } from '@/app/demoPaths';
+import { isDemoPath } from '@/app/demoPaths';
 import { isPublicPath } from '@/features/public/publicPaths';
-import { WhistleIcon } from '@/ui/WhistleIcon';
-import { ThemeToggle } from '@/ui/ThemeToggle';
-import { BrandLogo } from '@/ui/BrandLogo';
 import { UpdatePrompt } from '@/pwa/UpdatePrompt';
-import {
-  OfficialQuickLookPicker,
-  OfficialQuickLookProvider,
-} from '@/features/scheduler/officialQuickLookContext';
+import { OfficialQuickLookProvider } from '@/features/scheduler/officialQuickLookContext';
 import { orgTimeZone } from '@/domain/matchTime';
-
-const navIconClass = 'rs-bottom-nav__icon';
-
-type NavItem = {
-  to: string;
-  label: string;
-  icon: ReactNode;
-  isActive: (pathname: string) => boolean;
-};
+import { navForRole } from '@/app/shell/navItems';
+import { PrimaryNav } from '@/app/shell/PrimaryNav';
+import { TopAppBar } from '@/app/shell/TopAppBar';
+import { useCompactWidth } from '@/app/shell/useCompactWidth';
+import {
+  ContextualBarContext,
+  type ContextualBarSpec,
+} from '@/app/shell/contextualBar';
 
 function formatHeaderClock(now: Date, timeZone?: string): string {
   const date = now.toLocaleDateString(undefined, {
@@ -61,184 +31,12 @@ function formatHeaderClock(now: Date, timeZone?: string): string {
   return `${date} · ${time}`;
 }
 
-function navForRole(
-  roleView: RoleView,
-  demo: boolean,
-  hasInsightsAccess: boolean,
-): NavItem[] {
-  const prefix = (path: string) => (demo ? withDemoPrefix(path) : path);
-  const active = (base: string) => (p: string) =>
-    stripDemoPrefix(p).startsWith(base);
-
-  const about: NavItem = {
-    to: prefix('/about'),
-    label: 'Info',
-    icon: (
-      <FontAwesomeIcon
-        icon={faCircleInfo}
-        className={navIconClass}
-        aria-hidden
-      />
-    ),
-    isActive: (p) => {
-      const s = stripDemoPrefix(p);
-      return s.startsWith('/about');
-    },
-  };
-  const global: NavItem = {
-    to: prefix('/global'),
-    label: 'League',
-    icon: (
-      <FontAwesomeIcon
-        icon={faEarthAmericas}
-        className={navIconClass}
-        aria-hidden
-      />
-    ),
-    isActive: active('/global'),
-  };
-  const insights: NavItem = {
-    to: prefix('/insights'),
-    label: 'Insights',
-    icon: (
-      <FontAwesomeIcon
-        icon={faChartLine}
-        className={navIconClass}
-        aria-hidden
-      />
-    ),
-    isActive: (p) => stripDemoPrefix(p).startsWith('/insights'),
-  };
-  const profile: NavItem = {
-    to: prefix('/profile'),
-    label: 'Profile',
-    icon: (
-      <FontAwesomeIcon icon={faUser} className={navIconClass} aria-hidden />
-    ),
-    isActive: active('/profile'),
-  };
-
-  const withInsights = (items: NavItem[]): NavItem[] => {
-    if (!hasInsightsAccess) return items;
-    const leagueIdx = items.findIndex((i) =>
-      stripDemoPrefix(i.to).startsWith('/global'),
-    );
-    if (leagueIdx >= 0) {
-      return [
-        ...items.slice(0, leagueIdx + 1),
-        insights,
-        ...items.slice(leagueIdx + 1),
-      ];
-    }
-    const profileIdx = items.findIndex((i) =>
-      stripDemoPrefix(i.to).startsWith('/profile'),
-    );
-    if (profileIdx < 0) return [...items, insights];
-    return [
-      ...items.slice(0, profileIdx),
-      insights,
-      ...items.slice(profileIdx),
-    ];
-  };
-
-  if (roleView === 'scheduler') {
-    return withInsights([
-      about,
-      {
-        to: prefix('/scheduler'),
-        label: 'Scheduler',
-        icon: (
-          <FontAwesomeIcon
-            icon={faClipboardList}
-            className={navIconClass}
-            aria-hidden
-          />
-        ),
-        isActive: active('/scheduler'),
-      },
-      global,
-      profile,
-    ]);
-  }
-
-  if (roleView === 'finance') {
-    return [
-      about,
-      {
-        to: prefix('/finance/payouts'),
-        label: 'Finance',
-        icon: (
-          <FontAwesomeIcon
-            icon={faFileInvoiceDollar}
-            className={navIconClass}
-            aria-hidden
-          />
-        ),
-        isActive: active('/finance'),
-      },
-      profile,
-    ];
-  }
-
-  if (roleView === 'judicial') {
-    return withInsights([
-      about,
-      {
-        to: prefix('/judicial'),
-        label: 'Judicial',
-        icon: (
-          <FontAwesomeIcon
-            icon={faGavel}
-            className={navIconClass}
-            aria-hidden
-          />
-        ),
-        isActive: active('/judicial'),
-      },
-      profile,
-    ]);
-  }
-
-  if (roleView === 'teamAdmin') {
-    return withInsights([
-      about,
-      {
-        to: prefix('/team-admin'),
-        label: 'Team Admin',
-        icon: (
-          <FontAwesomeIcon
-            icon={faUsers}
-            className={navIconClass}
-            aria-hidden
-          />
-        ),
-        isActive: (p) => {
-          const s = stripDemoPrefix(p);
-          return s.startsWith('/team-admin') || s.startsWith('/coach');
-        },
-      },
-      global,
-      profile,
-    ]);
-  }
-
-  if (roleView === 'fan') {
-    return withInsights([about, global, profile]);
-  }
-
-  return withInsights([
-    about,
-    {
-      to: prefix('/referee'),
-      label: 'Referee/CMO',
-      icon: <WhistleIcon className={navIconClass} size={18} />,
-      isActive: active('/referee'),
-    },
-    global,
-    profile,
-  ]);
-}
-
+/**
+ * Material 3 mobile-first AppShell (Vite + React 19 + TypeScript).
+ *
+ * Compact (under 600dp): top app bar + bottom navigation bar for referees.
+ * Medium+: same destinations as a navigation rail (presentation change only).
+ */
 export function MobileShell() {
   const {
     currentUser,
@@ -256,9 +54,12 @@ export function MobileShell() {
   } = useApp();
   const navigate = useNavigate();
   const location = useLocation();
+  const compact = useCompactWidth();
   const [now, setNow] = useState(() => new Date());
+  const [contextualBar, setContextualBar] =
+    useState<ContextualBarSpec | null>(null);
   const tz = orgTimeZone(state.org.timezone);
-  const bottomNav = navForRole(
+  const primaryNav = navForRole(
     roleView,
     isDemoShowcase,
     hasInsightsAccess,
@@ -287,122 +88,81 @@ export function MobileShell() {
     navigate(target);
   };
 
+  const shellClass = [
+    'rs-app-shell',
+    showChrome && (compact ? 'rs-app-shell--compact' : 'rs-app-shell--medium'),
+    !showChrome && (isPublicDoc ? 'rs-app-shell--public-doc' : 'rs-app-shell--auth'),
+  ]
+    .filter(Boolean)
+    .join(' ');
+
   return (
-    <OfficialQuickLookProvider>
-    <Page
-      className={
-        !showChrome
-          ? isPublicDoc
-            ? 'rs-page--public-doc'
-            : 'rs-page--auth'
-          : undefined
-      }
-      masthead={
-        showChrome ? (
-          <Masthead className="rs-masthead">
-            <MastheadMain className="rs-masthead__main">
-              <MastheadBrand className="rs-masthead__brand">
-                <span className="rs-brand-block">
-                  <span className="rs-brand-row">
-                    <BrandLogo width={32} height={32} />
-                    <span className="rs-brand">MatchReadyTX</span>
-                    <ThemeToggle />
-                    {inDemoTree && (
-                      <span
-                        className="rs-demo-badge"
-                        title="Seed showcase — not your live org"
-                      >
-                        Demo
-                      </span>
-                    )}
-                  </span>
-                  <time className="rs-brand-date" dateTime={todayIso}>
-                    {clockLabel}
-                  </time>
-                  <span className="rs-brand-build">{appBuildLabel()}</span>
-                </span>
-              </MastheadBrand>
-            </MastheadMain>
-            <MastheadContent className="rs-masthead__content">
-              {inDemoTree && hasFirebaseSession && (
-                <Button
-                  variant="link"
-                  className="rs-demo-live"
-                  onClick={() => {
-                    if (enterLive()) {
-                      navigate(ROLE_HOME[roleView]);
-                    }
-                  }}
-                >
-                  Back to live
-                </Button>
-              )}
-              {inDemoTree && !hasFirebaseSession && (
-                <Button
-                  variant="link"
-                  className="rs-demo-signin"
-                  onClick={() => navigate('/')}
-                >
-                  Sign in
-                </Button>
-              )}
-              {canSwitchRoleView && (
-                <div className="rs-role-switch">
-                  <FormSelect
-                    className="rs-role-switch__select"
-                    value={roleView}
-                    onChange={(_, v) => switchView(v as RoleView)}
-                    aria-label="Role"
-                    ouiaId="RoleViewSwitch"
-                  >
-                    {availableLenses.map((lens) => (
-                      <FormSelectOption
-                        key={lens}
-                        value={lens}
-                        label={ROLE_VIEW_LABELS[lens]}
-                      />
-                    ))}
-                  </FormSelect>
-                </div>
-              )}
-              {isAssignerView && hasAssignerRole && <OfficialQuickLookPicker />}
-            </MastheadContent>
-          </Masthead>
-        ) : undefined
-      }
-    >
-      <PageSection className="rs-page-body" isFilled>
-        {inDemoTree && (
-          <div className="rs-demo-mode-banner" role="status">
-            <strong>Demo showcase</strong>
-            <span>Sample schedule and members — not your live org.</span>
-          </div>
-        )}
-        {/* pathname only — search-param updates must not remount (e.g. members search). */}
-        <Outlet key={location.pathname} />
-      </PageSection>
-      <UpdatePrompt />
-      {showChrome && (
-        <nav className="rs-bottom-nav" aria-label="Primary">
-          {bottomNav.map((item) => (
-            <NavLink
-              key={item.to}
-              to={item.to}
-              replace
-              className={() =>
-                `rs-bottom-nav__with-icon${
-                  item.isActive(location.pathname) ? ' active' : ''
-                }`
+    <ContextualBarContext.Provider value={setContextualBar}>
+      <OfficialQuickLookProvider>
+        <div className={shellClass}>
+        <a className="rs-skip-link" href="#main">
+          Skip to main content
+        </a>
+
+        {showChrome && (
+          <TopAppBar
+            clockLabel={clockLabel}
+            todayIso={todayIso}
+            inDemoTree={inDemoTree}
+            hasFirebaseSession={hasFirebaseSession}
+            canSwitchRoleView={canSwitchRoleView}
+            availableLenses={availableLenses}
+            roleView={roleView}
+            isAssignerView={isAssignerView}
+            hasAssignerRole={hasAssignerRole}
+            onEnterLive={() => {
+              if (enterLive()) {
+                navigate(ROLE_HOME[roleView]);
               }
-              end={false}
-            >
-              {item.icon}
-              <span>{item.label}</span>
-            </NavLink>
-          ))}
-        </nav>
-      )}
-    </Page>
-    </OfficialQuickLookProvider>
+            }}
+            onSignIn={() => navigate('/')}
+            onSwitchView={switchView}
+          />
+        )}
+
+          <div className="rs-app-shell__frame">
+            {showChrome && !compact && (
+              <PrimaryNav items={primaryNav} variant="rail" />
+            )}
+
+            <div className="rs-app-shell__content">
+              {showChrome && contextualBar ? (
+                <div className="rs-contextual-bar">
+                  <button
+                    type="button"
+                    className="rs-contextual-bar__action"
+                    onClick={contextualBar.onActivate}
+                  >
+                    ← {contextualBar.label}
+                  </button>
+                </div>
+              ) : null}
+
+              <main id="main" className="rs-page-body rs-page-main" tabIndex={-1}>
+                {inDemoTree && (
+                  <div className="rs-demo-mode-banner" role="status">
+                    <strong>Demo showcase</strong>
+                    <span>Sample schedule and members — not your live org.</span>
+                  </div>
+                )}
+                {/* pathname only — search-param updates must not remount (e.g. members search). */}
+                <Outlet key={location.pathname} />
+              </main>
+            </div>
+          </div>
+
+        {showChrome && compact && (
+          <PrimaryNav items={primaryNav} variant="bar" />
+        )}
+
+        <UpdatePrompt />
+        </div>
+      </OfficialQuickLookProvider>
+    </ContextualBarContext.Provider>
   );
 }

@@ -1,14 +1,33 @@
 /**
- * MatchReadyTX design tokens — PatternFly-aligned monochrome + high contrast.
+ * MatchReadyTX design tokens — Material 3 / monochrome + high contrast.
  *
  * Architecture (see docs/THEME.md):
  * 1. Palette — literal values ONLY in this file
- * 2. Semantic --rs-color-* — product tokens (reference palette or PF globals)
- * 3. PatternFly --pf-t--global-* overrides — brand + surfaces for PF components
+ * 2. Semantic --rs-color-* — product tokens
+ * 3. Legacy --pf-t--global-* fallbacks — keep existing CSS working after PF removal
  *
  * Color scheme: `pf-v6-theme-dark` on <html> (light default).
  * High contrast: `pf-v6-theme-high-contrast` on <html> (MatchReadyTX default).
  */
+
+/* ---- Legacy PatternFly spacer/border tokens (no PF CSS dependency) ---- */
+:root {
+  --pf-t--global--spacer--xs: 0.25rem;
+  --pf-t--global--spacer--sm: 0.5rem;
+  --pf-t--global--spacer--md: 1rem;
+  --pf-t--global--spacer--lg: 1.5rem;
+  --pf-t--global--spacer--xl: 2rem;
+  --pf-t--global--spacer--2xl: 3rem;
+  --pf-t--global--border--width--regular: 1px;
+  --pf-t--global--border--width--strong: 2px;
+  --pf-t--global--border--width--extra-strong: 3px;
+  --pf-t--global--border--width--action--plain--hover: 2px;
+  --pf-t--global--border--width--action--plain--clicked: 2px;
+  --pf-t--global--font--size--body--sm: 0.875rem;
+  --pf-t--global--font--line-height--body: 1.5;
+  --pf-t--global--background--color--highlight--default: #fef3c7;
+  --pf-t--global--icon--color--status--warning--default: #ca8a04;
+}
 
 /* ---- Palette (hex literals — do not use outside this file) ---- */
 :root.rs-theme {
@@ -85,19 +104,46 @@
   --rs-radius-dialog: 16px;
   --rs-shadow: none;
 
-  --rs-space-xs: var(--pf-t--global--spacer--xs);
-  --rs-space-sm: var(--pf-t--global--spacer--sm);
-  --rs-space-md: var(--pf-t--global--spacer--md);
-  --rs-space-lg: var(--pf-t--global--spacer--lg);
-  --rs-space-xl: var(--pf-t--global--spacer--xl);
+  --rs-space-xs: 0.25rem;
+  --rs-space-sm: 0.5rem;
+  --rs-space-md: 1rem;
+  --rs-space-lg: 1.5rem;
+  --rs-space-xl: 2rem;
 
   --rs-page-pad: 0.75rem;
   --rs-gap-grid: var(--rs-space-sm);
-  --rs-bottom-nav-height: 4rem;
+  --rs-bottom-nav-height: 5rem;
+  /** Material 3 navigation rail width (medium+). */
+  --rs-nav-rail-width: 5rem;
   /** Space below fixed masthead for overlays (mobile brand block is taller). */
   --rs-masthead-offset: 5.75rem;
-  --rs-bottom-clearance: 6.25rem;
-  --rs-tap-min: var(--pf-t--global--spacer--2xl);
+  --rs-bottom-clearance: 7.25rem;
+  --rs-tap-min: 3rem;
+
+  /* Bridge remaining CSS that still references PF globals */
+  --pf-t--global--border--color--default: var(--rs-color-border);
+  --pf-t--global--text--color--subtle: var(--rs-color-muted);
+
+  /*
+   * Material 3 semantic aliases → MatchReadyTX brand roles.
+   * Screens/shell chrome prefer these for M3 component semantics;
+   * literals stay in the palette above.
+   */
+  --rs-m3-surface: var(--rs-color-bg);
+  --rs-m3-surface-container: var(--rs-color-surface);
+  --rs-m3-surface-container-high: var(--rs-color-surface-muted);
+  --rs-m3-on-surface: var(--rs-color-ink);
+  --rs-m3-on-surface-variant: var(--rs-color-ended);
+  --rs-m3-inverse-surface: var(--rs-color-ink);
+  --rs-m3-inverse-on-surface: var(--rs-color-bg);
+  --rs-m3-primary: var(--rs-color-primary);
+  --rs-m3-on-primary: var(--rs-color-on-primary);
+  --rs-m3-secondary-container: var(--rs-color-surface-muted);
+  --rs-m3-on-secondary-container: var(--rs-color-primary);
+  --rs-m3-outline: var(--rs-color-border);
+  --rs-m3-outline-variant: var(--rs-color-border);
+  --rs-m3-error: var(--rs-color-urgent);
+  --rs-m3-on-error: var(--rs-color-on-urgent);
 
   --rs-font-family: 'Roboto', system-ui, -apple-system, 'Segoe UI', sans-serif;
   --rs-font-title: 600 18px/1.3 var(--rs-font-family);
@@ -105,6 +151,7 @@
   --rs-font-card-title-compact: 700 13px/1.25 var(--rs-font-family);
   --rs-font-meta: 400 12px/1.35 var(--rs-font-family);
   --rs-font-chip: 600 12px/1.2 var(--rs-font-family);
+  --rs-font-action: 600 14px/1.25 var(--rs-font-family);
   --rs-font-nav: 600 12px/1.2 var(--rs-font-family);
   --rs-font-body: 400 15px/1.45 var(--rs-font-family);
 
@@ -130,7 +177,8 @@
   --rs-color-charcoal-light: var(--rs-palette-gray-muted-light);
   --rs-color-charcoal-dark: var(--rs-palette-gray-ended);
   --rs-color-muted: var(--rs-palette-gray-muted);
-  --rs-color-ended: var(--rs-palette-gray-ended);
+  /* ≥4.5:1 on black — gray-ended (#737373) fails AA for normal text */
+  --rs-color-ended: var(--rs-palette-gray-muted);
   --rs-color-bg: var(--rs-palette-black);
   --rs-color-surface: var(--rs-palette-black);
   --rs-color-surface-muted: var(--rs-palette-gray-950);
@@ -150,6 +198,22 @@
   --rs-color-urgent-ink: var(--rs-color-ink);
   --rs-color-overlay-scrim: var(--rs-palette-black);
   --rs-color-focus-ring: var(--rs-color-primary);
+
+  --rs-m3-surface: var(--rs-color-bg);
+  --rs-m3-surface-container: var(--rs-color-surface);
+  --rs-m3-surface-container-high: var(--rs-color-surface-muted);
+  --rs-m3-on-surface: var(--rs-color-ink);
+  --rs-m3-on-surface-variant: var(--rs-color-ended);
+  --rs-m3-inverse-surface: var(--rs-color-ink);
+  --rs-m3-inverse-on-surface: var(--rs-color-bg);
+  --rs-m3-primary: var(--rs-color-primary);
+  --rs-m3-on-primary: var(--rs-color-on-primary);
+  --rs-m3-secondary-container: var(--rs-color-surface-muted);
+  --rs-m3-on-secondary-container: var(--rs-color-primary);
+  --rs-m3-outline: var(--rs-color-border);
+  --rs-m3-outline-variant: var(--rs-color-border);
+  --rs-m3-error: var(--rs-color-urgent);
+  --rs-m3-on-error: var(--rs-color-on-urgent);
 
   --pf-t--global--color--brand--default: var(--rs-color-primary);
   --pf-t--global--color--brand--hover: var(--rs-color-primary-muted);

@@ -2346,6 +2346,7 @@ function seedMatchReports(matches: Match[]): MatchReport[] {
       matchId: aboutAlex.id,
       officialId: aboutAlexCmoUid,
       slot: 'cmo',
+      subjectOfficialId: 'u_assigner',
       formKind: 'cmo',
       status: 'submitted',
       dueAt: new Date(
@@ -2425,6 +2426,28 @@ function seedMatchReports(matches: Match[]): MatchReport[] {
   };
 
   const finPaid = matches.find((m) => m.id === 'm_fin_paid');
+
+  // Keep one past match fully populated for the match-detail Reports demo:
+  // MO, AR, and CMO each have a submitted report on m_res02.
+  if (aboutAlex) {
+    pushSubmittedReport(
+      'mr_seed_match_detail_mo',
+      aboutAlex,
+      'u_assigner',
+      'mo',
+      'mo_quick',
+      13,
+    );
+    pushSubmittedReport(
+      'mr_seed_match_detail_ar',
+      aboutAlex,
+      'u_ref2',
+      'ar2',
+      'ar_basic',
+      13,
+    );
+  }
+
   if (finPaid) {
     pushSubmittedReport(
       'mr_fin_paid_mo',

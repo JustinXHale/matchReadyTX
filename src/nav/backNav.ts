@@ -35,7 +35,6 @@ export function canPopAppHistory(): boolean {
 }
 
 export function appBackLabel(fromState: unknown, fallback: BackNav): string {
-  if (canPopAppHistory()) return 'Back';
   const back = readBackNav(fromState) ?? fallback;
   return `Back to ${back.label}`;
 }

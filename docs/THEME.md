@@ -54,8 +54,9 @@ MatchReadyTX uses PatternFly’s layered model:
 
 | File | Prefixes / scope |
 |------|------------------|
-| `base.css` | `html/body`, PF button overrides, `.rs-page-*`, `.rs-stack` |
-| `brand-masthead.css` | `.rs-brand*`, masthead, demo badge, bottom nav, FAB |
+| `base.css` | `html/body`, button overrides, `.rs-page-*`, `.rs-stack` |
+| `brand-masthead.css` | `.rs-brand*`, demo badge, FAB, theme toggle |
+| `app-shell.css` | M3 AppShell: `.rs-app-shell*`, top app bar, nav bar, nav rail |
 | `layout.css` | Card grids, filters, match cards, modals, misc shared layout |
 | `pills.css` | `.rs-pill*` |
 | `signin.css` | `.rs-signin*`, social sign-in buttons |
@@ -127,14 +128,38 @@ Status tints use `color-mix(..., var(--rs-color-surface))` so light and dark sch
 
 ---
 
-## Layout (mobile-first, T03-aligned)
+## Layout (Material 3 mobile-first AppShell)
+
+Chrome is a custom M3 AppShell (`MobileShell` + `src/styles/shell/app-shell.css`). Feature UI imports from `@patternfly/react-core` resolve to MUI v6 shims in `src/lib/pf-mui` (Vite + Vitest + tsconfig aliases). PatternFly packages are not installed.
 
 | Pattern | Spec |
 |---------|------|
 | Page pad | `--rs-page-pad` = `0.75rem` |
 | Section stack | `--rs-space-md` via `.rs-stack` |
-| Bottom clearance | `--rs-bottom-clearance` above fixed nav |
+| Compact (under 600dp) | Bottom **navigation bar** (`.rs-nav-bar` / `.rs-bottom-nav`) |
+| Medium+ (600dp+) | Side **navigation rail** (`.rs-nav-rail`) — same destinations |
+| Bottom clearance | `--rs-bottom-clearance` above fixed nav (compact) |
+| Rail width | `--rs-nav-rail-width` |
 | Tap targets | ≥ `--rs-tap-min` (48px) |
+| Selected destination | Indicator pill = `--rs-m3-secondary-container` + `aria-current="page"` |
+
+M3 semantic aliases (`--rs-m3-surface`, `--rs-m3-on-surface`, …) map to brand `--rs-color-*` in `tokens.css` (monochrome — not default Material purple).
+
+### MUI v6 theme (`src/theme/m3Theme.ts`)
+
+`createMatchReadyTheme(mode)` builds an accessible Material 3 palette via `createTheme`. Light/dark sync with the existing `pf-v6-theme-dark` toggle (`MuiThemeProvider`).
+
+MUI shims also emit legacy `pf-v6-c-*` / `pf-m-*` class names so existing brand CSS (`.rs-btn--danger.pf-v6-c-button`, form-control layout, modal body stacks) keeps matching until selectors are rewritten to `Mui*` / `rs-*` only.
+
+Assignment status tonal surfaces (label + container + border — not color alone):
+
+| Status | Role | Use |
+|--------|------|-----|
+| Pending | `palette.assignmentPending` | Raise-hand waiting / crew accept needed |
+| Approved | `palette.assignmentApproved` | Confirmed assignment / approved request |
+| Declined | `palette.assignmentDeclined` | Declined raise-hand / released slot |
+
+Referee list UI: `src/components/RefereeCard.tsx` (elevated Card, ≥48px tap targets). Hex literals for MUI live in `src/theme/paletteLiterals.ts` and must stay aligned with `tokens.css`.
 
 Use `--rs-space-*` / `--pf-t--global--spacer--*` — not raw px in layout CSS.
 
@@ -159,5 +184,5 @@ See prior sections in this doc for pills, filter chips, sign-in, masthead, match
 |---------------|--------------------|
 | `AppColors.primary` | `--rs-color-primary` |
 | `AppColors.statusLive` | `--rs-color-urgent` |
-| Bottom nav | `.rs-bottom-nav` |
+| Bottom nav / rail | `.rs-nav-bar` (compact) · `.rs-nav-rail` (medium+) |
 | Roboto | `--rs-font-family` |

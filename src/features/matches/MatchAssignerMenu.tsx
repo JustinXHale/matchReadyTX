@@ -4,12 +4,16 @@ import {
   DropdownItem,
   DropdownList,
   MenuToggle,
+  Modal,
+  ModalHeader,
 } from '@patternfly/react-core';
 import { EllipsisVIcon } from '@patternfly/react-icons';
 import { isComplianceHeld } from '@/domain/complianceHold';
 import type { Match } from '@/domain/types';
 
 export type AssignerMenuAction =
+  | 'edit_details'
+  | 'change_status'
   | 'alert_coverage'
   | 'compliance_hold'
   | 'remove_compliance_hold'
@@ -26,6 +30,7 @@ type Props = {
   canAlertCoverage: boolean;
   coverageAlertLabel: string;
   onAction: (action: AssignerMenuAction) => void;
+  presentation?: 'icon' | 'bottom-bar';
 };
 
 export function MatchAssignerMenu({
@@ -33,6 +38,7 @@ export function MatchAssignerMenu({
   canAlertCoverage,
   coverageAlertLabel,
   onAction,
+  presentation = 'icon',
 }: Props) {
   const [isOpen, setIsOpen] = useState(false);
   const toggleRef = useRef<HTMLButtonElement>(null);
@@ -48,9 +54,86 @@ export function MatchAssignerMenu({
     onAction(action);
   };
 
+  const items: {
+    action: AssignerMenuAction;
+    label: string;
+    danger?: boolean;
+  }[] = [
+    { action: 'edit_details', label: 'Edit details' },
+    ...(canAlertCoverage
+      ? ([{ action: 'alert_coverage', label: coverageAlertLabel }] as const)
+      : []),
+    ...(isTerminal
+      ? ([{ action: 'reactivate', label: 'Reactivate match' }] as const)
+      : ([
+          { action: 'change_status', label: 'Change match status…' },
+          {
+            action: isComplianceHeld(match)
+              ? 'remove_compliance_hold'
+              : 'compliance_hold',
+            label: isComplianceHeld(match) ? 'Unlock match' : 'Lock match',
+          },
+          { action: 'cancel', label: 'Cancel match', danger: true },
+        ] as const)),
+  ];
+
+  if (presentation === 'bottom-bar') {
+    return (
+      <div className="rs-detail__assigner-menu rs-detail__assigner-menu--bottom-bar">
+        <button
+          ref={toggleRef}
+          type="button"
+          className="rs-detail__assigner-menu-toggle rs-detail__assigner-menu-toggle--bottom-bar"
+          aria-label="Match actions"
+          aria-haspopup="dialog"
+          aria-expanded={isOpen}
+          aria-controls={isOpen ? 'match-actions-sheet' : undefined}
+          onClick={() => setIsOpen(true)}
+        >
+          <span className="rs-detail__assigner-menu-toggle-content">
+            <EllipsisVIcon aria-hidden />
+            <span>Match actions</span>
+          </span>
+        </button>
+
+        <Modal
+          className="rs-match-actions-sheet"
+          isOpen={isOpen}
+          onClose={() => setIsOpen(false)}
+          aria-labelledby="match-actions-sheet-title"
+        >
+          <ModalHeader
+            title="Match actions"
+            labelId="match-actions-sheet-title"
+            onClose={() => setIsOpen(false)}
+          />
+          <div
+            id="match-actions-sheet"
+            className="rs-match-actions-sheet__actions"
+            role="group"
+            aria-label="Match actions"
+          >
+            {items.map((item) => (
+              <button
+                key={item.action}
+                type="button"
+                className={`rs-match-actions-sheet__action${
+                  item.danger ? ' rs-match-actions-sheet__action--danger' : ''
+                }`}
+                onClick={() => closeAnd(item.action)}
+              >
+                {item.label}
+              </button>
+            ))}
+          </div>
+        </Modal>
+      </div>
+    );
+  }
+
   return (
     <Dropdown
-      className="rs-detail__assigner-menu"
+      className={`rs-detail__assigner-menu rs-detail__assigner-menu--${presentation}`}
       isOpen={isOpen}
       onOpenChange={setIsOpen}
       popperProps={{ placement: 'bottom-end' }}
@@ -62,7 +145,7 @@ export function MatchAssignerMenu({
             variant="plain"
             aria-label="Match actions"
             isExpanded={isOpen}
-            className="rs-detail__assigner-menu-toggle"
+            className={`rs-detail__assigner-menu-toggle rs-detail__assigner-menu-toggle--${presentation}`}
             onClick={() => setIsOpen((open) => !open)}
           >
             <EllipsisVIcon aria-hidden />
@@ -70,56 +153,16 @@ export function MatchAssignerMenu({
         ),
       }}
     >
-      <DropdownList>
-        {canAlertCoverage && (
-          <DropdownItem onClick={() => closeAnd('alert_coverage')}>
-            {coverageAlertLabel}
+      <DropdownList aria-label="Match actions">
+        {items.map((item) => (
+          <DropdownItem
+            key={item.action}
+            className={item.danger ? 'rs-detail__assigner-menu-danger' : undefined}
+            onClick={() => closeAnd(item.action)}
+          >
+            {item.label}
           </DropdownItem>
-        )}
-        {isTerminal ? (
-          <DropdownItem onClick={() => closeAnd('reactivate')}>
-            Reactivate match
-          </DropdownItem>
-        ) : (
-          <>
-            {match.playedForfeit ? (
-              <DropdownItem onClick={() => closeAnd('clear_played_forfeit')}>
-                Clear played forfeit
-              </DropdownItem>
-            ) : (
-              <DropdownItem onClick={() => closeAnd('played_forfeit')}>
-                Played forfeit
-              </DropdownItem>
-            )}
-            <DropdownItem onClick={() => closeAnd('postpone')}>
-              Postpone match
-            </DropdownItem>
-            {isComplianceHeld(match) ? (
-              <DropdownItem onClick={() => closeAnd('remove_compliance_hold')}>
-                Remove compliance hold
-              </DropdownItem>
-            ) : (
-              <DropdownItem onClick={() => closeAnd('compliance_hold')}>
-                Lock until teams are compliant
-              </DropdownItem>
-            )}
-            {match.forfeitTeamId ? (
-              <DropdownItem onClick={() => closeAnd('clear_forfeit')}>
-                Clear forfeit
-              </DropdownItem>
-            ) : (
-              <DropdownItem onClick={() => closeAnd('forfeit')}>
-                Forfeit
-              </DropdownItem>
-            )}
-            <DropdownItem
-              className="rs-detail__assigner-menu-danger"
-              onClick={() => closeAnd('cancel')}
-            >
-              Cancel match
-            </DropdownItem>
-          </>
-        )}
+        ))}
       </DropdownList>
     </Dropdown>
   );

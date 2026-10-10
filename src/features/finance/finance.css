@@ -194,7 +194,10 @@ ul.rs-stack {
 @media print {
   .rs-finance-no-print,
   .rs-bottom-nav,
+  .rs-nav-bar,
+  .rs-nav-rail,
   .rs-masthead,
+  .rs-top-app-bar,
   .rs-top-tabs {
     display: none !important;
   }

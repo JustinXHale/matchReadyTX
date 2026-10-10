@@ -15,6 +15,38 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
+/* WCAG 2.4.11 — keep focused controls clear of sticky chrome */
+:focus,
+:focus-visible,
+:target {
+  scroll-margin-top: calc(var(--rs-masthead-offset) + 0.5rem);
+  scroll-margin-bottom: calc(var(--rs-bottom-nav-height) + 0.75rem);
+}
+
+/* WCAG 2.3.3 — calm motion for vestibular / preference users */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+.rs-visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
 /* PatternFly primary buttons → black */
 .pf-v6-c-button.pf-m-primary {
   background-color: var(--rs-color-primary) !important;
@@ -37,6 +69,7 @@ body {
   background: var(--rs-color-surface) !important;
 }
 
+/* Legacy PF page chrome (feature pages may still render PF sections). */
 .pf-v6-c-masthead,
 .pf-v6-c-page__main-section {
   background: var(--rs-color-bg) !important;
@@ -49,6 +82,7 @@ body {
 }
 
 .rs-page-body {
+  flex: 1 1 auto;
   padding-bottom: var(--rs-bottom-clearance) !important;
   max-width: 720px;
   width: 100%;
@@ -56,39 +90,20 @@ body {
   margin: 0 auto;
   box-sizing: border-box;
   padding-inline: var(--rs-page-pad) !important;
+  padding-block-start: var(--rs-page-pad);
   background: transparent !important;
   overflow-x: clip;
 }
 
-/* —— Sign-in placeholder —— */
-/* PF Page grid still allocates a sidebar column without masthead/sidebar. */
-.rs-page--auth.pf-v6-c-page {
-  grid-template-columns: minmax(0, 1fr);
-  grid-template-areas: 'main';
-}
-
-.rs-page--auth .pf-v6-c-page__main-container {
-  grid-column: 1 / -1;
-  grid-area: main;
-}
-
-.rs-page--auth .rs-page-body {
+/* Auth / public modes are classed on .rs-app-shell (see app-shell.css). */
+.rs-page--auth .rs-page-body,
+.rs-app-shell--auth .rs-page-body {
   padding-bottom: var(--pf-t--global--spacer--xl) !important;
   max-width: 420px;
 }
 
-/* Privacy policy — readable doc width on desktop, same as in-app pages */
-.rs-page--public-doc.pf-v6-c-page {
-  grid-template-columns: minmax(0, 1fr);
-  grid-template-areas: 'main';
-}
-
-.rs-page--public-doc .pf-v6-c-page__main-container {
-  grid-column: 1 / -1;
-  grid-area: main;
-}
-
-.rs-page--public-doc .rs-page-body {
+.rs-page--public-doc .rs-page-body,
+.rs-app-shell--public-doc .rs-page-body {
   padding-bottom: var(--pf-t--global--spacer--xl) !important;
   max-width: 720px;
 }

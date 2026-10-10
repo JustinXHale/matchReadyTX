@@ -7,6 +7,11 @@ export default defineConfig({
   resolve: {
     alias: {
       '@': path.resolve(__dirname, 'src'),
+      '@patternfly/react-core': path.resolve(__dirname, 'src/lib/pf-mui/index.ts'),
+      '@patternfly/react-icons': path.resolve(
+        __dirname,
+        'src/lib/pf-mui/icons.tsx',
+      ),
     },
   },
   test: {
