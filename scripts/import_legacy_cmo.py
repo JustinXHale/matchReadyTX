@@ -80,6 +80,8 @@ EMAIL_ALIASES = {
     "joshcop1234@yahoo.com": "2crvcb24rv@privaterelay.appleid.com",
     "mssheila93@hotmail.com": "adamssheila319@gmail.com",
     "jimbob_jones@hotmail.com": "d5fjgpb6ph@privaterelay.appleid.com",
+    # Form/roster hotmail vs Sign in with Apple relay (displayName "Andres Tafurt+").
+    "andrestafurt17@hotmail.com": "8zjfcr4f82@privaterelay.appleid.com",
 }
 
 
@@ -401,10 +403,12 @@ def build_docs(by_email: dict, by_name: dict) -> tuple[list[dict], list[dict]]:
 
         ref_uid = ref[0] if ref else None
         ref_name = ref[1] if ref else ref_label
-        ref_e = ref[2] if ref else (ref_email or "").strip().lower()
         cmo_uid = cmo[0] if cmo else None
         cmo_name = cmo[1] if cmo else cmo_label
-        cmo_e = cmo[2] if cmo else (cmo_email or "").strip().lower()
+        # Stable ids from preview emails (not Auth-resolved), so aliases still PATCH
+        # the same docs that were written as CMO-only / MO-only earlier.
+        ref_e = (ref_email or "").strip().lower()
+        cmo_e = (cmo_email or "").strip().lower()
 
         link = []
         if ref_uid and cmo_uid:
