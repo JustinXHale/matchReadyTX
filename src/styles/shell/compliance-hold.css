@@ -105,6 +105,13 @@
   position: relative;
 }
 
+.rs-detail__hold-underlay {
+  display: flex;
+  flex-direction: column;
+  gap: var(--rs-space-sm);
+  min-width: 0;
+}
+
 .rs-detail__hold-wrap--locked .rs-detail__hold-underlay {
   filter: grayscale(1);
   opacity: 0.18;

@@ -1,3 +1,4 @@
+import { Card } from '@mui/material';
 import { Link } from 'react-router-dom';
 import {
   formatMatchCardWeekday,
@@ -389,9 +390,20 @@ export function MatchListRow({
   }
 
   return (
-    <div className={rowClass}>
+    <Card
+      component="div"
+      elevation={1}
+      className={rowClass}
+      sx={{
+        bgcolor: 'background.paper',
+        border: (t) => `1px solid ${t.palette.outlineVariant}`,
+        borderRadius: 2,
+        overflow: 'hidden',
+        boxShadow: 'none',
+      }}
+    >
       {body}
       {aside ? <div className="rs-list-row__aside">{aside}</div> : null}
-    </div>
+    </Card>
   );
 }

@@ -536,7 +536,7 @@
 .rs-official-quicklook {
   display: flex;
   flex-direction: column;
-  gap: 20px;
+  gap: var(--rs-space-lg);
 }
 
 .rs-official-quicklook .rs-inline-tabs {
@@ -562,19 +562,48 @@
 .rs-official-quicklook__profile {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: var(--rs-space-md);
 }
 
 .rs-official-quicklook__identity {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: var(--rs-space-md);
 }
 
 .rs-official-quicklook__name {
   margin: 0;
   font-weight: 700;
   font-size: 1rem;
+}
+
+.rs-official-quicklook__location {
+  color: var(--rs-color-muted);
+  font-weight: 500;
+}
+
+.rs-official-quicklook__contact {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--rs-space-xs);
+  margin: var(--rs-space-xs) 0 0;
+  color: var(--rs-color-muted);
+  font-size: 0.875rem;
+}
+
+.rs-official-quicklook__contact a {
+  color: var(--pf-t--global--link--color--100, #0066cc);
+  overflow-wrap: anywhere;
+}
+
+.rs-official-quicklook__credentials {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--rs-space-xs);
+  margin: var(--rs-space-xs) 0 0;
+  color: var(--rs-color-muted);
+  font-size: 0.8125rem;
+  font-weight: 600;
 }
 
 .rs-official-quicklook__link {

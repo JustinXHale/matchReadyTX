@@ -23,6 +23,17 @@
     var(--pf-t--global--border--color--default);
 }
 
+.pf-v6-theme-high-contrast .rs-nav-bar,
+.pf-v6-theme-high-contrast .rs-nav-rail,
+.pf-v6-theme-high-contrast .rs-top-app-bar {
+  border-color: var(--pf-t--global--border--color--default);
+}
+
+.pf-v6-theme-high-contrast .rs-nav-dest--selected .rs-nav-dest__indicator {
+  border: var(--pf-t--global--border--width--regular) solid
+    var(--pf-t--global--border--color--default);
+}
+
 .pf-v6-theme-high-contrast .rs-theme-toggle,
 .pf-v6-theme-high-contrast .rs-filter-chip,
 .pf-v6-theme-high-contrast .rs-detail__back {

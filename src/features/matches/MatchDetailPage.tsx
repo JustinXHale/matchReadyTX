@@ -19,9 +19,8 @@ import {
   Radio,
   Alert,
 } from '@patternfly/react-core';
-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faPen } from '@fortawesome/free-solid-svg-icons';
 import { MatchCrewReportStatusPanel } from '@/features/matches/MatchCrewReportStatusPanel';
+import { CrewReportStatusPills } from '@/features/matches/CrewReportStatusPills';
 import { canSeeMatchFees } from '@/domain/visibility';
 import { roleHomeBack, useApp } from '@/app/AppContext';
 import {
@@ -77,6 +76,7 @@ import {
   teamFacingCrewShapeLabel,
   type CrewAssignment,
   type CrewSlot,
+  type FeeTable,
   type Match,
   type RequestableSlot,
   type Team,
@@ -107,7 +107,7 @@ import {
 } from '@/domain/complianceHold';
 import { ComplianceHoldOverlay } from '@/ui/ComplianceHoldOverlay';
 import { notifyComplianceHoldChange } from '@/services/complianceHoldNotify';
-import { defaultOrgId, clearMatchForfeitInFirestore, createGameRequestInFirestore, patchGameRequestContentInFirestore, saveComplianceHoldInFirestore, saveMatchCrewAssignment, saveMatchEventFlagsInFirestore, saveMatchForfeitInFirestore, saveMatchPlayedForfeitInFirestore, saveMatchRaiseHandInterest, saveMatchScheduleUrlInFirestore, saveMatchWorkflowInFirestore, callMatchSelfService } from '@/services/orgData';
+import { defaultOrgId, clearMatchForfeitInFirestore, createGameRequestInFirestore, patchGameRequestContentInFirestore, saveComplianceHoldInFirestore, saveMatchCrewAssignment, saveMatchDetailsInFirestore, saveMatchForfeitInFirestore, saveMatchPlayedForfeitInFirestore, saveMatchRaiseHandInterest, saveMatchWorkflowInFirestore, callMatchSelfService } from '@/services/orgData';
 import {
   formatRaiseHandInterestSlots,
   raiseHandInterestStatusLabel,
@@ -126,7 +126,6 @@ import {
 } from '@/domain/matchCardFooter';
 import {
   matchDetailHeaderReportLinks,
-  matchDetailReportActions,
 } from '@/features/referee/reports/reportLinks';
 import { fulfillRaiseHandsOnAssignmentConfirm } from '@/features/scheduler/queues/raiseHandActions';
 import { OfficialAssignPicker } from '@/features/matches/OfficialAssignPicker';
@@ -139,9 +138,14 @@ import {
   type AssignerMenuAction,
 } from '@/features/matches/MatchAssignerMenu';
 import { MatchForfeitModal } from '@/features/matches/MatchForfeitModal';
+import { useContextualBackBar } from '@/app/shell/contextualBar';
+import { useOfficialQuickLookOptional } from '@/features/scheduler/officialQuickLookContext';
+import { isReportWindowOpen } from '@/domain/reports';
 
 type CrewPickTarget = {
   slot: RequestableSlot;
+  /** Filled official user id (profile quick look). */
+  userId?: string;
   /** Fee-crew block id (empty or filled). */
   assignmentId?: string;
   /** CMO block id (empty or filled). */
@@ -149,6 +153,42 @@ type CrewPickTarget = {
   /** Filled CMO userId (contact / clear). */
   cmoUserId?: string;
 };
+
+type MatchDetailsDraft = {
+  title: string;
+  division: MatchDivisionSelection;
+  fees: Partial<Record<RequestableSlot, string>>;
+  flightProvided: boolean;
+  housingProvided: boolean;
+  notes: string;
+  scheduleUrl: string;
+};
+
+type DetailsSaveState = 'idle' | 'saving' | 'error';
+
+function buildMatchDetailsDraft(
+  match: Match,
+  tierOptions: string[],
+  feeDefaults: FeeTable,
+): MatchDetailsDraft {
+  const fees: Partial<Record<RequestableSlot, string>> = {};
+  for (const slot of rolesNeededForMatch(match)) {
+    if (slot === 'cmo') {
+      fees[slot] = String(match.feeOverride?.cmo ?? feeDefaults.cmo ?? 0);
+    } else {
+      fees[slot] = String(match.feeOverride?.[slot] ?? feeDefaults[slot]);
+    }
+  }
+  return {
+    title: match.title ?? '',
+    division: parseMatchDivision(match, tierOptions),
+    fees,
+    flightProvided: match.flightProvided,
+    housingProvided: match.housingProvided,
+    notes: match.notes ?? '',
+    scheduleUrl: match.scheduleUrl ?? '',
+  };
+}
 
 function TeamDisplayName({ label }: { label: TeamDisplayLabel }) {
   return (
@@ -286,6 +326,7 @@ export function MatchDetailPage() {
     roleView,
     dataMode,
   } = useApp();
+  const officialQuickLook = useOfficialQuickLookOptional();
   const orgTz = orgTimeZone(state.org.timezone);
   const match = state.matches.find((m) => m.id === id);
   const teamsById = useMemo(
@@ -328,11 +369,18 @@ export function MatchDetailPage() {
     useState<AssignerMenuAction | null>(null);
   const [showComplianceHoldModal, setShowComplianceHoldModal] = useState(false);
   const [complianceHoldDraft, setComplianceHoldDraft] = useState('');
+  const [showMatchStatusActions, setShowMatchStatusActions] = useState(false);
   const [showForfeitModal, setShowForfeitModal] = useState(false);
-  /** In-progress fee edits — keeps empty/partial input from snapping to org default. */
-  const [feeDrafts, setFeeDrafts] = useState<
-    Partial<Record<RequestableSlot, string>>
-  >({});
+  const [detailsDraft, setDetailsDraft] = useState<MatchDetailsDraft | null>(
+    null,
+  );
+  const [detailsSaveState, setDetailsSaveState] =
+    useState<DetailsSaveState>('idle');
+  const [detailsSaveError, setDetailsSaveError] = useState('');
+  const [detailsSaved, setDetailsSaved] = useState(false);
+  const [showDiscardDetails, setShowDiscardDetails] = useState(false);
+  const [crewManaging, setCrewManaging] = useState(false);
+  const detailsInitialRef = useRef('');
   const [requestSelectedSlots, setRequestSelectedSlots] = useState<
     RequestableSlot[]
   >([]);
@@ -340,85 +388,26 @@ export function MatchDetailPage() {
   const [requestEditing, setRequestEditing] = useState(true);
   const [requestToast, setRequestToast] = useState(false);
   const [selfServiceBusy, setSelfServiceBusy] = useState(false);
-  const [scheduleUrlDraft, setScheduleUrlDraft] = useState('');
   const [scheduleUrlError, setScheduleUrlError] = useState('');
-  const [titleDraft, setTitleDraft] = useState('');
   const requestSectionRef = useRef<HTMLElement | null>(null);
   const titleRowRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
-    setFeeDrafts({});
-  }, [id]);
-
-  useEffect(() => {
-    setScheduleUrlDraft(match?.scheduleUrl ?? '');
+    setDetailsDraft(null);
+    setDetailsSaveState('idle');
+    setDetailsSaveError('');
     setScheduleUrlError('');
-  }, [id, match?.scheduleUrl]);
-
-  useEffect(() => {
-    setTitleDraft(match?.title ?? '');
-  }, [id, match?.title]);
+    setCrewManaging(false);
+  }, [id]);
 
   const tierOptions = useMemo(
     () => tierOptionsFromOrgLevels(state.org.matchLevels),
     [state.org.matchLevels],
   );
-  const matchDivision = useMemo(
-    () => (match ? parseMatchDivision(match, tierOptions) : null),
-    [match, tierOptions],
-  );
   const divisionSummaryLabels = useMemo(
     () =>
       match ? matchDivisionSummaryLabels(match, tierOptions, genderLabel) : [],
     [match, tierOptions],
-  );
-
-  const onMatchDivisionChange = useCallback(
-    (next: MatchDivisionSelection) => {
-      if (!match || !isAssignerView) return;
-      const flags = applyMatchDivision(next);
-      store.setMatchFlags(match.id, flags);
-      if (dataMode === 'live' && isFirebaseConfigured) {
-        void saveMatchEventFlagsInFirestore(defaultOrgId(), match.id, {
-          ...flags,
-          matchType: flags.matchType ?? null,
-          title: match.title ?? null,
-        }).catch((err) => {
-          console.error('saveMatchEventFlagsInFirestore failed', err);
-        });
-      }
-    },
-    [dataMode, isAssignerView, match, store],
-  );
-
-  const persistScheduleUrl = useCallback(
-    (raw: string) => {
-      if (!match || !isAssignerView) return;
-      const validated = validateScheduleUrlInput(raw);
-      if (!validated.ok) {
-        setScheduleUrlError(validated.error);
-        return;
-      }
-      setScheduleUrlError('');
-      const next = validated.value;
-      if ((match.scheduleUrl ?? '') === (next ?? '')) return;
-      store.setMatchFlags(match.id, { scheduleUrl: next });
-      if (dataMode === 'live' && isFirebaseConfigured) {
-        void saveMatchScheduleUrlInFirestore(
-          defaultOrgId(),
-          match.id,
-          next,
-        ).catch((err) => {
-          console.error('saveMatchScheduleUrlInFirestore failed', err);
-          window.alert(
-            err instanceof Error
-              ? `Schedule link saved locally, but Firestore update failed: ${err.message}`
-              : 'Schedule link saved locally, but Firestore update failed.',
-          );
-        });
-      }
-    },
-    [dataMode, isAssignerView, match, store],
   );
 
   const persistSelfServiceIfLive = useCallback(
@@ -477,7 +466,7 @@ export function MatchDetailPage() {
         state.users,
       ).emails,
     ]);
-  }, [match, state.teams, state.users]);
+  }, [match, state.teams, state.users, teamNames]);
 
   const crewEmails = useMemo(() => {
     if (!match) return [];
@@ -529,7 +518,7 @@ export function MatchDetailPage() {
       setRequestNote('');
       setRequestEditing(true);
     }
-  }, [match, currentUser?.uid, state.requests]);
+  }, [match, currentUser, state.requests]);
 
   const highlightRequest = searchParams.get('request') === '1';
   const canRequestPreview = Boolean(
@@ -556,22 +545,71 @@ export function MatchDetailPage() {
     return () => window.clearTimeout(id);
   }, [requestToast]);
 
+  useEffect(() => {
+    if (!detailsSaved) return;
+    const id = window.setTimeout(() => setDetailsSaved(false), 4000);
+    return () => window.clearTimeout(id);
+  }, [detailsSaved]);
+
+  const detailsDirty = Boolean(
+    detailsDraft && JSON.stringify(detailsDraft) !== detailsInitialRef.current,
+  );
+
+  const closeDetailsEdit = useCallback(() => {
+    setDetailsDraft(null);
+    setDetailsSaveState('idle');
+    setDetailsSaveError('');
+    setScheduleUrlError('');
+    setShowDiscardDetails(false);
+  }, []);
+
+  const requestCloseDetailsEdit = useCallback(() => {
+    if (detailsDirty) {
+      setShowDiscardDetails(true);
+      return;
+    }
+    closeDetailsEdit();
+  }, [closeDetailsEdit, detailsDirty]);
+
+  const handleContextualBack = useCallback(() => {
+    if (detailsDraft) {
+      requestCloseDetailsEdit();
+      return;
+    }
+    goBack();
+  }, [detailsDraft, goBack, requestCloseDetailsEdit]);
+
+  useContextualBackBar(
+    detailsDraft ? 'Cancel editing' : backLabel,
+    handleContextualBack,
+  );
+
+  useEffect(() => {
+    if (!detailsDirty) return;
+    const warnBeforeUnload = (event: BeforeUnloadEvent) => {
+      event.preventDefault();
+    };
+    window.addEventListener('beforeunload', warnBeforeUnload);
+    return () => window.removeEventListener('beforeunload', warnBeforeUnload);
+  }, [detailsDirty]);
+
+  useEffect(() => {
+    if (isAssignerView) return;
+    setDetailsDraft(null);
+    setCrewManaging(false);
+  }, [isAssignerView]);
+
   if (!currentUser || !match) {
     return (
       <div className="rs-stack">
-        <button
-          type="button"
-          className="rs-detail__back"
-          onClick={goBack}
-        >
-          ← {backLabel}
-        </button>
         <p>Match not found.</p>
       </div>
     );
   }
 
   const isAssigner = isAssignerView;
+  const showCrewReportStatuses =
+    isAssigner && !crewManaging && isReportWindowOpen(match.kickoffAt);
   const complianceHeld = isComplianceHeld(match);
   const showComplianceLockedView =
     complianceHeld && shouldShowComplianceHoldUi(roleView);
@@ -581,9 +619,11 @@ export function MatchDetailPage() {
     isAssignerView,
   });
   const isHomeAdmin =
+    roleView === 'teamAdmin' &&
     currentUser.roles.includes('teamAdmin') &&
     currentUser.teamIds.includes(match.homeTeamId);
   const isAwayAdmin =
+    roleView === 'teamAdmin' &&
     currentUser.roles.includes('teamAdmin') &&
     currentUser.teamIds.includes(match.awayTeamId);
   const myHit = assignmentForUser(match, currentUser.uid);
@@ -666,16 +706,6 @@ export function MatchDetailPage() {
       (match.status === 'needs_reconfirmation' &&
         myAssignment?.status !== 'confirmed'));
 
-  const needsTeamConfirm =
-    !complianceHeld &&
-    (isHomeAdmin || isAwayAdmin) &&
-    match.status !== 'cancelled' &&
-    match.status !== 'postponed' &&
-    match.status !== 'draft' &&
-    match.status !== 'change_proposed' &&
-    ((isHomeAdmin && !match.homeConfirmedAt) ||
-      (isAwayAdmin && !match.awayConfirmedAt));
-
   const myTeamConfirmed =
     (isHomeAdmin && Boolean(match.homeConfirmedAt)) ||
     (isAwayAdmin && Boolean(match.awayConfirmedAt));
@@ -693,6 +723,18 @@ export function MatchDetailPage() {
     showMatchEconomics ? matchFeeBreakdown(match, state.org) : [];
   const showFees = feeParts.length > 0;
   const matchRoles = rolesNeededForMatch(match);
+  const crewCoverage = matchRoles.reduce(
+    (summary, slot) => {
+      const blocks =
+        slot === 'cmo' ? (match.cmo ?? []) : crewBlocks(match.crew[slot]);
+      return {
+        total: summary.total + Math.max(1, blocks.length),
+        filled:
+          summary.filled + blocks.filter((assignment) => assignment.userId).length,
+      };
+    },
+    { filled: 0, total: 0 },
+  );
   const canAlertCoverage =
     isAssigner &&
     match.status !== 'cancelled' &&
@@ -711,6 +753,88 @@ export function MatchDetailPage() {
     lat: match.venueLat,
     lng: match.venueLng,
   });
+
+  const beginDetailsEdit = () => {
+    const draft = buildMatchDetailsDraft(
+      match,
+      tierOptions,
+      state.org.defaultFees,
+    );
+    detailsInitialRef.current = JSON.stringify(draft);
+    setDetailsDraft(draft);
+    setDetailsSaveState('idle');
+    setDetailsSaveError('');
+    setScheduleUrlError('');
+    setCrewManaging(false);
+    window.requestAnimationFrame(() => {
+      titleRowRef.current?.scrollIntoView({ block: 'start' });
+    });
+  };
+
+  const saveDetails = async () => {
+    if (!detailsDraft || detailsSaveState === 'saving') return;
+
+    const validatedSchedule = validateScheduleUrlInput(
+      detailsDraft.scheduleUrl,
+    );
+    if (!validatedSchedule.ok) {
+      setScheduleUrlError(validatedSchedule.error);
+      setDetailsSaveState('error');
+      return;
+    }
+
+    const feeOverride = { ...(match.feeOverride ?? {}) };
+    for (const slot of matchRoles) {
+      const raw = detailsDraft.fees[slot]?.trim() ?? '';
+      const amount = Number(raw);
+      if (!raw || !Number.isFinite(amount) || amount < 0) {
+        setDetailsSaveError(
+          `Enter a valid non-negative fee for ${REQUESTABLE_SLOT_LABELS[slot]}.`,
+        );
+        setDetailsSaveState('error');
+        return;
+      }
+      const defaultAmount =
+        slot === 'cmo'
+          ? (state.org.defaultFees.cmo ?? 0)
+          : state.org.defaultFees[slot];
+      if (amount === defaultAmount) delete feeOverride[slot];
+      else feeOverride[slot] = amount;
+    }
+
+    const divisionFlags = applyMatchDivision(detailsDraft.division);
+    const details = {
+      ...divisionFlags,
+      title: detailsDraft.title.trim() || undefined,
+      feeOverride: Object.keys(feeOverride).length ? feeOverride : undefined,
+      flightProvided: detailsDraft.flightProvided,
+      housingProvided: detailsDraft.housingProvided,
+      notes: detailsDraft.notes.trim() || undefined,
+      scheduleUrl: validatedSchedule.value,
+    };
+
+    setDetailsSaveState('saving');
+    setDetailsSaveError('');
+    setScheduleUrlError('');
+    try {
+      if (dataMode === 'live' && isFirebaseConfigured) {
+        await saveMatchDetailsInFirestore(defaultOrgId(), match.id, details);
+      }
+      store.setMatchFlags(match.id, details);
+      detailsInitialRef.current = JSON.stringify(detailsDraft);
+      setDetailsDraft(null);
+      setDetailsSaveState('idle');
+      setDetailsSaved(true);
+    } catch (err) {
+      console.error('saveMatchDetailsInFirestore failed', err);
+      setDetailsSaveState('error');
+      setDetailsSaveError(
+        err instanceof Error
+          ? `Could not save event details: ${err.message}`
+          : 'Could not save event details. Try again.',
+      );
+    }
+  };
 
   const openTeamContact = (side: 'home' | 'away') => {
     const teamId = side === 'home' ? match.homeTeamId : match.awayTeamId;
@@ -749,8 +873,14 @@ export function MatchDetailPage() {
   };
 
   const onCrewRowActivate = (target: CrewPickTarget) => {
-    if (isAssigner) {
+    if (isAssigner && crewManaging) {
       openCrewPick(target);
+      return;
+    }
+    if (target.userId && officialQuickLook) {
+      officialQuickLook.openOfficial(target.userId, {
+        matchBack: { to: `/matches/${match.id}`, label: 'Match' },
+      });
       return;
     }
     if (target.slot === 'cmo') {
@@ -958,47 +1088,6 @@ export function MatchDetailPage() {
         );
       }
     }
-  };
-
-  const setSlotFee = (slot: RequestableSlot, raw: string) => {
-    if (!isCrewSlot(slot) && slot !== 'cmo') return;
-    const trimmed = raw.trim();
-    const nextOverride = { ...(match.feeOverride ?? {}) };
-    if (trimmed === '') {
-      delete nextOverride[slot === 'cmo' ? 'cmo' : slot];
-    } else {
-      const n = Number(trimmed);
-      if (!Number.isFinite(n) || n < 0) return;
-      if (slot === 'cmo') nextOverride.cmo = n;
-      else nextOverride[slot] = n;
-    }
-    store.setMatchFlags(match.id, {
-      feeOverride: Object.keys(nextOverride).length ? nextOverride : undefined,
-    });
-  };
-
-  const feeFieldValue = (
-    slot: RequestableSlot,
-    def: number,
-    override?: number,
-  ): string => {
-    if (feeDrafts[slot] !== undefined) return feeDrafts[slot]!;
-    if (override != null) return String(override);
-    return String(def);
-  };
-
-  const onFeeFieldChange = (slot: RequestableSlot, raw: string) => {
-    setFeeDrafts((prev) => ({ ...prev, [slot]: raw }));
-    setSlotFee(slot, raw);
-  };
-
-  const onFeeFieldBlur = (slot: RequestableSlot) => {
-    setFeeDrafts((prev) => {
-      if (prev[slot] === undefined) return prev;
-      const next = { ...prev };
-      delete next[slot];
-      return next;
-    });
   };
 
   const canToggleTeamDetails = (side: 'home' | 'away') => {
@@ -1360,6 +1449,14 @@ export function MatchDetailPage() {
   };
 
   const onAssignerMenuAction = (action: AssignerMenuAction) => {
+    if (action === 'edit_details') {
+      beginDetailsEdit();
+      return;
+    }
+    if (action === 'change_status') {
+      setShowMatchStatusActions(true);
+      return;
+    }
     if (action === 'forfeit') {
       setShowForfeitModal(true);
       return;
@@ -1393,23 +1490,12 @@ export function MatchDetailPage() {
     }
   };
 
-  const stickyPrimary = (() => {
-    if (needsOfficialConfirm && mySlot) {
-      return null; // Accept / Decline split bar below
-    }
-    if (needsTeamConfirm) {
-      return {
-        label: 'Confirm details',
-        onClick: () =>
-          store.confirmMatchTeam(match.id, isHomeAdmin ? 'home' : 'away'),
-      };
-    }
-    return null;
-  })();
-
-  const showAcceptDecline = Boolean(needsOfficialConfirm && mySlot);
+  const showAcceptDecline = Boolean(
+    isOfficialView && needsOfficialConfirm && mySlot,
+  );
 
   const canWithdrawFromAppointment =
+    isOfficialView &&
     Boolean(mySlot) &&
     myAssignment?.userId === currentUser.uid &&
     myAssignment?.status === 'confirmed' &&
@@ -1417,24 +1503,68 @@ export function MatchDetailPage() {
     match.status !== 'cancelled' &&
     match.status !== 'postponed';
 
-  const reportActions = matchDetailReportActions(
-    match,
-    currentUser.uid,
-    state.matchReports,
-    state.cardReports,
-  );
-  const headerReportLinks = matchDetailHeaderReportLinks(
-    match,
-    currentUser.uid,
-    state.matchReports,
-    state.cardReports,
-  );
-  const showReportSticky =
-    Boolean(reportActions.primary) &&
-    !showAcceptDecline &&
-    !canRequest &&
-    !stickyPrimary;
+  const hasFixedOfficialAction =
+    !showComplianceLockedView &&
+    (showAcceptDecline ||
+      canWithdrawFromAppointment ||
+      (showRaiseHandCard && !raiseHandLocked));
 
+  const crewReportLinks = matchDetailHeaderReportLinks(
+    match,
+    currentUser.uid,
+    state.matchReports,
+    state.cardReports,
+  );
+  const crewReportActions: {
+    kind: 'match' | 'coaching' | 'card';
+    label: string;
+    to?: string;
+    unavailableLabel?: string;
+  }[] = [];
+  const addCrewReportAction = (
+    kind: 'match' | 'coaching' | 'card',
+    fallbackLabel: string,
+    unavailableLabel: string,
+  ) => {
+    const available = crewReportLinks.find((link) => link.kind === kind);
+    crewReportActions.push(
+      available ?? {
+        kind,
+        label: fallbackLabel,
+        unavailableLabel,
+      },
+    );
+  };
+  const hasCrewMatchReportRole =
+    mySlot === 'mo' || mySlot === 'ar1' || mySlot === 'ar2';
+  if (isAssigner || (isOfficialView && hasCrewMatchReportRole)) {
+    addCrewReportAction(
+      'match',
+      'Match report',
+      'Match report unavailable until the reporting window opens',
+    );
+  }
+  if (isAssigner || (isOfficialView && mySlot === 'mo')) {
+    addCrewReportAction(
+      'card',
+      'Card report',
+      'Card report unavailable until kickoff',
+    );
+  }
+  if (isOfficialView && mySlot === 'cmo') {
+    addCrewReportAction(
+      'coaching',
+      'Coaching report',
+      'Coaching report unavailable until the reporting window opens',
+    );
+  }
+  for (const link of crewReportLinks) {
+    if (!crewReportActions.some((action) => action.kind === link.kind)) {
+      crewReportActions.push(link);
+    }
+  }
+  const showCrewReports =
+    showCrewReportStatuses || crewReportActions.length > 0;
   const submitRequest = async () => {
     if (!canSubmitRequest || !currentUser || !match) return;
 
@@ -1520,17 +1650,13 @@ export function MatchDetailPage() {
   };
 
   return (
-    <div className="rs-detail">
-      <button
-        type="button"
-        className="rs-detail__back"
-        onClick={goBack}
-      >
-        ← {backLabel}
-      </button>
-
+    <div
+      className={`rs-detail${
+        hasFixedOfficialAction ? ' rs-detail--has-fixed-action' : ''
+      }${isAssigner ? ' rs-detail--has-mobile-action' : ''}`}
+    >
       <div className="rs-detail__title-row" ref={titleRowRef}>
-        <Title headingLevel="h2" className="rs-detail__title">
+        <Title headingLevel="h1" className="rs-detail__title">
           <span className="rs-detail__home">
             <span className="rs-detail__ha">(H)</span>{' '}
             {teamNames ? (
@@ -1549,26 +1675,9 @@ export function MatchDetailPage() {
             )}
           </span>
         </Title>
-        {(headerReportLinks.length > 0 || isAssigner) && (
+        {!detailsDraft && isAssigner && (
           <div className="rs-detail__title-actions">
-            {headerReportLinks.map((link) => (
-              <Button
-                key={link.to + link.label}
-                variant="secondary"
-                size="sm"
-                onClick={() =>
-                  navigate(link.to, {
-                    state: backState({
-                      to: `/matches/${match.id}`,
-                      label: 'Match',
-                    }),
-                  })
-                }
-              >
-                {link.label}
-              </Button>
-            ))}
-            {isAssigner && (
+            <div className="rs-detail__desktop-action-menu">
               <MatchAssignerMenu
                 match={match}
                 canAlertCoverage={canAlertCoverage}
@@ -1577,7 +1686,7 @@ export function MatchDetailPage() {
                 }
                 onAction={onAssignerMenuAction}
               />
-            )}
+            </div>
           </div>
         )}
       </div>
@@ -1605,9 +1714,7 @@ export function MatchDetailPage() {
           />
         ) : null}
         <div
-          className={
-            showComplianceLockedView ? 'rs-detail__hold-underlay' : undefined
-          }
+          className="rs-detail__hold-underlay"
           aria-hidden={showComplianceLockedView || undefined}
         >
       {complianceHeld && isAssigner ? (
@@ -1622,53 +1729,7 @@ export function MatchDetailPage() {
         </Alert>
       ) : null}
 
-      {isAssigner ? (
-        <FormGroup fieldId="match-event-title" label="Event title">
-          <TextInput
-            id="match-event-title"
-            value={titleDraft}
-            onChange={(_e, v) => setTitleDraft(v)}
-            onBlur={() => {
-              const next = titleDraft.trim() || undefined;
-              if ((match.title ?? '') === (next ?? '')) return;
-              store.setMatchFlags(match.id, { title: next });
-              if (dataMode === 'live' && isFirebaseConfigured) {
-                void saveMatchEventFlagsInFirestore(defaultOrgId(), match.id, {
-                  isTournament: match.isTournament === true,
-                  title: next ?? null,
-                }).catch((err) => {
-                  console.error('saveMatchEventFlagsInFirestore failed', err);
-                });
-              }
-            }}
-            placeholder="Tournament or event name (groups coach feedback)"
-            aria-label="Event title"
-          />
-        </FormGroup>
-      ) : match.title?.trim() ? (
-        <p className="rs-detail__event-title">{match.title.trim()}</p>
-      ) : null}
-
-      {isAssigner && matchDivision ? (
-        <MatchDivisionPickers
-          division={matchDivision}
-          tierOptions={tierOptions}
-          onChange={onMatchDivisionChange}
-        />
-      ) : (
-        <div
-          className="rs-label-row rs-detail__game-chips"
-          aria-label="Game type"
-        >
-          {divisionSummaryLabels.map((label) => (
-            <span key={label} className="rs-pill rs-pill--ink">
-              {label}
-            </span>
-          ))}
-        </div>
-      )}
-
-      <div className="rs-label-row">
+      {!detailsDraft && <div className="rs-label-row rs-detail__status-row">
         {match.status !== 'crew_pending' && (
           <span
             className={`rs-pill${
@@ -1719,7 +1780,7 @@ export function MatchDetailPage() {
         {mySlot && needsOfficialConfirm && (
           <span className="rs-pill rs-pill--urgent">Needs your confirm</span>
         )}
-      </div>
+      </div>}
 
       {pendingProposal && (
         <section
@@ -2104,244 +2165,210 @@ export function MatchDetailPage() {
           </section>
         )}
 
-      <section className="rs-detail-card" aria-labelledby="event-info-heading">
-        <div className="rs-detail-card__head">
-          <h3 id="event-info-heading" className="rs-detail-section__label">
-            Event information
-          </h3>
-          {showTournamentSchedule && match.scheduleUrl ? (
-            <Button
-              variant="link"
-              isInline
-              className="rs-detail-card__action"
-              onClick={() =>
-                window.open(match.scheduleUrl, '_blank', 'noopener,noreferrer')
-              }
-            >
-              View schedule
-            </Button>
-          ) : null}
-        </div>
-        <div className="rs-detail-meta">
-          <div className="rs-detail-meta__row">
-            <span className="rs-detail-meta__label">When</span>
-            <div className="rs-detail-meta__value">
-              <span>{formatMatchKickoff(match.kickoffAt, orgTz)}</span>
-              {canProposeChange && (
-                <button
-                  type="button"
-                  className="rs-detail-meta__edit"
-                  onClick={openProposeModal}
-                  aria-label="Propose a time change"
-                >
-                  <FontAwesomeIcon icon={faPen} aria-hidden />
-                </button>
-              )}
-            </div>
+      {detailsDraft ? (
+        <section
+          className="rs-detail-card rs-detail-editor"
+          aria-labelledby="edit-details-heading"
+        >
+          <div className="rs-detail-card__head">
+            <h2 id="edit-details-heading" className="rs-detail-section__label">
+              Edit match details
+            </h2>
+            <span className="rs-detail-editor__mode">Unsaved draft</span>
           </div>
-          <div className="rs-detail-meta__row">
-            <span className="rs-detail-meta__label">Where</span>
-            <div className="rs-detail-meta__value">
-              {whereMapsUrl ? (
-                <a
-                  className="rs-detail-meta__maps"
-                  href={whereMapsUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                >
-                  {whereText}
-                </a>
-              ) : (
-                <span>{whereText}</span>
-              )}
-              {canProposeChange && (
-                <button
-                  type="button"
-                  className="rs-detail-meta__edit"
-                  onClick={openProposeModal}
-                  aria-label="Propose a venue change"
-                >
-                  <FontAwesomeIcon icon={faPen} aria-hidden />
-                </button>
-              )}
-            </div>
-          </div>
-          {isOfficialView && matchHasCalendarTime(match) && (
-            <div className="rs-detail-meta__row">
-              <span className="rs-detail-meta__label">Calendar</span>
-              <div className="rs-detail-meta__value">
-                <button
-                  type="button"
-                  className="rs-detail-meta__maps"
-                  onClick={() =>
-                    downloadMatchIcs(match, matchAppUrl(match.id))
-                  }
-                >
-                  Add to calendar
-                </button>
-              </div>
-            </div>
-          )}
-          {showMatchEconomics && (
-            <>
-              {showFees && (
-                <div className="rs-detail-meta__row rs-detail-meta__row--fees">
-                  <span className="rs-detail-meta__label">Match fee</span>
-                  <div className="rs-detail-fee-edit">
-                  {matchRoles
-                    .filter((r) => r === 'cmo' || isCrewSlot(r))
-                    .map((slot) => {
-                      const key = slot === 'cmo' ? 'cmo' : slot;
-                      const def =
-                        slot === 'cmo'
-                          ? (state.org.defaultFees.cmo ?? 0)
-                          : state.org.defaultFees[slot];
-                      const override = match.feeOverride?.[key];
-                      return (
-                        <label key={slot} className="rs-detail-fee-edit__field">
-                          <span>{REQUESTABLE_SLOT_SHORT[slot]}</span>
-                          <TextInput
-                            type="text"
-                            inputMode="numeric"
-                            pattern="[0-9]*"
-                            value={feeFieldValue(slot, def, override)}
-                            aria-label={`${REQUESTABLE_SLOT_LABELS[slot]} fee`}
-                            onChange={(_, v) => onFeeFieldChange(slot, v)}
-                            onBlur={() => onFeeFieldBlur(slot)}
-                          />
-                        </label>
-                      );
-                    })}
-                </div>
-              </div>
-              )}
-              <div className="rs-detail-meta__row">
-                <span className="rs-detail-meta__label">Flight</span>
-                <div
-                  className="rs-slot-picker"
-                  role="radiogroup"
-                  aria-label="Flight provided"
-                >
-                  <button
-                    type="button"
-                    role="radio"
-                    aria-checked={match.flightProvided}
-                    className={`rs-filter-chip${
-                      match.flightProvided ? ' rs-filter-chip--selected' : ''
-                    }`}
-                    onClick={() =>
-                      store.setMatchFlags(match.id, { flightProvided: true })
-                    }
-                  >
-                    Enabled
-                  </button>
-                  <button
-                    type="button"
-                    role="radio"
-                    aria-checked={!match.flightProvided}
-                    className={`rs-filter-chip${
-                      !match.flightProvided ? ' rs-filter-chip--selected' : ''
-                    }`}
-                    onClick={() =>
-                      store.setMatchFlags(match.id, { flightProvided: false })
-                    }
-                  >
-                    Disabled
-                  </button>
-                </div>
-              </div>
-              <div className="rs-detail-meta__row">
-                <span className="rs-detail-meta__label">Lodging</span>
-                <div
-                  className="rs-slot-picker"
-                  role="radiogroup"
-                  aria-label="Lodging provided"
-                >
-                  <button
-                    type="button"
-                    role="radio"
-                    aria-checked={match.housingProvided}
-                    className={`rs-filter-chip${
-                      match.housingProvided ? ' rs-filter-chip--selected' : ''
-                    }`}
-                    onClick={() =>
-                      store.setMatchFlags(match.id, { housingProvided: true })
-                    }
-                  >
-                    Enabled
-                  </button>
-                  <button
-                    type="button"
-                    role="radio"
-                    aria-checked={!match.housingProvided}
-                    className={`rs-filter-chip${
-                      !match.housingProvided ? ' rs-filter-chip--selected' : ''
-                    }`}
-                    onClick={() =>
-                      store.setMatchFlags(match.id, { housingProvided: false })
-                    }
-                  >
-                    Disabled
-                  </button>
-                </div>
-              </div>
-            </>
-          )}
-        </div>
+          <p className="rs-detail-note">
+            These settings describe the match. Schedule changes to kickoff or
+            venue use the separate proposal workflow.
+          </p>
 
-        <div className="rs-detail-additional">
-          <h4 className="rs-detail-section__sublabel">Additional info</h4>
-          {isAssigner || isHomeAdmin ? (
+          <FormGroup fieldId="match-event-title" label="Event or tournament name">
+            <TextInput
+              id="match-event-title"
+              value={detailsDraft.title}
+              onChange={(_e, value) =>
+                setDetailsDraft((draft) =>
+                  draft ? { ...draft, title: value } : draft,
+                )
+              }
+              placeholder="Optional grouping name"
+            />
+            <FormHelperText>
+              Groups tournament matches and coach feedback.
+            </FormHelperText>
+          </FormGroup>
+
+          <div className="rs-detail-editor__group">
+            <h3 className="rs-detail-section__sublabel">Classification</h3>
+            <MatchDivisionPickers
+              division={detailsDraft.division}
+              tierOptions={tierOptions}
+              onChange={(division) =>
+                setDetailsDraft((draft) =>
+                  draft ? { ...draft, division } : draft,
+                )
+              }
+            />
+          </div>
+
+          {showMatchEconomics && (
+            <div className="rs-detail-editor__group">
+              <h3 className="rs-detail-section__sublabel">Match fees</h3>
+              <div className="rs-detail-editor__fees">
+                {matchRoles.map((slot) => (
+                  <FormGroup
+                    key={slot}
+                    fieldId={`match-fee-${slot}`}
+                    label={REQUESTABLE_SLOT_LABELS[slot]}
+                  >
+                    <TextInput
+                      id={`match-fee-${slot}`}
+                      type="number"
+                      inputMode="decimal"
+                      min="0"
+                      value={detailsDraft.fees[slot] ?? ''}
+                      onChange={(_event, value) =>
+                        setDetailsDraft((draft) =>
+                          draft
+                            ? {
+                                ...draft,
+                                fees: { ...draft.fees, [slot]: value },
+                              }
+                            : draft,
+                        )
+                      }
+                      aria-label={`${REQUESTABLE_SLOT_LABELS[slot]} fee in dollars`}
+                    />
+                  </FormGroup>
+                ))}
+              </div>
+              <FormHelperText>
+                Dollar amount paid for each assigned role.
+              </FormHelperText>
+            </div>
+          )}
+
+          <div className="rs-detail-editor__group">
+            <h3 className="rs-detail-section__sublabel">Travel support</h3>
+            <div className="rs-detail-editor__checks">
+              <Checkbox
+                id="match-flight-provided"
+                label="Flight provided"
+                isChecked={detailsDraft.flightProvided}
+                onChange={(_event, checked) =>
+                  setDetailsDraft((draft) =>
+                    draft ? { ...draft, flightProvided: checked } : draft,
+                  )
+                }
+              />
+              <Checkbox
+                id="match-lodging-provided"
+                label="Lodging provided"
+                isChecked={detailsDraft.housingProvided}
+                onChange={(_event, checked) =>
+                  setDetailsDraft((draft) =>
+                    draft ? { ...draft, housingProvided: checked } : draft,
+                  )
+                }
+              />
+            </div>
+          </div>
+
+          <FormGroup fieldId="match-notes" label="Match notes">
             <TextArea
               id="match-notes"
-              value={match.notes ?? ''}
-              onChange={(_, v) =>
-                store.setMatchFlags(match.id, { notes: v || undefined })
+              value={detailsDraft.notes}
+              onChange={(_event, value) =>
+                setDetailsDraft((draft) =>
+                  draft ? { ...draft, notes: value } : draft,
+                )
               }
               rows={3}
               placeholder="Parking, arrival notes, organizer details…"
-              aria-label="Additional info"
             />
-          ) : match.notes?.trim() ? (
-            <p className="rs-detail-additional__body">{match.notes.trim()}</p>
-          ) : (
-            <p className="rs-detail-additional__empty">None</p>
-          )}
-        </div>
+          </FormGroup>
 
-        {showTournamentSchedule && (isAssigner || match.scheduleUrl) && (
-          <div className="rs-detail-additional">
-            <h4 className="rs-detail-section__sublabel">Tournament schedule</h4>
-            {isAssigner ? (
-              <FormGroup fieldId="match-schedule-url">
-                <TextInput
-                  id="match-schedule-url"
-                  type="url"
-                  value={scheduleUrlDraft}
-                  onChange={(_e, v) => {
-                    setScheduleUrlDraft(v);
-                    if (scheduleUrlError) setScheduleUrlError('');
-                  }}
-                  onBlur={() => persistScheduleUrl(scheduleUrlDraft)}
-                  placeholder="https://drive.google.com/file/d/…/view"
-                  aria-label="Tournament schedule link"
-                  validated={scheduleUrlError ? 'error' : 'default'}
-                />
-                <FormHelperText>
-                  Google Drive PDF or image — share as anyone with the link can
-                  view.
-                </FormHelperText>
-                {scheduleUrlError ? (
-                  <p className="rs-signin__note" role="alert">
-                    {scheduleUrlError}
-                  </p>
-                ) : null}
-              </FormGroup>
-            ) : (
-              <p className="rs-detail-additional__body">
-                <button
-                  type="button"
-                  className="rs-detail-meta__maps"
+          {detailsDraft.division.eventType === 'tournament' && (
+            <FormGroup fieldId="match-schedule-url" label="Tournament schedule link">
+              <TextInput
+                id="match-schedule-url"
+                type="url"
+                value={detailsDraft.scheduleUrl}
+                onChange={(_event, value) => {
+                  setDetailsDraft((draft) =>
+                    draft ? { ...draft, scheduleUrl: value } : draft,
+                  );
+                  setScheduleUrlError('');
+                }}
+                placeholder="https://drive.google.com/file/d/…/view"
+                validated={scheduleUrlError ? 'error' : 'default'}
+                aria-describedby={
+                  scheduleUrlError ? 'match-schedule-url-error' : undefined
+                }
+              />
+              <FormHelperText>
+                Use a link that teams and officials have permission to open.
+              </FormHelperText>
+              {scheduleUrlError ? (
+                <p
+                  id="match-schedule-url-error"
+                  className="rs-detail-note rs-detail-note--error"
+                  role="alert"
+                >
+                  {scheduleUrlError}
+                </p>
+              ) : null}
+            </FormGroup>
+          )}
+
+          {detailsSaveError ? (
+            <Alert
+              variant="danger"
+              isInline
+              title="Event details were not saved"
+            >
+              {detailsSaveError}
+            </Alert>
+          ) : null}
+
+          <div className="rs-detail-editor__actions">
+            <Button
+              variant="secondary"
+              onClick={requestCloseDetailsEdit}
+              isDisabled={detailsSaveState === 'saving'}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="primary"
+              onClick={() => void saveDetails()}
+              isDisabled={!detailsDirty || detailsSaveState === 'saving'}
+            >
+              {detailsSaveState === 'saving' ? 'Saving…' : 'Save changes'}
+            </Button>
+          </div>
+        </section>
+      ) : (
+        <section className="rs-detail-card" aria-labelledby="event-info-heading">
+          <div className="rs-detail-card__head">
+            <h2 id="event-info-heading" className="rs-detail-section__label">
+              Match details
+            </h2>
+            <div className="rs-detail-card__actions">
+              {canProposeChange ? (
+                <Button
+                  variant="link"
+                  isInline
+                  className="rs-detail-card__action"
+                  onClick={openProposeModal}
+                >
+                  Propose change
+                </Button>
+              ) : null}
+              {showTournamentSchedule && match.scheduleUrl ? (
+                <Button
+                  variant="link"
+                  isInline
+                  className="rs-detail-card__action"
                   onClick={() =>
                     window.open(
                       match.scheduleUrl,
@@ -2350,26 +2377,122 @@ export function MatchDetailPage() {
                     )
                   }
                 >
-                  Open tournament schedule
-                </button>
-              </p>
+                  View schedule
+                </Button>
+              ) : null}
+            </div>
+          </div>
+          <div className="rs-detail-meta">
+            {match.title?.trim() ? (
+              <div className="rs-detail-meta__row">
+                <span className="rs-detail-meta__label">Event</span>
+                <div className="rs-detail-meta__value">
+                  <span>{match.title.trim()}</span>
+                </div>
+              </div>
+            ) : null}
+            <div className="rs-detail-meta__row">
+              <span className="rs-detail-meta__label">When</span>
+              <div className="rs-detail-meta__value">
+                <span>{formatMatchKickoff(match.kickoffAt, orgTz)}</span>
+              </div>
+            </div>
+            <div className="rs-detail-meta__row">
+              <span className="rs-detail-meta__label">Where</span>
+              <div className="rs-detail-meta__value">
+                {whereMapsUrl ? (
+                  <a
+                    className="rs-detail-meta__maps"
+                    href={whereMapsUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    {whereText}
+                  </a>
+                ) : (
+                  <span>{whereText}</span>
+                )}
+              </div>
+            </div>
+            <div className="rs-detail-meta__row">
+              <span className="rs-detail-meta__label">Classification</span>
+              <div className="rs-detail-meta__value">
+                <span>{divisionSummaryLabels.join(' · ')}</span>
+              </div>
+            </div>
+            {isOfficialView && matchHasCalendarTime(match) && (
+              <div className="rs-detail-meta__row">
+                <span className="rs-detail-meta__label">Calendar</span>
+                <div className="rs-detail-meta__value">
+                  <button
+                    type="button"
+                    className="rs-detail-meta__maps"
+                    onClick={() =>
+                      downloadMatchIcs(match, matchAppUrl(match.id))
+                    }
+                  >
+                    Add to calendar
+                  </button>
+                </div>
+              </div>
+            )}
+            {showMatchEconomics && showFees && (
+              <div className="rs-detail-meta__row">
+                <span className="rs-detail-meta__label">Match fees</span>
+                <div className="rs-detail-meta__value">
+                  <span className="rs-detail-fees">
+                    {feeParts
+                      .map(
+                        (part) =>
+                          `${part.label} $${part.amount.toLocaleString()}`,
+                      )
+                      .join(' · ')}
+                  </span>
+                </div>
+              </div>
+            )}
+            {showMatchEconomics && (
+              <div className="rs-detail-meta__row">
+                <span className="rs-detail-meta__label">Travel</span>
+                <div className="rs-detail-meta__value">
+                  <span>
+                    {match.flightProvided && match.housingProvided
+                      ? 'Flight and lodging provided'
+                      : match.flightProvided
+                        ? 'Flight provided; lodging not provided'
+                        : match.housingProvided
+                          ? 'Lodging provided; flight not provided'
+                          : 'Flight and lodging not provided'}
+                  </span>
+                </div>
+              </div>
             )}
           </div>
-        )}
-      </section>
 
+          {match.notes?.trim() ? (
+            <div className="rs-detail-additional">
+              <h3 className="rs-detail-section__sublabel">Match notes</h3>
+              <p className="rs-detail-additional__body">{match.notes.trim()}</p>
+            </div>
+          ) : isAssigner ? (
+            <p className="rs-detail-additional__empty">No match notes.</p>
+          ) : null}
+        </section>
+      )}
+
+      {!detailsDraft && <>
       <section className="rs-detail-card" aria-labelledby="teams-heading">
         <div className="rs-detail-card__head">
-          <h3 id="teams-heading" className="rs-detail-section__label">
+          <h2 id="teams-heading" className="rs-detail-section__label">
             Teams
-          </h3>
+          </h2>
           <Button
             variant="link"
             isInline
             className="rs-detail-card__action"
             onClick={() => openEmailModal('teams')}
           >
-            Email
+            Email teams
           </Button>
         </div>
         {(isAssigner ||
@@ -2379,8 +2502,10 @@ export function MatchDetailPage() {
           match.status !== 'change_proposed' && (
           <p className="rs-detail-note">
             {isHomeAdmin || isAwayAdmin
-              ? 'Tap your team’s status to confirm kickoff details, or use Confirm details below.'
-              : 'Tap a status chip to mark details confirmed (e.g. after an email) or clear it.'}
+              ? 'Tap your team’s confirmation status to update it.'
+              : isAssigner
+                ? 'Tap a confirmation status to record or clear it.'
+                : 'As Match Official, tap a confirmation status to update it.'}
           </p>
         )}
         {waitingOnOtherTeam && otherTeamName && (
@@ -2415,14 +2540,20 @@ export function MatchDetailPage() {
                 return canToggleTeamDetails('home') ? (
                   <button
                     type="button"
-                    className={`rs-pill rs-detail-people__confirm${
-                      chip.tone === 'ok' ? ' rs-pill--ok' : ' rs-pill--urgent'
-                    }`}
+                    className="rs-detail-people__confirm-action"
                     onClick={() => toggleTeamDetails('home')}
                     aria-pressed={Boolean(match.homeConfirmedAt)}
-                    aria-label={`Home — ${chip.label}. Tap to toggle.`}
+                    aria-label={`Home confirmation: ${chip.label}. Tap to toggle.`}
                   >
-                    {chip.label}
+                    <span
+                      className={`rs-pill rs-detail-people__confirm${
+                        chip.tone === 'ok'
+                          ? ' rs-pill--ok'
+                          : ' rs-pill--urgent'
+                      }`}
+                    >
+                      {chip.label}
+                    </span>
                   </button>
                 ) : (
                   <span
@@ -2462,14 +2593,20 @@ export function MatchDetailPage() {
                 return canToggleTeamDetails('away') ? (
                   <button
                     type="button"
-                    className={`rs-pill rs-detail-people__confirm${
-                      chip.tone === 'ok' ? ' rs-pill--ok' : ' rs-pill--urgent'
-                    }`}
+                    className="rs-detail-people__confirm-action"
                     onClick={() => toggleTeamDetails('away')}
                     aria-pressed={Boolean(match.awayConfirmedAt)}
-                    aria-label={`Away — ${chip.label}. Tap to toggle.`}
+                    aria-label={`Away confirmation: ${chip.label}. Tap to toggle.`}
                   >
-                    {chip.label}
+                    <span
+                      className={`rs-pill rs-detail-people__confirm${
+                        chip.tone === 'ok'
+                          ? ' rs-pill--ok'
+                          : ' rs-pill--urgent'
+                      }`}
+                    >
+                      {chip.label}
+                    </span>
                   </button>
                 ) : (
                   <span
@@ -2497,20 +2634,75 @@ export function MatchDetailPage() {
 
       <section className="rs-detail-card" aria-labelledby="crew-heading">
         <div className="rs-detail-card__head">
-          <h3 id="crew-heading" className="rs-detail-section__label">
-            Crew
-          </h3>
-          {crewVisible && (
-            <Button
-              variant="link"
-              isInline
-              className="rs-detail-card__action"
-              onClick={() => openEmailModal('crew')}
-            >
-              Email
-            </Button>
-          )}
+          <h2 id="crew-heading" className="rs-detail-section__label">
+            {showCrewReports ? 'Crew & reports' : 'Crew'}
+            <span className="rs-detail-section__count">
+              {crewCoverage.filled} of {crewCoverage.total} filled
+            </span>
+          </h2>
+          <div className="rs-detail-card__actions">
+            {crewVisible && (
+              <Button
+                variant="link"
+                isInline
+                className="rs-detail-card__action"
+                onClick={() => openEmailModal('crew')}
+              >
+                Email crew
+              </Button>
+            )}
+            {isAssigner && (
+              <Button
+                variant={crewManaging ? 'secondary' : 'link'}
+                isInline={!crewManaging}
+                className="rs-detail-card__action"
+                onClick={() => setCrewManaging((managing) => !managing)}
+              >
+                {crewManaging ? 'Done' : 'Manage crew'}
+              </Button>
+            )}
+          </div>
         </div>
+        {crewManaging && (
+          <p className="rs-detail-note" role="status">
+            Crew management is active. Select a row to assign or replace an
+            official.
+          </p>
+        )}
+        {showCrewReportStatuses && (
+          <p className="rs-detail-note">
+            Match and coaching reports affect payout. Select a status to open
+            or file that report.
+          </p>
+        )}
+        {crewReportActions.length > 0 && (
+          <div
+            className="rs-detail-crew-report-actions"
+            aria-label="Report actions"
+          >
+            {crewReportActions.map((action) => (
+              <Button
+                key={action.kind}
+                variant="secondary"
+                isDisabled={!action.to}
+                aria-label={action.unavailableLabel ?? action.label}
+                onClick={
+                  action.to
+                    ? () =>
+                        navigate(action.to!, {
+                          state: backState({
+                            to: `/matches/${match.id}`,
+                            label: 'Match',
+                          }),
+                        })
+                    : undefined
+                }
+              >
+                {action.label}
+              </Button>
+            ))}
+          </div>
+        )}
         {crewVisible ? (
           <>
             <ul className="rs-detail-people">
@@ -2576,20 +2768,30 @@ export function MatchDetailPage() {
                   const pickTarget: CrewPickTarget = isCmo
                     ? {
                         slot,
+                        userId: b.userId,
                         cmoId: b.cmoId,
                         cmoUserId: b.cmoUserId,
                       }
-                    : { slot, assignmentId: b.assignmentId };
-                  const rowLabel = isAssigner
+                    : {
+                        slot,
+                        userId: b.userId,
+                        assignmentId: b.assignmentId,
+                      };
+                  const rowLabel = crewManaging
                     ? filled
-                      ? `Assign ${b.userName ?? 'official'} (${REQUESTABLE_SLOT_LABELS[slot]})`
+                      ? `Replace ${b.userName ?? 'official'} (${REQUESTABLE_SLOT_LABELS[slot]})`
                       : `Assign ${REQUESTABLE_SLOT_LABELS[slot]}`
                     : filled
-                      ? `Contact ${b.userName ?? 'official'} (${REQUESTABLE_SLOT_LABELS[slot]})`
+                      ? `View ${b.userName ?? 'official'}'s profile (${REQUESTABLE_SLOT_LABELS[slot]})`
                       : `${REQUESTABLE_SLOT_LABELS[slot]} open`;
+                  const showRowReports =
+                    showCrewReportStatuses &&
+                    filled &&
+                    Boolean(b.userId) &&
+                    slot !== 'no4';
 
                   const canRemove =
-                    isAssigner &&
+                    crewManaging &&
                     Boolean(b.blockId) &&
                     !(
                       slot === 'mo' &&
@@ -2599,15 +2801,43 @@ export function MatchDetailPage() {
 
                   return (
                     <li key={b.key} className="rs-detail-people__item">
-                      {isAssigner || filled ? (
+                      {showRowReports && b.userId ? (
+                        <div className="rs-detail-people__row rs-detail-people__row--static rs-detail-people__row--reports">
+                          <button
+                            type="button"
+                            className="rs-detail-people__profile"
+                            onClick={() => onCrewRowActivate(pickTarget)}
+                            aria-label={rowLabel}
+                          >
+                            <span className="rs-detail-people__slot">
+                              {REQUESTABLE_SLOT_SHORT[slot]}
+                            </span>
+                            <span className="rs-detail-people__main">
+                              <span className="rs-detail-people__name">
+                                {b.userName ?? 'Official'}
+                              </span>
+                              {'notifyLine' in b && b.notifyLine ? (
+                                <span className="rs-detail-people__notified">
+                                  {b.notifyLine}
+                                </span>
+                              ) : null}
+                            </span>
+                          </button>
+                          <CrewReportStatusPills
+                            match={match}
+                            slot={slot}
+                            officialId={b.userId}
+                            officialName={b.userName ?? 'Official'}
+                            users={state.users}
+                            matchReports={state.matchReports}
+                            cardReports={state.cardReports}
+                          />
+                        </div>
+                      ) : crewManaging || filled ? (
                         <button
                           type="button"
                           className="rs-detail-people__row"
-                          onClick={() =>
-                            isAssigner
-                              ? openCrewPick(pickTarget)
-                              : onCrewRowActivate(pickTarget)
-                          }
+                          onClick={() => onCrewRowActivate(pickTarget)}
                           aria-label={rowLabel}
                         >
                           <span className="rs-detail-people__slot">
@@ -2642,7 +2872,7 @@ export function MatchDetailPage() {
                           <span className="rs-detail-people__status">Open</span>
                         </div>
                       )}
-                      {isAssigner && filled && b.userId && (
+                      {crewManaging && filled && b.userId && (
                         <button
                           type="button"
                           className="rs-detail-people__resend"
@@ -2661,7 +2891,7 @@ export function MatchDetailPage() {
                             resendEmailKey(slot, b.userId, b.blockId)
                           ] === 'sent'
                             ? 'Sent'
-                            : 'Resend'}
+                            : 'Resend email'}
                         </button>
                       )}
                       {canRemove && (
@@ -2673,7 +2903,6 @@ export function MatchDetailPage() {
                               ? `Clear ${b.userName ?? 'official'} from ${REQUESTABLE_SLOT_LABELS[slot]}`
                               : `Remove ${REQUESTABLE_SLOT_LABELS[slot]} block`
                           }
-                          title={filled ? 'Clear official' : 'Remove role block'}
                           onClick={() =>
                             requestRemoveBlock(
                               slot,
@@ -2683,7 +2912,7 @@ export function MatchDetailPage() {
                             )
                           }
                         >
-                          ×
+                          {filled ? 'Clear' : 'Remove role'}
                         </button>
                       )}
                     </li>
@@ -2691,16 +2920,13 @@ export function MatchDetailPage() {
                 });
               })}
             </ul>
-            {isAssigner && dataMode === 'live' && isFirebaseConfigured && (
+            {crewManaging && dataMode === 'live' && isFirebaseConfigured && (
               <p className="rs-detail-note">
-                Tap a name to reassign, <strong>×</strong> to clear an official
-                (slot stays open) or remove an empty role, or{' '}
-                <strong>Resend</strong> to email that official again. The Crew{' '}
-                <strong>Email</strong> button opens your mail app (mailto), not
-                Resend.
+                Assignment changes save immediately and may notify the selected
+                official. Clearing an official leaves the role open.
               </p>
             )}
-            {isAssigner && (
+            {crewManaging && (
               <FormSelect
                 className="rs-crew-add"
                 id="add-crew-role"
@@ -2833,6 +3059,8 @@ export function MatchDetailPage() {
           </details>
         </section>
       )}
+
+      </>}
 
       {showRaiseHandCard && (
         <section
@@ -2979,74 +3207,68 @@ export function MatchDetailPage() {
         </div>
       )}
 
-      {!showComplianceLockedView && stickyPrimary && (
-        <div className="rs-detail-sticky">
-          <Button variant="primary" isBlock onClick={stickyPrimary.onClick}>
-            {stickyPrimary.label}
-          </Button>
+      {isAssigner && !detailsDraft && (
+        <div className="rs-detail__mobile-action-bar">
+          <MatchAssignerMenu
+            match={match}
+            canAlertCoverage={canAlertCoverage}
+            coverageAlertLabel={
+              coverageAlertSent ? 'Resend alert' : 'Alert refs'
+            }
+            onAction={onAssignerMenuAction}
+            presentation="bottom-bar"
+          />
         </div>
       )}
 
-      {!showComplianceLockedView && showReportSticky && reportActions.primary && (
-        <div className="rs-detail-sticky">
+      {isAssigner && detailsDraft && (
+        <div
+          className="rs-detail__mobile-edit-bar"
+          aria-label="Edit details actions"
+        >
+          <Button
+            variant="secondary"
+            onClick={requestCloseDetailsEdit}
+            isDisabled={detailsSaveState === 'saving'}
+          >
+            Cancel
+          </Button>
           <Button
             variant="primary"
-            isBlock
-            onClick={() =>
-              navigate(reportActions.primary!.to, {
-                state: backState({
-                  to: `/matches/${match.id}`,
-                  label: 'Match',
-                }),
-              })
-            }
+            onClick={() => void saveDetails()}
+            isDisabled={!detailsDirty || detailsSaveState === 'saving'}
           >
-            {reportActions.primary.label}
+            {detailsSaveState === 'saving' ? 'Saving…' : 'Save changes'}
           </Button>
-          {reportActions.cardLink && (
-            <Button
-              variant="link"
-              isBlock
-              onClick={() =>
-                navigate(reportActions.cardLink!.to, {
-                  state: backState({
-                    to: `/matches/${match.id}`,
-                    label: 'Match',
-                  }),
-                })
-              }
-            >
-              {reportActions.cardLink.label}
-            </Button>
-          )}
         </div>
       )}
 
-      {!showComplianceLockedView &&
-        !showReportSticky &&
-        reportActions.cardLink &&
-        !showAcceptDecline &&
-        !canRequest &&
-        !stickyPrimary && (
-          <div className="rs-detail-sticky">
-            <Button
-              variant={
-                reportActions.cardLink.nudge ? 'primary' : 'secondary'
-              }
-              isBlock
-              onClick={() =>
-                navigate(reportActions.cardLink!.to, {
-                  state: backState({
-                    to: `/matches/${match.id}`,
-                    label: 'Match',
-                  }),
-                })
-              }
-            >
-              {reportActions.cardLink.label}
-            </Button>
-          </div>
-        )}
+      <Modal
+        variant={ModalVariant.small}
+        isOpen={showDiscardDetails}
+        onClose={() => setShowDiscardDetails(false)}
+        aria-labelledby="discard-details-title"
+        aria-describedby="discard-details-desc"
+      >
+        <ModalHeader>
+          <Title headingLevel="h2" id="discard-details-title" size="lg">
+            Discard unsaved changes?
+          </Title>
+        </ModalHeader>
+        <ModalBody>
+          <p id="discard-details-desc" className="rs-modal-lede">
+            Your event detail changes have not been saved.
+          </p>
+        </ModalBody>
+        <ModalFooter>
+          <Button variant="secondary" onClick={() => setShowDiscardDetails(false)}>
+            Keep editing
+          </Button>
+          <Button variant="danger" onClick={closeDetailsEdit}>
+            Discard changes
+          </Button>
+        </ModalFooter>
+      </Modal>
 
       <Modal
         variant={ModalVariant.small}
@@ -3262,10 +3484,16 @@ export function MatchDetailPage() {
                   (a) => a.id === pickTarget.assignmentId,
                 );
                 setPickTarget(null);
-                if (assignment) openCrewContact(slot, assignment);
+                if (currentPickUserId && officialQuickLook) {
+                  officialQuickLook.openOfficial(currentPickUserId, {
+                    matchBack: { to: `/matches/${match.id}`, label: 'Match' },
+                  });
+                } else if (assignment) {
+                  openCrewContact(slot, assignment);
+                }
               }}
             >
-              Contact
+              View profile
             </Button>
           )}
           {currentPickUserId && pickTarget?.slot === 'cmo' && (
@@ -3277,10 +3505,16 @@ export function MatchDetailPage() {
                   (c) => c.userId === pickTarget.cmoUserId,
                 );
                 setPickTarget(null);
-                if (cmo) openCmoContactRow(cmo);
+                if (currentPickUserId && officialQuickLook) {
+                  officialQuickLook.openOfficial(currentPickUserId, {
+                    matchBack: { to: `/matches/${match.id}`, label: 'Match' },
+                  });
+                } else if (cmo) {
+                  openCmoContactRow(cmo);
+                }
               }}
             >
-              Contact
+              View profile
             </Button>
           )}
           <Button
@@ -3508,6 +3742,74 @@ export function MatchDetailPage() {
 
       <Modal
         variant={ModalVariant.small}
+        isOpen={showMatchStatusActions}
+        onClose={() => setShowMatchStatusActions(false)}
+        aria-labelledby="match-status-actions-title"
+        aria-describedby="match-status-actions-desc"
+      >
+        <ModalHeader>
+          <Title headingLevel="h2" id="match-status-actions-title" size="lg">
+            Change match status
+          </Title>
+        </ModalHeader>
+        <ModalBody>
+          <p id="match-status-actions-desc" className="rs-modal-lede">
+            Choose how this match should be recorded. You’ll review the change
+            before it is applied.
+          </p>
+          <div className="rs-match-status-actions">
+            <Button
+              variant="secondary"
+              isBlock
+              onClick={() => {
+                setShowMatchStatusActions(false);
+                onAssignerMenuAction(
+                  match.playedForfeit
+                    ? 'clear_played_forfeit'
+                    : 'played_forfeit',
+                );
+              }}
+            >
+              {match.playedForfeit
+                ? 'Clear played forfeit'
+                : 'Played forfeit'}
+            </Button>
+            <Button
+              variant="secondary"
+              isBlock
+              onClick={() => {
+                setShowMatchStatusActions(false);
+                onAssignerMenuAction('postpone');
+              }}
+            >
+              Postpone match
+            </Button>
+            <Button
+              variant="secondary"
+              isBlock
+              onClick={() => {
+                setShowMatchStatusActions(false);
+                onAssignerMenuAction(
+                  match.forfeitTeamId ? 'clear_forfeit' : 'forfeit',
+                );
+              }}
+            >
+              {match.forfeitTeamId ? 'Clear forfeit' : 'Forfeit'}
+            </Button>
+          </div>
+        </ModalBody>
+        <ModalFooter>
+          <Button
+            variant="link"
+            onClick={() => setShowMatchStatusActions(false)}
+          >
+            Cancel
+          </Button>
+        </ModalFooter>
+      </Modal>
+
+      <Modal
+        variant={ModalVariant.small}
         isOpen={assignerConfirm != null}
         onClose={() => setAssignerConfirm(null)}
         aria-labelledby="assigner-action-title"
@@ -3642,6 +3944,16 @@ export function MatchDetailPage() {
             isInline
             isPlain
             title="Match successfully requested"
+          />
+        </div>
+      )}
+      {detailsSaved && (
+        <div className="rs-update-toast" role="status">
+          <Alert
+            variant="success"
+            isInline
+            isPlain
+            title="Event details updated"
           />
         </div>
       )}

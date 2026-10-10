@@ -19,7 +19,9 @@
     "noUncheckedSideEffectImports": true,
     "baseUrl": ".",
     "paths": {
-      "@/*": ["src/*"]
+      "@/*": ["src/*"],
+      "@patternfly/react-core": ["src/lib/pf-mui/index.ts"],
+      "@patternfly/react-icons": ["src/lib/pf-mui/icons.tsx"]
     }
   },
   "include": ["src"]

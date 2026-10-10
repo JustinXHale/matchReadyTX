@@ -157,6 +157,33 @@
   border-bottom: 1px solid var(--rs-color-border);
 }
 
+.rs-report-view__title-row,
+.rs-report-view__admin-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--rs-space-sm);
+}
+
+.rs-report-view__title-row .pf-v6-c-title {
+  min-width: 0;
+}
+
+.rs-report-admin {
+  flex: 0 0 auto;
+}
+
+.rs-report-admin__toggle.pf-v6-c-menu-toggle {
+  width: var(--rs-tap-min);
+  height: var(--rs-tap-min);
+  padding: 0;
+  justify-content: center;
+}
+
+.rs-report-admin__danger {
+  color: var(--rs-color-urgent) !important;
+}
+
 .rs-report-view__label {
   font-size: 12px;
   font-weight: 600;

@@ -1,0 +1,310 @@
+/**
+ * Material 3 AppShell — top app bar, navigation bar (compact), navigation rail (medium+).
+ * Brand colors via --rs-m3-* aliases in tokens.css (monochrome, not default Material purple).
+ */
+
+/* WCAG 2.4.1 — skip link appears on keyboard focus */
+.rs-skip-link {
+  position: absolute;
+  left: 0.75rem;
+  top: 0.75rem;
+  z-index: 1000;
+  padding: 0.75rem 1rem;
+  border-radius: var(--rs-radius-chip);
+  background: var(--rs-color-primary);
+  color: var(--rs-color-on-primary);
+  font: var(--rs-font-nav);
+  text-decoration: none;
+  transform: translateY(-200%);
+  transition: transform 120ms ease;
+}
+
+.rs-skip-link:focus,
+.rs-skip-link:focus-visible {
+  transform: translateY(0);
+  outline: 2px solid var(--rs-color-focus-ring);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rs-skip-link {
+    transition: none;
+  }
+}
+
+.rs-app-shell {
+  display: flex;
+  flex-direction: column;
+  min-height: 100%;
+  min-height: 100dvh;
+  background: var(--rs-m3-surface);
+  color: var(--rs-m3-on-surface);
+}
+
+.rs-app-shell--compact,
+.rs-app-shell--medium {
+  height: 100%;
+  height: 100dvh;
+  max-height: 100dvh;
+  overflow: hidden;
+}
+
+.rs-app-shell__frame {
+  display: flex;
+  flex: 1 1 auto;
+  min-height: 0;
+  min-width: 0;
+  width: 100%;
+  overflow: hidden;
+}
+
+.rs-app-shell__content {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-height: 0;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.rs-contextual-bar {
+  z-index: 190;
+  flex: 0 0 auto;
+  width: 100%;
+  border-bottom: 1px solid var(--rs-m3-inverse-surface);
+  background: var(--rs-m3-inverse-surface);
+}
+
+.rs-contextual-bar__action {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  max-width: 720px;
+  min-height: var(--rs-tap-min);
+  margin: 0 auto;
+  padding: 8px var(--rs-page-pad);
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: var(--rs-m3-inverse-on-surface);
+  font: var(--rs-font-nav);
+  font-weight: 650;
+  text-align: left;
+  cursor: pointer;
+}
+
+.rs-contextual-bar__action:hover,
+.rs-contextual-bar__action:focus-visible {
+  background: color-mix(
+    in srgb,
+    var(--rs-m3-inverse-on-surface) 12%,
+    var(--rs-m3-inverse-surface)
+  );
+}
+
+.rs-contextual-bar__action:focus-visible {
+  outline: 2px solid var(--rs-m3-inverse-on-surface);
+  outline-offset: -2px;
+}
+
+.rs-app-shell--compact .rs-page-body,
+.rs-app-shell--medium .rs-page-body {
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+}
+
+.rs-app-shell--auth .rs-page-body,
+.rs-app-shell--public-doc .rs-page-body {
+  padding-bottom: var(--rs-space-xl) !important;
+}
+
+.rs-app-shell--auth .rs-page-body {
+  max-width: 420px;
+}
+
+.rs-app-shell--public-doc .rs-page-body {
+  max-width: 720px;
+}
+
+.rs-app-shell--medium .rs-page-body {
+  padding-bottom: var(--rs-space-xl) !important;
+  padding-inline-start: var(--rs-page-pad) !important;
+}
+
+/* —— Top app bar —— */
+.rs-top-app-bar {
+  position: sticky;
+  top: 0;
+  z-index: 200;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding-inline: 12px;
+  padding-block: 8px;
+  padding-top: max(8px, env(safe-area-inset-top, 0px));
+  max-width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+  background: var(--rs-m3-surface-container);
+  color: var(--rs-m3-on-surface);
+  border-bottom: 1px solid var(--rs-m3-outline-variant);
+}
+
+.rs-top-app-bar__main {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.rs-top-app-bar__brand {
+  display: inline-flex;
+  max-width: 100%;
+  text-decoration: none !important;
+  color: inherit;
+}
+
+.rs-top-app-bar__brand *,
+.rs-top-app-bar__brand:hover,
+.rs-top-app-bar__brand:focus,
+.rs-top-app-bar__brand:hover *,
+.rs-top-app-bar__brand:focus * {
+  text-decoration: none !important;
+}
+
+.rs-top-app-bar__actions {
+  flex: 0 1 auto;
+  min-width: 0;
+  max-width: 52%;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex-wrap: nowrap;
+  gap: 4px;
+}
+
+/* —— Shared destination control —— */
+.rs-nav-dest {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  text-decoration: none;
+  color: var(--rs-m3-on-surface-variant);
+  font: var(--rs-font-nav);
+  min-width: var(--rs-tap-min);
+  min-height: var(--rs-tap-min);
+  box-sizing: border-box;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.rs-nav-dest:focus-visible {
+  outline: 2px solid var(--rs-color-focus-ring);
+  outline-offset: 2px;
+}
+
+.rs-nav-dest__indicator {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 4rem;
+  height: 2rem;
+  border-radius: var(--rs-radius-pill);
+  transition:
+    background-color 120ms ease,
+    color 120ms ease;
+}
+
+.rs-nav-dest__icon {
+  display: block;
+  flex-shrink: 0;
+  width: 1.25rem;
+  height: 1.25rem;
+  font-size: 1.25rem;
+}
+
+.rs-nav-dest__label {
+  max-width: 100%;
+  padding-inline: 2px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-align: center;
+}
+
+.rs-nav-dest--selected {
+  color: var(--rs-m3-on-surface);
+  font-weight: 700;
+}
+
+.rs-nav-dest--selected .rs-nav-dest__indicator {
+  background: var(--rs-m3-secondary-container);
+  color: var(--rs-m3-on-secondary-container);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rs-nav-dest__indicator {
+    transition: none;
+  }
+}
+
+/* —— Navigation bar (compact / mobile referees) —— */
+.rs-nav-bar,
+.rs-bottom-nav {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  z-index: 300;
+  display: flex;
+  justify-content: space-around;
+  align-items: stretch;
+  min-height: var(--rs-bottom-nav-height);
+  padding-bottom: env(safe-area-inset-bottom, 0);
+  padding-inline: env(safe-area-inset-left, 0) env(safe-area-inset-right, 0);
+  background: var(--rs-m3-surface-container);
+  border-top: 1px solid var(--rs-m3-outline-variant);
+}
+
+.rs-nav-dest--bar {
+  flex: 1 1 0;
+  padding: 6px 2px 8px;
+  min-height: calc(var(--rs-bottom-nav-height) - 4px);
+}
+
+/* —— Navigation rail (medium+) —— */
+.rs-nav-rail {
+  align-self: stretch;
+  flex: 0 0 var(--rs-nav-rail-width);
+  width: var(--rs-nav-rail-width);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 12px 0;
+  padding-bottom: max(12px, env(safe-area-inset-bottom, 0px));
+  padding-left: env(safe-area-inset-left, 0);
+  box-sizing: border-box;
+  background: var(--rs-m3-surface-container);
+  border-right: 1px solid var(--rs-m3-outline-variant);
+  z-index: 150;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.rs-nav-dest--rail {
+  width: 100%;
+  padding: 8px 4px;
+  gap: 6px;
+}
+
+.rs-nav-dest--rail .rs-nav-dest__label {
+  font-size: 11px;
+  line-height: 1.15;
+  white-space: normal;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}

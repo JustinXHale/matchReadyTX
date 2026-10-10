@@ -1,6 +1,7 @@
 import { EmptyState, EmptyStateBody } from '@patternfly/react-core';
 import { useMemo, useState } from 'react';
 import { useApp } from '@/app/AppContext';
+import { RefereeCard } from '@/components/RefereeCard';
 import {
   compareKickoffAsc,
   divisionFilterOptionsFromMatches,
@@ -12,7 +13,6 @@ import { applyMatchScope } from '@/domain/visibility';
 import { orgTimeZone } from '@/domain/matchTime';
 import { ScheduleMatchListWithPast } from '@/ui/ScheduleMatchListLayout';
 import { useScheduleListSections } from '@/ui/useScheduleListSections';
-import { MatchListRow } from '@/ui/MatchListRow';
 import { MatchCrewTrailing } from '@/ui/MatchCrewTrailing';
 import type { Match, MatchGender } from '@/domain/types';
 import {
@@ -30,22 +30,19 @@ const APPOINTMENTS_BACK: BackNav = {
 function AppointmentRow({
   match,
   userId,
-  urgent,
 }: {
   match: Match;
   userId: string;
-  urgent?: boolean;
 }) {
   const mySlot = appointmentMySlot(match, userId);
   return (
-    <MatchListRow
+    <RefereeCard
       match={match}
+      userId={userId}
       to={`/matches/${match.id}`}
       showTime
-      split="appt"
-      urgent={urgent}
       back={APPOINTMENTS_BACK}
-      trailing={
+      aside={
         mySlot ? (
           <MatchCrewTrailing
             match={match}
@@ -172,11 +169,7 @@ export function AppointmentsPage() {
             <ul className="rs-list" aria-label="Pending acceptance">
               {pendingAccept.map((m) => (
                 <li key={`pending-${m.id}`}>
-                  <AppointmentRow
-                    match={m}
-                    userId={currentUser.uid}
-                    urgent
-                  />
+                  <AppointmentRow match={m} userId={currentUser.uid} />
                 </li>
               ))}
             </ul>

@@ -1645,6 +1645,45 @@ export async function saveMatchEventFlagsInFirestore(
   );
 }
 
+/** Persist the assigner-facing match details editor as one Firestore write. */
+export async function saveMatchDetailsInFirestore(
+  orgId: string,
+  matchId: string,
+  details: Pick<
+    Match,
+    | 'gender'
+    | 'level'
+    | 'isTournament'
+    | 'matchType'
+    | 'title'
+    | 'feeOverride'
+    | 'flightProvided'
+    | 'housingProvided'
+    | 'notes'
+    | 'scheduleUrl'
+  >,
+): Promise<void> {
+  await setDoc(
+    doc(requireDb(), 'orgs', orgId, 'matches', matchId),
+    {
+      gender: details.gender,
+      level: details.level,
+      isTournament: details.isTournament === true,
+      matchType: details.matchType?.trim() || null,
+      title: details.title?.trim() || null,
+      feeOverride: details.feeOverride
+        ? deepStripUndefined(details.feeOverride)
+        : null,
+      flightProvided: details.flightProvided,
+      housingProvided: details.housingProvided,
+      notes: details.notes?.trim() || null,
+      scheduleUrl: details.scheduleUrl?.trim() || null,
+      updatedAt: new Date().toISOString(),
+    },
+    { merge: true },
+  );
+}
+
 /** Persist optional tournament schedule link (assigner; live mode). */
 export async function saveMatchScheduleUrlInFirestore(
   orgId: string,

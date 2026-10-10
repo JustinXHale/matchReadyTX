@@ -81,7 +81,8 @@
 
 .pf-v6-theme-dark .rs-brand-date,
 .pf-v6-theme-dark .rs-brand-build {
-  color: var(--rs-color-warn);
+  /* Meta text — use muted ink, not warn yellow (fails 1.4.3 as text). */
+  color: var(--rs-color-muted);
 }
 
 .rs-pwa-install {
@@ -209,95 +210,7 @@
   white-space: nowrap;
 }
 
-.rs-bottom-nav {
-  position: fixed;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  min-height: var(--rs-bottom-nav-height);
-  display: flex;
-  justify-content: space-around;
-  align-items: stretch;
-  background: var(--rs-color-surface);
-  border-top: 1px solid var(--rs-color-border);
-  z-index: 300;
-  padding-bottom: env(safe-area-inset-bottom, 0);
-}
-
-.rs-bottom-nav a {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 2px;
-  text-decoration: none;
-  color: var(--rs-color-ended);
-  font: var(--rs-font-nav);
-  padding: 6px 4px;
-  min-height: var(--rs-tap-min);
-}
-
-.rs-bottom-nav a.active {
-  color: var(--rs-color-primary);
-}
-
-.rs-bottom-nav__with-icon {
-  min-height: 52px;
-}
-
-.rs-bottom-nav__icon {
-  display: block;
-  flex-shrink: 0;
-  width: 1.125rem;
-  height: 1.125rem;
-  font-size: 1.125rem;
-}
-
-/* Masthead: logo + demo left, role switcher same row right */
-.rs-masthead.pf-v6-c-masthead {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  padding-inline: 12px;
-  max-width: 100%;
-  min-width: 0;
-  box-sizing: border-box;
-}
-
-.rs-masthead__main {
-  flex: 1 1 auto;
-  min-width: 0;
-  overflow: hidden;
-}
-
-.rs-masthead__brand {
-  display: inline-flex;
-  max-width: 100%;
-  text-decoration: none !important;
-  color: inherit;
-}
-
-.rs-masthead__brand *,
-.rs-masthead__brand:hover,
-.rs-masthead__brand:focus,
-.rs-masthead__brand:hover *,
-.rs-masthead__brand:focus * {
-  text-decoration: none !important;
-}
-
-.rs-masthead__content {
-  flex: 0 1 auto;
-  min-width: 0;
-  max-width: 52%;
-  margin-inline-start: 0 !important;
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  flex-wrap: nowrap;
-  gap: 4px;
-}
+/* Bottom nav / masthead chrome → src/styles/shell/app-shell.css (M3 AppShell) */
 
 .rs-masthead-actions {
   display: flex;

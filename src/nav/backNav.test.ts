@@ -52,12 +52,17 @@ describe('canPopAppHistory', () => {
 });
 
 describe('appBackLabel', () => {
-  it('uses generic Back when history can pop', () => {
+  it('uses a descriptive fallback label when history can pop', () => {
     Object.defineProperty(window, 'history', {
       configurable: true,
       value: { ...window.history, state: { idx: 1 } },
     });
-    expect(appBackLabel(null, fallback)).toBe('Back');
+    expect(appBackLabel(null, fallback)).toBe('Back to Home');
+  });
+
+  it('uses the explicit destination label when provided', () => {
+    const state = backState({ to: '/members', label: 'Members' });
+    expect(appBackLabel(state, fallback)).toBe('Back to Members');
   });
 
   it('uses fallback label when history cannot pop', () => {
