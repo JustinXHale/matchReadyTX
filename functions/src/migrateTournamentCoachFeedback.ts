@@ -267,11 +267,9 @@ async function main(): Promise<void> {
   for (const m of migrations) {
     const src = m.source.data;
     const sameDoc = m.source.id === m.newId;
-    const {
-      officialUserId: _omitUid,
-      officialName: _omitName,
-      ...srcRest
-    } = src;
+    const srcRest = { ...src };
+    delete srcRest.officialUserId;
+    delete srcRest.officialName;
     const payload: Record<string, unknown> = {
       ...srcRest,
       id: m.newId,

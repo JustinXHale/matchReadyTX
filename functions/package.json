@@ -5,6 +5,7 @@
   "engines": { "node": "20" },
   "scripts": {
     "build": "tsc",
+    "audit:cmo-personas": "npm run build && node lib/auditCmoPersonaCompatibility.js",
     "migrate:tournament-feedback": "npm run build && node lib/migrateTournamentCoachFeedback.js",
     "migrate:merge-duplicate-teams": "npm run build && node lib/migrateMergeDuplicateTeams.js",
     "migrate:repair-second-yellow": "npm run build && node lib/migrateRepairSecondYellowCases.js",

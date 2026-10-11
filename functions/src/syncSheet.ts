@@ -1,7 +1,6 @@
 import { google } from 'googleapis';
 import {
   FieldValue,
-  type DocumentData,
   type DocumentReference,
   type Firestore,
 } from 'firebase-admin/firestore';

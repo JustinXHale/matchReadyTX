@@ -27,10 +27,6 @@ function slotList(crew: Record<string, unknown>, slot: CrewSlot): CrewRow[] {
   return [];
 }
 
-function crewPeople(list: CrewRow[]): CrewRow[] {
-  return list.filter((a) => Boolean(a.userId));
-}
-
 function emptyCrewBlocks(list: CrewRow[]): CrewRow[] {
   return list.filter((a) => !a.userId);
 }
