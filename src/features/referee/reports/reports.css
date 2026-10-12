@@ -47,7 +47,7 @@
 
 .rs-person-search__panel {
   min-width: min(100vw - 32px, 360px);
-  max-width: 420px;
+  max-width: var(--rs-form-max);
 }
 
 .rs-person-search__body {
@@ -265,7 +265,7 @@
 .rs-report-stepper__num {
   width: 1.5rem;
   height: 1.5rem;
-  border-radius: 999px;
+  border-radius: var(--rs-radius-pill);
   display: inline-flex;
   align-items: center;
   justify-content: center;

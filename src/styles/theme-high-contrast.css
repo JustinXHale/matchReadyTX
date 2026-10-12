@@ -17,6 +17,13 @@
   box-shadow: none;
 }
 
+/* Cards use a subtle structural boundary; interactive controls retain the
+ * stronger high-contrast outline below. */
+.pf-v6-theme-high-contrast .rs-list-row,
+.pf-v6-theme-high-contrast .rs-match-card {
+  border-color: var(--rs-color-surface-border);
+}
+
 .pf-v6-theme-high-contrast .rs-fab {
   box-shadow: none;
   border: var(--pf-t--global--border--width--strong) solid
@@ -36,7 +43,7 @@
 
 .pf-v6-theme-high-contrast .rs-theme-toggle,
 .pf-v6-theme-high-contrast .rs-filter-chip,
-.pf-v6-theme-high-contrast .rs-detail__back {
+.pf-v6-theme-high-contrast .rs-report-step-back {
   border-width: var(--pf-t--global--border--width--regular);
   border-style: solid;
   border-color: var(--pf-t--global--border--color--default);
@@ -46,8 +53,8 @@
 .pf-v6-theme-high-contrast .rs-theme-toggle:focus-visible,
 .pf-v6-theme-high-contrast .rs-filter-chip:hover,
 .pf-v6-theme-high-contrast .rs-filter-chip:focus-visible,
-.pf-v6-theme-high-contrast .rs-detail__back:hover,
-.pf-v6-theme-high-contrast .rs-detail__back:focus-visible {
+.pf-v6-theme-high-contrast .rs-report-step-back:hover,
+.pf-v6-theme-high-contrast .rs-report-step-back:focus-visible {
   border-width: var(
     --pf-t--global--border--width--action--plain--hover,
     var(--pf-t--global--border--width--regular)
@@ -69,6 +76,7 @@
 
 .pf-v6-theme-high-contrast .rs-list-row--warn {
   border-left-width: var(--pf-t--global--border--width--extra-strong, 3px);
+  border-left-color: var(--rs-color-warn);
 }
 
 .pf-v6-theme-high-contrast .rs-urgent-alert,

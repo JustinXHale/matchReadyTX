@@ -19,7 +19,7 @@
   height: 32px;
   object-fit: contain;
   flex-shrink: 0;
-  border-radius: 6px;
+  border-radius: var(--rs-radius-chip);
 }
 
 /* White asset → black icon on light surfaces */
@@ -60,6 +60,8 @@
   align-items: flex-start;
   gap: 1px;
   line-height: 1.15;
+  min-width: 0;
+  max-width: 100%;
 }
 
 .rs-brand-date {
@@ -99,7 +101,7 @@
   flex-shrink: 0;
   width: 40px;
   height: 40px;
-  border-radius: 8px;
+  border-radius: var(--rs-radius-chip);
   object-fit: contain;
 }
 
@@ -154,8 +156,8 @@
 
 .rs-masthead-notify {
   position: relative;
-  min-width: 40px !important;
-  min-height: 40px !important;
+  min-width: var(--rs-tap-min) !important;
+  min-height: var(--rs-tap-min) !important;
 }
 
 .rs-masthead-notify .rs-nav-badge {
@@ -198,6 +200,8 @@
   gap: 2px;
   font: var(--rs-font-body);
   color: var(--rs-color-ink);
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 
 .rs-demo-mode-banner strong {
@@ -257,8 +261,9 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 2rem;
-  height: 2rem;
+  width: var(--rs-tap-min);
+  height: var(--rs-tap-min);
+  flex: 0 0 var(--rs-tap-min);
   padding: 0;
   border: 1px solid var(--rs-color-border);
   border-radius: var(--rs-radius-chip);

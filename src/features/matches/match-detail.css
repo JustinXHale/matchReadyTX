@@ -13,9 +13,7 @@
 }
 
 .rs-detail--has-fixed-action {
-  padding-bottom: calc(
-    var(--rs-bottom-nav-height) + 56px + var(--rs-space-md)
-  );
+  padding-bottom: 0;
 }
 
 .rs-detail__title-row {
@@ -79,8 +77,8 @@
 }
 
 .rs-match-actions-sheet .pf-v6-c-modal-box {
-  width: min(100%, 720px) !important;
-  max-width: 720px !important;
+  width: min(100%, var(--rs-content-max)) !important;
+  max-width: var(--rs-content-max) !important;
   max-height: min(80dvh, 40rem);
   margin: 0 !important;
   border-right: 1px solid var(--rs-m3-outline-variant);
@@ -139,6 +137,18 @@
   display: block;
   overflow-wrap: anywhere;
   word-break: break-word;
+}
+
+.rs-detail__opponent-line {
+  display: flex;
+  align-items: baseline;
+  gap: 0.35em;
+  min-width: 0;
+}
+
+.rs-detail__opponent-line .rs-detail__away {
+  display: inline;
+  min-width: 0;
 }
 
 .rs-detail__ha {
@@ -351,7 +361,7 @@
   margin: 0;
   padding: 10px;
   border: 0;
-  border-radius: 8px;
+  border-radius: var(--rs-radius-chip);
   background: transparent;
   color: inherit;
   font: inherit;
@@ -510,7 +520,7 @@
   gap: 2px;
   min-width: 0;
   padding: 8px 10px;
-  border-radius: 8px;
+  border-radius: var(--rs-radius-chip);
   border: 1px solid var(--rs-color-border);
   background: var(--rs-color-surface);
 }
@@ -586,7 +596,7 @@
   margin: 0;
   padding: 10px 10px;
   border: 1px solid var(--rs-color-border);
-  border-radius: 8px;
+  border-radius: var(--rs-radius-chip);
   background: var(--rs-color-surface-muted);
   text-align: left;
   cursor: pointer;
@@ -618,7 +628,7 @@
   margin: 0;
   padding: 8px 10px;
   border: 1px solid var(--rs-color-border);
-  border-radius: 8px;
+  border-radius: var(--rs-radius-chip);
   background: var(--rs-color-surface-muted);
   box-sizing: border-box;
   cursor: default;
@@ -1046,7 +1056,7 @@
     bottom: calc(var(--rs-bottom-nav-height) + env(safe-area-inset-bottom, 0px));
     z-index: 250;
     display: flex;
-    max-width: 720px;
+    max-width: var(--rs-content-max);
     margin: 0 auto;
     padding: 0;
     border-top: 1px solid var(--rs-m3-inverse-surface);
@@ -1069,7 +1079,7 @@
     display: grid;
     grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
     gap: var(--rs-space-sm);
-    max-width: 720px;
+    max-width: var(--rs-content-max);
     margin: 0 auto;
     padding: var(--rs-space-sm) var(--rs-page-pad);
     border-top: 1px solid var(--rs-color-border);
@@ -1086,7 +1096,7 @@
     place-items: center;
     flex: 1 1 auto;
     width: 100%;
-    min-height: 56px;
+    min-height: var(--rs-action-bar-height);
     padding: 0 var(--rs-page-pad);
     border: 0;
     border-radius: 0;

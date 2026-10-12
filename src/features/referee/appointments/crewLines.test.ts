@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   appointmentMySlot,
+  compactCrewPersonName,
   crewColumnLines,
 } from '@/features/referee/appointments/crewLines';
 import type { Match } from '@/domain/types';
@@ -72,6 +73,12 @@ describe('appointmentMySlot', () => {
 });
 
 describe('crewColumnLines', () => {
+  it('compacts crew names to first name and last initial', () => {
+    expect(compactCrewPersonName('Riley Official')).toBe('Riley O.');
+    expect(compactCrewPersonName('Justin X. Hale')).toBe('Justin H.');
+    expect(compactCrewPersonName('Mia')).toBe('Mia');
+  });
+
   it('shows MO and CMO lines for a 2nd Side match', () => {
     const match = baseMatch({
       crew: {
@@ -91,8 +98,8 @@ describe('crewColumnLines', () => {
     });
     const lines = crewColumnLines(match, { highlightUserId: 'cmo1' });
     expect(lines.map((l) => `${l.slotLabel} ${l.value}`)).toEqual([
-      'MO Wian Engelbrecht',
-      'CMO Justin X. Hale',
+      'MO Wian E.',
+      'CMO Justin H.',
     ]);
     expect(lines.find((l) => l.slotLabel === 'CMO')?.isMine).toBe(true);
   });

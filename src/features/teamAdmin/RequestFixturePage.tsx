@@ -11,6 +11,7 @@ import {
 } from '@patternfly/react-core';
 import { useNavigate } from 'react-router-dom';
 import { useApp, useAppHref } from '@/app/AppContext';
+import { useContextualAppBack } from '@/app/shell/contextualBar';
 import { OTHER_OPPONENT_TEAM_ID } from '@/domain/fixtureRequests';
 import type { MatchGender } from '@/domain/types';
 import { isFirebaseConfigured } from '@/services/firebase';
@@ -44,6 +45,11 @@ export function RequestFixturePage() {
   const { currentUser, state, store, dataMode, refresh } = useApp();
   const navigate = useNavigate();
   const teamAdminHref = useAppHref('/team-admin');
+  const fixtureBack = useMemo(
+    () => ({ to: teamAdminHref, label: 'Team Admin' }),
+    [teamAdminHref],
+  );
+  useContextualAppBack(fixtureBack);
   const levels = state.org.matchLevels;
   const competitions = state.org.competitions;
 
@@ -98,16 +104,13 @@ export function RequestFixturePage() {
   if (myTeams.length === 0) {
     return (
       <div className="rs-stack">
-        <Title headingLevel="h2" size="lg">
+        <Title headingLevel="h1" size="lg">
           Request a fixture
         </Title>
         <p className="rs-match-card__meta">
           Your account is not linked to a club yet. Ask an assigner to add your
           email on the Contacts sheet, then try again.
         </p>
-        <Button variant="link" onClick={() => navigate(teamAdminHref)}>
-          Back to Team Admin
-        </Button>
       </div>
     );
   }
@@ -184,14 +187,7 @@ export function RequestFixturePage() {
 
   return (
     <div className="rs-stack rs-fixture-form">
-      <Button
-        variant="link"
-        className="rs-detail__back"
-        onClick={() => navigate(teamAdminHref)}
-      >
-        ← Team Admin
-      </Button>
-      <Title headingLevel="h2" size="lg">
+      <Title headingLevel="h1" size="lg">
         Request a fixture
       </Title>
       <p className="rs-match-card__meta">

@@ -15,12 +15,12 @@ export const Panel = forwardRef<
     <Paper
       ref={ref}
       className={className}
-      elevation={1}
+      elevation={0}
       style={style}
       sx={{
         border: 1,
         borderColor: 'outlineVariant',
-        borderRadius: 2,
+        borderRadius: 'var(--rs-radius-card)',
         overflow: 'hidden',
       }}
     >

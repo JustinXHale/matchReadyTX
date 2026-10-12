@@ -23,7 +23,7 @@
   background: transparent;
   cursor: zoom-in;
   text-align: left;
-  border-radius: 12px;
+  border-radius: var(--rs-radius-card);
 }
 
 .rs-onboard__level-chart-hit:focus-visible {
@@ -38,7 +38,7 @@
   max-height: min(52vh, 420px);
   object-fit: contain;
   object-position: top center;
-  border-radius: 12px;
+  border-radius: var(--rs-radius-card);
   border: 1px solid var(--rs-color-border);
   background: var(--rs-color-surface);
 }
@@ -48,7 +48,7 @@
   right: 10px;
   bottom: 10px;
   padding: 4px 8px;
-  border-radius: 999px;
+  border-radius: var(--rs-radius-pill);
   font-size: 11px;
   font-weight: 600;
   letter-spacing: 0.02em;
@@ -75,7 +75,7 @@
   margin: 0;
   padding: 10px 12px;
   border: 1.5px solid var(--rs-color-border);
-  border-radius: 10px;
+  border-radius: var(--rs-radius-card);
   background: var(--rs-color-surface);
   font: inherit;
   font-size: 14px;

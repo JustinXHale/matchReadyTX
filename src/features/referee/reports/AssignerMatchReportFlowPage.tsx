@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { Link, Navigate, useParams, useSearchParams } from 'react-router-dom';
+import { Navigate, useParams, useSearchParams } from 'react-router-dom';
 import { Title } from '@patternfly/react-core';
 import { useApp, useAppHref } from '@/app/AppContext';
 import { officialHasCrewReportSlot, type CrewReportSlot } from '@/domain/reports';
@@ -8,10 +8,30 @@ import {
   MatchReportFlowPage,
   type AssignerFilingContext,
 } from '@/features/referee/reports/MatchReportFlowPage';
+import { useContextualAppBack } from '@/app/shell/contextualBar';
 
 function parseCrewReportSlot(raw: string | null): CrewReportSlot | null {
   if (raw === 'mo' || raw === 'ar1' || raw === 'ar2') return raw;
   return null;
+}
+
+function InvalidAssignerReport({ matchHref }: { matchHref: string }) {
+  const back = useMemo(
+    () => ({ to: matchHref, label: 'Match' }),
+    [matchHref],
+  );
+  useContextualAppBack(back);
+
+  return (
+    <div className="rs-stack">
+      <Title headingLevel="h2" size="lg">
+        Cannot file this report
+      </Title>
+      <p className="rs-match-card__meta">
+        Choose a crew member with a pending MO or AR report on this match.
+      </p>
+    </div>
+  );
 }
 
 export function AssignerMatchReportFlowPage() {
@@ -47,19 +67,7 @@ export function AssignerMatchReportFlowPage() {
     !slot ||
     !officialHasCrewReportSlot(match, officialId, slot)
   ) {
-    return (
-      <div className="rs-stack">
-        <Title headingLevel="h2" size="lg">
-          Cannot file this report
-        </Title>
-        <p className="rs-match-card__meta">
-          Choose a crew member with a pending MO or AR report on this match.
-        </p>
-        <Link className="rs-detail__back" to={matchHref}>
-          ← Back to match
-        </Link>
-      </div>
-    );
+    return <InvalidAssignerReport matchHref={matchHref} />;
   }
 
   const assignerFiling: AssignerFilingContext = {

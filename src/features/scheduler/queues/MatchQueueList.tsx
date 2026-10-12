@@ -22,6 +22,8 @@ import {
   type CrewPickTarget,
 } from '@/features/matches/AssignOfficialModal';
 import { CoverageMatchRequesters } from '@/features/scheduler/queues/CoverageMatchRequesters';
+import { CoverageMatchCrewSummary } from '@/features/scheduler/queues/CoverageMatchCrewSummary';
+import { MatchActionPrompt } from '@/ui/MatchActionPrompt';
 import { MatchListRow } from '@/ui/MatchListRow';
 import { WORK_QUEUES_BACK } from '@/features/scheduler/queues/workQueuePagesShared';
 
@@ -82,82 +84,93 @@ export function MatchQueueList({
                 match={m}
                 to={`/matches/${m.id}`}
                 showTime
-                split="action"
                 urgent={urgent}
                 back={QUEUES_BACK}
+                topBanner={
+                  assignOpenSlots || raiseHand.length > 0 ? (
+                    <CoverageMatchCrewSummary match={m} />
+                  ) : undefined
+                }
                 meta={
                   !matchHasForfeitOutcome(m) ? (
                     <span className="rs-pill">{matchStatusLabel(m)}</span>
                   ) : null
                 }
-                trailing={
-                  <div className="rs-queue-action">
-                    {assignOpenSlots ? (
-                      <>
-                        <span className="rs-queue-action__sign" aria-hidden>
-                          <FontAwesomeIcon icon={faUserPlus} />
-                        </span>
-                        {openSlots.length > 0 ? (
-                          <div
-                            className="rs-queue-action__slots"
-                            role="group"
-                            aria-label="Open positions"
-                          >
-                            {openSlots.map((target) => (
-                              <button
-                                key={`${target.slot}-${target.assignmentId ?? 'open'}`}
-                                type="button"
-                                className="rs-filter-chip"
-                                aria-label={`Assign ${REQUESTABLE_SLOT_LABELS[target.slot]}`}
-                                onClick={(e) => {
-                                  e.preventDefault();
-                                  e.stopPropagation();
-                                  setPick({
-                                    match: m,
-                                    target: {
-                                      slot: target.slot,
-                                      assignmentId: target.assignmentId,
-                                    },
-                                  });
-                                }}
+                footer={
+                  assignOpenSlots || onAlert || raiseHand.length > 0 ? (
+                    <div className="rs-queue-supporting-stack">
+                      {assignOpenSlots || onAlert ? (
+                        <div className="rs-raise-hand-footer__row">
+                          {assignOpenSlots ? (
+                            openSlots.length > 0 ? (
+                              <div
+                                className="rs-queue-action__slots"
+                                role="group"
+                                aria-label="Open positions"
                               >
-                                {REQUESTABLE_SLOT_SHORT[target.slot]}
-                              </button>
-                            ))}
-                          </div>
-                        ) : (
-                          <span className="rs-queue-action__cta">{ctaLabel}</span>
-                        )}
-                      </>
-                    ) : (
-                      <span className="rs-queue-action__cta">{ctaLabel}</span>
-                    )}
-                    {onAlert && (
-                      <Button
-                        size="sm"
-                        variant="secondary"
-                        onClick={(e) => {
-                          e.preventDefault();
-                          e.stopPropagation();
-                          onAlert(m.id);
-                          setAlerted((prev) => new Set(prev).add(m.id));
-                        }}
-                      >
-                        {sent ? 'Resend alert' : 'Alert refs'}
-                      </Button>
-                    )}
-                  </div>
+                                {openSlots.map((target) => (
+                                  <button
+                                    key={`${target.slot}-${target.assignmentId ?? 'open'}`}
+                                    type="button"
+                                    className="rs-filter-chip"
+                                    aria-label={`Assign ${REQUESTABLE_SLOT_LABELS[target.slot]}`}
+                                    onClick={(e) => {
+                                      e.preventDefault();
+                                      e.stopPropagation();
+                                      setPick({
+                                        match: m,
+                                        target: {
+                                          slot: target.slot,
+                                          assignmentId: target.assignmentId,
+                                        },
+                                      });
+                                    }}
+                                  >
+                                    <FontAwesomeIcon
+                                      icon={faUserPlus}
+                                      className="pf-v5-u-mr-sm"
+                                    />
+                                    {REQUESTABLE_SLOT_SHORT[target.slot]}
+                                  </button>
+                                ))}
+                              </div>
+                            ) : (
+                              <span className="rs-queue-action__cta">
+                                {ctaLabel}
+                              </span>
+                            )
+                          ) : null}
+                          {onAlert ? (
+                            <Button
+                              size="sm"
+                              variant="secondary"
+                              onClick={(e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                onAlert(m.id);
+                                setAlerted((prev) => new Set(prev).add(m.id));
+                              }}
+                            >
+                              {sent ? 'Resend alert' : 'Alert refs'}
+                            </Button>
+                          ) : null}
+                        </div>
+                      ) : null}
+                      {raiseHand.length > 0 &&
+                      onApproveRaiseHand &&
+                      onDeclineRaiseHand ? (
+                        <CoverageMatchRequesters
+                          match={m}
+                          requests={raiseHand}
+                          matchBack={QUEUES_BACK}
+                          onApprove={onApproveRaiseHand}
+                          onDecline={onDeclineRaiseHand}
+                        />
+                      ) : null}
+                    </div>
+                  ) : undefined
                 }
               />
-              {raiseHand.length > 0 && onApproveRaiseHand && onDeclineRaiseHand ? (
-                <CoverageMatchRequesters
-                  match={m}
-                  requests={raiseHand}
-                  matchBack={QUEUES_BACK}
-                  onApprove={onApproveRaiseHand}
-                  onDecline={onDeclineRaiseHand}
-                />
-              ) : null}
             </li>
           );
         })}
@@ -226,71 +239,50 @@ export function ProposalQueueList({
           : 'Fact change pending';
         const awaitingApply = p.status === 'pending';
         const awaitingAck = !p.assignerAckAt;
+        const statusLabel = awaitingApply
+          ? p.assignerAckAt
+            ? 'Ready to apply'
+            : 'Review'
+          : 'Awaiting ack';
         return (
           <li key={p.id}>
             <MatchListRow
               match={m}
               to={`/matches/${p.matchId}`}
               showTime
-              split="action"
               back={QUEUES_BACK}
+              topBanner={
+                <MatchActionPrompt
+                  message={`${statusLabel}: ${kickoffHint}`}
+                  primaryLabel={awaitingApply ? 'Apply' : 'Acknowledge'}
+                  onPrimary={() =>
+                    awaitingApply ? onApply(p.id) : onAcknowledge(p.id)
+                  }
+                  secondaryLabel={
+                    awaitingApply && onDismiss ? 'Deny' : undefined
+                  }
+                  onSecondary={
+                    awaitingApply && onDismiss
+                      ? () => onDismiss(p.id)
+                      : undefined
+                  }
+                  tertiaryLabel={
+                    awaitingApply && awaitingAck ? 'Acknowledge' : undefined
+                  }
+                  onTertiary={
+                    awaitingApply && awaitingAck
+                      ? () => onAcknowledge(p.id)
+                      : undefined
+                  }
+                  tone="attention"
+                  ariaLabel={`Change proposal for ${m.homeTeamName} versus ${m.awayTeamName}`}
+                />
+              }
               meta={
                 <>
-                  <span className="rs-pill rs-pill--warn">
-                    {awaitingApply
-                      ? p.assignerAckAt
-                        ? 'Ready to apply'
-                        : 'Review'
-                      : 'Awaiting ack'}
-                  </span>
+                  <span className="rs-pill rs-pill--warn">{statusLabel}</span>
                   <span className="rs-list-row__hint">{kickoffHint}</span>
                 </>
-              }
-              trailing={
-                <div className="rs-queue-action">
-                  {awaitingApply && (
-                    <Button
-                      size="sm"
-                      variant="primary"
-                      onClick={(e) => {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        onApply(p.id);
-                      }}
-                    >
-                      Apply change
-                    </Button>
-                  )}
-                  {awaitingApply && onDismiss && (
-                    <Button
-                      size="sm"
-                      variant="link"
-                      isDanger
-                      isInline
-                      onClick={(e) => {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        onDismiss(p.id);
-                      }}
-                    >
-                      Deny change
-                    </Button>
-                  )}
-                  {awaitingAck && (
-                    <Button
-                      size="sm"
-                      variant="link"
-                      isInline
-                      onClick={(e) => {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        onAcknowledge(p.id);
-                      }}
-                    >
-                      Acknowledge only
-                    </Button>
-                  )}
-                </div>
               }
             />
           </li>

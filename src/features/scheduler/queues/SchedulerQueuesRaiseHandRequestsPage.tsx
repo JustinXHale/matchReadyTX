@@ -1,3 +1,4 @@
+import { Title } from '@patternfly/react-core';
 import { useMemo } from 'react';
 import { useApp } from '@/app/AppContext';
 import { compareKickoffAsc } from '@/domain/divisionFilters';
@@ -42,6 +43,9 @@ export function SchedulerQueuesRaiseHandRequestsPage() {
 
   return (
     <>
+      <Title headingLevel="h1" size="lg">
+        Raise-hand requests
+      </Title>
       <p className="rs-match-card__meta">
         Referees volunteering for open slots on released matches. You can also
         approve or decline from Schedule when viewing that game.

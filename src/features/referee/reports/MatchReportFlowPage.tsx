@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import {
   Button,
@@ -53,6 +53,7 @@ import {
 } from '@/services/reportsLive';
 import type { UserProfile } from '@/domain/types';
 import { MatchListRow } from '@/ui/MatchListRow';
+import { useContextualBackBar } from '@/app/shell/contextualBar';
 
 type Step = 'chooser' | 'form' | 'done';
 
@@ -135,6 +136,19 @@ export function MatchReportFlowPage({
     Boolean(submitted) &&
     !pending;
   const report = pending ?? (isEditing ? submitted : undefined);
+  const handleContextualBack = useCallback(() => {
+    if (isEditing && report) {
+      navigate(reportHrefForSubmitted(report), {
+        state: backState(flowBack),
+      });
+      return;
+    }
+    exitFlow();
+  }, [exitFlow, flowBack, isEditing, navigate, report]);
+  useContextualBackBar(
+    isEditing ? 'Back to Match report' : flowBackLabel,
+    handleContextualBack,
+  );
   const savedMo = isEditing ? submitted?.moPayload : undefined;
   const savedAr = isEditing ? submitted?.arPayload : undefined;
 
@@ -242,7 +256,7 @@ export function MatchReportFlowPage({
     }
     if (!currentUser) return;
     void ensureMatchReportReady(matchId, currentUser.uid).catch(onEnsureFailed);
-  }, [assignerFiling, dataMode, currentUser?.uid, matchId, isEditing]);
+  }, [assignerFiling, dataMode, currentUser, matchId, isEditing]);
 
   useEffect(() => {
     if (!match) return;
@@ -253,7 +267,7 @@ export function MatchReportFlowPage({
       ),
     );
     if (!savedMo) setIsTournament(isTournamentMatch(match));
-  }, [match?.id]);
+  }, [match, savedAr?.crewAttendance, savedMo, savedMo?.crewAttendance]);
 
   useEffect(() => {
     if (!isEditing || !submitted || !match) return;
@@ -298,7 +312,7 @@ export function MatchReportFlowPage({
         (mo ? 'mo_quick' : ar ? 'ar_basic' : null),
     );
     setStep('form');
-  }, [isEditing, submitted?.id, match?.id]);
+  }, [isEditing, match, submitted]);
 
   const [crewIssuesNote, setCrewIssuesNote] = useState(
     () => savedMo?.crewIssuesNote ?? savedAr?.crewIssuesNote ?? '',
@@ -659,13 +673,6 @@ export function MatchReportFlowPage({
       .join(', ');
     return (
       <div className="rs-stack">
-        <button
-          type="button"
-          className="rs-detail__back"
-          onClick={exitFlow}
-        >
-          ← {flowBackLabel}
-        </button>
         <Title headingLevel="h2" size="lg">
           Match report
         </Title>
@@ -751,30 +758,18 @@ export function MatchReportFlowPage({
 
   return (
     <div className="rs-stack">
-      <button
-        type="button"
-        className="rs-detail__back"
-        onClick={() => {
-          if (isEditing) {
-            navigate(reportHrefForSubmitted(report), {
-              state: backState(flowBack),
-            });
-            return;
-          }
-          if (isAssignerFiling) {
-            exitFlow();
-            return;
-          }
-          if (report.slot === 'mo') {
+      {!isEditing && !isAssignerFiling && report.slot === 'mo' ? (
+        <button
+          type="button"
+          className="rs-report-step-back"
+          onClick={() => {
             setFormKind(null);
             setStep('chooser');
-          } else {
-            exitFlow();
-          }
-        }}
-      >
-        ← {isEditing || report.slot !== 'mo' ? flowBackLabel : 'Choose form'}
-      </button>
+          }}
+        >
+          ← Choose form
+        </button>
+      ) : null}
       <Title headingLevel="h2" size="lg">
         {title}
       </Title>

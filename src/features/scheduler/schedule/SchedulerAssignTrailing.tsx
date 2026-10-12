@@ -9,16 +9,19 @@ export function SchedulerAssignTrailing({
   match,
   back,
   highlightUserId,
+  doubleBookedUserIds,
   onPick,
 }: {
   match: Match;
   back: BackNav;
   highlightUserId?: string;
+  doubleBookedUserIds?: ReadonlySet<string> | string[];
   onPick: (target: CrewPickTarget) => void;
 }) {
   const lines = crewColumnLines(match, {
     highlightUserId,
     assignableOpen: true,
+    doubleBookedUserIds,
   });
 
   return (

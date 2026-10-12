@@ -67,7 +67,8 @@ import {
   subscribeSubmittedCmoForOfficial,
   setJudicialRoleCallable,
 } from '@/services/orgData';
-import { useAppBack, type BackNav } from '@/nav/backNav';
+import { type BackNav } from '@/nav/backNav';
+import { useContextualAppBack } from '@/app/shell/contextualBar';
 import { MatchListRow } from '@/ui/MatchListRow';
 import {
   ConferenceTeamPicker,
@@ -306,7 +307,7 @@ export function MemberDetailPage() {
   const memberHref = useAppHref(`/about/members/${userId ?? ''}`);
   const timeZone = state.org.timezone || 'America/Chicago';
   const availNow = new Date();
-  const { goBack, backLabel } = useAppBack(FALLBACK_BACK);
+  useContextualAppBack(FALLBACK_BACK);
   /** Address / availability: must be acting as Scheduler, not merely hold the role. */
   const canSeeAssignerPii = isAssignerView && hasAssignerRole;
   const canManage = isAssignerView && hasAssignerRole;
@@ -408,15 +409,17 @@ export function MemberDetailPage() {
   const [availYear, setAvailYear] = useState(availNow.getFullYear());
   const [availMonth, setAvailMonth] = useState(availNow.getMonth() + 1);
   const [officialTab, setOfficialTab] = useState<'profile' | 'insights'>('profile');
+  const assessedUserId = user?.uid;
+  const assessedUserLevel = user?.assessedLevel;
 
   useEffect(() => {
-    if (!user) return;
+    if (!assessedUserId) return;
     setAssessedDraft(
-      user.assessedLevel != null ? String(user.assessedLevel) : '',
+      assessedUserLevel != null ? String(assessedUserLevel) : '',
     );
     setAssessedSaved(false);
     setAssessedError(null);
-  }, [user?.uid, user?.assessedLevel]);
+  }, [assessedUserId, assessedUserLevel]);
 
   useEffect(() => {
     setEditing(false);
@@ -503,9 +506,6 @@ export function MemberDetailPage() {
   if (!user) {
     return (
       <div className="rs-stack">
-        <button type="button" className="rs-detail__back" onClick={goBack}>
-          ← {backLabel}
-        </button>
         <EmptyState titleText="Member not found" headingLevel="h3">
           <EmptyStateBody>That member is not in this org.</EmptyStateBody>
         </EmptyState>
@@ -796,10 +796,6 @@ export function MemberDetailPage() {
         editing ? ' rs-member-page--editing' : ''
       }`}
     >
-      <button type="button" className="rs-detail__back" onClick={goBack}>
-        ← {backLabel}
-      </button>
-
       <section className="rs-detail-card rs-member-hero" aria-labelledby="member-name">
         <div className="rs-member-hero__head">
           <UserAvatar user={user} size="md" />

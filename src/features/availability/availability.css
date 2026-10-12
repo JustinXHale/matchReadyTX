@@ -28,7 +28,7 @@
 .rs-avail-swatch {
   width: 12px;
   height: 12px;
-  border-radius: 4px;
+  border-radius: var(--rs-radius-xs);
   border: 1px solid var(--rs-color-border);
 }
 
@@ -100,7 +100,7 @@
   min-height: 3.4rem;
   padding: 0;
   border: 1px solid var(--rs-color-border);
-  border-radius: 10px;
+  border-radius: var(--rs-radius-card);
   background: var(--rs-color-surface);
   color: var(--rs-color-ink);
   overflow: hidden;
@@ -177,7 +177,7 @@
 .rs-avail-weekday {
   width: 2.4rem;
   height: 2.4rem;
-  border-radius: 999px;
+  border-radius: var(--rs-radius-pill);
   border: 1.5px solid var(--rs-color-border);
   background: var(--rs-color-surface);
   font-weight: 650;

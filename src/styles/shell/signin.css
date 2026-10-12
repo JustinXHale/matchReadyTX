@@ -38,7 +38,7 @@
 
 .rs-signin__logo {
   object-fit: contain;
-  border-radius: 28px;
+  border-radius: var(--rs-radius-dialog);
 }
 
 .rs-signin__lede {
@@ -72,7 +72,7 @@
   width: 100%;
   min-height: 48px;
   padding: 0 16px;
-  border-radius: 8px;
+  border-radius: var(--rs-radius-chip);
   border: 1px solid transparent;
   font: 600 16px/1.2 var(--rs-font-family);
   cursor: pointer;

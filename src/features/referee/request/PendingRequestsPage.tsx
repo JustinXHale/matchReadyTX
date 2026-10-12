@@ -13,7 +13,8 @@ import { Button as MuiButton, Stack, Typography } from '@mui/material';
 import { useMemo, useState } from 'react';
 import { flushSync } from 'react-dom';
 import { useApp } from '@/app/AppContext';
-import { RefereeCard } from '@/components/RefereeCard';
+import { useAppFeedback } from '@/app/feedback/feedbackContext';
+import { MatchSummaryCard } from '@/components/MatchSummaryCard';
 import {
   compareKickoffAsc,
   divisionFilterOptionsFromMatches,
@@ -107,6 +108,7 @@ function RequestAside({
 
 export function PendingRequestsPage() {
   const { currentUser, state, store, refresh, dataMode } = useApp();
+  const { notify } = useAppFeedback();
   const timeZone = orgTimeZone(state.org.timezone);
   const [pendingRemoval, setPendingRemoval] = useState<{
     request: GameRequest;
@@ -225,10 +227,11 @@ export function PendingRequestsPage() {
           );
         } catch (err) {
           console.error('Withdraw request failed', err);
-          window.alert(
+          notify(
             err instanceof Error
               ? err.message
               : 'Could not remove your request. Try again.',
+            'error',
           );
         }
       }
@@ -238,7 +241,7 @@ export function PendingRequestsPage() {
   return (
     <div className="rs-stack">
       {pool.length === 0 ? (
-        <EmptyState titleText="Nothing pending" headingLevel="h3">
+        <EmptyState titleText="Nothing pending">
           <EmptyStateBody>
             When you raise your hand on Available matches, waiting requests show
             up here. If an assigner declines one, it stays here with their
@@ -269,13 +272,13 @@ export function PendingRequestsPage() {
           ) : (
             byMonth.map((group) => (
               <section key={group.key} className="rs-month-section">
-                <Title headingLevel="h3" size="md" className="rs-month-heading">
+                <Title headingLevel="h2" size="md" className="rs-month-heading">
                   {group.label}
                 </Title>
                 <ul className="rs-list">
                   {group.items.map(({ request, match }) => (
                     <li key={request.id}>
-                      <RefereeCard
+                      <MatchSummaryCard
                         match={match}
                         userId={currentUser!.uid}
                         request={request}

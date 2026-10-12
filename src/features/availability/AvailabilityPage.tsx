@@ -52,7 +52,7 @@ function defaultWindow(): TimeWindow {
 }
 
 /**
- * Referee/CMO availability — month calendar with tap cycle,
+ * Referee availability — month calendar with tap cycle,
  * pattern apply, and bulk month actions. Persists to Firestore when live.
  */
 export function AvailabilityPage() {
@@ -99,11 +99,11 @@ export function AvailabilityPage() {
       <div className="rs-stack">
         <Title headingLevel="h1">Availability</Title>
         <p>
-          Availability is managed in the Referee/CMO lens. Switch role in the
+          Availability is managed in the Referee lens. Switch role in the
           header to continue.
         </p>
         <Button variant="secondary" onClick={() => setRoleView('referee')}>
-          Switch to Referee/CMO
+          Switch to Referee
         </Button>
       </div>
     );
@@ -337,22 +337,24 @@ export function AvailabilityPage() {
               onChange={() => setPatMode('blocked')}
             />
           </FormGroup>
-          <FormGroup label="Start date" fieldId="pat-from">
-            <IconDateInput
-              id="pat-from"
-              type="date"
-              value={patFrom}
-              onChange={(_, v) => setPatFrom(v)}
-            />
-          </FormGroup>
-          <FormGroup label="End date" fieldId="pat-to">
-            <IconDateInput
-              id="pat-to"
-              type="date"
-              value={patTo}
-              onChange={(_, v) => setPatTo(v)}
-            />
-          </FormGroup>
+          <div className="rs-date-range">
+            <FormGroup label="Start date" fieldId="pat-from">
+              <IconDateInput
+                id="pat-from"
+                type="date"
+                value={patFrom}
+                onChange={(_, v) => setPatFrom(v)}
+              />
+            </FormGroup>
+            <FormGroup label="End date" fieldId="pat-to">
+              <IconDateInput
+                id="pat-to"
+                type="date"
+                value={patTo}
+                onChange={(_, v) => setPatTo(v)}
+              />
+            </FormGroup>
+          </div>
           <FormGroup label="Days of week">
             <div className="rs-avail-weekdays" role="group">
               {WEEKDAY_LABELS.map((w) => (

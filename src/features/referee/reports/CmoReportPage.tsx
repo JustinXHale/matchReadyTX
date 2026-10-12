@@ -8,7 +8,7 @@ import {
   TextInput,
   Title,
 } from '@patternfly/react-core';
-import { useApp } from '@/app/AppContext';
+import { useApp, useAppHref } from '@/app/AppContext';
 import {
   CMO_ASSESSED_RATING_MAX,
   CMO_ASSESSED_RATING_MIN,
@@ -49,6 +49,7 @@ import {
   persistSubmittedCmoReport,
 } from '@/services/reportsLive';
 import { useScrollReportToTopOnChange } from '@/features/referee/reports/scrollReportToTop';
+import { useContextualAppBack } from '@/app/shell/contextualBar';
 
 const SECTION_COUNT = 4;
 const SECTION_TITLES = [
@@ -108,6 +109,12 @@ export function CmoReportPage() {
   const subjectFromQuery = searchParams.get('subjectOfficialId') ?? '';
   const { currentUser, state, store, dataMode } = useApp();
   const navigate = useNavigate();
+  const coachingReportsHref = useAppHref('/referee/reports/coaching');
+  const coachingReportsBack = useMemo(
+    () => ({ to: coachingReportsHref, label: 'Coaching Reports' }),
+    [coachingReportsHref],
+  );
+  useContextualAppBack(coachingReportsBack);
 
   const match = resolveMatchForReports(
     matchId,
@@ -210,7 +217,7 @@ export function CmoReportPage() {
     ).catch((err) => console.error('ensureCmoReportReady failed', err));
   }, [
     dataMode,
-    currentUser?.uid,
+    currentUser,
     matchId,
     effectiveSubjectId,
     outsideSessionId,
@@ -278,7 +285,7 @@ export function CmoReportPage() {
   const goPrev = () => {
     setError(null);
     if (section === 0) {
-      navigate('/referee/reports/coaching');
+      navigate(coachingReportsHref);
       return;
     }
     setSection((s) => s - 1);
@@ -339,12 +346,6 @@ export function CmoReportPage() {
         <Title headingLevel="h2" size="lg">
           Match not found
         </Title>
-        <Button
-          variant="link"
-          onClick={() => navigate('/referee/reports/coaching')}
-        >
-          Back to Coaching Reports
-        </Button>
       </div>
     );
   }
@@ -358,13 +359,6 @@ export function CmoReportPage() {
     );
     return (
       <div className="rs-stack">
-        <button
-          type="button"
-          className="rs-detail__back"
-          onClick={() => navigate('/referee/reports/coaching')}
-        >
-          ← Coaching Reports
-        </button>
         <Title headingLevel="h2" size="lg">
           Choose match official
         </Title>
@@ -418,12 +412,6 @@ export function CmoReportPage() {
         >
           View report
         </Button>
-        <Button
-          variant="secondary"
-          onClick={() => navigate('/referee/reports/coaching')}
-        >
-          Back to Coaching Reports
-        </Button>
       </div>
     );
   }
@@ -456,12 +444,6 @@ export function CmoReportPage() {
             View report
           </Button>
         )}
-        <Button
-          variant="secondary"
-          onClick={() => navigate('/referee/reports/coaching')}
-        >
-          Back to Coaching Reports
-        </Button>
       </div>
     );
   }
@@ -472,9 +454,11 @@ export function CmoReportPage() {
 
   return (
     <div className="rs-stack rs-cmo-report">
-      <button type="button" className="rs-detail__back" onClick={goPrev}>
-        ← {section === 0 ? 'Coaching Reports' : SECTION_TITLES[section - 1]}
-      </button>
+      {section > 0 ? (
+        <button type="button" className="rs-report-step-back" onClick={goPrev}>
+          ← {SECTION_TITLES[section - 1]}
+        </button>
+      ) : null}
       <Title headingLevel="h2" size="lg" className="rs-cmo-report__title">
         CMO report
       </Title>

@@ -3,7 +3,7 @@ import type { ReactNode } from 'react';
 
 export function EmptyState({
   titleText,
-  headingLevel = 'h3',
+  headingLevel = 'h2',
   children,
   className,
 }: {
@@ -23,12 +23,12 @@ export function EmptyState({
         bgcolor: 'background.paper',
         border: 1,
         borderColor: 'outlineVariant',
-        borderRadius: 2,
+        borderRadius: 'var(--rs-radius-card)',
       }}
     >
       <Stack spacing={1} alignItems="center">
         {titleText != null ? (
-          <Typography component={headingLevel} variant="h6" fontWeight={700}>
+          <Typography component={headingLevel} variant="h2">
             {titleText}
           </Typography>
         ) : null}

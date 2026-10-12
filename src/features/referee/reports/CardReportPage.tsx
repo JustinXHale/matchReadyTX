@@ -1,5 +1,5 @@
-import { useMemo, useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useCallback, useMemo, useState } from 'react';
+import { useParams } from 'react-router-dom';
 import {
   Button,
   Form,
@@ -38,6 +38,7 @@ import { assignmentForUser } from '@/domain/types';
 import { CardReportViewBody } from '@/features/referee/reports/MatchReportViewPage';
 import { CARD_REPORTS_BACK } from '@/features/referee/reports/reportLinks';
 import { useAppBack } from '@/nav/backNav';
+import { useContextualBackBar } from '@/app/shell/contextualBar';
 import { persistSubmittedCardReport } from '@/services/reportsLive';
 import { useScrollReportToTopOnChange } from '@/features/referee/reports/scrollReportToTop';
 import { IconDateInput } from '@/ui/IconDateInput';
@@ -67,7 +68,6 @@ function emptyCard(homeId: string, homeName: string): CardIncident {
 export function CardReportPage() {
   const { matchId = '' } = useParams();
   const { currentUser, state, store, dataMode } = useApp();
-  const navigate = useNavigate();
   const { goBack, backLabel } = useAppBack(CARD_REPORTS_BACK);
 
   const match = state.matches.find((m) => m.id === matchId);
@@ -118,6 +118,17 @@ export function CardReportPage() {
   );
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const handleContextualBack = useCallback(() => {
+    if (step === 'cards') {
+      setStep('identity');
+      return;
+    }
+    goBack();
+  }, [goBack, step]);
+  useContextualBackBar(
+    step === 'cards' ? 'Back to Identity' : backLabel,
+    handleContextualBack,
+  );
 
   if (!currentUser) return null;
 
@@ -127,12 +138,6 @@ export function CardReportPage() {
         <Title headingLevel="h2" size="lg">
           Match not found
         </Title>
-        <Button
-          variant="link"
-          onClick={() => navigate('/referee/reports/cards')}
-        >
-          Back to Card Reports
-        </Button>
       </div>
     );
   }
@@ -145,9 +150,6 @@ export function CardReportPage() {
     if (submittedForMatch) {
       return (
         <div className="rs-stack">
-          <button type="button" className="rs-detail__back" onClick={goBack}>
-            ← {backLabel}
-          </button>
           <Title headingLevel="h2" size="lg">
             Card report
           </Title>
@@ -164,12 +166,6 @@ export function CardReportPage() {
           Card reports are filed by the Match Official
           {crewSlot ? ` (you are ${crewSlot.toUpperCase()} on this match)` : ''}.
         </p>
-        <Button
-          variant="secondary"
-          onClick={() => navigate(`/matches/${match.id}`)}
-        >
-          Back to match
-        </Button>
       </div>
     );
   }
@@ -183,12 +179,6 @@ export function CardReportPage() {
         <p className="rs-match-card__meta">
           Available after kickoff for yellow and red cards.
         </p>
-        <Button
-          variant="secondary"
-          onClick={() => navigate(`/matches/${match.id}`)}
-        >
-          Back to match
-        </Button>
       </div>
     );
   }
@@ -196,19 +186,10 @@ export function CardReportPage() {
   if ((already || submittedForMatch) && step !== 'done') {
     return (
       <div className="rs-stack">
-        <button type="button" className="rs-detail__back" onClick={() => navigate(-1)}>
-          ← Back
-        </button>
         <Title headingLevel="h2" size="lg">
           Card report on file
         </Title>
         <CardReportViewBody matchId={match.id} />
-        <Button
-          variant="secondary"
-          onClick={() => navigate('/referee/reports/cards')}
-        >
-          Back to Card Reports
-        </Button>
       </div>
     );
   }
@@ -222,12 +203,6 @@ export function CardReportPage() {
         <p className="rs-match-card__meta">
           {match.homeTeamName} vs {match.awayTeamName}
         </p>
-        <Button
-          variant="secondary"
-          onClick={() => navigate('/referee/reports/cards')}
-        >
-          Back to Card Reports
-        </Button>
       </div>
     );
   }
@@ -329,16 +304,6 @@ export function CardReportPage() {
 
   return (
     <div className="rs-stack">
-      <button
-        type="button"
-        className="rs-detail__back"
-        onClick={() => {
-          if (step === 'cards') setStep('identity');
-          else navigate('/referee/reports/cards');
-        }}
-      >
-        ← {step === 'cards' ? 'Identity' : 'Card Reports'}
-      </button>
       <div ref={reportTopRef}>
         <Title headingLevel="h2" size="lg">
           Card report

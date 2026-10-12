@@ -1,4 +1,4 @@
-import { Button, FormGroup, Switch, TextInput, TextArea, Title } from '@patternfly/react-core';
+import { FormGroup, Switch, TextInput, TextArea, Title } from '@patternfly/react-core';
 import { Link, useLocation, useParams } from 'react-router-dom';
 import { useMemo, useState } from 'react';
 import { useApp, useAppHref } from '@/app/AppContext';
@@ -17,7 +17,8 @@ import {
   defaultOrgId,
   setCoachFeedbackPublicOnProfile,
 } from '@/services/orgData';
-import { useAppBack, type BackNav } from '@/nav/backNav';
+import { type BackNav } from '@/nav/backNav';
+import { useContextualAppBack } from '@/app/shell/contextualBar';
 import { MatchListRow } from '@/ui/MatchListRow';
 import { ScaleRatingCards } from '@/ui/ScaleRatingCards';
 
@@ -89,7 +90,7 @@ export function SchedulerFeedbackDetailPage() {
     }),
     [listHref, location.pathname],
   );
-  const { goBack, backLabel } = useAppBack(listFallback);
+  useContextualAppBack(listFallback);
   const memberBase = useAppHref('/about/members');
   const [publishBusy, setPublishBusy] = useState(false);
   const [publishError, setPublishError] = useState<string | null>(null);
@@ -113,9 +114,6 @@ export function SchedulerFeedbackDetailPage() {
         <Title headingLevel="h2" size="lg">
           Feedback not found
         </Title>
-        <Button variant="link" onClick={goBack}>
-          ← {backLabel}
-        </Button>
       </div>
     );
   }
@@ -176,13 +174,6 @@ export function SchedulerFeedbackDetailPage() {
 
   return (
     <div className="rs-stack">
-      <Button
-        variant="link"
-        className="rs-detail__back"
-        onClick={goBack}
-      >
-        ← {backLabel}
-      </Button>
       <Title headingLevel="h1" size="lg">
         Coach feedback
       </Title>

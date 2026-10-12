@@ -5,6 +5,7 @@ import {
   type Dispatch,
   type SetStateAction,
 } from 'react';
+import { useAppBack, type BackNav } from '@/nav/backNav';
 
 export type ContextualBarSpec = {
   label: string;
@@ -30,4 +31,11 @@ export function useContextualBackBar(
       setContextualBar((current) => (current === spec ? null : current));
     };
   }, [label, onActivate, setContextualBar]);
+}
+
+/** Route back behavior plus the shared, non-scrolling shell presentation. */
+export function useContextualAppBack(fallback: BackNav) {
+  const appBack = useAppBack(fallback);
+  useContextualBackBar(appBack.backLabel, appBack.goBack);
+  return appBack;
 }

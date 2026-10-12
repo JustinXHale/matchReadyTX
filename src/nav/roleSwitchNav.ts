@@ -13,37 +13,63 @@ const SHARED_PATH_PREFIXES = [
 /** Exact-path equivalents when switching between assigner and official lenses. */
 const LENS_EQUIVALENTS: Record<string, Partial<Record<RoleView, string>>> = {
   '/referee/appointments': {
+    referee: '/referee/appointments',
+    cmo: '/referee/appointments',
     scheduler: '/scheduler/schedule',
   },
   '/referee/appointments/open': {
+    referee: '/referee/appointments/open',
+    cmo: '/referee/appointments/open',
     scheduler: '/scheduler/schedule',
   },
   '/referee/appointments/requested': {
+    referee: '/referee/appointments/requested',
+    cmo: '/referee/appointments/requested',
     scheduler: '/scheduler/schedule/requests/raise-hand',
+  },
+  '/referee/availability': {
+    cmo: '/referee/appointments',
+  },
+  '/referee/reports/match': {
+    cmo: '/referee/reports/coaching',
+  },
+  '/referee/reports/cards': {
+    cmo: '/referee/reports/coaching',
+  },
+  '/referee/reports/coaching': {
+    referee: '/referee/reports/match',
   },
   '/scheduler': {
     referee: '/referee/appointments',
+    cmo: '/referee/appointments',
   },
   '/scheduler/schedule': {
     referee: '/referee/appointments/open',
+    cmo: '/referee/appointments/open',
   },
   '/scheduler/schedule/coverage': {
     referee: '/referee/appointments/open',
+    cmo: '/referee/appointments/open',
   },
   '/scheduler/schedule/changes': {
     referee: '/referee/appointments/requested',
+    cmo: '/referee/appointments/requested',
   },
   '/scheduler/schedule/notifications': {
     referee: '/referee/appointments',
+    cmo: '/referee/appointments',
   },
   '/scheduler/schedule/requests/raise-hand': {
     referee: '/referee/appointments/requested',
+    cmo: '/referee/appointments/requested',
   },
   '/scheduler/schedule/requests/fixtures': {
     referee: '/referee/appointments/requested',
+    cmo: '/referee/appointments/requested',
   },
   '/scheduler/schedule/requests/team-links': {
     referee: '/referee/appointments/requested',
+    cmo: '/referee/appointments/requested',
   },
 };
 

@@ -149,7 +149,7 @@ function matchLinkText(match: Match): string {
 function matchLinkHtml(match: Match): string {
   const url = matchAppUrl(match.id);
   return `<p><a href="${url}">Open this match in MatchReadyTX</a></p>
-<p style="color:#666;font-size:13px;">If you are not signed in, you will be asked to log in first, then taken to the match.</p>`;
+<p style="color:#757575;font-size:13px;">If you are not signed in, you will be asked to log in first, then taken to the match.</p>`;
 }
 function canNotify(userId: string): boolean {
   return (

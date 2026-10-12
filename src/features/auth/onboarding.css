@@ -12,7 +12,7 @@
 .rs-onboard__track {
   height: 3px;
   margin: 0 0 28px;
-  border-radius: 999px;
+  border-radius: var(--rs-radius-pill);
   background: var(--rs-color-border);
   overflow: hidden;
 }
@@ -81,7 +81,7 @@
   width: 100%;
   aspect-ratio: 16 / 9;
   margin: 16px 0 4px;
-  border-radius: 12px;
+  border-radius: var(--rs-radius-card);
   border: 1px solid var(--rs-color-border);
   background: var(--rs-color-surface-muted);
   overflow: hidden;
@@ -193,7 +193,7 @@
   margin: 0;
   padding: 14px 16px;
   border: 1.5px solid var(--rs-color-border);
-  border-radius: 12px;
+  border-radius: var(--rs-radius-card);
   background: var(--rs-color-surface);
   text-align: left;
   cursor: pointer;
@@ -217,10 +217,10 @@
   justify-content: center;
   width: 22px;
   height: 22px;
-  border-radius: 6px;
+  border-radius: var(--rs-radius-chip);
   border: 1.5px solid var(--rs-color-border);
   background: var(--rs-color-surface);
-  color: var(--rs-color-secondary);
+  color: var(--rs-color-on-ok);
 }
 
 .rs-onboard__check--on {

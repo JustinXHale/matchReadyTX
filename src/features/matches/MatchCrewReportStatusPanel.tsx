@@ -18,6 +18,7 @@ import {
   persistSchedulerDeleteMatchReport,
   persistSchedulerResetMatchReport,
 } from '@/services/reportsLive';
+import { useAppFeedback } from '@/app/feedback/feedbackContext';
 
 /** Exceptional scheduler cleanup for report records whose official left the crew. */
 export function MatchCrewReportStatusPanel({
@@ -32,6 +33,7 @@ export function MatchCrewReportStatusPanel({
   cardReports: CardReport[];
 }) {
   const { store, dataMode } = useApp();
+  const { confirm } = useAppFeedback();
   const href = (path: string) =>
     dataMode === 'demo' ? withDemoPrefix(path) : path;
   const [busyKey, setBusyKey] = useState<string | null>(null);
@@ -44,7 +46,14 @@ export function MatchCrewReportStatusPanel({
     action: 'reset' | 'delete',
     confirmMessage: string,
   ) => {
-    if (reports.length === 0 || !window.confirm(confirmMessage)) return;
+    if (reports.length === 0) return;
+    const confirmed = await confirm({
+      title: action === 'reset' ? 'Reset report?' : 'Delete report?',
+      message: confirmMessage,
+      confirmLabel: action === 'reset' ? 'Reset' : 'Delete',
+      destructive: true,
+    });
+    if (!confirmed) return;
     setError(null);
     setBusyKey(rowKey);
     try {
@@ -76,9 +85,13 @@ export function MatchCrewReportStatusPanel({
     report: CardReport,
     officialName: string,
   ) => {
-    if (!window.confirm(`Delete ${officialName}'s card report for this match?`)) {
-      return;
-    }
+    const confirmed = await confirm({
+      title: 'Delete card report?',
+      message: `Delete ${officialName}'s card report for this match?`,
+      confirmLabel: 'Delete',
+      destructive: true,
+    });
+    if (!confirmed) return;
     setError(null);
     setBusyKey(rowKey);
     try {

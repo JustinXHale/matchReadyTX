@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { EmptyState, EmptyStateBody } from '@patternfly/react-core';
 import { useApp } from '@/app/AppContext';
@@ -9,32 +9,31 @@ import {
   matchOnCalendarDate,
   uniqueMatchCalendarDates,
 } from '@/domain/divisionFilters';
-import {
-  matchEventTypeLabel,
-  matchFormatChoiceLabel,
-  matchSideChoiceLabel,
-  type MatchEventType,
-  type MatchFormatChoice,
-  type MatchSideChoice,
-} from '@/domain/matchDivision';
-import { GlobalDivisionFilters } from '@/features/global/GlobalDivisionFilters';
+import { matchFormatChoiceLabel, matchSideChoiceLabel } from '@/domain/matchDivision';
 import { RsFilterSelect } from '@/ui/RsFilterSelect';
-import { MatchListRow } from '@/ui/MatchListRow';
+import { MatchSummaryCard } from '@/components/MatchSummaryCard';
 import { canOfficialRequestMatch, openRequestSlots } from '@/domain/requests';
 import {
   REQUESTABLE_SLOT_SHORT,
+  genderLabel,
   type Match,
+  type MatchGender,
   type RequestableSlot,
 } from '@/domain/types';
 import { backState, type BackNav } from '@/nav/backNav';
 import {
   pathWithSearch,
   useAvailableMatchesFilterParams,
+  type AvailableMatchesFilters,
   type AvailableRoleFilter,
 } from '@/nav/listFilterParams';
 import { orgTimeZone } from '@/domain/matchTime';
+import { MatchActionPrompt } from '@/ui/MatchActionPrompt';
 import { ScheduleMatchListWithPast } from '@/ui/ScheduleMatchListLayout';
 import { useScheduleListSections } from '@/ui/useScheduleListSections';
+import { FilterDialog } from '@/ui/FilterDialog';
+import { MatchFilterSummary } from '@/ui/MatchFilterSummary';
+import './request.css';
 
 const OPEN_MATCHES_PATH = '/referee/appointments/open';
 
@@ -59,8 +58,8 @@ function formatOpenSlots(slots: RequestableSlot[]): string {
   return slots.map((s) => REQUESTABLE_SLOT_SHORT[s]).join(' · ');
 }
 
-/** Opens match detail so the official can pick a role and raise their hand. */
-function RaiseHandTrailing({
+/** Full-width raise-hand prompt — opens match detail to pick a role. */
+function RaiseHandPrompt({
   match,
   requestBack,
 }: {
@@ -69,26 +68,19 @@ function RaiseHandTrailing({
 }) {
   const navigate = useNavigate();
   const open = openRequestSlots(match);
+  const openLabel = open.length > 0 ? formatOpenSlots(open) : 'open roles';
   return (
-    <button
-      type="button"
-      className="rs-raise-hand-col rs-raise-hand-hit"
-      aria-label="Open match to raise hand"
-      onClick={(e) => {
-        e.preventDefault();
-        e.stopPropagation();
+    <MatchActionPrompt
+      message={`Raise hand for ${openLabel}?`}
+      primaryLabel="✋ Raise hand"
+      onPrimary={() =>
         navigate(`/matches/${match.id}?request=1`, {
           state: backState(requestBack),
-        });
-      }}
-    >
-      <span className="rs-raise-hand" aria-hidden>
-        ✋
-      </span>
-      {open.length > 0 && (
-        <span className="rs-raise-hand-col__open">{formatOpenSlots(open)}</span>
-      )}
-    </button>
+        })
+      }
+      tone="attention"
+      ariaLabel={`Raise hand for ${match.homeTeamName} versus ${match.awayTeamName}`}
+    />
   );
 }
 
@@ -102,18 +94,20 @@ export function GlobalRequestPage() {
     levelFilter,
     competitionFilter,
     formatFilter,
-    eventTypeFilter,
     sideFilter,
     dateFilter,
-    setRoleFilter,
-    setGenderFilter,
-    setLevelFilter,
-    setCompetitionFilter,
-    setFormatFilter,
-    setEventTypeFilter,
-    setSideFilter,
     setDateFilter,
+    setAvailableFilters,
   } = useAvailableMatchesFilterParams();
+  const [filtersOpen, setFiltersOpen] = useState(false);
+  const [draft, setDraft] = useState<AvailableMatchesFilters>(() => ({
+    role: roleFilter,
+    gender: genderFilter,
+    level: levelFilter,
+    competition: competitionFilter,
+    format: formatFilter,
+    side: sideFilter,
+  }));
 
   const requestBack: BackNav = useMemo(
     () => ({
@@ -132,35 +126,8 @@ export function GlobalRequestPage() {
   }, [currentUser, state.matches, state.requests]);
 
   const filterOptions = useMemo(
-    () => divisionFilterOptionsFromMatches(filterPool, competitionFilter),
-    [filterPool, competitionFilter],
-  );
-
-  const formatSelectOptions = useMemo(
-    () =>
-      filterOptions.formats.map((format) => ({
-        value: format,
-        label: matchFormatChoiceLabel(format),
-      })),
-    [filterOptions.formats],
-  );
-
-  const eventSelectOptions = useMemo(
-    () =>
-      filterOptions.eventTypes.map((eventType) => ({
-        value: eventType,
-        label: matchEventTypeLabel(eventType),
-      })),
-    [filterOptions.eventTypes],
-  );
-
-  const sideSelectOptions = useMemo(
-    () =>
-      filterOptions.sides.map((side) => ({
-        value: side,
-        label: matchSideChoiceLabel(side),
-      })),
-    [filterOptions.sides],
+    () => divisionFilterOptionsFromMatches(filterPool, null),
+    [filterPool],
   );
 
   const roleSelectOptions = useMemo(
@@ -173,22 +140,33 @@ export function GlobalRequestPage() {
     level: levelFilter,
     competition: competitionFilter,
     format: formatFilter,
-    eventType: eventTypeFilter,
+    eventType: null,
     side: sideFilter,
   });
 
-  const matchesDivision = (m: Match) =>
-    matchOnCalendarDate(m, dateFilter) &&
-    (!divisionActive ||
-      matchMatchesDivisionFilters(
-        m,
-        genderFilter,
-        levelFilter,
-        competitionFilter,
-        formatFilter,
-        eventTypeFilter,
-        sideFilter,
-      ));
+  const matchesDivision = useCallback(
+    (m: Match) =>
+      matchOnCalendarDate(m, dateFilter) &&
+      (!divisionActive ||
+        matchMatchesDivisionFilters(
+          m,
+          genderFilter,
+          levelFilter,
+          competitionFilter,
+          formatFilter,
+          null,
+          sideFilter,
+        )),
+    [
+      competitionFilter,
+      dateFilter,
+      divisionActive,
+      formatFilter,
+      genderFilter,
+      levelFilter,
+      sideFilter,
+    ],
+  );
 
   const availableDates = useMemo(
     () =>
@@ -202,7 +180,7 @@ export function GlobalRequestPage() {
               levelFilter,
               competitionFilter,
               formatFilter,
-              eventTypeFilter,
+              null,
               sideFilter,
             )
           ) {
@@ -219,7 +197,6 @@ export function GlobalRequestPage() {
       levelFilter,
       competitionFilter,
       formatFilter,
-      eventTypeFilter,
       sideFilter,
       roleFilter,
     ],
@@ -252,14 +229,7 @@ export function GlobalRequestPage() {
     state.officialAlerts,
     state.matches,
     state.requests,
-    divisionActive,
-    genderFilter,
-    levelFilter,
-    competitionFilter,
-    formatFilter,
-    eventTypeFilter,
-    sideFilter,
-    dateFilter,
+    matchesDivision,
   ]);
 
   const urgentIds = useMemo(
@@ -286,14 +256,7 @@ export function GlobalRequestPage() {
     state.matches,
     state.requests,
     urgentIds,
-    divisionActive,
-    genderFilter,
-    levelFilter,
-    competitionFilter,
-    formatFilter,
-    eventTypeFilter,
-    sideFilter,
-    dateFilter,
+    matchesDivision,
   ]);
 
   const filteredUrgent = useMemo(
@@ -319,69 +282,133 @@ export function GlobalRequestPage() {
 
   const hasBase = urgentMatches.length > 0 || openGames.length > 0;
   const hasAny = filteredUrgent.length > 0 || filteredOpen.length > 0;
+  const activeFilterCount = [
+    roleFilter,
+    genderFilter,
+    levelFilter,
+    competitionFilter,
+    formatFilter,
+    sideFilter,
+  ].filter(Boolean).length;
+  const draftOptions = divisionFilterOptionsFromMatches(
+    filterPool,
+    draft.competition,
+  );
+  const openFilters = () => {
+    setDraft({
+      role: roleFilter,
+      gender: genderFilter,
+      level: levelFilter,
+      competition: competitionFilter,
+      format: formatFilter,
+      side: sideFilter,
+    });
+    setFiltersOpen(true);
+  };
+
+  const updateDraft = <K extends keyof AvailableMatchesFilters>(
+    key: K,
+    value: AvailableMatchesFilters[K],
+  ) => setDraft((current) => ({ ...current, [key]: value }));
 
   return (
     <div className="rs-stack">
-      <GlobalDivisionFilters
-        className="rs-filter-bar--available-matches"
-        options={filterOptions}
-        genderFilter={genderFilter}
-        levelFilter={levelFilter}
-        competitionFilter={competitionFilter}
-        onGenderChange={setGenderFilter}
-        onLevelChange={setLevelFilter}
-        onCompetitionChange={setCompetitionFilter}
-        layout="paired"
-        showSingleLevel
-        stageSecondary={false}
-        showDate
-        dateFilter={dateFilter}
-        onDateChange={setDateFilter}
+      <MatchFilterSummary
+        ariaLabel="Filter available matches"
+        dateValue={dateFilter}
         availableDates={availableDates}
-        ariaLabel="Filter requestable games"
-        pairRow2End={
-          <RsFilterSelect
-            label="Position"
-            value={roleFilter}
-            onChange={(next) => setRoleFilter(next as RoleFilter | null)}
-            placeholder="All positions"
-            options={roleSelectOptions}
-          />
-        }
-        pairRow3={
-          <RsFilterSelect
-            label="Format"
-            value={formatFilter}
-            onChange={(next) => setFormatFilter(next as MatchFormatChoice | null)}
-            placeholder="All formats"
-            options={formatSelectOptions}
-          />
-        }
-        pairRow4={
-          <>
-            {filterOptions.eventTypes.length > 0 && (
-              <RsFilterSelect
-                label="Event"
-                value={eventTypeFilter}
-                onChange={(next) =>
-                  setEventTypeFilter(next as MatchEventType | null)
-                }
-                placeholder="All events"
-                options={eventSelectOptions}
-              />
-            )}
-            {filterOptions.sides.length > 0 && (
-              <RsFilterSelect
-                label="Side"
-                value={sideFilter}
-                onChange={(next) => setSideFilter(next as MatchSideChoice | null)}
-                placeholder="All sides"
-                options={sideSelectOptions}
-              />
-            )}
-          </>
-        }
+        onDateChange={setDateFilter}
+        activeFilterCount={activeFilterCount}
+        onOpenFilters={openFilters}
       />
+
+      <FilterDialog
+        id="available-match-filters"
+        open={filtersOpen}
+        onCancel={() => setFiltersOpen(false)}
+        onClear={() =>
+          setDraft({
+            role: null,
+            gender: null,
+            level: null,
+            competition: null,
+            format: null,
+            side: null,
+          })
+        }
+        onApply={() => {
+          setAvailableFilters(draft);
+          setFiltersOpen(false);
+        }}
+      >
+        <RsFilterSelect
+          label="Competition"
+          value={draft.competition}
+          onChange={(next) =>
+            setDraft((current) => ({
+              ...current,
+              competition: next,
+              level: null,
+              gender: null,
+            }))
+          }
+          placeholder="All competitions"
+          options={filterOptions.competitions.map((value) => ({
+            value,
+            label: value,
+          }))}
+        />
+        <RsFilterSelect
+          label="Tier"
+          value={draft.level}
+          onChange={(next) => updateDraft('level', next)}
+          placeholder="All tiers"
+          options={draftOptions.levels.map((value) => ({ value, label: value }))}
+        />
+        <RsFilterSelect
+          label="Gender"
+          value={draft.gender}
+          onChange={(next) =>
+            updateDraft('gender', next as MatchGender | null)
+          }
+          placeholder="All genders"
+          options={draftOptions.genders.map((value) => ({
+            value,
+            label: genderLabel(value),
+          }))}
+        />
+        <RsFilterSelect
+          label="Position"
+          value={draft.role}
+          onChange={(next) => updateDraft('role', next as RoleFilter | null)}
+          placeholder="All positions"
+          options={roleSelectOptions}
+        />
+        <RsFilterSelect
+          label="Format"
+          value={draft.format}
+          onChange={(next) =>
+            updateDraft('format', next as AvailableMatchesFilters['format'])
+          }
+          placeholder="All formats"
+          options={draftOptions.formats.map((value) => ({
+            value,
+            label: matchFormatChoiceLabel(value),
+          }))}
+        />
+        <RsFilterSelect
+          label="Side"
+          value={draft.side}
+          onChange={(next) =>
+            updateDraft('side', next as AvailableMatchesFilters['side'])
+          }
+          placeholder="All sides"
+          options={draftOptions.sides.map((value) => ({
+            value,
+            label: matchSideChoiceLabel(value),
+          }))}
+        />
+      </FilterDialog>
 
       {!hasBase ? (
         <EmptyState titleText="No available matches" headingLevel="h3">
@@ -402,14 +429,18 @@ export function GlobalRequestPage() {
             <ul className="rs-list" aria-label="Urgent coverage">
               {filteredUrgent.map((m) => (
                 <li key={`urgent-${m.id}`}>
-                  <MatchListRow
+                  <MatchSummaryCard
                     match={m}
                     to={`/matches/${m.id}?request=1`}
                     showTime
-                    split="action"
-                    urgent
                     back={requestBack}
-                    trailing={<RaiseHandTrailing match={m} requestBack={requestBack} />}
+                    statusPresentation={{
+                      tone: 'declined',
+                      label: 'Urgent coverage',
+                    }}
+                    topBanner={
+                      <RaiseHandPrompt match={m} requestBack={requestBack} />
+                    }
                   />
                 </li>
               ))}
@@ -423,13 +454,15 @@ export function GlobalRequestPage() {
             showPastCollapsed={showPastCollapsed}
             renderMatchRow={(m) => (
               <li key={m.id}>
-                <MatchListRow
+                <MatchSummaryCard
                   match={m}
                   to={`/matches/${m.id}?request=1`}
                   showTime
-                  split="action"
                   back={requestBack}
-                  trailing={<RaiseHandTrailing match={m} requestBack={requestBack} />}
+                  statusPresentation={{ tone: 'pending', label: 'Available' }}
+                  topBanner={
+                    <RaiseHandPrompt match={m} requestBack={requestBack} />
+                  }
                 />
               </li>
             )}

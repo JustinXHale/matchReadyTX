@@ -8,7 +8,7 @@ export function CoverageMatchCrewSummary({ match }: { match: Match }) {
 
   return (
     <div
-      className="rs-coverage-requesters rs-coverage-crew"
+      className="rs-coverage-crew"
       aria-label="Current crew assignments"
     >
       <div className="rs-coverage-requesters__summary-main">

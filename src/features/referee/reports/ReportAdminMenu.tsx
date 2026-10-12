@@ -15,6 +15,7 @@ import {
   persistSchedulerDeleteMatchReport,
   persistSchedulerResetMatchReport,
 } from '@/services/reportsLive';
+import { useAppFeedback } from '@/app/feedback/feedbackContext';
 
 type Props =
   | {
@@ -32,6 +33,7 @@ type Props =
 /** Scheduler-only destructive report controls, colocated with the report itself. */
 export function ReportAdminMenu(props: Props) {
   const { store, dataMode } = useApp();
+  const { confirm } = useAppFeedback();
   const [isOpen, setIsOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
@@ -39,13 +41,14 @@ export function ReportAdminMenu(props: Props) {
 
   const resetMatchReport = async () => {
     if (props.kind !== 'match') return;
-    if (
-      !window.confirm(
-        'Reset this report? Its submitted answers will be cleared and it will become due again.',
-      )
-    ) {
-      return;
-    }
+    const confirmed = await confirm({
+      title: 'Reset report?',
+      message:
+        'Its submitted answers will be cleared and the report will become due again.',
+      confirmLabel: 'Reset',
+      destructive: true,
+    });
+    if (!confirmed) return;
     setIsOpen(false);
     setError('');
     setBusy(true);
@@ -66,9 +69,13 @@ export function ReportAdminMenu(props: Props) {
   };
 
   const deleteReport = async () => {
-    if (!window.confirm('Delete this report? This action cannot be undone.')) {
-      return;
-    }
+    const confirmed = await confirm({
+      title: 'Delete report?',
+      message: 'This action cannot be undone.',
+      confirmLabel: 'Delete',
+      destructive: true,
+    });
+    if (!confirmed) return;
     setIsOpen(false);
     setError('');
     setBusy(true);

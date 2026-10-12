@@ -2,17 +2,47 @@ import { Link } from 'react-router-dom';
 import type { CrewColumnLine } from '@/features/referee/appointments/crewLines';
 import { backState, type BackNav } from '@/nav/backNav';
 
+function lineClassName(line: CrewColumnLine, base: string): string {
+  const classes = [base];
+  if (line.doubleBooked) classes.push(`${base}--overlap`);
+  if (line.confirmed) classes.push(`${base}--confirmed`);
+  return classes.join(' ');
+}
+
+function CrewLineValue({ line }: { line: CrewColumnLine }) {
+  return (
+    <span className="rs-appt-crew__content">
+      {line.confirmed ? (
+        <span className="rs-appt-crew__check" aria-hidden>
+          ✓
+        </span>
+      ) : null}
+      <span className="rs-appt-crew__slot">{line.slotLabel}</span>{' '}
+      {line.value}
+      {line.doubleBooked ? (
+        <span className="rs-sr-only"> (double-booked)</span>
+      ) : null}
+      {line.confirmed ? (
+        <span className="rs-sr-only"> (confirmed)</span>
+      ) : null}
+    </span>
+  );
+}
+
 function CrewColumnLineBody({ line }: { line: CrewColumnLine }) {
   if (line.isMine) {
+    const classes = ['rs-appt-crew__line', 'rs-appt-crew__mine'];
+    if (line.doubleBooked) classes.push('rs-appt-crew__line--overlap');
+    if (line.confirmed) classes.push('rs-appt-crew__line--confirmed');
     return (
-      <span className="rs-pill rs-appt-crew__mine">
-        {line.slotLabel} {line.value}
+      <span className={classes.join(' ')}>
+        <CrewLineValue line={line} />
       </span>
     );
   }
   return (
-    <p className="rs-appt-crew__line">
-      <span className="rs-appt-crew__slot">{line.slotLabel}</span> {line.value}
+    <p className={lineClassName(line, 'rs-appt-crew__line')}>
+      <CrewLineValue line={line} />
     </p>
   );
 }
@@ -75,11 +105,10 @@ export function CrewColumnContent({
               key={line.id}
               to={matchTo}
               state={linkState}
-              className="rs-appt-crew__line rs-appt-crew-hit"
+              className={lineClassName(line, 'rs-appt-crew__line') + ' rs-appt-crew-hit'}
               onClick={(e) => e.stopPropagation()}
             >
-              <span className="rs-appt-crew__slot">{line.slotLabel}</span>{' '}
-              {line.value}
+              <CrewLineValue line={line} />
             </Link>
           );
         }

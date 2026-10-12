@@ -7,6 +7,7 @@ import {
   Modal,
   ModalBody,
   ModalFooter,
+  ModalHeader,
   TextArea,
   TextInput,
 } from '@patternfly/react-core';
@@ -74,13 +75,15 @@ export function AboutResourceFormModal({
       variant="small"
       isOpen={isOpen}
       onClose={onClose}
-      aria-labelledby="rs-resource-form-title"
+      aria-labelledby="resource-form-title"
     >
+      <ModalHeader
+        title={initial ? 'Edit resource' : 'Add resource'}
+        labelId="resource-form-title"
+        onClose={onClose}
+      />
       <ModalBody>
         <Form>
-          <h2 id="rs-resource-form-title" className="pf-v6-c-title pf-m-h2">
-            {initial ? 'Edit resource' : 'Add resource'}
-          </h2>
           <FormGroup label="Title" isRequired fieldId="resource-title">
             <TextInput
               id="resource-title"

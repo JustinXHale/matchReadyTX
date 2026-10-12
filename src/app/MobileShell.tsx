@@ -63,6 +63,7 @@ export function MobileShell() {
     roleView,
     isDemoShowcase,
     hasInsightsAccess,
+    hasFirebaseSession,
   );
   const showChrome =
     Boolean(currentUser) && !isPublicPath(location.pathname);
@@ -120,7 +121,6 @@ export function MobileShell() {
                 navigate(ROLE_HOME[roleView]);
               }
             }}
-            onSignIn={() => navigate('/')}
             onSwitchView={switchView}
           />
         )}

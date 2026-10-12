@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
+  applyAvailableMatchesFilters,
+  applySchedulerScheduleFilters,
   parseAvailableRoleParam,
   parseGenderParam,
   parseMemberTabParam,
@@ -49,6 +51,48 @@ describe('parseAvailableRoleParam', () => {
   });
 });
 
+describe('applyAvailableMatchesFilters', () => {
+  it('applies the draft in one URL state and removes the retired event filter', () => {
+    const params = new URLSearchParams('date=2026-10-10&event=league&role=ar');
+    applyAvailableMatchesFilters(params, {
+      role: 'mo',
+      gender: 'women',
+      level: 'Tier 2',
+      competition: 'Lonestar Women',
+      format: null,
+      side: '1st',
+    });
+    expect(params.get('date')).toBe('2026-10-10');
+    expect(params.get('role')).toBe('mo');
+    expect(params.get('gender')).toBe('women');
+    expect(params.get('level')).toBe('Tier 2');
+    expect(params.get('competition')).toBe('Lonestar Women');
+    expect(params.get('side')).toBe('1st');
+    expect(params.has('format')).toBe(false);
+    expect(params.has('event')).toBe(false);
+  });
+});
+
+describe('applySchedulerScheduleFilters', () => {
+  it('applies modal filters together while preserving the visible date filter', () => {
+    const params = new URLSearchParams(
+      'date=2026-10-10&needs=1&status=draft',
+    );
+    applySchedulerScheduleFilters(params, {
+      gender: 'women',
+      level: 'Tier 1',
+      competition: 'Lonestar Women',
+      status: 'needs_assignment',
+    });
+    expect(params.get('date')).toBe('2026-10-10');
+    expect(params.get('gender')).toBe('women');
+    expect(params.get('level')).toBe('Tier 1');
+    expect(params.get('competition')).toBe('Lonestar Women');
+    expect(params.get('status')).toBe('needs_assignment');
+    expect(params.has('needs')).toBe(false);
+  });
+});
+
 describe('parseMemberTabParam', () => {
   it('defaults to referees', () => {
     expect(parseMemberTabParam(null)).toBe('referees');
@@ -59,8 +103,8 @@ describe('parseMemberTabParam', () => {
 describe('pathWithSearch', () => {
   it('appends query string when present', () => {
     const params = new URLSearchParams({ gender: 'men', date: '2026-09-04' });
-    expect(pathWithSearch('/global/schedule/upcoming', params)).toBe(
-      '/global/schedule/upcoming?gender=men&date=2026-09-04',
+    expect(pathWithSearch('/global/schedule', params)).toBe(
+      '/global/schedule?gender=men&date=2026-09-04',
     );
   });
 

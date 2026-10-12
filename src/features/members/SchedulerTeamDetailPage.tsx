@@ -12,9 +12,12 @@ import {
   teamAdminsForTeam,
   teamContactPeople,
 } from '@/domain/teams';
-import { useAppBack, backState, type BackNav } from '@/nav/backNav';
+import { backState, type BackNav } from '@/nav/backNav';
+import { useContextualAppBack } from '@/app/shell/contextualBar';
 import { UserAvatar } from '@/ui/UserAvatar';
-import { MatchListRow } from '@/ui/MatchListRow';
+import { MatchSummaryCard } from '@/components/MatchSummaryCard';
+import { MatchCrewTrailing } from '@/ui/MatchCrewTrailing';
+import { workflowMatchCardStatus } from '@/ui/matchCardStatus';
 import { MapsAddressLink } from '@/ui/MapsAddressLink';
 
 const FALLBACK_BACK: BackNav = { to: '/about/members/teams', label: 'Teams' };
@@ -22,10 +25,10 @@ const FALLBACK_BACK: BackNav = { to: '/about/members/teams', label: 'Teams' };
 export function SchedulerTeamDetailPage() {
   const { teamId } = useParams();
   const location = useLocation();
-  const { state } = useApp();
+  const { currentUser, state } = useApp();
   const membersHref = useAppHref('/about/members');
   const teamsBaseHref = useAppHref('/about/members/teams');
-  const { goBack, backLabel } = useAppBack(FALLBACK_BACK);
+  useContextualAppBack(FALLBACK_BACK);
 
   const team = useMemo(() => {
     if (!teamId) return null;
@@ -83,9 +86,6 @@ export function SchedulerTeamDetailPage() {
   if (!team) {
     return (
       <div className="rs-stack">
-        <button type="button" className="rs-detail__back" onClick={goBack}>
-          ← {backLabel}
-        </button>
         <EmptyState titleText="Team not found" headingLevel="h3">
           <EmptyStateBody>That club isn’t on the synced schedule.</EmptyStateBody>
         </EmptyState>
@@ -95,10 +95,6 @@ export function SchedulerTeamDetailPage() {
 
   return (
     <div className="rs-stack">
-      <button type="button" className="rs-detail__back" onClick={goBack}>
-        ← {backLabel}
-      </button>
-
       <section className="rs-detail-card" aria-labelledby="team-name">
         <h2 id="team-name" className="rs-detail-section__label">
           {team.name}
@@ -191,11 +187,19 @@ export function SchedulerTeamDetailPage() {
           <ul className="rs-list">
             {upcoming.map((m) => (
               <li key={m.id}>
-                <MatchListRow
+                <MatchSummaryCard
                   match={m}
                   to={`/matches/${m.id}`}
                   showTime
                   back={matchBack}
+                  statusPresentation={workflowMatchCardStatus(m)}
+                  footer={
+                    <MatchCrewTrailing
+                      match={m}
+                      highlightUserId={currentUser?.uid}
+                      back={matchBack}
+                    />
+                  }
                 />
               </li>
             ))}

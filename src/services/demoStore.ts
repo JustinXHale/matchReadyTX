@@ -27,6 +27,8 @@ import {
   applyLevelCrewDefaults,
   applyLevelCrewDefaultsIfStock,
   matchEligibleForCrewDefaultsReapply,
+  matchFromCrewRoles,
+  matchHasCrewAssignments,
   type DefaultCrewByLevel,
 } from '@/domain/crewDefaults';
 import { feeOverrideForMatch, matchesForFeeApply } from '@/domain/feeDefaults';
@@ -86,6 +88,7 @@ import {
 } from '@/domain/judicial';
 import { seedDemoJudicialSeason } from '@/services/demoJudicialSeason';
 import { createDraftInvoice } from '@/domain/invoiceBuilder';
+import { notifyApp } from '@/app/feedback/feedbackBus';
 import { buildAssignmentPayableRows } from '@/domain/paymentReadiness';
 import {
   isOtherOpponentTeamId,
@@ -128,6 +131,7 @@ import {
   crewPeople,
   emptyAssignment,
   emptyCrew,
+  emptyCrewBlocks,
   hasRefereeLensRole,
   isCrewVisibleToTeams,
   newAssignmentId,
@@ -145,6 +149,7 @@ import {
   defaultOrgId,
   saveMatchTeamConfirmation,
   saveMatchWorkflowInFirestore,
+  saveOfficialPaymentInFirestore,
   updateChangeProposalInFirestore,
 } from '@/services/orgData';
 
@@ -162,6 +167,31 @@ export const DEMO_CROWD_RAISE_HAND_MATCH_ID = 'm_g01';
 
 /** Pre-seeded compliance hold for schedule + detail overlay demos. */
 export const DEMO_COMPLIANCE_HOLD_MATCH_ID = 'm_hold01';
+
+/** Rebuild empty AR/CMO/#4 blocks when rolesNeeded lists them but crew is MO-only. */
+function repairOpenGameCrewIfNeeded(m: Match): Match {
+  if (matchHasCrewAssignments(m)) return m;
+  const needed = m.rolesNeeded?.length
+    ? m.rolesNeeded
+    : (['mo'] as RequestableSlot[]);
+  const wantsAr = needed.includes('ar1') || needed.includes('ar2');
+  const wantsCmo = needed.includes('cmo');
+  const wantsNo4 = needed.includes('no4');
+  if (!wantsAr && !wantsCmo && !wantsNo4) return m;
+  const hasArOpen =
+    emptyCrewBlocks(m.crew.ar1).length > 0 ||
+    emptyCrewBlocks(m.crew.ar2).length > 0;
+  const hasCmoOpen = (m.cmo ?? []).some((c) => !c.userId);
+  const hasNo4Open = emptyCrewBlocks(m.crew.no4).length > 0;
+  if (
+    (!wantsAr || hasArOpen) &&
+    (!wantsCmo || hasCmoOpen) &&
+    (!wantsNo4 || hasNo4Open)
+  ) {
+    return m;
+  }
+  return { ...m, ...matchFromCrewRoles(needed) };
+}
 
 type LiveSnapshotExpect =
   | 'assignment_confirmed'
@@ -429,9 +459,16 @@ function seedUsers(): UserProfile[] {
       ...withHome('1200 Barton Springs Rd', 'Austin', 'TX', '78704'),
       homeLat: 30.2672,
       homeLng: -97.7431,
-      // One demo persona covers Scheduler, Referee/CMO, and Team Admin lenses
+      // One demo persona covers Scheduler, Referee, CMO, and Team Admin lenses
       // with multiple club sides (1sts + 2nds).
-      roles: ['assigner', 'official', 'teamAdmin', 'reportAnalytics', 'judicial'],
+      roles: [
+        'assigner',
+        'official',
+        'cmo',
+        'teamAdmin',
+        'reportAnalytics',
+        'judicial',
+      ],
       teamIds: ['team_austin', 'team_austin_2nds'],
       profileComplete: true,
       birthday: '1988-04-12',
@@ -979,14 +1016,17 @@ function seedMatches(): Match[] {
     const pair = openPairs[i % openPairs.length];
     const venue = openVenues[i % openVenues.length];
     const id = `m_g${String(i + 1).padStart(2, '0')}`;
-    const rolesNeeded =
+    // Seed real empty blocks for every needed role so Available shows
+    // multi-position raise-hand prompts (not MO-only).
+    const rolesNeeded: RequestableSlot[] =
       i % 4 === 0
-        ? (['mo', 'ar1', 'ar2', 'no4', 'cmo'] as const)
+        ? ['mo', 'ar1', 'ar2', 'no4', 'cmo']
         : i % 4 === 1
-          ? (['mo', 'ar1', 'ar2', 'cmo'] as const)
+          ? ['mo', 'ar1', 'ar2', 'cmo']
           : i % 4 === 2
-            ? (['mo', 'no4'] as const)
-            : (['mo', 'ar1', 'ar2', 'no4'] as const);
+            ? ['mo', 'no4']
+            : ['mo', 'ar1', 'ar2', 'no4'];
+    const crewSetup = matchFromCrewRoles(rolesNeeded);
     return {
       id,
       sheetRowKey: `sheet-${id}`,
@@ -1008,8 +1048,9 @@ function seedMatches(): Match[] {
       homeConfirmedAt: released,
       awayConfirmedAt: released,
       releasedAt: released,
-      rolesNeeded: [...rolesNeeded],
-      crew: emptyCrew(),
+      rolesNeeded: crewSetup.rolesNeeded,
+      crew: crewSetup.crew,
+      cmo: crewSetup.cmo,
     };
   });
 
@@ -3430,6 +3471,7 @@ class DemoStore {
     paymentContact: string;
     paidByUserId?: string;
     paidByName?: string;
+    notes?: string;
   }): Promise<void> {
     const payment: OfficialPayment = {
       id: input.rowId,
@@ -3445,9 +3487,9 @@ class DemoStore {
       paidAt: new Date().toISOString(),
       paidByUserId: input.paidByUserId,
       paidByName: input.paidByName,
+      notes: input.notes,
     };
     if (isLiveDataMode()) {
-      const { saveOfficialPaymentInFirestore } = await import('@/services/orgData');
       await saveOfficialPaymentInFirestore(defaultOrgId(), payment);
       return;
     }
@@ -3662,6 +3704,23 @@ class DemoStore {
     this.listeners.forEach((l) => l());
   }
 
+  /**
+   * Rebuild empty crew blocks for demo open games that list AR/CMO/#4 in
+   * rolesNeeded but still only have an MO empty slot (stale in-memory seed).
+   * Safe for HMR / long-lived demo sessions without a full reset.
+   */
+  repairDemoOpenMatchCrews(): void {
+    this.set((s) => {
+      let changed = false;
+      const matches = s.matches.map((m) => {
+        const next = repairOpenGameCrewIfNeeded(m);
+        if (next !== m) changed = true;
+        return next;
+      });
+      return changed ? { ...s, matches } : s;
+    });
+  }
+
   /** Upsert a Firebase user into the in-memory roster and sign them in. */
   upsertAndSignIn(user: UserProfile): void {
     this.set((s) => {
@@ -3838,6 +3897,7 @@ class DemoStore {
           return d.toISOString();
         };
         const released = new Date().toISOString();
+        const secondsCrew = matchFromCrewRoles(['mo', 'ar1', 'ar2']);
         matches = [
           ...matches,
           {
@@ -3861,8 +3921,8 @@ class DemoStore {
             homeConfirmedAt: undefined,
             awayConfirmedAt: released,
             releasedAt: released,
-            rolesNeeded: ['mo', 'ar1', 'ar2'],
-            crew: emptyCrew(),
+            rolesNeeded: secondsCrew.rolesNeeded,
+            crew: secondsCrew.crew,
           },
           {
             id: 'm_2nds02',
@@ -3885,8 +3945,8 @@ class DemoStore {
             homeConfirmedAt: released,
             awayConfirmedAt: released,
             releasedAt: released,
-            rolesNeeded: ['mo', 'ar1', 'ar2'],
-            crew: emptyCrew(),
+            rolesNeeded: secondsCrew.rolesNeeded,
+            crew: secondsCrew.crew,
           },
         ];
       }
@@ -3894,7 +3954,7 @@ class DemoStore {
       return {
         ...s,
         teams,
-        matches,
+        matches: matches.map(repairOpenGameCrewIfNeeded),
         users: s.users.map((u) => {
           if (u.uid !== 'u_assigner' && u.uid !== 'u_home') return u;
           const roles = new Set(u.roles);
@@ -4504,9 +4564,7 @@ class DemoStore {
             err instanceof Error
               ? err.message
               : 'Could not dismiss the proposal. Check permissions and try again.';
-          if (typeof window !== 'undefined') {
-            window.alert(message);
-          }
+          notifyApp(message, 'error');
         });
     }
 
@@ -6184,3 +6242,12 @@ class DemoStore {
 }
 
 export const demoStore = new DemoStore();
+
+// HMR / long-lived tabs: fix MO-only open games while still in demo showcase.
+try {
+  if (sessionStorage.getItem('rs-data-mode') === 'demo') {
+    demoStore.repairDemoOpenMatchCrews();
+  }
+} catch {
+  /* ignore */
+}

@@ -216,9 +216,9 @@ export function SchedulerUploadPage() {
       )}
 
       <section className="rs-detail-card" aria-labelledby="upload-step-1">
-        <h3 id="upload-step-1" className="rs-detail-section__label">
+        <h2 id="upload-step-1" className="rs-detail-section__label">
           1 · Connect & sync schedule
-        </h3>
+        </h2>
         <p className="rs-match-card__meta">
           In Google Sheets open your workbook → <strong>Share</strong> →{' '}
           <strong>Copy link</strong>. Paste that link here (not “Publish to
@@ -273,9 +273,9 @@ export function SchedulerUploadPage() {
       </section>
 
       <section className="rs-detail-card" aria-labelledby="upload-step-2">
-        <h3 id="upload-step-2" className="rs-detail-section__label">
+        <h2 id="upload-step-2" className="rs-detail-section__label">
           2 · Release to teams
-        </h3>
+        </h2>
         <p className="rs-match-card__meta">
           Synced games start as drafts. Release them so Team Admins can confirm
           or propose changes.

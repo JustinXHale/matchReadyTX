@@ -98,7 +98,7 @@ export function AboutPage() {
       </nav>
 
       <section id="about-why" className="rs-about-section">
-        <Title headingLevel="h3" size="md">
+        <Title headingLevel="h2" size="md">
           Why MatchReadyTX exists
         </Title>
         <p>
@@ -126,7 +126,7 @@ export function AboutPage() {
       </section>
 
       <section id="about-confirmation" className="rs-about-section">
-        <Title headingLevel="h3" size="md">
+        <Title headingLevel="h2" size="md">
           A different approach to match confirmation
         </Title>
         <p>
@@ -157,12 +157,12 @@ export function AboutPage() {
       </section>
 
       <section id="about-does" className="rs-about-section">
-        <Title headingLevel="h3" size="md">
+        <Title headingLevel="h2" size="md">
           What MatchReadyTX does
         </Title>
         <div className="rs-about-features">
           <article className="rs-about-feature">
-            <h4 className="rs-about-feature__title">Familiar scheduling</h4>
+            <h3 className="rs-about-feature__title">Familiar scheduling</h3>
             <p>
               The organization’s Google Sheet remains the schedule’s source of
               truth. Assigners keep working the way they already do; the app
@@ -170,7 +170,7 @@ export function AboutPage() {
             </p>
           </article>
           <article className="rs-about-feature">
-            <h4 className="rs-about-feature__title">Team confirmation</h4>
+            <h3 className="rs-about-feature__title">Team confirmation</h3>
             <p>
               Home and away administrators confirm that the match is going
               forward and verify the date, kickoff time, and venue before crew
@@ -178,7 +178,7 @@ export function AboutPage() {
             </p>
           </article>
           <article className="rs-about-feature">
-            <h4 className="rs-about-feature__title">Assignment management</h4>
+            <h3 className="rs-about-feature__title">Assignment management</h3>
             <p>
               Officials can view appointments, accept assignments, and request
               available matches. Assigners work those requests and other open
@@ -186,28 +186,28 @@ export function AboutPage() {
             </p>
           </article>
           <article className="rs-about-feature">
-            <h4 className="rs-about-feature__title">Controlled crew visibility</h4>
+            <h3 className="rs-about-feature__title">Controlled crew visibility</h3>
             <p>
               Teams see officiating details only when the assignment is ready.
               The crew becomes visible after the Match Official has confirmed.
             </p>
           </article>
           <article className="rs-about-feature">
-            <h4 className="rs-about-feature__title">Timely reminders</h4>
+            <h3 className="rs-about-feature__title">Timely reminders</h3>
             <p>
               As kickoff approaches, reminders help teams and officials catch
               details that may have slipped during a busy week.
             </p>
           </article>
           <article className="rs-about-feature">
-            <h4 className="rs-about-feature__title">Post-match reporting</h4>
+            <h3 className="rs-about-feature__title">Post-match reporting</h3>
             <p>
               Referees and coaching match officials can file their reports in
               the same place they manage the appointment.
             </p>
           </article>
           <article className="rs-about-feature">
-            <h4 className="rs-about-feature__title">Match and travel information</h4>
+            <h3 className="rs-about-feature__title">Match and travel information</h3>
             <p>
               Schedulers can view match fees and flight/lodging flags when
               assigning. Referees, team admins, and fans see kickoff, venue, and
@@ -219,12 +219,12 @@ export function AboutPage() {
       </section>
 
       <section id="about-roles" className="rs-about-section">
-        <Title headingLevel="h3" size="md">
+        <Title headingLevel="h2" size="md">
           Roles in the app
         </Title>
         <div className="rs-about-features">
           <article className="rs-about-feature">
-            <h4 className="rs-about-feature__title">Referee / CMO</h4>
+            <h3 className="rs-about-feature__title">Referee / CMO</h3>
             <p>
               Shared view for referees and coaching match officials. Manage
               appointments, request matches, submit reports, and see when an
@@ -232,7 +232,7 @@ export function AboutPage() {
             </p>
           </article>
           <article className="rs-about-feature">
-            <h4 className="rs-about-feature__title">Team Admin</h4>
+            <h3 className="rs-about-feature__title">Team Admin</h3>
             <p>
               For club contacts. Confirm fixtures, verify match details,
               propose changes, and respond to open requests as kickoff
@@ -240,7 +240,7 @@ export function AboutPage() {
             </p>
           </article>
           <article className="rs-about-feature">
-            <h4 className="rs-about-feature__title">Scheduler</h4>
+            <h3 className="rs-about-feature__title">Scheduler</h3>
             <p>
               The assigner’s control center: Queues, Schedule, and Org. Assign
               crews, sync the Google Sheet, release schedules, and maintain fee
@@ -248,7 +248,7 @@ export function AboutPage() {
             </p>
           </article>
           <article className="rs-about-feature">
-            <h4 className="rs-about-feature__title">Fan</h4>
+            <h3 className="rs-about-feature__title">Fan</h3>
             <p>
               Browse the schedule, standings, and teams. Official names stay
               hidden until a Match Official has confirmed — same rule as for
@@ -259,7 +259,7 @@ export function AboutPage() {
       </section>
 
       <section id="about-creator" className="rs-about-section">
-        <Title headingLevel="h3" size="md">
+        <Title headingLevel="h2" size="md">
           Creator
         </Title>
         <div className="rs-about-maker">

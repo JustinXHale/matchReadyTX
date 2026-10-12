@@ -10,9 +10,32 @@ body,
 body {
   font: var(--rs-font-body);
   font-family: var(--rs-font-family);
-  background: var(--rs-color-bg);
-  color: var(--rs-color-ink);
+  background: var(--rs-m3-surface);
+  color: var(--rs-m3-on-surface);
   -webkit-font-smoothing: antialiased;
+}
+
+/* Shared semantic heading hierarchy for every routed page. */
+.rs-page-body .pf-v6-c-title,
+.rs-page-body h1,
+.rs-page-body h2,
+.rs-page-body h3 {
+  overflow-wrap: anywhere;
+}
+
+.rs-page-body .pf-v6-c-title.pf-m-h1,
+.rs-stack > h1.pf-v6-c-title {
+  margin: 0;
+  font: var(--rs-font-title) !important;
+  color: var(--rs-m3-on-surface);
+  letter-spacing: -0.01em;
+}
+
+.rs-page-body .pf-v6-c-title.pf-m-h2,
+.rs-page-body h2.pf-v6-c-title {
+  margin: 0;
+  font: var(--rs-font-section-title) !important;
+  color: var(--rs-m3-on-surface);
 }
 
 /* WCAG 2.4.11 — keep focused controls clear of sticky chrome */
@@ -84,7 +107,7 @@ body {
 .rs-page-body {
   flex: 1 1 auto;
   padding-bottom: var(--rs-bottom-clearance) !important;
-  max-width: 720px;
+  max-width: var(--rs-content-max);
   width: 100%;
   min-width: 0;
   margin: 0 auto;
@@ -99,13 +122,13 @@ body {
 .rs-page--auth .rs-page-body,
 .rs-app-shell--auth .rs-page-body {
   padding-bottom: var(--pf-t--global--spacer--xl) !important;
-  max-width: 420px;
+  max-width: var(--rs-form-max);
 }
 
 .rs-page--public-doc .rs-page-body,
 .rs-app-shell--public-doc .rs-page-body {
   padding-bottom: var(--pf-t--global--spacer--xl) !important;
-  max-width: 720px;
+  max-width: var(--rs-content-max);
 }
 
 .rs-stack {
@@ -164,7 +187,7 @@ body {
 .rs-btn--gold.pf-v6-c-button.pf-m-primary {
   background-color: var(--rs-color-warn) !important;
   border-color: var(--rs-color-warn) !important;
-  color: var(--rs-color-on-primary) !important;
+  color: var(--rs-color-on-warn) !important;
 }
 
 .rs-btn--danger.pf-v6-c-button,
@@ -193,13 +216,13 @@ body {
 .rs-btn--gold.pf-v6-c-button:focus-visible {
   background-color: color-mix(in srgb, var(--rs-color-warn) 88%, var(--rs-color-tint-contrast)) !important;
   border-color: color-mix(in srgb, var(--rs-color-warn) 88%, var(--rs-color-tint-contrast)) !important;
-  color: var(--rs-color-on-primary) !important;
+  color: var(--rs-color-on-warn) !important;
 }
 
 .rs-btn--gold.pf-v6-c-button.pf-m-secondary {
   background-color: var(--rs-color-warn) !important;
   border-color: var(--rs-color-warn) !important;
-  color: var(--rs-color-on-primary) !important;
+  color: var(--rs-color-on-warn) !important;
 }
 
 .rs-btn--disabled-visible.pf-v6-c-button,
@@ -225,4 +248,22 @@ body {
 
 .pf-v6-c-modal-box__body > .rs-form-stack {
   width: 100%;
+}
+.rs-sr-only {
+  position: absolute !important;
+  width: 1px !important;
+  height: 1px !important;
+  padding: 0 !important;
+  margin: -1px !important;
+  overflow: hidden !important;
+  clip: rect(0, 0, 0, 0) !important;
+  white-space: nowrap !important;
+  border: 0 !important;
+}
+
+.rs-field-error {
+  margin: 0;
+  color: var(--rs-m3-error);
+  font: var(--rs-font-meta);
+  font-weight: 700;
 }

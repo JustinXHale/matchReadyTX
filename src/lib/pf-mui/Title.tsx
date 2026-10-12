@@ -3,14 +3,14 @@ import type { ReactNode } from 'react';
 
 type Heading = 'h1' | 'h2' | 'h3' | 'h4' | 'h5' | 'h6';
 
-const sizeMap: Record<string, 'h3' | 'h4' | 'h5' | 'h6' | 'subtitle1' | 'subtitle2' | 'body2'> = {
-  '4xl': 'h3',
-  '3xl': 'h4',
-  '2xl': 'h5',
-  xl: 'h5',
-  lg: 'h6',
-  md: 'subtitle1',
-  sm: 'subtitle2',
+const sizeMap: Record<string, 'h1' | 'h2' | 'h3' | 'subtitle1' | 'subtitle2' | 'body2'> = {
+  '4xl': 'h1',
+  '3xl': 'h1',
+  '2xl': 'h1',
+  xl: 'h1',
+  lg: 'h2',
+  md: 'h3',
+  sm: 'subtitle1',
   xs: 'body2',
 };
 
@@ -41,7 +41,6 @@ export function Title({
       variant={sizeMap[size] ?? 'h6'}
       className={classes}
       id={id}
-      fontWeight={700}
     >
       {children}
     </Typography>

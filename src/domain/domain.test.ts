@@ -114,7 +114,11 @@ import {
   officialDoubleBookings,
   rolePillsForMember,
 } from '@/domain/members';
-import { defaultRoleView, lensesForUser } from '@/app/AppContext';
+import {
+  defaultRoleView,
+  lensesForUser,
+  migrateLegacyRoleView,
+} from '@/app/AppContext';
 import { standingsByDivision, standingsCombined } from '@/domain/standings';
 import { scheduleTeamEntries, teamContactPeople, conferenceTeamOptions } from '@/domain/teams';
 import { dedupeTeamsForPicker } from '@/domain/teamList';
@@ -1723,11 +1727,30 @@ describe('fan role helpers', () => {
       }),
     ).toBe('referee');
     expect(
+      lensesForUser({
+        ...fanUser,
+        roles: ['official', 'cmo'],
+      }),
+    ).toEqual(['referee', 'cmo']);
+    expect(
+      defaultRoleView({
+        ...fanUser,
+        roles: ['cmo'],
+      }),
+    ).toBe('cmo');
+    expect(
       defaultRoleView({
         ...fanUser,
         roles: ['assigner', 'fan'],
       }),
     ).toBe('scheduler');
+  });
+
+  it('migrates legacy lens aliases without collapsing the CMO lens', () => {
+    expect(migrateLegacyRoleView('official')).toBe('referee');
+    expect(migrateLegacyRoleView('assigner')).toBe('scheduler');
+    expect(migrateLegacyRoleView('coach')).toBe('teamAdmin');
+    expect(migrateLegacyRoleView('cmo')).toBe('cmo');
   });
 });
 
@@ -2466,7 +2489,7 @@ describe('crewColumnLines', () => {
       mo: [filled, emptyAssignment('mo'), emptyAssignment('mo')],
     };
     const lines = crewColumnLines(m);
-    expect(lines.some((l) => l.value === 'Jane Ref')).toBe(true);
+    expect(lines.some((l) => l.value === 'Jane R.')).toBe(true);
     expect(lines.some((l) => l.slotLabel === '(2) MO' && l.value === 'Open')).toBe(
       true,
     );

@@ -3,16 +3,15 @@ import { NavLink } from 'react-router-dom';
 import { useApp, useAppHref } from '@/app/AppContext';
 import {
   countCardReportsDue,
-  countCoachingReportsDue,
   countMatchReportsDue,
   formatDueBadge,
 } from '@/features/referee/reports/dueCounts';
 
 export function ReportsSubNav() {
-  const { currentUser, state } = useApp();
+  const { currentUser, state, roleView } = useApp();
   const matchHref = useAppHref('/referee/reports/match');
   const cardsHref = useAppHref('/referee/reports/cards');
-  const coachingHref = useAppHref('/referee/reports/coaching');
+  const coachingMineHref = useAppHref('/referee/reports/coaching/mine');
 
   const matchDue = useMemo(() => {
     if (!currentUser) return 0;
@@ -27,10 +26,7 @@ export function ReportsSubNav() {
       currentUser.uid,
     );
   }, [currentUser, state.matches, state.cardReports, state.matchReports]);
-  const coachingDue = useMemo(() => {
-    if (!currentUser) return 0;
-    return countCoachingReportsDue(state.matchReports, currentUser.uid);
-  }, [currentUser, state.matchReports]);
+  if (roleView === 'cmo') return null;
 
   return (
     <nav className="rs-sub-tabs" aria-label="Reports">
@@ -67,22 +63,10 @@ export function ReportsSubNav() {
         )}
       </NavLink>
       <NavLink
-        to={coachingHref}
-        className={({ isActive }) =>
-          `rs-nav-with-badge${isActive ? ' active' : ''}`
-        }
-        aria-label={
-          coachingDue > 0
-            ? `Coaching reports, ${coachingDue} due`
-            : 'Coaching reports'
-        }
+        to={coachingMineHref}
+        className={({ isActive }) => (isActive ? 'active' : '')}
       >
-        Coaching Reports
-        {coachingDue > 0 && (
-          <span className="rs-nav-badge rs-nav-badge--inline" aria-hidden>
-            {formatDueBadge(coachingDue)}
-          </span>
-        )}
+        Coaching on me
       </NavLink>
     </nav>
   );

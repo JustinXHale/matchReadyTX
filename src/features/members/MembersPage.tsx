@@ -1,6 +1,11 @@
 import { useMemo } from 'react';
 import { Link } from 'react-router-dom';
-import { EmptyState, EmptyStateBody, TextInput } from '@patternfly/react-core';
+import {
+  EmptyState,
+  EmptyStateBody,
+  TextInput,
+  Title,
+} from '@patternfly/react-core';
 import { useApp } from '@/app/AppContext';
 import {
   formatMemberScheduleHint,
@@ -221,6 +226,9 @@ export function MembersPage() {
 
   return (
     <div className="rs-stack">
+      <Title headingLevel="h1" size="lg">
+        Members
+      </Title>
       <p className="rs-match-card__meta">
         Society directory — open someone to review level requests, set assessed
         level, assign clubs, or remove them from the org.

@@ -27,6 +27,7 @@ export function navForRole(
   roleView: RoleView,
   demo: boolean,
   hasInsightsAccess: boolean,
+  hasFirebaseSession: boolean,
 ): NavItem[] {
   const prefix = (path: string) => (demo ? withDemoPrefix(path) : path);
   const active = (base: string) => (p: string) =>
@@ -69,12 +70,14 @@ export function navForRole(
     isActive: (p) => stripDemoPrefix(p).startsWith('/insights'),
   };
   const profile: NavItem = {
-    to: prefix('/profile'),
-    label: 'Profile',
+    to: hasFirebaseSession ? prefix('/profile') : '/login',
+    label: hasFirebaseSession ? 'Profile' : 'Sign in',
     icon: (
       <FontAwesomeIcon icon={faUser} className={navIconClass} aria-hidden />
     ),
-    isActive: active('/profile'),
+    isActive: hasFirebaseSession
+      ? active('/profile')
+      : (p) => stripDemoPrefix(p) === '/login',
   };
 
   const withInsights = (items: NavItem[]): NavItem[] => {
@@ -185,16 +188,31 @@ export function navForRole(
     return withInsights([about, global, profile]);
   }
 
-  // Referee/CMO — primary mobile lens (appointments, request, reports)
-  return withInsights([
+  if (roleView === 'cmo') {
+    return [
+      about,
+      {
+        to: prefix('/referee/appointments'),
+        label: 'CMO',
+        icon: <WhistleIcon className={navIconClass} size={18} />,
+        isActive: active('/referee'),
+      },
+      global,
+      insights,
+      profile,
+    ];
+  }
+
+  // Referee lens intentionally omits Insights; switch to CMO when eligible.
+  return [
     about,
     {
       to: prefix('/referee'),
-      label: 'Referee/CMO',
+      label: 'Referee',
       icon: <WhistleIcon className={navIconClass} size={18} />,
       isActive: active('/referee'),
     },
     global,
     profile,
-  ]);
+  ];
 }

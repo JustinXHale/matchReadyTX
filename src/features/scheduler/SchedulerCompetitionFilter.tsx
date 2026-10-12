@@ -57,7 +57,7 @@ export function useSchedulerCompetition() {
         : COMPETITION_ALL;
     setSelectedState(next);
     writeStoredCompetition(next);
-  }, [options.join('|')]);
+  }, [options]);
 
   const setSelected = (value: string) => {
     setSelectedState(value);

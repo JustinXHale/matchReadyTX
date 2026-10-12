@@ -56,7 +56,7 @@ export function Modal({
           width: '100%',
           maxWidth: widthMap[variant] ?? 720,
           m: 2,
-          borderRadius: 2,
+          borderRadius: 'var(--rs-radius-dialog)',
         },
       }}
     >
@@ -140,7 +140,7 @@ export function ModalFooter({
   className?: string;
 }) {
   return (
-    <DialogActions className={className} sx={{ px: 3, py: 2, gap: 1 }}>
+    <DialogActions className={className}>
       {children}
     </DialogActions>
   );

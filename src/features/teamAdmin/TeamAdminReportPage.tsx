@@ -1,6 +1,5 @@
 import { useMemo, useState } from 'react';
 import { EmptyState, EmptyStateBody, Title } from '@patternfly/react-core';
-import { Link } from 'react-router-dom';
 import { useApp, useAppHref } from '@/app/AppContext';
 import {
   COACH_FEEDBACK_SCALE_LABELS,
@@ -23,6 +22,7 @@ import { matchInCompetition } from '@/domain/competitions';
 import { isFirebaseConfigured } from '@/services/firebase';
 import { defaultOrgId, saveCoachFeedbackInFirestore } from '@/services/orgData';
 import { MatchListRow } from '@/ui/MatchListRow';
+import { MatchActionPrompt } from '@/ui/MatchActionPrompt';
 
 type StatusFilter = 'all' | 'needs' | 'submitted' | 'declined' | 'draft';
 
@@ -36,6 +36,12 @@ function statusLabel(existing: CoachFeedback | undefined): string {
     return `Submitted · ${COACH_FEEDBACK_SCALE_LABELS[overall]}`;
   }
   return 'Submitted';
+}
+
+function feedbackSubject(row: ReturnType<typeof coachFeedbackListRows>[number]): string {
+  return row.kind === 'crew'
+    ? `the referee crew for ${row.tournamentTitle}`
+    : `MO ${row.mo.userName}`;
 }
 
 export function TeamAdminReportPage() {
@@ -287,47 +293,51 @@ export function TeamAdminReportPage() {
               existing?.status !== 'submitted' && existing?.status !== 'declined';
             const formHref = `${reportBase}/${match.id}`;
             const docId = coachFeedbackDocId(match, reportingTeamId);
+            const subject = feedbackSubject(row);
+            const prompt = existing?.status === 'submitted'
+              ? {
+                  message: `Feedback submitted for ${subject}.`,
+                  primaryLabel: 'View feedback',
+                  tone: 'complete' as const,
+                }
+              : existing?.status === 'declined'
+                ? {
+                    message: `Feedback declined for ${subject}.`,
+                    primaryLabel: 'Review feedback',
+                    tone: 'neutral' as const,
+                  }
+                : existing?.status === 'draft'
+                  ? {
+                      message: `Finish feedback for ${subject}?`,
+                      primaryLabel: 'Continue feedback',
+                      tone: 'attention' as const,
+                    }
+                  : {
+                      message: `Leave feedback for ${subject}?`,
+                      primaryLabel: 'Start',
+                      tone: 'attention' as const,
+                    };
             return (
               <MatchListRow
                 key={docId}
                 match={match}
                 to={formHref}
-                split="action"
                 warn={needs}
-                trailing={
-                  <div className="rs-coach-feedback-trailing">
-                    <Link
-                      to={formHref}
-                      className="rs-coach-feedback-trailing__hit"
-                    >
-                      <span
-                        className={`rs-pill${needs ? ' rs-pill--warn' : ''}`}
-                      >
-                        {statusLabel(existing)}
-                      </span>
-                      {row.kind === 'crew' ? (
-                        <span className="rs-coach-feedback-trailing__mo">
-                          Referee crew · {row.tournamentTitle}
-                        </span>
-                      ) : (
-                        <span className="rs-coach-feedback-trailing__mo">
-                          MO {row.mo.userName}
-                        </span>
-                      )}
-                    </Link>
-                    {canDecline ? (
-                      <button
-                        type="button"
-                        className="rs-coach-feedback-decline"
-                        disabled={busyId === docId}
-                        onClick={() =>
-                          void onDecline(match.id, reportingTeamId)
-                        }
-                      >
-                        Decline
-                      </button>
-                    ) : null}
-                  </div>
+                topBanner={
+                  <MatchActionPrompt
+                    message={prompt.message}
+                    primaryLabel={prompt.primaryLabel}
+                    primaryTo={formHref}
+                    secondaryLabel={canDecline ? 'Decline' : undefined}
+                    onSecondary={
+                      canDecline
+                        ? () => void onDecline(match.id, reportingTeamId)
+                        : undefined
+                    }
+                    secondaryDisabled={busyId === docId}
+                    tone={prompt.tone}
+                    ariaLabel={`${statusLabel(existing)} for ${subject}`}
+                  />
                 }
               />
             );

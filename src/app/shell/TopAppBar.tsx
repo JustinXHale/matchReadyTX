@@ -20,7 +20,6 @@ type Props = {
   isAssignerView: boolean;
   hasAssignerRole: boolean;
   onEnterLive: () => void;
-  onSignIn: () => void;
   onSwitchView: (next: RoleView) => void;
 };
 
@@ -39,7 +38,6 @@ export function TopAppBar({
   isAssignerView,
   hasAssignerRole,
   onEnterLive,
-  onSignIn,
   onSwitchView,
 }: Props) {
   return (
@@ -71,11 +69,6 @@ export function TopAppBar({
         {inDemoTree && hasFirebaseSession && (
           <Button variant="link" className="rs-demo-live" onClick={onEnterLive}>
             Back to live
-          </Button>
-        )}
-        {inDemoTree && !hasFirebaseSession && (
-          <Button variant="link" className="rs-demo-signin" onClick={onSignIn}>
-            Sign in
           </Button>
         )}
         {canSwitchRoleView && (

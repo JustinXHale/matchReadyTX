@@ -4,10 +4,12 @@ import { EmptyState, EmptyStateBody, Title } from '@patternfly/react-core';
 import { useApp } from '@/app/AppContext';
 import { releasedMatches } from '@/domain/visibility';
 import { genderLabel, type Match } from '@/domain/types';
-import { MatchListRow } from '@/ui/MatchListRow';
+import { MatchSummaryCard } from '@/components/MatchSummaryCard';
 import { MatchCrewTrailing } from '@/ui/MatchCrewTrailing';
+import { workflowMatchCardStatus } from '@/ui/matchCardStatus';
 import { formatTeamAddress, teamHomeMapsUrl } from '@/domain/teams';
-import { useAppBack, type BackNav } from '@/nav/backNav';
+import { type BackNav } from '@/nav/backNav';
+import { useContextualAppBack } from '@/app/shell/contextualBar';
 import { MapsAddressLink } from '@/ui/MapsAddressLink';
 import {
   formatMatchMonthLabel,
@@ -22,7 +24,7 @@ export function GlobalTeamDetailPage() {
   const location = useLocation();
   const { currentUser, state } = useApp();
   const timeZone = orgTimeZone(state.org.timezone);
-  const { goBack, backLabel } = useAppBack(FALLBACK_BACK);
+  useContextualAppBack(FALLBACK_BACK);
 
   const team = useMemo(() => {
     if (!teamId) return null;
@@ -89,13 +91,6 @@ export function GlobalTeamDetailPage() {
   if (!team) {
     return (
       <div className="rs-stack">
-        <button
-          type="button"
-          className="rs-detail__back"
-          onClick={goBack}
-        >
-          ← {backLabel}
-        </button>
         <EmptyState titleText="Team not found" headingLevel="h3">
           <EmptyStateBody>
             That team isn’t on the schedule.
@@ -107,14 +102,6 @@ export function GlobalTeamDetailPage() {
 
   return (
     <div className="rs-stack">
-      <button
-        type="button"
-        className="rs-detail__back"
-        onClick={goBack}
-      >
-        ← {backLabel}
-      </button>
-
       <Title headingLevel="h1" className="rs-team-detail__title">
         {team.name}
       </Title>
@@ -142,19 +129,19 @@ export function GlobalTeamDetailPage() {
       ) : (
         byMonth.map((group) => (
           <section key={group.key} className="rs-month-section">
-            <Title headingLevel="h3" size="md" className="rs-month-heading">
+            <Title headingLevel="h2" size="md" className="rs-month-heading">
               {group.label}
             </Title>
             <ul className="rs-list">
               {group.matches.map((m) => (
                   <li key={m.id}>
-                    <MatchListRow
+                    <MatchSummaryCard
                       match={m}
                       to={`/matches/${m.id}`}
                       showTime
-                      split="action"
                       back={matchBack}
-                      trailing={
+                      statusPresentation={workflowMatchCardStatus(m)}
+                      footer={
                         <MatchCrewTrailing
                           match={m}
                           highlightUserId={currentUser?.uid}

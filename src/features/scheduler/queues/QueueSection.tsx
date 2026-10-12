@@ -16,7 +16,7 @@ export function QueueSection({
   return (
     <section className="rs-queue-section" aria-labelledby={id}>
       <Title
-        headingLevel="h3"
+        headingLevel="h2"
         size="md"
         id={id}
         className="rs-queue-section__title"

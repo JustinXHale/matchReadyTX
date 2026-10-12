@@ -23,6 +23,7 @@ import { MatchCrewReportStatusPanel } from '@/features/matches/MatchCrewReportSt
 import { CrewReportStatusPills } from '@/features/matches/CrewReportStatusPills';
 import { canSeeMatchFees } from '@/domain/visibility';
 import { roleHomeBack, useApp } from '@/app/AppContext';
+import { useAppFeedback } from '@/app/feedback/feedbackContext';
 import {
   applyMatchForfeitOutcome,
   cancelMatch,
@@ -314,6 +315,7 @@ function resolveCmoContact(
 
 export function MatchDetailPage() {
   const { id } = useParams();
+  const { notify } = useAppFeedback();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const {
@@ -422,15 +424,16 @@ export function MatchDetailPage() {
       } catch (err) {
         console.error('Failed to save match response', err);
         store.releaseLiveSnapshotGuard(`match:${input.matchId}`);
-        window.alert(
+        notify(
           err instanceof Error
             ? `Updated locally, but save failed: ${err.message}`
             : 'Updated locally, but save failed.',
+          'error',
         );
         return false;
       }
     },
-    [dataMode, store],
+    [dataMode, notify, store],
   );
 
   const officials = useMemo(
@@ -602,7 +605,12 @@ export function MatchDetailPage() {
   if (!currentUser || !match) {
     return (
       <div className="rs-stack">
-        <p>Match not found.</p>
+        <Title headingLevel="h1" size="lg">
+          Match not found
+        </Title>
+        <p className="rs-match-card__meta">
+          This match is unavailable or no longer in the schedule.
+        </p>
       </div>
     );
   }
@@ -926,10 +934,11 @@ export function MatchDetailPage() {
           })
           .catch((err) => {
             console.error('Failed to save/email assignment', err);
-            window.alert(
+            notify(
               err instanceof Error
                 ? `Assigned locally, but email/save failed: ${err.message}`
                 : 'Assigned locally, but email/save failed. Check the console.',
+              'error',
             );
           });
       }
@@ -982,7 +991,7 @@ export function MatchDetailPage() {
       return;
     }
     if (dataMode !== 'live' || !isFirebaseConfigured) {
-      window.alert('Resend email is only available in Live mode.');
+      notify('Resend email is only available in Live mode.', 'info');
       return;
     }
     setResendEmailByKey((prev) => ({ ...prev, [key]: 'sending' }));
@@ -998,10 +1007,11 @@ export function MatchDetailPage() {
       .catch((err) => {
         console.error('Failed to resend assignment email', err);
         setResendEmailByKey((prev) => ({ ...prev, [key]: 'error' }));
-        window.alert(
+        notify(
           err instanceof Error
             ? `Could not resend email: ${err.message}`
             : 'Could not resend email. Check the console.',
+          'error',
         );
       });
   };
@@ -1028,10 +1038,11 @@ export function MatchDetailPage() {
           userId: removedUserId,
         }).catch((err) => {
           console.error('Failed to save/email unassignment', err);
-          window.alert(
+          notify(
             err instanceof Error
               ? `Cleared locally, but email/save failed: ${err.message}`
               : 'Cleared locally, but email/save failed. Check the console.',
+            'error',
           );
         });
       } else if (next) {
@@ -1095,7 +1106,7 @@ export function MatchDetailPage() {
     if (complianceHeld && !isAssigner) return false;
     // Scheduler can set either side.
     if (isAssigner) return true;
-    // Referee (MO) can set either side — only in the Referee/CMO lens.
+    // Referee (MO) can set either side — only in an appointed-official lens.
     if (isOfficialView && mySlot === 'mo' && myAssignment?.userId) return true;
     // Team Admin may only confirm their own club’s side.
     if (side === 'home' && isHomeAdmin) return true;
@@ -1298,10 +1309,11 @@ export function MatchDetailPage() {
             cancelMatch(match),
           ).catch((err) => {
             console.error('saveMatchWorkflowInFirestore failed', err);
-            window.alert(
+            notify(
               err instanceof Error
                 ? `Updated locally, but save failed: ${err.message}`
                 : 'Updated locally, but save failed.',
+              'error',
             );
           });
         }
@@ -1315,10 +1327,11 @@ export function MatchDetailPage() {
             postponeMatch(match),
           ).catch((err) => {
             console.error('saveMatchWorkflowInFirestore failed', err);
-            window.alert(
+            notify(
               err instanceof Error
                 ? `Updated locally, but save failed: ${err.message}`
                 : 'Updated locally, but save failed.',
+              'error',
             );
           });
         }
@@ -1333,10 +1346,11 @@ export function MatchDetailPage() {
             true,
           ).catch((err) => {
             console.error('saveMatchPlayedForfeitInFirestore failed', err);
-            window.alert(
+            notify(
               err instanceof Error
                 ? `Updated locally, but save failed: ${err.message}`
                 : 'Updated locally, but save failed.',
+              'error',
             );
           });
         }
@@ -1351,10 +1365,11 @@ export function MatchDetailPage() {
             false,
           ).catch((err) => {
             console.error('saveMatchPlayedForfeitInFirestore failed', err);
-            window.alert(
+            notify(
               err instanceof Error
                 ? `Updated locally, but save failed: ${err.message}`
                 : 'Updated locally, but save failed.',
+              'error',
             );
           });
         }
@@ -1366,10 +1381,11 @@ export function MatchDetailPage() {
           void clearMatchForfeitInFirestore(defaultOrgId(), match.id).catch(
             (err) => {
               console.error('clearMatchForfeitInFirestore failed', err);
-              window.alert(
+              notify(
                 err instanceof Error
                   ? `Updated locally, but save failed: ${err.message}`
                   : 'Updated locally, but save failed.',
+                'error',
               );
             },
           );
@@ -1384,10 +1400,11 @@ export function MatchDetailPage() {
             reactivateMatch(match),
           ).catch((err) => {
             console.error('saveMatchWorkflowInFirestore failed', err);
-            window.alert(
+            notify(
               err instanceof Error
                 ? `Updated locally, but save failed: ${err.message}`
                 : 'Updated locally, but save failed.',
+              'error',
             );
           });
         }
@@ -1408,10 +1425,11 @@ export function MatchDetailPage() {
             )
             .catch((err) => {
               console.error('clearComplianceHold failed', err);
-              window.alert(
+              notify(
                 err instanceof Error
                   ? `Updated locally, but save failed: ${err.message}`
                   : 'Updated locally, but save failed.',
+                'error',
               );
             });
         }
@@ -1438,10 +1456,11 @@ export function MatchDetailPage() {
         )
         .catch((err) => {
           console.error('setComplianceHold failed', err);
-          window.alert(
+          notify(
             err instanceof Error
               ? `Updated locally, but save failed: ${err.message}`
               : 'Updated locally, but save failed.',
+            'error',
           );
         });
     }
@@ -1481,10 +1500,11 @@ export function MatchDetailPage() {
         applyMatchForfeitOutcome(match, input),
       ).catch((err) => {
         console.error('saveMatchForfeitInFirestore failed', err);
-        window.alert(
+        notify(
           err instanceof Error
             ? `Updated locally, but save failed: ${err.message}`
             : 'Updated locally, but save failed.',
+          'error',
         );
       });
     }
@@ -1592,10 +1612,11 @@ export function MatchDetailPage() {
           );
         } catch (err) {
           console.error('Raise-hand update failed', err);
-          window.alert(
+          notify(
             err instanceof Error
               ? err.message
               : 'Could not update your request. Try again.',
+            'error',
           );
           return;
         }
@@ -1628,10 +1649,11 @@ export function MatchDetailPage() {
         } catch (err) {
           console.error('Raise-hand request failed', err);
           store.withdrawRequest(reqId, currentUser.uid);
-          window.alert(
+          notify(
             err instanceof Error
               ? err.message
               : 'Could not save your request. Try again.',
+            'error',
           );
           return;
         }
@@ -1665,14 +1687,16 @@ export function MatchDetailPage() {
               match.homeTeamName
             )}
           </span>
-          <span className="rs-detail__vs">vs</span>
-          <span className="rs-detail__away">
-            <span className="rs-detail__ha">(A)</span>{' '}
-            {teamNames ? (
-              <TeamDisplayName label={teamNames.away} />
-            ) : (
-              match.awayTeamName
-            )}
+          <span className="rs-detail__opponent-line">
+            <span className="rs-detail__vs">vs</span>{' '}
+            <span className="rs-detail__away">
+              <span className="rs-detail__ha">(A)</span>{' '}
+              {teamNames ? (
+                <TeamDisplayName label={teamNames.away} />
+              ) : (
+                match.awayTeamName
+              )}
+            </span>
           </span>
         </Title>
         {!detailsDraft && isAssigner && (

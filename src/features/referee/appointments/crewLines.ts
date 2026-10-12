@@ -21,6 +21,13 @@ export const APPOINTMENT_CREW_ORDER = [
 
 export type AppointmentCrewKey = (typeof APPOINTMENT_CREW_ORDER)[number];
 
+/** Compact card label: first name plus the final name's initial. */
+export function compactCrewPersonName(name: string): string {
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+  if (parts.length < 2) return parts[0] ?? '';
+  return `${parts[0]} ${parts[parts.length - 1].charAt(0).toUpperCase()}.`;
+}
+
 /**
  * Display for crew lines on appointment cards:
  * - confirmed → official name
@@ -114,6 +121,11 @@ export type CrewColumnLine = {
   slotLabel: string;
   value: string;
   isMine: boolean;
+  userId?: string;
+  /** Official has accepted the assignment. */
+  confirmed?: boolean;
+  /** Official is assigned to another match the same local day. */
+  doubleBooked?: boolean;
   /** Set on open lines when scheduler assign buttons are enabled. */
   assignTarget?: CrewColumnAssignTarget;
 };
@@ -129,11 +141,16 @@ export function crewColumnLines(
     redactNames?: boolean;
     /** Attach tap targets on open lines (scheduler schedule column). */
     assignableOpen?: boolean;
+    /** Officials double-booked on another match the same local day. */
+    doubleBookedUserIds?: ReadonlySet<string> | string[];
   },
 ): CrewColumnLine[] {
   const highlightUserId = opts?.highlightUserId;
   const redactNames = Boolean(opts?.redactNames);
   const assignableOpen = Boolean(opts?.assignableOpen);
+  const doubleBooked = new Set(
+    opts?.doubleBookedUserIds ? [...opts.doubleBookedUserIds] : [],
+  );
   const needed = new Set(rolesNeededForMatch(match));
   const lines: CrewColumnLine[] = [];
 
@@ -162,7 +179,10 @@ export function crewColumnLines(
       for (const c of named) {
         const isMine = Boolean(highlightUserId && c.userId === highlightUserId);
         const view = cmoAsAssignment(c);
-        const raw = crewSlotLineLabel(view);
+        const raw =
+          view.status === 'confirmed' && view.userName?.trim()
+            ? compactCrewPersonName(view.userName)
+            : crewSlotLineLabel(view);
         const value = redactNames
           ? view.status === 'confirmed'
             ? 'Confirmed'
@@ -173,6 +193,9 @@ export function crewColumnLines(
           slotLabel: 'CMO',
           value,
           isMine,
+          userId: c.userId,
+          confirmed: view.status === 'confirmed',
+          doubleBooked: Boolean(c.userId && doubleBooked.has(c.userId)),
         });
       }
       const firstOpenCmo = list.find((c) => !c.userId);
@@ -201,7 +224,10 @@ export function crewColumnLines(
 
     for (const a of people) {
       const isMine = Boolean(highlightUserId && a.userId === highlightUserId);
-      const raw = crewSlotLineLabel(a);
+      const raw =
+        a.status === 'confirmed' && a.userName?.trim()
+          ? compactCrewPersonName(a.userName)
+          : crewSlotLineLabel(a);
       const value = redactNames
         ? a.status === 'confirmed'
           ? 'Confirmed'
@@ -212,6 +238,9 @@ export function crewColumnLines(
         slotLabel: label,
         value,
         isMine,
+        userId: a.userId,
+        confirmed: a.status === 'confirmed',
+        doubleBooked: Boolean(a.userId && doubleBooked.has(a.userId)),
       });
     }
     if (openN > 0) pushOpen(`${key}-open`, label, openN, feeTarget);

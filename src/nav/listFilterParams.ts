@@ -1,8 +1,7 @@
-import { useCallback } from 'react';
+import { useCallback, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import type { MatchEventType, MatchFormatChoice, MatchSideChoice } from '@/domain/matchDivision';
+import type { MatchFormatChoice, MatchSideChoice } from '@/domain/matchDivision';
 import {
-  parseEventTypeFilterParam,
   parseFormatFilterParam,
   parseSideFilterParam,
 } from '@/domain/divisionFilters';
@@ -156,6 +155,28 @@ export function useGlobalScheduleFilterParams() {
 
 export type AvailableRoleFilter = 'mo' | 'ar' | 'cmo' | 'no4';
 
+export type AvailableMatchesFilters = {
+  role: AvailableRoleFilter | null;
+  gender: MatchGender | null;
+  level: string | null;
+  competition: string | null;
+  format: MatchFormatChoice | null;
+  side: MatchSideChoice | null;
+};
+
+export function applyAvailableMatchesFilters(
+  params: URLSearchParams,
+  value: AvailableMatchesFilters,
+): void {
+  patchSearchParam(params, 'role', value.role);
+  patchSearchParam(params, 'gender', value.gender);
+  patchSearchParam(params, 'level', value.level);
+  patchSearchParam(params, 'competition', value.competition);
+  patchSearchParam(params, 'format', value.format);
+  patchSearchParam(params, 'side', value.side);
+  params.delete('event');
+}
+
 const ROLE_FILTER_VALUES = new Set<AvailableRoleFilter>(['mo', 'ar', 'cmo', 'no4']);
 
 export function parseAvailableRoleParam(
@@ -173,8 +194,12 @@ export function useAvailableMatchesFilterParams() {
 
   const roleFilter = parseAvailableRoleParam(searchParams.get('role'));
   const formatFilter = parseFormatFilterParam(searchParams.get('format'));
-  const eventTypeFilter = parseEventTypeFilterParam(searchParams.get('event'));
   const sideFilter = parseSideFilterParam(searchParams.get('side'));
+
+  useEffect(() => {
+    if (!searchParams.has('event')) return;
+    patch((sp) => sp.delete('event'));
+  }, [patch, searchParams]);
 
   const setRoleFilter = useCallback(
     (value: AvailableRoleFilter | null) => {
@@ -188,15 +213,16 @@ export function useAvailableMatchesFilterParams() {
     },
     [patch],
   );
-  const setEventTypeFilter = useCallback(
-    (value: MatchEventType | null) => {
-      patch((sp) => patchSearchParam(sp, 'event', value));
-    },
-    [patch],
-  );
   const setSideFilter = useCallback(
     (value: MatchSideChoice | null) => {
       patch((sp) => patchSearchParam(sp, 'side', value));
+    },
+    [patch],
+  );
+
+  const setAvailableFilters = useCallback(
+    (value: AvailableMatchesFilters) => {
+      patch((sp) => applyAvailableMatchesFilters(sp, value));
     },
     [patch],
   );
@@ -206,12 +232,11 @@ export function useAvailableMatchesFilterParams() {
     ...division,
     roleFilter,
     formatFilter,
-    eventTypeFilter,
     sideFilter,
     setRoleFilter,
     setFormatFilter,
-    setEventTypeFilter,
     setSideFilter,
+    setAvailableFilters,
   };
 }
 
@@ -224,6 +249,28 @@ export type SchedulerStatusFilter =
   | 'pending_team_review'
   | 'crew_pending'
   | 'compliance_hold';
+
+export type SchedulerScheduleFilters = {
+  gender: MatchGender | null;
+  level: string | null;
+  competition: string | null;
+  status: SchedulerStatusFilter;
+};
+
+export function applySchedulerScheduleFilters(
+  params: URLSearchParams,
+  value: SchedulerScheduleFilters,
+): void {
+  patchSearchParam(params, 'gender', value.gender);
+  patchSearchParam(params, 'level', value.level);
+  patchSearchParam(params, 'competition', value.competition);
+  patchSearchParam(
+    params,
+    'status',
+    value.status === 'all' ? null : value.status,
+  );
+  params.delete('needs');
+}
 
 const SCHEDULER_STATUS_VALUES = new Set<string>([
   'all',
@@ -269,11 +316,19 @@ export function useSchedulerScheduleFilterParams() {
     [patch],
   );
 
+  const setScheduleFilters = useCallback(
+    (value: SchedulerScheduleFilters) => {
+      patch((sp) => applySchedulerScheduleFilters(sp, value));
+    },
+    [patch],
+  );
+
   return {
     searchParams,
     ...division,
     statusFilter,
     setStatusFilter,
+    setScheduleFilters,
   };
 }
 

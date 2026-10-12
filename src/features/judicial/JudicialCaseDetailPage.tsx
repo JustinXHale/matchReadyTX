@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Link, useNavigate, useParams } from 'react-router-dom';
+import { Link, useParams } from 'react-router-dom';
 import {
   Button,
   FormGroup,
@@ -27,7 +27,7 @@ import {
   type JudicialCaseStatus,
   type JudicialComment,
 } from '@/domain/judicial';
-import { useAppBack } from '@/nav/backNav';
+import { useContextualAppBack } from '@/app/shell/contextualBar';
 import {
   addJudicialCommentInFirestore,
   defaultOrgId,
@@ -46,9 +46,8 @@ const HEARING_STATUSES: JudicialCaseStatus[] = [
 export function JudicialCaseDetailPage() {
   const { incidentId = '' } = useParams();
   const { state, currentUser, dataMode, store } = useApp();
-  const navigate = useNavigate();
   const casesHref = useAppHref('/judicial/cases');
-  const { goBack, backLabel } = useAppBack({
+  useContextualAppBack({
     to: '/judicial/cases',
     label: 'Cases',
   });
@@ -94,7 +93,7 @@ export function JudicialCaseDetailPage() {
     setPlayerFirst(judicialCase.playerFirstName);
     setPlayerLast(judicialCase.playerLastName);
     setPlayerJersey(judicialCase.playerJersey ?? '');
-  }, [judicialCase?.id, judicialCase?.status, judicialCase?.updatedAt]);
+  }, [judicialCase]);
 
   useEffect(() => {
     if (dataMode !== 'live' || !incidentId) return;
@@ -123,9 +122,6 @@ export function JudicialCaseDetailPage() {
         <Title headingLevel="h2" size="lg">
           Case not found
         </Title>
-        <Button variant="link" onClick={() => navigate(casesHref)}>
-          Back to cases
-        </Button>
       </div>
     );
   }
@@ -233,9 +229,6 @@ export function JudicialCaseDetailPage() {
 
   return (
     <div className="rs-stack">
-      <button type="button" className="rs-detail__back" onClick={goBack}>
-        ← {backLabel}
-      </button>
       <Title headingLevel="h1" size="lg">
         {displayCasePlayer(judicialCase)}
       </Title>

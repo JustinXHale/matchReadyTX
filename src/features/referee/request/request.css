@@ -10,7 +10,7 @@
   align-items: center;
   gap: var(--pf-t--global--spacer--xs);
   width: 100%;
-  min-height: 40px;
+  min-height: var(--rs-tap-min);
   padding: 0 var(--pf-t--global--spacer--sm);
   border: 1px solid var(--rs-color-border);
   border-radius: var(--rs-radius-chip);
@@ -29,7 +29,7 @@
   min-width: 1.25rem;
   height: 1.25rem;
   padding: 0 0.35rem;
-  border-radius: 999px;
+  border-radius: var(--rs-radius-pill);
   background: var(--rs-color-ink);
   color: var(--rs-color-surface);
   font-size: 11px;
@@ -95,7 +95,7 @@
 
 .rs-filter-field--select .rs-multi-filter-toggle {
   width: 100%;
-  min-height: 40px;
+  min-height: var(--rs-tap-min);
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -130,7 +130,7 @@
   min-width: 1.25rem;
   height: 1.25rem;
   padding: 0 0.35rem;
-  border-radius: 999px;
+  border-radius: var(--rs-radius-pill);
   background: var(--rs-color-ink);
   color: var(--rs-color-surface);
   font-size: 11px;

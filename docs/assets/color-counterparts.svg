@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1000" height="730" viewBox="0 0 1000 730" role="img" aria-labelledby="title description">
+  <title id="title">MatchReadyTX compact color palette</title>
+  <desc id="description">Core app colors and accessible semantic containers shown as light and dark theme counterparts.</desc>
+  <style>
+    .title { fill: #ffffff; font: 700 34px system-ui, sans-serif; }
+    .subtitle { fill: #ffffff; font: 600 20px system-ui, sans-serif; }
+    .heading { fill: #ffffff; font: 700 18px system-ui, sans-serif; letter-spacing: 1px; }
+    .name { fill: #ffffff; font: 600 18px system-ui, sans-serif; }
+    .hex { fill: #ffffff; font: 500 18px ui-monospace, SFMono-Regular, Menlo, monospace; }
+    .arrow { fill: #ffffff; font: 700 24px system-ui, sans-serif; text-anchor: middle; }
+    .swatch { stroke: #757575; stroke-width: 2; }
+  </style>
+  <rect width="1000" height="730" fill="#000000" rx="20"/>
+  <text class="title" x="30" y="52">MatchReadyTX compact palette</text>
+  <text class="subtitle" x="30" y="88">Light theme → Dark theme</text>
+  <text class="heading" x="350" y="130">LIGHT</text>
+  <text class="heading" x="650" y="130">DARK</text>
+  <g transform="translate(0 170)"><text class="name" x="30">Surface</text><rect class="swatch" x="350" y="-28" width="48" height="48" rx="24" fill="#ffffff"/><text class="hex" x="415">#FFFFFF</text><text class="arrow" x="610">→</text><rect class="swatch" x="650" y="-28" width="48" height="48" rx="24" fill="#000000"/><text class="hex" x="715">#000000</text></g>
+  <g transform="translate(0 245)"><text class="name" x="30">Primary content</text><rect class="swatch" x="350" y="-28" width="48" height="48" rx="24" fill="#000000"/><text class="hex" x="415">#000000</text><text class="arrow" x="610">→</text><rect class="swatch" x="650" y="-28" width="48" height="48" rx="24" fill="#ffffff"/><text class="hex" x="715">#FFFFFF</text></g>
+  <g transform="translate(0 320)"><text class="name" x="30">Neutral / outline</text><rect class="swatch" x="350" y="-28" width="48" height="48" rx="24" fill="#757575"/><text class="hex" x="415">#757575</text><text class="arrow" x="610">=</text><rect class="swatch" x="650" y="-28" width="48" height="48" rx="24" fill="#757575"/><text class="hex" x="715">#757575</text></g>
+  <g transform="translate(0 395)"><text class="name" x="30">Neutral container</text><rect class="swatch" x="350" y="-28" width="48" height="48" rx="24" fill="#f3f4f6"/><text class="hex" x="415">#F3F4F6</text><text class="arrow" x="610">→</text><rect class="swatch" x="650" y="-28" width="48" height="48" rx="24" fill="#141414"/><text class="hex" x="715">#141414</text></g>
+  <g transform="translate(0 470)"><text class="name" x="30">Error</text><rect class="swatch" x="350" y="-28" width="48" height="48" rx="24" fill="#d44034"/><text class="hex" x="415">#D44034</text><text class="arrow" x="610">=</text><rect class="swatch" x="650" y="-28" width="48" height="48" rx="24" fill="#d44034"/><text class="hex" x="715">#D44034</text></g>
+  <g transform="translate(0 545)"><text class="name" x="30">Success accent</text><rect class="swatch" x="350" y="-28" width="48" height="48" rx="24" fill="#008838"/><text class="hex" x="415">#008838</text><text class="arrow" x="610">=</text><rect class="swatch" x="650" y="-28" width="48" height="48" rx="24" fill="#008838"/><text class="hex" x="715">#008838</text></g>
+  <g transform="translate(0 620)"><text class="name" x="30">Warning / pending</text><rect class="swatch" x="350" y="-28" width="48" height="48" rx="24" fill="#dca614"/><text class="hex" x="415">#DCA614</text><text class="arrow" x="610">=</text><rect class="swatch" x="650" y="-28" width="48" height="48" rx="24" fill="#dca614"/><text class="hex" x="715">#DCA614</text></g>
+</svg>

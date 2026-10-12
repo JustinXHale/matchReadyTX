@@ -36,9 +36,13 @@ export function InvoiceEditorPage() {
   const navigate = useNavigate();
   const listHref = useAppHref('/finance/invoices');
   const org = state.org;
-  const competitions = org.competitions?.length
-    ? org.competitions
-    : ['Lonestar Men', 'Lonestar Women'];
+  const competitions = useMemo(
+    () =>
+      org.competitions?.length
+        ? org.competitions
+        : ['Lonestar Men', 'Lonestar Women'],
+    [org.competitions],
+  );
 
   const existing = !isNew
     ? state.conferenceInvoices.find((i) => i.id === invoiceId)
@@ -53,6 +57,9 @@ export function InvoiceEditorPage() {
   const [invoice, setInvoice] = useState<ConferenceInvoice | null>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const printHref = useAppHref(
+    `/finance/invoices/${invoice?.id ?? invoiceId ?? 'new'}/print`,
+  );
 
   useEffect(() => {
     if (existing) {
@@ -91,8 +98,6 @@ export function InvoiceEditorPage() {
   }
 
   const readOnly = invoice.status === 'finalized';
-  const printHref = useAppHref(`/finance/invoices/${invoice.id}/print`);
-
   const patchInvoice = (patch: Partial<ConferenceInvoice>) => {
     setInvoice((prev) => (prev ? refreshInvoiceTotals({ ...prev, ...patch }) : prev));
   };

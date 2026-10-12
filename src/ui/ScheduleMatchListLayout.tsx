@@ -13,7 +13,7 @@ export function MatchMonthSections<T extends KickoffMatchRef>({
 }) {
   return groups.map((group) => (
     <section key={group.key} className="rs-month-section">
-      <Title headingLevel="h3" size="md" className="rs-month-heading">
+      <Title headingLevel="h2" size="md" className="rs-month-heading">
         {group.label}
       </Title>
       <ul className="rs-list">{group.matches.map((m) => renderMatchRow(m))}</ul>

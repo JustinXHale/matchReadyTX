@@ -11,7 +11,12 @@ import {
 import { useApp, useAppHref } from '@/app/AppContext';
 import { submittedCmoReports, cmoReportStats } from '@/domain/insights';
 import { displayMatchForCmoReport, type MatchReport } from '@/domain/reports';
-import { crewPeople, type Match } from '@/domain/types';
+import {
+  REQUESTABLE_SLOT_SHORT,
+  assignmentForUser,
+  crewPeople,
+  type Match,
+} from '@/domain/types';
 import {
   cmoFilerName,
   cmoFilterOptionsFromOfficialIds,
@@ -19,10 +24,10 @@ import {
   reportMatchesCmoFilter,
 } from '@/features/insights/insightsDisplay';
 import { formatInsightsAvg } from '@/features/insights/insightsFormat';
-import { InsightsReportTrailing } from '@/features/insights/InsightsReportTrailing';
 import { moDisplayNames } from '@/features/referee/appointments/crewLines';
 import { cmoReportViewPath } from '@/features/referee/reports/reportLinks';
 import { MatchListRow } from '@/ui/MatchListRow';
+import { ReportAttributionFooter } from '@/ui/ReportAttributionFooter';
 
 const ALL_CMOS = '';
 
@@ -108,22 +113,24 @@ export function InsightsCmoReportsPage() {
             : ''}
       </p>
 
-      <TextInput
-        id="insights-cmo-search"
-        type="search"
-        value={query}
-        onChange={(_e, value) => setQuery(value)}
-        placeholder="Search match official reviewed"
-        aria-label="Search CMO reports by match official"
-      />
-
-      {cmoOptions.length > 0 && (
+      <div className="rs-insights-report-filters">
+        <FormGroup label="Search" fieldId="insights-cmo-search">
+          <TextInput
+            id="insights-cmo-search"
+            type="search"
+            value={query}
+            onChange={(_e, value) => setQuery(value)}
+            placeholder="Match official reviewed"
+            aria-label="Search CMO reports by match official"
+          />
+        </FormGroup>
         <FormGroup label="Filter by CMO" fieldId="insights-cmo-filter">
           <FormSelect
             id="insights-cmo-filter"
             aria-label="Filter by CMO"
             value={cmoFilter}
             onChange={(_event, value) => setCmoFilter(value)}
+            isDisabled={cmoOptions.length === 0}
           >
             <FormSelectOption value="" label="All CMOs" />
             {cmoOptions.map((opt) => (
@@ -135,7 +142,7 @@ export function InsightsCmoReportsPage() {
             ))}
           </FormSelect>
         </FormGroup>
-      )}
+      </div>
 
       {rows.length === 0 ? (
         <EmptyState titleText="No matching CMO reports" headingLevel="h3">
@@ -162,13 +169,17 @@ export function InsightsCmoReportsPage() {
             const viewHref = cmoReportViewPath(r.matchId, r.subjectOfficialId, {
               officialId: r.officialId,
             });
-            const trailing = (
-              <InsightsReportTrailing
-                score={rating != null ? String(rating) : '—'}
-                officialName={subject}
-                officialHref={
-                  subjectId ? `${memberBase}/${subjectId}` : undefined
+            const subjectSlot = subjectId
+              ? assignmentForUser(match, subjectId)?.slot
+              : undefined;
+            const attribution = (
+              <ReportAttributionFooter
+                rating={rating != null ? String(rating) : '—'}
+                position={
+                  subjectSlot ? REQUESTABLE_SLOT_SHORT[subjectSlot] : 'MO'
                 }
+                refereeName={subject}
+                refereeHref={subjectId ? `${memberBase}/${subjectId}` : undefined}
               />
             );
             return (
@@ -176,13 +187,14 @@ export function InsightsCmoReportsPage() {
                 key={r.id}
                 match={match}
                 to={viewHref}
-                split="action"
+                showTime
+                submitted
                 meta={
                   <span className="rs-match-card__meta">
                     CMO {filer}
                   </span>
                 }
-                trailing={trailing}
+                footer={attribution}
               />
             );
           })}

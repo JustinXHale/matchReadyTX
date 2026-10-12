@@ -38,7 +38,7 @@ export function SchedulerTeamsPage() {
   }, [entries]);
 
   const visible = useMemo(() => {
-    let list = competitionFilter
+    const list = competitionFilter
       ? entries.filter((e) => e.competitions.includes(competitionFilter))
       : entries;
     const q = query.trim().toLowerCase();

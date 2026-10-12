@@ -2,7 +2,7 @@
 
 Status: Working product-design specification  
 Review method: page-by-page  
-Current page: Event / Match detail  
+Current page: Event / Match detail — approved migration reference
 Last updated: October 10, 2026
 
 ## Purpose
@@ -26,8 +26,43 @@ This is an interaction specification, not just a visual restyling exercise. A qu
 
 | Area | Status | Document section |
 | --- | --- | --- |
-| Event / Match detail | Initial redesign implemented — pending visual/user review | [Event / Match detail](#event--match-detail-page) |
-| Remaining pages | Not yet reviewed | Add one page at a time |
+| Event / Match detail | Production redesign approved — reusable patterns promoted to the app theme guide | [Event / Match detail](#event--match-detail-page) |
+| Shared page UX pass | Implemented; automated checks pass, manual device/assistive-tech validation remains | [Shared page UX pass](#shared-page-ux-pass--october-10-2026) |
+| Remaining pages | Continue page-by-page product review | Add one page at a time |
+
+## Shared page UX pass — October 10, 2026
+
+Implemented across the shell, Referee/CMO work, shared match cards, Available
+matches, Team Admin schedule, reports, Judicial, and Insights:
+
+- separate Referee and CMO presentation lenses with lens-safe report routing;
+- signed-out demo navigation uses **Sign in** in place of **Profile**;
+- time precedes location, assigned crew uses a full-width supporting footer,
+  and Team Admin action status uses a full-width top banner;
+- report rows consistently distinguish due and submitted states with text and
+  semantic surfaces;
+- Available-match and Judicial advanced filters use transactional responsive
+  dialogs/sheets with Apply, Cancel, Clear, active counts, and URL-backed state;
+- date fields retain native picker interaction without duplicate visible icons;
+- Judicial and Insights filter layouts adapt without stretching mobile layouts;
+- the obsolete Available-match Event filter and Vite mixed-import advisory were
+  removed.
+
+Automated validation: ESLint passes with zero warnings; 319 unit/component tests
+pass; the production build and CSS contract pass; `git diff --check` passes.
+Compact visual smoke checks passed at a 500px browser window for Available and
+Assigned matches, including the Date/Filters row, bottom navigation, report
+badges, card order, and assigned-crew footer.
+
+Manual release checks still required on a physical device and with assistive
+technology:
+
+- keyboard-only traversal, dialog focus trap/restoration, Escape, and Cancel;
+- VoiceOver/TalkBack names and state announcements;
+- 200% browser zoom and OS text scaling at 320/360px and breakpoint boundaries;
+- offline, permission-denied, failed-save/retry, and concurrent-update behavior
+  for Match Detail and each mutated workflow;
+- light/dark/high-contrast review on the target mobile browsers.
 
 ---
 
@@ -59,7 +94,7 @@ This avoids one giant global “editable/not editable” switch. The page instea
 
 ### Implementation status
 
-The initial production pass is implemented in the working tree on the `MaterialDesignMigration` branch:
+The approved production pass is implemented on the `MaterialDesignMigration` branch:
 
 - assigners now land in a read-first view;
 - event name, kickoff, venue, and classification live together in Match Details;
@@ -111,7 +146,14 @@ The initial production pass is implemented in the working tree on the `MaterialD
   contact methods, and level/starting year;
 - the demo data includes a past match with submitted MO, AR, and CMO reports
   so every report state can be reviewed from the match page;
-- responsive header/editor layouts and larger interactive targets are included.
+- responsive header/editor layouts and larger interactive targets are included;
+- browser-native alerts and confirmations have been removed from application
+  code: brief outcomes use the shared snackbar layer, while consequential
+  reset/delete decisions use an accessible Material dialog that initially
+  focuses the safe Cancel action;
+- fixture requests, team feedback, and report flows use the shared shell-level
+  contextual back bar for route exits; report previous-step controls remain
+  in-flow, appear only after the first step, and use distinct semantics.
 
 The broader proposal, confirmation, report, and historical workflows remain functionally intact and can be refined in subsequent page-review passes.
 
@@ -966,7 +1008,7 @@ Recommended:
 
 ### Phase 3 — Production hardening
 
-1. Replace browser alert/confirm calls.
+1. ~~Replace browser alert/confirm calls.~~ Completed October 10, 2026.
 2. Add loading, offline, conflict, retry, and permission states.
 3. Complete keyboard/screen-reader and text-scaling audit.
 4. Validate touch targets and focus restoration.
@@ -1002,16 +1044,18 @@ Scoring: `0` missing/incorrect, `1` partially addressed, `2` production-ready.
 
 | Category | Current | Target | Main gap |
 | --- | :---: | :---: | --- |
-| Task clarity | 1 | 2 | Reading, editing, and operations compete |
-| Information hierarchy | 0 | 2 | Configuration controls precede core match facts |
-| Component semantics | 0 | 2 | Chips/pills and rows serve ambiguous action/status roles |
-| Token discipline | 1 | 2 | Semantic tokens exist, but component hierarchy needs consolidation |
-| Adaptive behavior | 1 | 2 | Wide back bar and stretched single-column behavior need refinement |
-| States and feedback | 0 | 2 | Mixed autosave/blur save, browser alerts, incomplete retry/conflict model |
-| Accessibility | 0 | 2 | Small targets and ambiguous custom controls require correction/testing |
-| Expressive restraint | 1 | 2 | Too many equally prominent pills, inputs, and cards |
+| Task clarity | 2 | 2 | Read-first mode separates review, editing, and operations |
+| Information hierarchy | 2 | 2 | Match facts, teams, crew, reports, and secondary history have clear order |
+| Component semantics | 2 | 2 | Status, navigation, menus, dialogs, sheets, and edit actions have distinct roles |
+| Token discipline | 2 | 2 | Shared semantic color, type, spacing, radius, and state roles are applied |
+| Adaptive behavior | 2 | 2 | Compact action bars/sheets and expanded menus/content flow are intentional |
+| States and feedback | 1 | 2 | Shared snackbar/dialog feedback is complete; offline, retry, and conflict coverage remains |
+| Accessibility | 1 | 2 | Targets, contrast, dialog focus, and overflow checks pass; assistive-technology and text-scaling validation remains |
+| Expressive restraint | 2 | 2 | Emphasis is reserved for required actions and semantic status |
 
-**Current result: not production-ready.** The page is functionally rich, but the information architecture and interaction model must be simplified before visual polish can make it feel like a commercial product.
+**Current result: 14/16 — ready for final production validation.** No category
+is missing. The remaining work is resilience-state coverage plus manual
+assistive-technology, keyboard, zoom, and physical-device validation.
 
 ## 20. Decisions to confirm during review
 

@@ -29,7 +29,7 @@ import {
   outsideCmoPath,
   outsidePerformancePath,
 } from '@/features/referee/reports/reportLinks';
-import { useAppBack } from '@/nav/backNav';
+import { useContextualAppBack } from '@/app/shell/contextualBar';
 
 type StarterRole = 'referee' | 'coach';
 
@@ -43,7 +43,7 @@ export function CreateOutsideReportPage() {
   const starterRole = roleFromQuery(searchParams.get('as'));
   const navigate = useNavigate();
   const coachingHref = useAppHref('/referee/reports/coaching');
-  const { goBack, backLabel } = useAppBack(COACHING_REPORTS_BACK);
+  useContextualAppBack(COACHING_REPORTS_BACK);
 
   const [showAllRefs, setShowAllRefs] = useState(starterRole === 'coach');
   const [otherUid, setOtherUid] = useState('');
@@ -131,9 +131,6 @@ export function CreateOutsideReportPage() {
 
   return (
     <div className="rs-stack">
-      <button type="button" className="rs-detail__back" onClick={goBack}>
-        ← {backLabel}
-      </button>
       <Title headingLevel="h2" size="lg">
         Create outside report
       </Title>

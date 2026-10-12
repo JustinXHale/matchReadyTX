@@ -23,4 +23,20 @@ export default tseslint.config(
       '@typescript-eslint/no-unused-vars': ['warn', { argsIgnorePattern: '^_' }],
     },
   },
+  {
+    files: [
+      'src/app/AppContext.tsx',
+      'src/features/referee/reports/CrewAttendanceFields.tsx',
+      'src/features/referee/reports/TeamScoreFields.tsx',
+      'src/features/scheduler/SchedulerCompetitionFilter.tsx',
+      'src/features/scheduler/officialQuickLookContext.tsx',
+      'src/features/teamAdmin/TeamAdminMatchRow.tsx',
+    ],
+    rules: {
+      // These modules intentionally colocate components with tightly coupled
+      // hooks/constants that form one public API. Splitting them would add
+      // indirection without improving runtime refresh behavior.
+      'react-refresh/only-export-components': 'off',
+    },
+  },
 );

@@ -31,7 +31,8 @@ import {
   resolveSubmittedMatchReport,
   submittedMatchReportsForMatch,
 } from '@/features/referee/reports/reportLinks';
-import { backState, useAppBack } from '@/nav/backNav';
+import { backState } from '@/nav/backNav';
+import { useContextualAppBack } from '@/app/shell/contextualBar';
 import { SubmittedPerformanceReportView } from '@/features/referee/reports/SubmittedPerformanceReportView';
 import { MatchListRow } from '@/ui/MatchListRow';
 import { ReportAdminMenu } from '@/features/referee/reports/ReportAdminMenu';
@@ -58,7 +59,7 @@ export function MatchReportViewPage() {
   const { currentUser, state, isAssignerView } = useApp();
   const navigate = useNavigate();
   const matchHref = useAppHref(`/matches/${matchId}`);
-  const { goBack, backLabel } = useAppBack(MATCH_REPORTS_BACK);
+  useContextualAppBack(MATCH_REPORTS_BACK);
 
   const report = resolveSubmittedMatchReport(state.matchReports, matchId, {
     officialId: params.get('officialId') ?? undefined,
@@ -77,12 +78,6 @@ export function MatchReportViewPage() {
         <Title headingLevel="h2" size="lg">
           No submitted match report
         </Title>
-        <Button
-          variant="secondary"
-          onClick={() => navigate('/referee/reports/match')}
-        >
-          Back to Match Reports
-        </Button>
       </div>
     );
   }
@@ -93,9 +88,6 @@ export function MatchReportViewPage() {
         <Title headingLevel="h2" size="lg">
           Match not found
         </Title>
-        <Button variant="link" onClick={() => navigate('/referee/reports/match')}>
-          Back to Match Reports
-        </Button>
       </div>
     );
   }
@@ -113,13 +105,6 @@ export function MatchReportViewPage() {
 
   return (
     <div className="rs-stack rs-report-view">
-      <button
-        type="button"
-        className="rs-detail__back"
-        onClick={goBack}
-      >
-        ← {backLabel}
-      </button>
       <div className="rs-report-view__title-row">
         <Title headingLevel="h2" size="lg">
           Match report ({kindLabel})
@@ -285,7 +270,7 @@ export function CmoReportViewPage() {
   const { currentUser, state, isAssignerView } = useApp();
   const navigate = useNavigate();
   const matchHref = useAppHref(`/matches/${matchId}`);
-  const { goBack, backLabel } = useAppBack(COACHING_CMO_BACK);
+  useContextualAppBack(COACHING_CMO_BACK);
 
   if (!currentUser) return null;
 
@@ -306,13 +291,6 @@ export function CmoReportViewPage() {
   ) {
     return (
       <div className="rs-stack">
-        <button
-          type="button"
-          className="rs-detail__back"
-          onClick={goBack}
-        >
-          ← {backLabel}
-        </button>
         <Title headingLevel="h2" size="lg">
           Choose coaching report
         </Title>
@@ -411,9 +389,6 @@ export function CmoReportViewPage() {
   ) {
     return (
       <div className="rs-stack">
-        <button type="button" className="rs-detail__back" onClick={goBack}>
-          ← {backLabel}
-        </button>
         <Title headingLevel="h2" size="lg">
           Coaching report pending
         </Title>
@@ -437,13 +412,6 @@ export function CmoReportViewPage() {
 
   return (
     <div className="rs-stack rs-report-view">
-      <button
-        type="button"
-        className="rs-detail__back"
-        onClick={goBack}
-      >
-        ← {backLabel}
-      </button>
       <div className="rs-report-view__title-row">
         <Title headingLevel="h2" size="lg">
           {youFiled

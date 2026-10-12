@@ -38,7 +38,7 @@ This document is the **product** source of truth for what we are building and wh
 | **Q-V1** | Teams see officials **only after any assigned Match Official has confirmed** the assignment (see §5.5 for crew nuance) |
 | **Q-G1** | Prefer **automatic Sheet sync** (push via Apps Script webhook and/or short-interval pull) |
 | **Q-R4** | Each role type (MO, AR1, AR2, No.4, optional CMO) may have **multiple explicit blocks** (including empty). Assigners add blocks via **Add role** (all types always listed). At least **one Match Official** block is required. Raise-hand stays open until empty blocks are filled |
-| **Q-R6** | **Referee + CMO share one app lens** (masthead / bottom nav: **Referee/CMO**). Appointments and Request (Pending / Global) are shared. Reports split by duty: **Match Reports** (referee) vs **Coaching Reports** (CMO context) |
+| **Q-R6** | **Referee and CMO use separate presentation lenses.** Appointments remain shared; Referee owns Availability plus Match/Card Reports, while CMO owns Coaching Reports and Insights. Domain roles remain the authorization source. |
 
 Still open items are listed in §14.
 
@@ -73,7 +73,7 @@ Assigners currently manage schedules, contacts, and referee assignments across s
 | **Match Official (MO)** | Required crew member | Set availability ranges; **request games**; confirm assignment; T-72; mark unavailable with reason when needed |
 | **Assistant Referee (AR1 / AR2)** | Optional but supported in v1 | Same availability / request / confirm / T-72 flows when assigned |
 | **Number 4** | Optional fourth official | Same when assigned |
-| **CMO (optional)** | Coaching Match Official on a fixture | Selectable profile role + crew/contact slot; **Coaching Reports** under the shared **Referee/CMO** lens — not a separate masthead role |
+| **CMO (optional)** | Coaching Match Official on a fixture | Selectable profile role + crew/contact slot; separate **CMO** lens with Appointments, Coaching Reports, and Insights |
 | **Judicial** | Discipline officer | Review card reports, comment with other officers, record red-card rulings, conference discipline dashboard + printable one-pager. **Not** self-selected — Scheduler or an existing Judicial member grants the role. |
 | **Treasurer** | Society finance contact (e.g. conference billing / official pay tracking) | **Finance** lens: payout readiness (reports gate pay), mark assignments paid (PayPal/Zelle/etc.), generate conference invoices by date range with invoice rates distinct from payout rates. **Not** self-selected — Scheduler grants on member profile. Assigner also has Finance access. |
 | **Fan** | Spectator / society follower | Browse released schedule, standings, and teams; see official **names** only after MO confirmation (same as teams). Light onboarding (name + email); optional favorite clubs |
@@ -81,7 +81,7 @@ Assigners currently manage schedules, contacts, and referee assignments across s
 
 **v1 assumption:** Assigner and Org Admin are often the same person. Model capabilities separately for other societies later.
 
-**UI lenses (masthead / bottom nav):** **Referee/CMO | Team Admin | Scheduler | Finance | Judicial | Fan**. Scheduler = Assigner **control center**. Finance = payout tracker + conference invoicing (no payment rails). Judicial = discipline dashboard + cases. Fan home = Global schedule. Referee and CMO share one lens (**Q-R6** locked). Team Admin tabs: Schedule · Referee Feedback. Finance tabs: Payouts · Invoices. Judicial tabs: Dashboard · Cases.
+**UI lenses (masthead / bottom nav):** **Referee | CMO | Team Admin | Scheduler | Finance | Judicial | Fan**. Scheduler = Assigner **control center**. Finance = payout tracker + conference invoicing (no payment rails). Judicial = discipline dashboard + cases. Fan home = Global schedule. Referee and CMO share Appointments but expose duty-specific tools. Team Admin tabs: Schedule · Referee Feedback. Finance tabs: Payouts · Invoices. Judicial tabs: Dashboard · Cases.
 
 ### Role open items (non-blocking)
 
@@ -297,7 +297,7 @@ Officials need a simple way to declare **general availability** so assigners can
 **MVP (locked): opt-in day calendar + time windows**
 
 - **Default closed:** unmarked days mean not available until the official opens them.
-- **UI:** month calendar under Referee/CMO → Availability (CMO same tool). Tap cycles **closed → available → blocked → closed**.
+- **UI:** month calendar under Referee → Availability. Tap cycles **closed → available → blocked → closed**.
 - **Available** days carry one or more **local time windows** (default 07:00–21:00 org timezone; editable per day, including split windows for tournament days).
 - **Blocked** means the official reviewed the date and cut it (distinct from forgetting to open a day).
 - **Set pattern:** date range + weekday chips + open **or block** + hours (when opening) → apply to matching days. Opening preserves blocked days; blocking overwrites open/closed.
@@ -693,7 +693,7 @@ Profile onboarding is incomplete until required fields for the chosen role path 
 | **Email** | Resend |
 | **Hosting** | Firebase Hosting + Cloud Functions |
 | **Payments** | **Never** — no Stripe / reimbursements |
-| **Q-R6** | **Referee + CMO = one lens** (label **Referee/CMO**); Reports: Match Reports vs Coaching Reports |
+| **Q-R6** | **Referee and CMO = separate lenses**; shared Appointments, duty-specific Reports, Insights on CMO |
 
 ---
 
@@ -705,7 +705,7 @@ Profile onboarding is incomplete until required fields for the chosen role path 
 - No offline-first sync  
 - No SMS, in-app chat, PWA push, or multi-tenant SaaS billing  
 - No separate Coach vs Team Admin products (they are one persona)  
-- No separate CMO masthead role — CMO shares **Referee/CMO**; only Reports routing differs (Match vs Coaching)
+- CMO is a separate masthead lens; domain permissions remain role-based and Appointments remain shared
 
 ---
 
@@ -727,7 +727,7 @@ See [`IMPLEMENTATION_SPEC.md`](./IMPLEMENTATION_SPEC.md).
 | Availability range | Start–end datetime window for an open or blocked calendar day (org timezone) |
 | Coach / Team Admin | Same club persona — confirm facts, propose changes, T-72 for their team’s matches; optional post-match MO feedback for the Scheduler |
 | Coach feedback | Team Admin report on Match Official performance (1–5 scales with competency hints). One per club side per match; any Team Admin for that club may save draft, submit, edit after submit (edit history kept), or decline. Scheduler-confidential; officials never see it. Ratings/trends dashboards later |
-| CMO | Coaching Match Official — optional match contact/slot; shares **Referee/CMO** lens. **Coaching Reports** (not club Coach) are the CMO-side report path; referees use **Match Reports** |
+| CMO | Coaching Match Official — optional match contact/slot with a separate CMO lens. **Coaching Reports** (not club Coach) are the CMO-side report path; referees use Match/Card Reports |
 | Game request | Official expresses interest from **Referee → Request → Global**; assigner approves or declines. Pending lists only **active** requests (upcoming kickoff, open preferred slot) |
 | Match fee (display) | Slot fee from in-app default schedule or match override; never on shared Sheet; **never paid out in-app** |
 | Mileage estimate | Org rate × distance (rules may zero out under minimum or when flight provided); domain-ready, deferred on match detail UI; display only |
