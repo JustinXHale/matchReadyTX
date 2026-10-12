@@ -17,7 +17,7 @@ export function applyContactRowsToTeams(
   rows: ContactRow[],
   newId: () => string,
 ): Team[] {
-  let next = [...teams];
+  const next = [...teams];
   for (const row of rows) {
     const name = row.teamName.trim();
     const email = normalizeEmail(row.email);

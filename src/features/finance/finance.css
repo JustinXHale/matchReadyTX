@@ -54,6 +54,13 @@ ul.rs-stack {
   border-top: 1px solid var(--rs-color-border);
 }
 
+.rs-finance-payout-form__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--rs-space-sm);
+  align-items: center;
+}
+
 .rs-finance-panel .pf-v6-c-title {
   margin: 0;
 }
@@ -194,7 +201,10 @@ ul.rs-stack {
 @media print {
   .rs-finance-no-print,
   .rs-bottom-nav,
+  .rs-nav-bar,
+  .rs-nav-rail,
   .rs-masthead,
+  .rs-top-app-bar,
   .rs-top-tabs {
     display: none !important;
   }

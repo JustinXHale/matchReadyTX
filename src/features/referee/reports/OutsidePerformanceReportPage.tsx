@@ -8,7 +8,7 @@ import {
   COACHING_MINE_BACK,
   outsideCmoViewPath,
 } from '@/features/referee/reports/reportLinks';
-import { useAppBack } from '@/nav/backNav';
+import { useContextualAppBack } from '@/app/shell/contextualBar';
 import {
   ensureOutsidePerformanceReady,
   ensureOutsidePerformanceReadyDemo,
@@ -20,7 +20,7 @@ export function OutsidePerformanceReportPage() {
   const { sessionId = '' } = useParams();
   const { currentUser, state, store, dataMode } = useApp();
   const navigate = useNavigate();
-  const { goBack, backLabel } = useAppBack(COACHING_MINE_BACK);
+  const { goBack } = useContextualAppBack(COACHING_MINE_BACK);
   const [error, setError] = useState<string | null>(null);
 
   const session = state.outsideCoachingSessions.find((s) => s.id === sessionId);
@@ -55,7 +55,7 @@ export function OutsidePerformanceReportPage() {
     } else {
       ensureOutsidePerformanceReadyDemo(sessionId, currentUser.uid);
     }
-  }, [dataMode, currentUser?.uid, sessionId]);
+  }, [dataMode, currentUser, sessionId]);
 
   if (!currentUser) return null;
 
@@ -65,9 +65,6 @@ export function OutsidePerformanceReportPage() {
         <Title headingLevel="h2" size="lg">
           Outside report not found
         </Title>
-        <Button variant="secondary" onClick={goBack}>
-          ← {backLabel}
-        </Button>
       </div>
     );
   }
@@ -82,9 +79,6 @@ export function OutsidePerformanceReportPage() {
           Only the referee on this outside session can file the performance
           report.
         </p>
-        <Button variant="secondary" onClick={goBack}>
-          ← {backLabel}
-        </Button>
       </div>
     );
   }
@@ -92,9 +86,6 @@ export function OutsidePerformanceReportPage() {
   if (report?.status === 'submitted') {
     return (
       <div className="rs-stack">
-        <button type="button" className="rs-detail__back" onClick={goBack}>
-          ← {backLabel}
-        </button>
         <Title headingLevel="h2" size="lg">
           Performance report submitted
         </Title>
@@ -148,9 +139,6 @@ export function OutsidePerformanceReportPage() {
 
   return (
     <div className="rs-stack">
-      <button type="button" className="rs-detail__back" onClick={goBack}>
-        ← {backLabel}
-      </button>
       <Title headingLevel="h2" size="lg">
         Outside performance report
       </Title>

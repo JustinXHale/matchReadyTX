@@ -33,11 +33,14 @@ const STATUS_OPTIONS: { value: PaymentReadinessStatus | 'all'; label: string }[]
     { value: 'paid', label: 'Paid' },
   ];
 
+type OtherExpense = { id: string; name: string; amount: number };
+
 type PayoutDraft = {
   method: PaymentMethod;
   contact: string;
   payoutFee: number;
   mileagePay: number;
+  otherExpenses: OtherExpense[];
 };
 
 function rowDraft(
@@ -51,7 +54,15 @@ function rowDraft(
     contact: row.payment?.paymentContact ?? row.defaultPaymentContact ?? '',
     payoutFee: row.payment?.payoutFee ?? row.payoutFee,
     mileagePay: row.payment?.mileagePay ?? row.mileagePay,
+    otherExpenses: [],
   };
+}
+
+function otherExpensesTotal(expenses: OtherExpense[]): number {
+  return expenses.reduce(
+    (sum, item) => sum + (Number.isFinite(item.amount) ? item.amount : 0),
+    0,
+  );
 }
 
 export function PayoutsPage() {
@@ -112,7 +123,12 @@ export function PayoutsPage() {
         .filter((r) => r.readiness === 'ready_to_pay')
         .reduce((s, r) => {
           const draft = rowDraft(r, drafts);
-          return s + draft.payoutFee + draft.mileagePay;
+          return (
+            s +
+            draft.payoutFee +
+            draft.mileagePay +
+            otherExpensesTotal(draft.otherExpenses)
+          );
         }, 0),
     [filtered, drafts],
   );
@@ -135,6 +151,14 @@ export function PayoutsPage() {
   const markPaid = async (row: (typeof rows)[number]) => {
     const draft = rowDraft(row, drafts);
     if (!draft.contact.trim()) return;
+    const extras = draft.otherExpenses.filter((item) => item.name.trim());
+    const extrasTotal = otherExpensesTotal(extras);
+    const notes =
+      extras.length > 0
+        ? extras
+            .map((item) => `${item.name.trim()}: ${formatMoney(item.amount)}`)
+            .join('; ')
+        : undefined;
     setBusyId(row.id);
     try {
       await store.markOfficialPaid({
@@ -143,12 +167,13 @@ export function PayoutsPage() {
         officialId: row.officialId,
         slot: row.slot,
         kickoffAt: row.kickoffAt,
-        payoutFee: draft.payoutFee,
+        payoutFee: draft.payoutFee + extrasTotal,
         mileagePay: draft.mileagePay,
         paymentMethod: draft.method,
         paymentContact: draft.contact.trim(),
         paidByUserId: currentUser?.uid,
         paidByName: currentUser?.displayName,
+        notes,
       });
     } finally {
       setBusyId(null);
@@ -350,13 +375,84 @@ export function PayoutsPage() {
                         />
                       </label>
                     </div>
-                    <div className="rs-actions">
+                    {draft.otherExpenses.map((expense, index) => (
+                      <div
+                        key={expense.id}
+                        className="rs-filter-bar__row rs-finance-payout-form__amount-row"
+                      >
+                        <label className="rs-filter-field">
+                          <span className="rs-filter-field__label">
+                            Other expense
+                          </span>
+                          <TextInput
+                            aria-label={`Other expense ${index + 1} name`}
+                            value={expense.name}
+                            placeholder="e.g. Flight"
+                            onChange={(_, v) =>
+                              patchDraft(row.id, row, {
+                                otherExpenses: draft.otherExpenses.map((item) =>
+                                  item.id === expense.id
+                                    ? { ...item, name: v }
+                                    : item,
+                                ),
+                              })
+                            }
+                          />
+                        </label>
+                        <label className="rs-filter-field rs-filter-field--amount">
+                          <span className="rs-filter-field__label">Amount ($)</span>
+                          <TextInput
+                            aria-label={`Other expense ${index + 1} amount`}
+                            type="number"
+                            step="0.01"
+                            value={String(expense.amount)}
+                            onChange={(_, v) =>
+                              patchDraft(row.id, row, {
+                                otherExpenses: draft.otherExpenses.map((item) =>
+                                  item.id === expense.id
+                                    ? {
+                                        ...item,
+                                        amount: parseAmount(v, item.amount),
+                                      }
+                                    : item,
+                                ),
+                              })
+                            }
+                          />
+                        </label>
+                      </div>
+                    ))}
+                    <div className="rs-actions rs-finance-payout-form__actions">
+                      <Button
+                        variant="secondary"
+                        onClick={() =>
+                          patchDraft(row.id, row, {
+                            otherExpenses: [
+                              ...draft.otherExpenses,
+                              {
+                                id: `exp_${Date.now()}_${draft.otherExpenses.length}`,
+                                name: '',
+                                amount: 0,
+                              },
+                            ],
+                          })
+                        }
+                      >
+                        + Other expenses
+                      </Button>
                       <Button
                         variant="primary"
                         isDisabled={!draft.contact.trim() || busyId === row.id}
                         onClick={() => void markPaid(row)}
                       >
                         Mark paid
+                        {otherExpensesTotal(draft.otherExpenses) > 0
+                          ? ` (${formatMoney(
+                              draft.payoutFee +
+                                draft.mileagePay +
+                                otherExpensesTotal(draft.otherExpenses),
+                            )})`
+                          : ''}
                       </Button>
                     </div>
                   </div>

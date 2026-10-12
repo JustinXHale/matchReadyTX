@@ -64,7 +64,7 @@
 }
 
 .rs-about-resource__manage .pf-v6-c-button {
-  min-height: auto !important;
+  min-height: var(--rs-tap-min) !important;
   padding: 0 !important;
 }
 
@@ -76,12 +76,13 @@
 .rs-about-toc {
   position: sticky;
   top: 0;
-  z-index: 2;
+  z-index: 10;
+  align-self: stretch;
   margin: 0 calc(-1 * var(--rs-page-pad));
   padding: 8px var(--rs-page-pad) 10px;
-  background: color-mix(in srgb, var(--rs-color-bg) 92%, var(--rs-color-surface));
-  backdrop-filter: blur(8px);
+  background: var(--rs-m3-surface-container);
   border-bottom: 1px solid var(--rs-color-border);
+  box-shadow: 0 2px 4px color-mix(in srgb, var(--rs-color-ink) 10%, transparent);
 }
 
 .rs-about-toc__label {
@@ -114,6 +115,7 @@
   font: var(--rs-font-chip);
   white-space: nowrap;
   max-width: none;
+  min-height: var(--rs-tap-min);
   transition:
     background-color 0.12s ease,
     color 0.12s ease,

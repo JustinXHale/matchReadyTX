@@ -16,7 +16,6 @@
  *   cd functions && npm run build && node lib/migrateRepairSecondYellowCases.js --write
  */
 
-import { type Firestore } from '@google-cloud/firestore';
 import { requireCliFirestore } from './cliFirebaseAuth';
 
 const args = process.argv.slice(2);
@@ -225,7 +224,8 @@ function splitNestedSecondIntoTwoYellows(cards: CardIncident[]): {
         receivedAnotherCard: false,
       });
       // Drop nested secondOffense entirely — Firestore rejects undefined values.
-      const { secondOffense: _drop, ...rest } = card;
+      const rest = { ...card };
+      delete rest.secondOffense;
       next.push(
         omitUndefined({
           ...rest,

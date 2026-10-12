@@ -12,8 +12,8 @@ import { Link } from 'react-router-dom';
 import { useApp, useAppHref } from '@/app/AppContext';
 import { coachFeedbackAverage, isCrewScopeCoachFeedback } from '@/domain/coachFeedback';
 import { formatInsightsAvg } from '@/features/insights/insightsFormat';
-import { InsightsReportTrailing } from '@/features/insights/InsightsReportTrailing';
 import { MatchListRow } from '@/ui/MatchListRow';
+import { ReportAttributionFooter } from '@/ui/ReportAttributionFooter';
 
 function formatAvg(avg: number): string {
   return formatInsightsAvg(avg);
@@ -87,7 +87,7 @@ export function InsightsCoachFeedbackPage() {
         {avgRating != null ? ` · avg ${formatAvg(avgRating)} (1–5)` : ''}
       </p>
 
-      <div className="rs-insights-official-filters">
+      <div className="rs-insights-report-filters">
         <FormGroup
           label="Filter by team"
           fieldId="insights-coach-team"
@@ -151,16 +151,16 @@ export function InsightsCoachFeedbackPage() {
                 {isCrew ? ' · Tournament crew' : ''}
               </span>
             );
-            const trailing = (
-              <InsightsReportTrailing
-                score={avg != null ? formatAvg(avg) : '—'}
-                officialName={
+            const attribution = (
+              <ReportAttributionFooter
+                rating={avg != null ? formatAvg(avg) : '—'}
+                position={isCrew ? 'Crew' : 'MO'}
+                refereeName={
                   isCrew
                     ? (f.tournamentTitle ?? 'Tournament')
                     : (f.officialName ?? 'Official')
                 }
-                officialHref={isCrew ? undefined : (officialHref ?? undefined)}
-                namePrefix={isCrew ? 'Crew' : 'MO'}
+                refereeHref={isCrew ? undefined : (officialHref ?? undefined)}
               />
             );
 
@@ -170,14 +170,15 @@ export function InsightsCoachFeedbackPage() {
                   key={f.id}
                   match={match}
                   to={detailHref}
-                  split="action"
+                  showTime
+                  submitted
                   meta={meta}
-                  trailing={trailing}
+                  footer={attribution}
                 />
               );
             }
             return (
-              <div key={f.id} className="rs-list-row rs-list-row--action">
+              <div key={f.id} className="rs-list-row">
                 <Link to={detailHref} className="rs-list-row__main">
                   <div className="rs-list-row__body">
                     <span className="rs-match-card__title">
@@ -186,7 +187,9 @@ export function InsightsCoachFeedbackPage() {
                     {meta}
                   </div>
                 </Link>
-                <div className="rs-list-row__trailing">{trailing}</div>
+                <div className="rs-list-row__supporting-footer">
+                  {attribution}
+                </div>
               </div>
             );
           })}

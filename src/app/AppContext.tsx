@@ -50,8 +50,15 @@ import {
 import { withDemoPrefix } from '@/app/demoPaths';
 import type { BackNav } from '@/nav/backNav';
 
-/** Header role switcher — Referee/CMO combined (Q-R6 locked). Team Admin = club lens. */
-export type RoleView = 'referee' | 'teamAdmin' | 'scheduler' | 'fan' | 'judicial' | 'finance';
+/** Header persona lens. Domain roles remain the source of authorization. */
+export type RoleView =
+  | 'referee'
+  | 'cmo'
+  | 'teamAdmin'
+  | 'scheduler'
+  | 'fan'
+  | 'judicial'
+  | 'finance';
 
 /** Seed showcase vs Firebase + Firestore. Independent of Auth when on `/demo`. */
 export type DataMode = 'demo' | 'live';
@@ -60,6 +67,7 @@ const ROLE_VIEW_KEY = 'rs-role-view';
 const DATA_MODE_KEY = 'rs-data-mode';
 const ROLE_VIEWS: RoleView[] = [
   'referee',
+  'cmo',
   'teamAdmin',
   'scheduler',
   'fan',
@@ -68,7 +76,8 @@ const ROLE_VIEWS: RoleView[] = [
 ];
 
 export const ROLE_VIEW_LABELS: Record<RoleView, string> = {
-  referee: 'Referee/CMO',
+  referee: 'Referee',
+  cmo: 'CMO',
   teamAdmin: 'Team Admin',
   scheduler: 'Scheduler',
   fan: 'Fan',
@@ -80,7 +89,8 @@ export const ROLE_VIEW_LABELS: Record<RoleView, string> = {
 export function lensesForUser(user: UserProfile | null): RoleView[] {
   if (!user) return [];
   const out: RoleView[] = [];
-  if (hasRefereeLensRole(user.roles)) out.push('referee');
+  if (user.roles.includes('official')) out.push('referee');
+  if (user.roles.includes('cmo')) out.push('cmo');
   if (shouldShowTeamAdminLens(user)) out.push('teamAdmin');
   if (user.roles.includes('assigner')) out.push('scheduler');
   if (hasFinanceAccessRole(user.roles)) out.push('finance');
@@ -136,8 +146,10 @@ interface AppContextValue {
   availableLenses: RoleView[];
   roleView: RoleView;
   setRoleView: (view: RoleView) => void;
-  /** Referee/CMO lens (combined official + coaching-match-official tools). */
+  /** Referee lens (availability, appointments, match/card reports). */
   isRefereeView: boolean;
+  /** Coaching Match Official lens (appointments, coaching reports, insights). */
+  isCmoView: boolean;
   /** Team Admin club lens. */
   isTeamAdminView: boolean;
   /** @deprecated Use isTeamAdminView */
@@ -145,7 +157,7 @@ interface AppContextValue {
   isSchedulerView: boolean;
   /** Alias: scheduler lens (assigner control center). */
   isAssignerView: boolean;
-  /** Alias: referee/cmo lens (legacy official tools). */
+  /** Alias: either appointed-official lens; retained for shared match actions. */
   isOfficialView: boolean;
   /** Fan browse lens (League schedule). */
   isFanView: boolean;
@@ -157,10 +169,10 @@ interface AppContextValue {
 
 const AppContext = createContext<AppContextValue | null>(null);
 
-function migrateLegacyRoleView(v: string | null): RoleView | null {
+export function migrateLegacyRoleView(v: string | null): RoleView | null {
   if (!v) return null;
   if (v === 'assigner') return 'scheduler';
-  if (v === 'official' || v === 'cmo') return 'referee';
+  if (v === 'official') return 'referee';
   if (v === 'coach') return 'teamAdmin';
   if (ROLE_VIEWS.includes(v as RoleView)) return v as RoleView;
   return null;
@@ -216,9 +228,10 @@ function persistDataMode(mode: DataMode): void {
 
 export function defaultRoleView(user: UserProfile | null): RoleView {
   if (!user) return 'referee';
-  // Day-to-day home: Referee/CMO first, then linked Team Admin, then Scheduler.
+  // Day-to-day home: Referee first, then CMO, linked Team Admin, then Scheduler.
   // Pending Team Admin (no clubs yet) browses as Fan.
-  if (hasRefereeLensRole(user.roles)) return 'referee';
+  if (user.roles.includes('official')) return 'referee';
+  if (user.roles.includes('cmo')) return 'cmo';
   if (shouldShowTeamAdminLens(user)) return 'teamAdmin';
   if (user.roles.includes('assigner')) return 'scheduler';
   if (hasFinanceAccessRole(user.roles)) return 'finance';
@@ -232,9 +245,10 @@ export function defaultRoleView(user: UserProfile | null): RoleView {
 /** Home path for the active role lens (also used by shell role switch). */
 export const ROLE_HOME: Record<RoleView, string> = {
   referee: '/referee/appointments',
+  cmo: '/referee/appointments',
   teamAdmin: '/team-admin',
   scheduler: '/scheduler',
-  fan: '/global/schedule/upcoming',
+  fan: '/global/schedule',
   judicial: '/judicial',
   finance: '/finance/payouts',
 };
@@ -280,6 +294,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
   dataModeRef.current = dataMode;
 
   useEffect(() => demoStore.subscribe(() => setState(demoStore.getState())), []);
+
+  // Repair stale in-memory open games after HMR so AR/CMO/#4 filters work.
+  useEffect(() => {
+    if (dataMode !== 'demo') return;
+    demoStore.repairDemoOpenMatchCrews();
+  }, [dataMode]);
 
   const setDataMode = useCallback((mode: DataMode) => {
     if (mode === 'demo' && !isDemoMode) return;
@@ -391,14 +411,42 @@ export function AppProvider({ children }: { children: ReactNode }) {
     };
   }, []);
 
+  const currentUser = useMemo(
+    () => state.users.find((u) => u.uid === state.currentUserId) ?? null,
+    [state.users, state.currentUserId],
+  );
+  const liveUid = currentUser?.uid ?? '';
+  const liveProfileComplete = Boolean(currentUser?.profileComplete);
+  const liveIsAssigner = Boolean(currentUser?.roles.includes('assigner'));
+  const liveHasInsightsAccess = hasInsightsAccessRole(currentUser?.roles ?? []);
+  const liveHasTeamAdminRole = Boolean(
+    currentUser?.roles.includes('teamAdmin'),
+  );
+  const liveHasJudicialRole = Boolean(currentUser?.roles.includes('judicial'));
+  const liveHasReportAnalyticsRole = Boolean(
+    currentUser?.roles.includes('reportAnalytics'),
+  );
+  const liveHasRefereeRole = Boolean(
+    currentUser && hasRefereeLensRole(currentUser.roles),
+  );
+  const liveHasFinanceAccess = hasFinanceAccessRole(currentUser?.roles ?? []);
+  const liveTeamIdsKey = currentUser?.teamIds.join('\u0000') ?? '';
+  const availabilityUidsKey = useMemo(() => {
+    const ids = liveIsAssigner
+      ? state.users.map((user) => user.uid).filter((uid) => !uid.startsWith('u_'))
+      : liveUid && !liveUid.startsWith('u_')
+        ? [liveUid]
+        : [];
+    return [...new Set(ids)].sort().join('\u0000');
+  }, [liveIsAssigner, liveUid, state.users]);
+
   /** Firestore org schedule — live mode + real Firebase uid + completed profile. */
   useEffect(() => {
     if (!isFirebaseConfigured) return;
     if (dataMode !== 'live') return;
-    const uid = state.currentUserId;
+    const uid = liveUid;
     if (!uid || uid.startsWith('u_')) return;
-    const me = state.users.find((u) => u.uid === uid);
-    if (!me?.profileComplete) return;
+    if (!liveProfileComplete) return;
 
     const unsubOrg = subscribeLiveOrg(
       defaultOrgId(),
@@ -410,7 +458,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       (err) => console.error('Live org subscription failed', err),
       {
         viewerUid: uid,
-        isAssigner: Boolean(me?.roles.includes('assigner')),
+        isAssigner: liveIsAssigner,
       },
     );
     const unsubRoster = subscribeOrgRoster(
@@ -426,23 +474,15 @@ export function AppProvider({ children }: { children: ReactNode }) {
       unsubOrg();
       unsubRoster();
     };
-  }, [
-    state.currentUserId,
-    dataMode,
-    state.users.find((u) => u.uid === state.currentUserId)?.profileComplete,
-    state.users
-      .find((u) => u.uid === state.currentUserId)
-      ?.roles.join(','),
-  ]);
+  }, [dataMode, liveIsAssigner, liveProfileComplete, liveUid]);
 
   /** Club list for onboarding before profileComplete (matches/org still gated). */
   useEffect(() => {
     if (!isFirebaseConfigured) return;
     if (dataMode !== 'live') return;
-    const uid = state.currentUserId;
+    const uid = liveUid;
     if (!uid || uid.startsWith('u_')) return;
-    const me = state.users.find((u) => u.uid === uid);
-    if (me?.profileComplete) return;
+    if (liveProfileComplete) return;
 
     const unsub = subscribeLiveTeams(
       defaultOrgId(),
@@ -454,11 +494,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       (err) => console.error('Live teams subscription failed', err),
     );
     return unsub;
-  }, [
-    dataMode,
-    state.currentUserId,
-    state.users.find((u) => u.uid === state.currentUserId)?.profileComplete,
-  ]);
+  }, [dataMode, liveProfileComplete, liveUid]);
 
   const refreshLiveProfile = useCallback(async () => {
     const uid =
@@ -483,18 +519,15 @@ export function AppProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (!isFirebaseConfigured) return;
     if (dataMode !== 'live') return;
-    const uid = state.currentUserId;
+    const uid = liveUid;
     if (!uid || uid.startsWith('u_')) return;
-    const me = state.users.find((u) => u.uid === uid);
-    if (!me) return;
-    const isGlobal = hasInsightsAccessRole(me.roles);
-    const canRead =
-      isGlobal || me.roles.includes('teamAdmin');
+    const isGlobal = liveHasInsightsAccess;
+    const canRead = isGlobal || liveHasTeamAdminRole;
     if (!canRead) return;
 
     const unsub = subscribeCoachFeedback(
       defaultOrgId(),
-      { isGlobal, teamIds: me.teamIds },
+      { isGlobal, teamIds: liveTeamIdsKey ? liveTeamIdsKey.split('\u0000') : [] },
       (feedback) => {
         if (dataModeRef.current !== 'live') return;
         demoStore.applyLiveCoachFeedback(feedback);
@@ -505,34 +538,27 @@ export function AppProvider({ children }: { children: ReactNode }) {
     return () => unsub();
   }, [
     dataMode,
-    state.currentUserId,
-    state.users.find((u) => u.uid === state.currentUserId)?.roles.join(','),
-    state.users
-      .find((u) => u.uid === state.currentUserId)
-      ?.teamIds.join(','),
+    liveHasInsightsAccess,
+    liveHasTeamAdminRole,
+    liveTeamIdsKey,
+    liveUid,
   ]);
 
   /** Match + card reports — officials see own; assigner / insights see all. */
   useEffect(() => {
     if (!isFirebaseConfigured) return;
     if (dataMode !== 'live') return;
-    const uid = state.currentUserId;
+    const uid = liveUid;
     if (!uid || uid.startsWith('u_')) return;
-    const me = state.users.find((u) => u.uid === uid);
-    if (!me) return;
     const isMatchReportsGlobal =
-      hasInsightsAccessRole(me.roles) ||
-      me.roles.includes('judicial') ||
-      hasFinanceAccessRole(me.roles);
+      liveHasInsightsAccess || liveHasJudicialRole || liveHasFinanceAccess;
     const isCardReportsGlobal =
-      me.roles.includes('assigner') ||
-      me.roles.includes('reportAnalytics') ||
-      me.roles.includes('judicial') ||
-      hasFinanceAccessRole(me.roles);
+      liveIsAssigner ||
+      liveHasReportAnalyticsRole ||
+      liveHasJudicialRole ||
+      liveHasFinanceAccess;
     const canRead =
-      isMatchReportsGlobal ||
-      isCardReportsGlobal ||
-      hasRefereeLensRole(me.roles);
+      isMatchReportsGlobal || isCardReportsGlobal || liveHasRefereeRole;
     if (!canRead) return;
 
     const orgId = defaultOrgId();
@@ -573,19 +599,22 @@ export function AppProvider({ children }: { children: ReactNode }) {
     };
   }, [
     dataMode,
-    state.currentUserId,
-    state.users.find((u) => u.uid === state.currentUserId)?.roles.join(','),
+    liveHasFinanceAccess,
+    liveHasInsightsAccess,
+    liveHasJudicialRole,
+    liveHasRefereeRole,
+    liveHasReportAnalyticsRole,
+    liveIsAssigner,
+    liveUid,
   ]);
 
   /** Judicial cases + dashboard settings — assigner or judicial. */
   useEffect(() => {
     if (!isFirebaseConfigured) return;
     if (dataMode !== 'live') return;
-    const uid = state.currentUserId;
+    const uid = liveUid;
     if (!uid || uid.startsWith('u_')) return;
-    const me = state.users.find((u) => u.uid === uid);
-    if (!me) return;
-    if (!me.roles.includes('assigner') && !me.roles.includes('judicial')) {
+    if (!liveIsAssigner && !liveHasJudicialRole) {
       return;
     }
     const orgId = defaultOrgId();
@@ -611,20 +640,15 @@ export function AppProvider({ children }: { children: ReactNode }) {
       unsubCases();
       unsubSettings();
     };
-  }, [
-    dataMode,
-    state.currentUserId,
-    state.users.find((u) => u.uid === state.currentUserId)?.roles.join(','),
-  ]);
+  }, [dataMode, liveHasJudicialRole, liveIsAssigner, liveUid]);
 
   /** Official payments + conference invoices — assigner or treasurer. */
   useEffect(() => {
     if (!isFirebaseConfigured) return;
     if (dataMode !== 'live') return;
-    const uid = state.currentUserId;
+    const uid = liveUid;
     if (!uid || uid.startsWith('u_')) return;
-    const me = state.users.find((u) => u.uid === uid);
-    if (!me || !hasFinanceAccessRole(me.roles)) return;
+    if (!liveHasFinanceAccess) return;
 
     const orgId = defaultOrgId();
     const unsubPayments = subscribeOfficialPayments(
@@ -649,11 +673,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       unsubPayments();
       unsubInvoices();
     };
-  }, [
-    dataMode,
-    state.currentUserId,
-    state.users.find((u) => u.uid === state.currentUserId)?.roles.join(','),
-  ]);
+  }, [dataMode, liveHasFinanceAccess, liveUid]);
 
   /**
    * Availability ranges from Firestore.
@@ -662,15 +682,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (!isFirebaseConfigured) return;
     if (dataMode !== 'live') return;
-    const uid = state.currentUserId;
+    const uid = liveUid;
     if (!uid || uid.startsWith('u_')) return;
-
-    const me = state.users.find((u) => u.uid === uid);
-    const isAssigner = Boolean(me?.roles.includes('assigner'));
-    const uids = isAssigner
-      ? state.users.map((u) => u.uid).filter((id) => !id.startsWith('u_'))
-      : [uid];
-    const unique = [...new Set(uids.includes(uid) ? uids : [uid, ...uids])];
+    const listedUids = availabilityUidsKey
+      ? availabilityUidsKey.split('\u0000')
+      : [];
+    const unique = listedUids.includes(uid)
+      ? listedUids
+      : [uid, ...listedUids];
 
     const unsub = subscribeUsersAvailability(
       availOrgId(),
@@ -683,18 +702,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       (err) => console.error('Availability subscription failed', err),
     );
     return () => unsub();
-  }, [
-    dataMode,
-    state.currentUserId,
-    state.users
-      .map((u) => u.uid)
-      .filter((id) => !id.startsWith('u_'))
-      .sort()
-      .join(','),
-    state.users.find((u) => u.uid === state.currentUserId)?.roles.includes(
-      'assigner',
-    ),
-  ]);
+  }, [availabilityUidsKey, dataMode, liveUid]);
 
   const refresh = useCallback(() => setState(demoStore.getState()), []);
 
@@ -723,11 +731,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
       });
     })();
   }, []);
-
-  const currentUser = useMemo(
-    () => state.users.find((u) => u.uid === state.currentUserId) ?? null,
-    [state.users, state.currentUserId],
-  );
 
   const hasFirebaseSession = liveProfile != null;
   const isDemoShowcase = dataMode === 'demo';
@@ -760,18 +763,15 @@ export function AppProvider({ children }: { children: ReactNode }) {
     const safe = resolveRoleView(currentUser);
     setRoleViewState(safe);
     persistRoleView(safe);
-  }, [
-    currentUser?.uid,
-    currentUser?.roles.join(','),
-    currentUser?.teamIds?.join(','),
-  ]);
+  }, [currentUser]);
 
   const isRefereeView = roleView === 'referee';
+  const isCmoView = roleView === 'cmo';
   const isTeamAdminView = roleView === 'teamAdmin';
   const isCoachView = isTeamAdminView;
   const isSchedulerView = roleView === 'scheduler';
   const isAssignerView = isSchedulerView;
-  const isOfficialView = isRefereeView;
+  const isOfficialView = isRefereeView || isCmoView;
   const isFanView = roleView === 'fan';
   const isJudicialView = roleView === 'judicial';
   const isFinanceView = roleView === 'finance';
@@ -807,6 +807,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       roleView,
       setRoleView,
       isRefereeView,
+      isCmoView,
       isTeamAdminView,
       isCoachView,
       isSchedulerView,
@@ -845,6 +846,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       roleView,
       setRoleView,
       isRefereeView,
+      isCmoView,
       isTeamAdminView,
       isCoachView,
       isSchedulerView,

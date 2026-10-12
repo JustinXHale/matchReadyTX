@@ -1,7 +1,8 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useState, type KeyboardEvent } from 'react';
 import { Title } from '@patternfly/react-core';
 import { Link } from 'react-router-dom';
 import { useApp, useAppHref } from '@/app/AppContext';
+import { useAppFeedback } from '@/app/feedback/feedbackContext';
 import { isKickoffUpcoming } from '@/domain/requests';
 import { teamLinkRequestsForReviewer } from '@/domain/teamLinkRequests';
 import { applyMatchScope, matchesForUser } from '@/domain/visibility';
@@ -44,12 +45,12 @@ function isActionNeeded(match: Match, hasPendingProposal: boolean): boolean {
 
 export function TeamAdminHomePage() {
   const { currentUser, state, store, refresh, dataMode } = useApp();
+  const { notify } = useAppFeedback();
   const timeZone = orgTimeZone(state.org.timezone);
   const requestFixtureHref = useAppHref('/team-admin/request-fixture');
   const [teamFilter, setTeamFilter] = useState<string | null>(null);
   const [genderFilter, setGenderFilter] = useState<MatchGender | null>(null);
   const [teamLinkBusyId, setTeamLinkBusyId] = useState<string | null>(null);
-  const [levelFilter, setLevelFilter] = useState<string | null>(null);
   const [competitionFilter, setCompetitionFilter] = useState<string | null>(
     null,
   );
@@ -62,6 +63,30 @@ export function TeamAdminHomePage() {
       .map((id) => state.teams.find((t) => t.id === id))
       .filter((t): t is Team => t != null);
   }, [currentUser, state.teams]);
+  const activeTeamId =
+    teamFilter && myTeams.some((team) => team.id === teamFilter)
+      ? teamFilter
+      : (myTeams[0]?.id ?? null);
+
+  const moveTeamTab = (
+    event: KeyboardEvent<HTMLButtonElement>,
+    index: number,
+  ) => {
+    let nextIndex = index;
+    if (event.key === 'ArrowRight') nextIndex = (index + 1) % myTeams.length;
+    else if (event.key === 'ArrowLeft') {
+      nextIndex = (index - 1 + myTeams.length) % myTeams.length;
+    } else if (event.key === 'Home') nextIndex = 0;
+    else if (event.key === 'End') nextIndex = myTeams.length - 1;
+    else return;
+
+    event.preventDefault();
+    setTeamFilter(myTeams[nextIndex].id);
+    const tabs = event.currentTarget.parentElement?.querySelectorAll<HTMLButtonElement>(
+      '[role="tab"]',
+    );
+    tabs?.[nextIndex]?.focus();
+  };
 
   const linkReviews = useMemo(
     () => teamLinkRequestsForReviewer(state.teamLinkRequests, currentUser),
@@ -91,8 +116,9 @@ export function TeamAdminHomePage() {
       }
     } catch (err) {
       console.error('Team link review failed', err);
-      window.alert(
+      notify(
         callableErrorMessage(err, 'Failed to review Team Admin request.'),
+        'error',
       );
     } finally {
       setTeamLinkBusyId(null);
@@ -128,13 +154,12 @@ export function TeamAdminHomePage() {
 
     const rows: ListedMatch[] = [];
     for (const teamId of currentUser.teamIds) {
-      if (teamFilter && teamId !== teamFilter) continue;
+      if (activeTeamId && teamId !== activeTeamId) continue;
       for (const match of visible) {
         if (match.homeTeamId !== teamId && match.awayTeamId !== teamId) {
           continue;
         }
         if (genderFilter && match.gender !== genderFilter) continue;
-        if (levelFilter && match.level !== levelFilter) continue;
         if (!matchInCompetition(match, competitionFilter)) {
           continue;
         }
@@ -166,9 +191,8 @@ export function TeamAdminHomePage() {
     currentUser,
     filterPool,
     pendingByMatch,
-    teamFilter,
+    activeTeamId,
     genderFilter,
-    levelFilter,
     competitionFilter,
     dateFilter,
     statusFilter,
@@ -178,13 +202,12 @@ export function TeamAdminHomePage() {
     if (!currentUser) return [];
     const out: Match[] = [];
     for (const teamId of currentUser.teamIds) {
-      if (teamFilter && teamId !== teamFilter) continue;
+      if (activeTeamId && teamId !== activeTeamId) continue;
       for (const match of filterPool) {
         if (match.homeTeamId !== teamId && match.awayTeamId !== teamId) {
           continue;
         }
         if (genderFilter && match.gender !== genderFilter) continue;
-        if (levelFilter && match.level !== levelFilter) continue;
         if (!matchInCompetition(match, competitionFilter)) {
           continue;
         }
@@ -200,9 +223,8 @@ export function TeamAdminHomePage() {
     currentUser,
     filterPool,
     pendingByMatch,
-    teamFilter,
+    activeTeamId,
     genderFilter,
-    levelFilter,
     competitionFilter,
     statusFilter,
   ]);
@@ -226,13 +248,13 @@ export function TeamAdminHomePage() {
   const settledByTeam = useMemo(() => {
     const groups: { team: Team; matches: ListedMatch[] }[] = [];
     for (const team of myTeams) {
-      if (teamFilter && team.id !== teamFilter) continue;
+      if (activeTeamId && team.id !== activeTeamId) continue;
       const matches = settled.filter((r) => r.teamId === team.id);
       if (matches.length === 0) continue;
       groups.push({ team, matches });
     }
     return groups;
-  }, [myTeams, settled, teamFilter]);
+  }, [myTeams, settled, activeTeamId]);
 
   const settledByMonthFallback = useMemo(() => {
     if (settledByTeam.length > 0) return [];
@@ -274,9 +296,7 @@ export function TeamAdminHomePage() {
   const hasTeams = myTeams.length > 0;
   const empty = listed.length === 0;
   const hasFilters =
-    teamFilter != null ||
     genderFilter != null ||
-    levelFilter != null ||
     competitionFilter != null ||
     dateFilter != null ||
     statusFilter !== 'all';
@@ -315,21 +335,22 @@ export function TeamAdminHomePage() {
         <>
           {myTeams.length > 1 && (
             <div
-              className="rs-filter-chips"
-              role="group"
-              aria-label="Filter by side"
+              className="rs-inline-tabs rs-team-admin__team-tabs"
+              role="tablist"
+              aria-label="Team schedule"
             >
-              {myTeams.map((t) => (
+              {myTeams.map((t, index) => (
                 <button
                   key={t.id}
                   type="button"
-                  className={`rs-filter-chip${
-                    teamFilter === t.id ? ' rs-filter-chip--selected' : ''
+                  role="tab"
+                  className={`rs-inline-tabs__tab${
+                    activeTeamId === t.id ? ' active' : ''
                   }`}
-                  aria-pressed={teamFilter === t.id}
-                  onClick={() =>
-                    setTeamFilter((prev) => (prev === t.id ? null : t.id))
-                  }
+                  aria-selected={activeTeamId === t.id}
+                  tabIndex={activeTeamId === t.id ? 0 : -1}
+                  onClick={() => setTeamFilter(t.id)}
+                  onKeyDown={(event) => moveTeamTab(event, index)}
                 >
                   {t.name}
                 </button>
@@ -366,11 +387,12 @@ export function TeamAdminHomePage() {
           <GlobalDivisionFilters
             options={filterOptions}
             genderFilter={genderFilter}
-            levelFilter={levelFilter}
+            levelFilter={null}
             competitionFilter={competitionFilter}
             onGenderChange={setGenderFilter}
-            onLevelChange={setLevelFilter}
+            onLevelChange={() => {}}
             onCompetitionChange={setCompetitionFilter}
+            hideLevels
             showDate
             dateFilter={dateFilter}
             onDateChange={setDateFilter}
@@ -439,7 +461,7 @@ export function TeamAdminHomePage() {
               {settledByMonthFallback.map((group) => (
                 <section key={group.key} className="rs-month-section">
                   <Title
-                    headingLevel="h3"
+                    headingLevel="h2"
                     size="md"
                     className="rs-month-heading"
                   >

@@ -23,7 +23,7 @@
 
 .rs-public__logo {
   object-fit: contain;
-  border-radius: 28px;
+  border-radius: var(--rs-radius-dialog);
 }
 
 .rs-public__lede {

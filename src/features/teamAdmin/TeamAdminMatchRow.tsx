@@ -1,4 +1,7 @@
-import { MatchListRow } from '@/ui/MatchListRow';
+import {
+  MatchSummaryCard,
+  type MatchCardStatusPresentation,
+} from '@/components/MatchSummaryCard';
 import { MatchCrewTrailing } from '@/ui/MatchCrewTrailing';
 import {
   isCrewVisibleToTeams,
@@ -24,10 +27,20 @@ export function sideConfirmedForTeam(match: Match, teamId: string): boolean {
   return false;
 }
 
-function pillClassForTone(tone: 'urgent' | 'warn' | 'none'): string {
-  if (tone === 'urgent') return 'rs-pill rs-pill--urgent';
-  if (tone === 'warn') return 'rs-pill rs-pill--warn';
-  return 'rs-pill';
+function statusPresentation(
+  tone: 'urgent' | 'warn' | 'none',
+  label: string | null,
+): MatchCardStatusPresentation {
+  if (tone === 'urgent') {
+    return { tone: 'declined', label: label ?? 'Needs confirm' };
+  }
+  if (tone === 'warn') {
+    return {
+      tone: 'pending',
+      label: label ?? 'Waiting on Referee Confirmation',
+    };
+  }
+  return { tone: 'approved', label: 'Confirmed' };
 }
 
 export function TeamAdminMatchRow({
@@ -47,49 +60,21 @@ export function TeamAdminMatchRow({
   const crewVisible = isCrewVisibleToTeams(match);
 
   return (
-    <MatchListRow
+    <MatchSummaryCard
       match={match}
       to={to}
       showTime
-      split="action"
-      urgent={listStatus.tone === 'urgent'}
-      warn={listStatus.tone === 'warn'}
       back={back}
-      trailing={
-        listStatus.label ? (
-          <div className="rs-team-admin__status">
-            <span
-              className={`${pillClassForTone(listStatus.tone)}${
-                listStatus.label === 'Change Proposed' ||
-                listStatus.tone === 'warn'
-                  ? ' rs-team-admin__status-pill--wrap'
-                  : ''
-              }`}
-            >
-              {listStatus.label === 'Change Proposed' ? (
-                <>
-                  Change
-                  <br />
-                  Proposed
-                </>
-              ) : listStatus.tone === 'warn' ? (
-                <>
-                  Waiting on
-                  <br />
-                  Referee Confirmation
-                </>
-              ) : (
-                listStatus.label
-              )}
-            </span>
-          </div>
-        ) : (
-          <MatchCrewTrailing
-            match={match}
-            back={back}
-            redactNames={!crewVisible}
-          />
-        )
+      statusPresentation={statusPresentation(
+        listStatus.tone,
+        listStatus.label,
+      )}
+      footer={
+        <MatchCrewTrailing
+          match={match}
+          back={back}
+          redactNames={!crewVisible}
+        />
       }
     />
   );

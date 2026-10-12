@@ -296,9 +296,11 @@ export function PerformanceReportForm({
 
   return (
     <div className="rs-stack rs-perf-report">
-      <button type="button" className="rs-detail__back" onClick={goPrev}>
-        ← {section === 0 ? (isUpdate ? 'Match report' : 'Choose form') : SECTION_TITLES[section - 1]}
-      </button>
+      {section > 0 ? (
+        <button type="button" className="rs-report-step-back" onClick={goPrev}>
+          ← {SECTION_TITLES[section - 1]}
+        </button>
+      ) : null}
       <Title headingLevel="h2" size="lg" className="rs-perf-report__title">
         Performance Report
       </Title>

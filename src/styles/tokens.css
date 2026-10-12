@@ -1,110 +1,174 @@
 /**
- * MatchReadyTX design tokens — PatternFly-aligned monochrome + high contrast.
+ * MatchReadyTX design tokens — Material 3 / monochrome + high contrast.
  *
  * Architecture (see docs/THEME.md):
  * 1. Palette — literal values ONLY in this file
- * 2. Semantic --rs-color-* — product tokens (reference palette or PF globals)
- * 3. PatternFly --pf-t--global-* overrides — brand + surfaces for PF components
+ * 2. Semantic --rs-color-* — product tokens
+ * 3. Legacy --pf-t--global-* fallbacks — keep existing CSS working after PF removal
  *
  * Color scheme: `pf-v6-theme-dark` on <html> (light default).
  * High contrast: `pf-v6-theme-high-contrast` on <html> (MatchReadyTX default).
  */
 
+/* ---- Legacy PatternFly spacer/border tokens (no PF CSS dependency) ---- */
+:root {
+  --pf-t--global--spacer--xs: 0.25rem;
+  --pf-t--global--spacer--sm: 0.5rem;
+  --pf-t--global--spacer--md: 1rem;
+  --pf-t--global--spacer--lg: 1.5rem;
+  --pf-t--global--spacer--xl: 2rem;
+  --pf-t--global--spacer--2xl: 3rem;
+  --pf-t--global--border--width--regular: 1px;
+  --pf-t--global--border--width--strong: 2px;
+  --pf-t--global--border--width--extra-strong: 3px;
+  --pf-t--global--border--width--action--plain--hover: 2px;
+  --pf-t--global--border--width--action--plain--clicked: 2px;
+  --pf-t--global--font--size--body--sm: 0.875rem;
+  --pf-t--global--font--line-height--body: 1.5;
+}
+
 /* ---- Palette (hex literals — do not use outside this file) ---- */
 :root.rs-theme {
   --rs-palette-black: #000000;
   --rs-palette-white: #ffffff;
-  --rs-palette-gray-50: #f9fafb;
-  --rs-palette-gray-100: #f3f4f6;
-  --rs-palette-gray-200: #e5e7eb;
-  --rs-palette-gray-400: #9ca3af;
-  --rs-palette-gray-500: #6b7280;
-  --rs-palette-gray-600: #4b5563;
-  --rs-palette-gray-700: #374151;
-  --rs-palette-gray-800: #1f2937;
-  --rs-palette-gray-900: #111827;
-  --rs-palette-gray-950: #141414;
-  --rs-palette-gray-border: #333333;
-  --rs-palette-gray-muted: #a3a3a3;
-  --rs-palette-gray-muted-light: #d4d4d4;
-  --rs-palette-gray-ended: #737373;
-  --rs-palette-red-urgent: #dc2626;
-  --rs-palette-green-ok: #16a34a;
-  --rs-palette-yellow-warn: #ca8a04;
-  --rs-palette-yellow-warn-vivid: #fbbf24;
-  /* Google sign-in (official control colors) */
-  --rs-palette-google-text: #1f1f1f;
-  --rs-palette-google-border: #747775;
-  --rs-palette-google-bg: #ffffff;
-  --rs-palette-google-bg-hover: #f8f9fa;
-  --rs-palette-google-spinner-track: #dadce0;
-  --rs-palette-overlay-scrim: #111827;
+  /* Midpoint colors meet 4.5:1 against both pure white and pure black. */
+  --rs-palette-neutral: #757575;
+  --rs-palette-neutral-border: #e5e7eb;
+  --rs-palette-neutral-border-dark: #333333;
+  --rs-palette-error: #d44034;
+  --rs-palette-success: #008838;
+  --rs-palette-warning: #dca614;
+  --rs-palette-neutral-container: #f3f4f6;
+  --rs-palette-neutral-container-dark: #141414;
 
   /* ---- Semantic colors (light scheme) ---- */
   --rs-color-primary: var(--rs-palette-black);
-  --rs-color-secondary: var(--rs-palette-white);
-  --rs-color-primary-muted: var(--rs-palette-gray-800);
-  --rs-color-charcoal: var(--rs-palette-gray-700);
-  --rs-color-charcoal-light: var(--rs-palette-gray-600);
-  --rs-color-charcoal-dark: var(--rs-palette-gray-800);
-  --rs-color-muted: var(--rs-palette-gray-600);
-  --rs-color-ended: var(--rs-palette-gray-500);
-  --rs-color-bg: var(--rs-palette-gray-50);
+  --rs-color-secondary: var(--rs-palette-neutral);
+  --rs-color-on-secondary: var(--rs-palette-white);
+  --rs-color-primary-muted: var(--rs-palette-neutral);
+  --rs-color-charcoal: var(--rs-palette-neutral);
+  --rs-color-charcoal-light: var(--rs-palette-neutral);
+  --rs-color-charcoal-dark: var(--rs-palette-neutral);
+  --rs-color-muted: var(--rs-palette-black);
+  --rs-color-ended: var(--rs-palette-black);
+  --rs-color-bg: var(--rs-palette-white);
   --rs-color-surface: var(--rs-palette-white);
-  --rs-color-surface-muted: var(--rs-palette-gray-100);
-  --rs-color-border: var(--rs-palette-gray-200);
+  --rs-color-surface-muted: var(--rs-palette-neutral-container);
+  --rs-color-border: var(--rs-palette-neutral);
+  --rs-color-surface-border: var(--rs-palette-neutral-border);
+  --rs-color-outline: var(--rs-palette-neutral);
   --rs-color-ink: var(--rs-palette-black);
   --rs-color-on-primary: var(--rs-palette-white);
-  --rs-color-urgent: var(--rs-palette-red-urgent);
+  --rs-color-urgent: var(--rs-palette-error);
   --rs-color-on-urgent: var(--rs-palette-white);
   --rs-color-urgent-ink: var(--rs-color-urgent);
-  --rs-color-urgent-meta: var(--rs-palette-black); /* meta on solid urgent rows */
+  --rs-color-urgent-meta: var(--rs-color-on-urgent); /* meta on solid urgent rows */
   --rs-color-urgent-chip-bg: var(--rs-palette-black);
   --rs-color-urgent-chip-text: var(--rs-palette-white);
-  --rs-color-ok: var(--rs-palette-green-ok);
-  --rs-color-warn: var(--rs-palette-yellow-warn);
-  --rs-color-warn-surface: var(--rs-palette-yellow-warn);
-  --rs-color-warn-accent: var(--rs-palette-yellow-warn);
+  --rs-color-ok: var(--rs-palette-success);
+  --rs-color-on-ok: var(--rs-palette-white);
+  --rs-color-warn: var(--rs-palette-warning);
+  --rs-color-warn-surface: var(--rs-color-surface);
+  --rs-color-warn-accent: var(--rs-color-warn);
   --rs-color-on-warn: var(--rs-palette-black);
-  --rs-color-on-warn-surface: var(--rs-palette-black);
+  --rs-color-on-warn-surface: var(--rs-color-warn);
   --rs-color-tint-contrast: var(--rs-palette-black);
-  --rs-color-signin-google-text: var(--rs-palette-google-text);
-  --rs-color-signin-google-border: var(--rs-palette-google-border);
-  --rs-color-signin-google-bg: var(--rs-palette-google-bg);
-  --rs-color-signin-google-bg-hover: var(--rs-palette-google-bg-hover);
-  --rs-color-signin-google-spinner-track: var(--rs-palette-google-spinner-track);
+  --rs-color-signin-google-text: var(--rs-palette-black);
+  --rs-color-signin-google-border: var(--rs-palette-neutral);
+  --rs-color-signin-google-bg: var(--rs-palette-white);
+  --rs-color-signin-google-bg-hover: var(--rs-palette-white);
+  --rs-color-signin-google-spinner-track: var(--rs-palette-neutral);
   --rs-color-signin-apple-bg: var(--rs-palette-black);
-  --rs-color-signin-apple-bg-hover: var(--rs-palette-gray-900);
+  --rs-color-signin-apple-bg-hover: var(--rs-palette-neutral);
   --rs-color-signin-apple-text: var(--rs-palette-white);
-  --rs-color-overlay-scrim: var(--rs-palette-overlay-scrim);
+  --rs-color-overlay-scrim: var(--rs-palette-black);
   --rs-color-focus-ring: var(--rs-color-primary);
+  /* Semantic fills deliberately reuse the small palette. Status must remain
+   * visible; simplifying color does not mean flattening state into surfaces. */
+  --rs-color-success-container: var(--rs-color-ok);
+  --rs-color-on-success-container: var(--rs-color-on-ok);
+  --rs-color-warning-container: var(--rs-palette-warning);
+  --rs-color-on-warning-container: var(--rs-palette-black);
+  --rs-color-error-container: var(--rs-color-urgent);
+  --rs-color-on-error-container: var(--rs-color-on-urgent);
 
+  /* Context-safe content roles. Containers remap these locally as needed. */
+  --rs-content-surface: var(--rs-color-surface);
+  --rs-content-primary: var(--rs-color-ink);
+  --rs-content-secondary: var(--rs-color-muted);
+  --rs-content-outline: var(--rs-color-border);
+
+  --rs-radius-xs: 4px;
   --rs-radius-card: 12px;
   --rs-radius-chip: 8px;
   --rs-radius-pill: 999px;
   --rs-radius-dialog: 16px;
   --rs-shadow: none;
+  --rs-shadow-overlay: 0 4px 20px color-mix(in srgb, var(--rs-color-overlay-scrim) 15%, transparent);
 
-  --rs-space-xs: var(--pf-t--global--spacer--xs);
-  --rs-space-sm: var(--pf-t--global--spacer--sm);
-  --rs-space-md: var(--pf-t--global--spacer--md);
-  --rs-space-lg: var(--pf-t--global--spacer--lg);
-  --rs-space-xl: var(--pf-t--global--spacer--xl);
+  --rs-space-xs: 0.25rem;
+  --rs-space-sm: 0.5rem;
+  --rs-space-md: 1rem;
+  --rs-space-lg: 1.5rem;
+  --rs-space-xl: 2rem;
+  --rs-space-2xl: 3rem;
 
   --rs-page-pad: 0.75rem;
   --rs-gap-grid: var(--rs-space-sm);
-  --rs-bottom-nav-height: 4rem;
+  --rs-bottom-nav-height: 5rem;
+  /** Material 3 navigation rail width (medium+). */
+  --rs-nav-rail-width: 5rem;
   /** Space below fixed masthead for overlays (mobile brand block is taller). */
   --rs-masthead-offset: 5.75rem;
-  --rs-bottom-clearance: 6.25rem;
-  --rs-tap-min: var(--pf-t--global--spacer--2xl);
+  --rs-bottom-clearance: 7.25rem;
+  --rs-tap-min: 3rem;
+  --rs-action-bar-height: 3.5rem;
+  --rs-status-height: 2rem;
+  --rs-content-max: 45rem;
+  --rs-form-max: 30rem;
+
+  /* Bridge remaining CSS that still references PF globals */
+  --pf-t--global--border--color--default: var(--rs-color-border);
+  --pf-t--global--text--color--subtle: var(--rs-color-muted);
+
+  /*
+   * Material 3 semantic aliases → MatchReadyTX brand roles.
+   * Screens/shell chrome prefer these for M3 component semantics;
+   * literals stay in the palette above.
+   */
+  --rs-m3-surface: var(--rs-color-bg);
+  --rs-m3-surface-container-low: var(--rs-color-bg);
+  --rs-m3-surface-container: var(--rs-color-surface);
+  --rs-m3-surface-container-high: var(--rs-color-surface-muted);
+  --rs-m3-surface-container-highest: var(--rs-color-surface-muted);
+  --rs-m3-on-surface: var(--rs-color-ink);
+  --rs-m3-on-surface-variant: var(--rs-color-ended);
+  --rs-m3-inverse-surface: var(--rs-color-ink);
+  --rs-m3-inverse-on-surface: var(--rs-color-bg);
+  --rs-m3-primary: var(--rs-color-primary);
+  --rs-m3-on-primary: var(--rs-color-on-primary);
+  --rs-m3-secondary-container: var(--rs-color-surface-muted);
+  --rs-m3-on-secondary-container: var(--rs-color-primary);
+  --rs-m3-outline: var(--rs-color-outline);
+  --rs-m3-outline-variant: var(--rs-color-border);
+  --rs-m3-error: var(--rs-color-urgent);
+  --rs-m3-on-error: var(--rs-color-on-urgent);
+  --rs-m3-error-container: var(--rs-color-error-container);
+  --rs-m3-on-error-container: var(--rs-color-on-error-container);
+  --rs-m3-success-container: var(--rs-color-success-container);
+  --rs-m3-on-success-container: var(--rs-color-on-success-container);
+  --rs-m3-warning-container: var(--rs-color-warning-container);
+  --rs-m3-on-warning-container: var(--rs-color-on-warning-container);
 
   --rs-font-family: 'Roboto', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --rs-font-headline: 600 24px/1.25 var(--rs-font-family);
   --rs-font-title: 600 18px/1.3 var(--rs-font-family);
+  --rs-font-section-title: 700 16px/1.3 var(--rs-font-family);
   --rs-font-card-title: 700 14px/1.25 var(--rs-font-family);
   --rs-font-card-title-compact: 700 13px/1.25 var(--rs-font-family);
   --rs-font-meta: 400 12px/1.35 var(--rs-font-family);
   --rs-font-chip: 600 12px/1.2 var(--rs-font-family);
+  --rs-font-action: 600 14px/1.25 var(--rs-font-family);
   --rs-font-nav: 600 12px/1.2 var(--rs-font-family);
   --rs-font-body: 400 15px/1.45 var(--rs-font-family);
 
@@ -124,32 +188,51 @@
 /* Dark color scheme */
 .pf-v6-theme-dark.rs-theme {
   --rs-color-primary: var(--rs-palette-white);
-  --rs-color-secondary: var(--rs-palette-black);
-  --rs-color-primary-muted: var(--rs-palette-gray-200);
-  --rs-color-charcoal: var(--rs-palette-gray-muted);
-  --rs-color-charcoal-light: var(--rs-palette-gray-muted-light);
-  --rs-color-charcoal-dark: var(--rs-palette-gray-ended);
-  --rs-color-muted: var(--rs-palette-gray-muted);
-  --rs-color-ended: var(--rs-palette-gray-ended);
+  --rs-color-on-secondary: var(--rs-palette-black);
   --rs-color-bg: var(--rs-palette-black);
   --rs-color-surface: var(--rs-palette-black);
-  --rs-color-surface-muted: var(--rs-palette-gray-950);
-  --rs-color-border: var(--rs-palette-gray-border);
+  --rs-color-surface-muted: var(--rs-palette-neutral-container-dark);
   --rs-color-ink: var(--rs-palette-white);
+  --rs-color-muted: var(--rs-palette-white);
+  --rs-color-ended: var(--rs-palette-white);
+  --rs-color-surface-border: var(--rs-palette-neutral-border-dark);
   --rs-color-on-primary: var(--rs-palette-black);
   --rs-color-tint-contrast: var(--rs-palette-white);
-  --rs-color-warn: var(--rs-palette-yellow-warn-vivid);
-  --rs-color-warn-surface: var(
-    --pf-t--global--background--color--highlight--default
-  );
-  --rs-color-warn-accent: var(
-    --pf-t--global--icon--color--status--warning--default
-  );
-  --rs-color-on-warn: var(--rs-palette-black);
-  --rs-color-on-warn-surface: var(--rs-color-ink);
-  --rs-color-urgent-ink: var(--rs-color-ink);
   --rs-color-overlay-scrim: var(--rs-palette-black);
   --rs-color-focus-ring: var(--rs-color-primary);
+  --rs-color-success-container: var(--rs-color-ok);
+  --rs-color-on-success-container: var(--rs-color-on-ok);
+  --rs-color-warning-container: var(--rs-palette-warning);
+  --rs-color-on-warning-container: var(--rs-palette-black);
+
+  --rs-content-surface: var(--rs-color-surface);
+  --rs-content-primary: var(--rs-color-ink);
+  --rs-content-secondary: var(--rs-color-muted);
+  --rs-content-outline: var(--rs-color-border);
+
+  --rs-m3-surface: var(--rs-color-bg);
+  --rs-m3-surface-container-low: var(--rs-color-bg);
+  --rs-m3-surface-container: var(--rs-color-surface);
+  --rs-m3-surface-container-high: var(--rs-color-surface-muted);
+  --rs-m3-surface-container-highest: var(--rs-color-surface-muted);
+  --rs-m3-on-surface: var(--rs-color-ink);
+  --rs-m3-on-surface-variant: var(--rs-color-ended);
+  --rs-m3-inverse-surface: var(--rs-color-ink);
+  --rs-m3-inverse-on-surface: var(--rs-color-bg);
+  --rs-m3-primary: var(--rs-color-primary);
+  --rs-m3-on-primary: var(--rs-color-on-primary);
+  --rs-m3-secondary-container: var(--rs-color-surface-muted);
+  --rs-m3-on-secondary-container: var(--rs-color-primary);
+  --rs-m3-outline: var(--rs-color-outline);
+  --rs-m3-outline-variant: var(--rs-color-border);
+  --rs-m3-error: var(--rs-color-urgent);
+  --rs-m3-on-error: var(--rs-color-on-urgent);
+  --rs-m3-error-container: var(--rs-color-error-container);
+  --rs-m3-on-error-container: var(--rs-color-on-error-container);
+  --rs-m3-success-container: var(--rs-color-success-container);
+  --rs-m3-on-success-container: var(--rs-color-on-success-container);
+  --rs-m3-warning-container: var(--rs-color-warning-container);
+  --rs-m3-on-warning-container: var(--rs-color-on-warning-container);
 
   --pf-t--global--color--brand--default: var(--rs-color-primary);
   --pf-t--global--color--brand--hover: var(--rs-color-primary-muted);

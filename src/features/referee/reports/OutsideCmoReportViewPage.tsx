@@ -13,13 +13,13 @@ import {
   outsideCmoPath,
   outsidePerformancePath,
 } from '@/features/referee/reports/reportLinks';
-import { useAppBack } from '@/nav/backNav';
+import { useContextualAppBack } from '@/app/shell/contextualBar';
 
 /** Gate: referee must submit Performance before viewing the CMO report. */
 export function OutsideCmoReportViewPage() {
   const { sessionId = '' } = useParams();
   const { currentUser, state } = useApp();
-  const { goBack, backLabel } = useAppBack(COACHING_MINE_BACK);
+  useContextualAppBack(COACHING_MINE_BACK);
 
   const session = state.outsideCoachingSessions.find((s) => s.id === sessionId);
   const cmo = outsideCmoReport(state.matchReports, sessionId);
@@ -33,9 +33,6 @@ export function OutsideCmoReportViewPage() {
         <Title headingLevel="h2" size="lg">
           Outside report not found
         </Title>
-        <Button variant="secondary" onClick={goBack}>
-          ← {backLabel}
-        </Button>
       </div>
     );
   }
@@ -47,9 +44,6 @@ export function OutsideCmoReportViewPage() {
   if (isReferee && !unlocked) {
     return (
       <div className="rs-stack">
-        <button type="button" className="rs-detail__back" onClick={goBack}>
-          ← {backLabel}
-        </button>
         <Title headingLevel="h2" size="lg">
           Coaching report pending
         </Title>
@@ -81,9 +75,6 @@ export function OutsideCmoReportViewPage() {
     }
     return (
       <div className="rs-stack">
-        <button type="button" className="rs-detail__back" onClick={goBack}>
-          ← {backLabel}
-        </button>
         <Title headingLevel="h2" size="lg">
           Coaching report not submitted yet
         </Title>

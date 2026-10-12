@@ -105,7 +105,7 @@ export function subscribeOrgRoster(
 ): Unsubscribe {
   const database = requireDb();
   let memberMeta = new Map<string, OrgMemberMeta>();
-  let profiles = new Map<string, UserProfile>();
+  const profiles = new Map<string, UserProfile>();
   let cancelled = false;
   const unsubs: Unsubscribe[] = [];
 

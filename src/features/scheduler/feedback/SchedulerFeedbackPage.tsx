@@ -4,6 +4,7 @@ import { Link } from 'react-router-dom';
 import { useApp, useAppHref } from '@/app/AppContext';
 import { coachFeedbackAverage, isCrewScopeCoachFeedback } from '@/domain/coachFeedback';
 import { MatchListRow } from '@/ui/MatchListRow';
+import { ReportAttributionFooter } from '@/ui/ReportAttributionFooter';
 
 function formatAvg(avg: number): string {
   return Number.isInteger(avg) ? String(avg) : avg.toFixed(1);
@@ -70,29 +71,17 @@ export function SchedulerFeedbackPage() {
                 {isCrew ? ' · Tournament crew' : ''}
               </span>
             );
-            const trailing = (
-              <div className="rs-coach-feedback-trailing">
-                <span className="rs-pill">
-                  {avg != null ? formatAvg(avg) : '—'}
-                </span>
-                {isCrew ? (
-                  <span className="rs-coach-feedback-trailing__mo">
-                    Crew · {f.tournamentTitle ?? 'Tournament'}
-                  </span>
-                ) : officialHref ? (
-                  <Link
-                    to={officialHref}
-                    className="rs-coach-feedback-trailing__mo"
-                    onClick={(e) => e.stopPropagation()}
-                  >
-                    MO {f.officialName}
-                  </Link>
-                ) : (
-                  <span className="rs-coach-feedback-trailing__mo">
-                    MO {f.officialName}
-                  </span>
-                )}
-              </div>
+            const attribution = (
+              <ReportAttributionFooter
+                rating={avg != null ? formatAvg(avg) : '—'}
+                position={isCrew ? 'Crew' : 'MO'}
+                refereeName={
+                  isCrew
+                    ? (f.tournamentTitle ?? 'Tournament')
+                    : (f.officialName ?? 'Official')
+                }
+                refereeHref={isCrew ? undefined : (officialHref ?? undefined)}
+              />
             );
 
             if (match) {
@@ -101,14 +90,13 @@ export function SchedulerFeedbackPage() {
                   key={f.id}
                   match={match}
                   to={detailHref}
-                  split="action"
                   meta={meta}
-                  trailing={trailing}
+                  footer={attribution}
                 />
               );
             }
             return (
-              <div key={f.id} className="rs-list-row rs-list-row--action">
+              <div key={f.id} className="rs-list-row">
                 <Link to={detailHref} className="rs-list-row__main">
                   <div className="rs-list-row__body">
                     <span className="rs-match-card__title">
@@ -117,7 +105,9 @@ export function SchedulerFeedbackPage() {
                     {meta}
                   </div>
                 </Link>
-                <div className="rs-list-row__trailing">{trailing}</div>
+                <div className="rs-list-row__supporting-footer">
+                  {attribution}
+                </div>
               </div>
             );
           })}

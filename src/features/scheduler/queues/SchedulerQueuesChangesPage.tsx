@@ -114,20 +114,28 @@ export function SchedulerQueuesChangesPage() {
 
   if (!filtersActive && proposals.length === 0) {
     return (
-      <EmptyState titleText="No pending changes" headingLevel="h3">
-        <EmptyStateBody>
-          There are no change proposals waiting for your review or apply.
-        </EmptyStateBody>
-      </EmptyState>
+      <div className="rs-stack">
+        <Title headingLevel="h1" size="lg">
+          Changes
+        </Title>
+        <EmptyState titleText="No pending changes">
+          <EmptyStateBody>
+            There are no change proposals waiting for your review or apply.
+          </EmptyStateBody>
+        </EmptyState>
+      </div>
     );
   }
 
   return (
     <>
+      <Title headingLevel="h1" size="lg">
+        Changes
+      </Title>
       <p className="rs-match-card__meta">
         Change proposals that still need assigner review or apply. Apply updates
-        the match and Sheet; deny closes the proposal (use when you already
-        handled it offline). Acknowledge only dismisses from your queue without
+        the match and Sheet; Deny closes the proposal (use when you already
+        handled it offline). Acknowledge dismisses it from your queue without
         closing the proposal.
       </p>
 

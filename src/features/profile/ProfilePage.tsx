@@ -176,13 +176,9 @@ export function ProfilePage() {
           r.status === 'pending',
       ),
   );
-  const requestableTeamOptions = useMemo(
-    () =>
-      conferenceTeamOptions(
-        sortedTeams,
-        new Set(requestableTeams.map((team) => team.id)),
-      ),
-    [requestableTeams, sortedTeams],
+  const requestableTeamOptions = conferenceTeamOptions(
+    sortedTeams,
+    new Set(requestableTeams.map((team) => team.id)),
   );
   const levelOk =
     levelUnknown ||
@@ -464,14 +460,14 @@ export function ProfilePage() {
         />
       ) : (
       <Form className="rs-profile-form">
-        <FormGroup label="Photo" fieldId="pf-photo">
+        <FormGroup label="Photo">
           <div className="rs-profile-photo">
             <UserAvatar user={previewUser} />
             <div className="rs-profile-photo__actions">
               <input
                 ref={fileRef}
-                id="pf-photo"
                 type="file"
+                aria-label="Profile photo"
                 accept="image/jpeg,image/png,image/webp"
                 hidden
                 onChange={(e) => {

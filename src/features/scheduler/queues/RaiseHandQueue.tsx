@@ -1,19 +1,17 @@
 import { Button } from '@patternfly/react-core';
+import { useMemo } from 'react';
 import { useApp } from '@/app/AppContext';
-import { formatMemberCityState, officialEffectiveLevel } from '@/domain/members';
 import { gameRequestPreferredSlots } from '@/domain/requests';
 import {
   REQUESTABLE_SLOT_LABELS,
   type GameRequest,
   type RequestableSlot,
-  type UserProfile,
 } from '@/domain/types';
-import { useOfficialQuickLook } from '@/features/scheduler/officialQuickLookContext';
 import { CoverageMatchCrewSummary } from '@/features/scheduler/queues/CoverageMatchCrewSummary';
-import { useRaiseHandRequestModals } from '@/features/scheduler/queues/useRaiseHandRequestModals';
+import { CoverageMatchRequesters } from '@/features/scheduler/queues/CoverageMatchRequesters';
 import { MatchListRow } from '@/ui/MatchListRow';
 
-function formatPreferredSlots(request: GameRequest): string {
+function formatPreferredSlotsLong(request: GameRequest): string {
   const slots = gameRequestPreferredSlots(request);
   if (slots.length === 0) return 'Position TBD';
   return slots.map((s) => REQUESTABLE_SLOT_LABELS[s]).join(' · ');
@@ -34,11 +32,22 @@ export function RaiseHandQueue({
   onDecline: (id: string, reason?: string) => void;
 }) {
   const { state } = useApp();
-  const { openOfficial } = useOfficialQuickLook();
-  const { startApprove, startDecline, modals } = useRaiseHandRequestModals(
-    onApprove,
-    onDecline,
-  );
+
+  const groups = useMemo(() => {
+    const byMatch = new Map<string, GameRequest[]>();
+    const orphan: GameRequest[] = [];
+    for (const request of requests) {
+      const match = state.matches.find((m) => m.id === request.matchId);
+      if (!match) {
+        orphan.push(request);
+        continue;
+      }
+      const list = byMatch.get(request.matchId) ?? [];
+      list.push(request);
+      byMatch.set(request.matchId, list);
+    }
+    return { byMatch, orphan };
+  }, [requests, state.matches]);
 
   if (requests.length === 0) {
     return (
@@ -49,119 +58,64 @@ export function RaiseHandQueue({
   return (
     <>
       <ul className="rs-list">
-        {requests.map((r) => {
-          const matchMissing = !state.matches.some((m) => m.id === r.matchId);
+        {[...groups.byMatch.entries()].map(([matchId, matchRequests]) => {
+          const match = state.matches.find((m) => m.id === matchId)!;
           return (
-            <RaiseHandItem
-              key={r.id}
-              request={r}
-              user={state.users.find((u) => u.uid === r.userId)}
-              onApprove={() => startApprove(r)}
-              onDecline={() => {
-                if (matchMissing) {
-                  onDecline(r.id, 'Match removed from schedule');
-                  return;
+            <li key={matchId} className="rs-coverage-match">
+              <MatchListRow
+                match={match}
+                to={`/matches/${matchId}`}
+                showTime
+                back={QUEUES_BACK}
+                topBanner={<CoverageMatchCrewSummary match={match} />}
+                footer={
+                  <CoverageMatchRequesters
+                    match={match}
+                    requests={matchRequests}
+                    matchBack={QUEUES_BACK}
+                    onApprove={onApprove}
+                    onDecline={onDecline}
+                  />
                 }
-                startDecline(r);
-              }}
-              onOpenProfile={() => {
-                openOfficial(r.userId, { matchBack: QUEUES_BACK });
-              }}
-            />
+                meta={
+                  matchRequests.length === 1 && matchRequests[0]?.note ? (
+                    <span className="rs-list-row__hint">
+                      “{matchRequests[0].note}”
+                    </span>
+                  ) : undefined
+                }
+              />
+            </li>
+          );
+        })}
+        {groups.orphan.map((request) => {
+          const user = state.users.find((u) => u.uid === request.userId);
+          const name = user?.displayName ?? request.userName;
+          return (
+            <li key={request.id} className="rs-request-item">
+              <div className="rs-request-item__main">
+                <strong>{name}</strong>
+                <div className="rs-match-card__meta">
+                  {formatPreferredSlotsLong(request)} — match no longer on
+                  schedule
+                  {request.matchId ? ` (${request.matchId})` : ''}
+                </div>
+              </div>
+              <div className="rs-queue-decision__actions">
+                <Button
+                  size="sm"
+                  variant="danger"
+                  onClick={() =>
+                    onDecline(request.id, 'Match removed from schedule')
+                  }
+                >
+                  Dismiss
+                </Button>
+              </div>
+            </li>
           );
         })}
       </ul>
-      {modals}
     </>
-  );
-}
-
-function RaiseHandItem({
-  request,
-  user,
-  onApprove,
-  onDecline,
-  onOpenProfile,
-}: {
-  request: GameRequest;
-  user: UserProfile | undefined;
-  onApprove: () => void;
-  onDecline: () => void;
-  onOpenProfile: () => void;
-}) {
-  const { state } = useApp();
-  const match = state.matches.find((m) => m.id === request.matchId);
-  const slotLabel = formatPreferredSlots(request);
-  const name = user?.displayName ?? request.userName;
-  const level =
-    user != null && officialEffectiveLevel(user) != null
-      ? String(officialEffectiveLevel(user))
-      : '—';
-  const cityState = user ? formatMemberCityState(user) : null;
-
-  if (!match) {
-    return (
-      <li className="rs-request-item">
-        <div className="rs-request-item__main">
-          <strong>{name}</strong>
-          <div className="rs-match-card__meta">
-            {slotLabel} — match no longer on schedule
-            {request.matchId ? ` (${request.matchId})` : ''}
-          </div>
-        </div>
-        <div className="rs-queue-decision__actions">
-          <Button size="sm" variant="danger" onClick={onDecline}>
-            Dismiss
-          </Button>
-        </div>
-      </li>
-    );
-  }
-
-  return (
-    <li className="rs-coverage-match">
-      <MatchListRow
-        match={match}
-        to={`/matches/${request.matchId}`}
-        showTime
-        split="action"
-        back={QUEUES_BACK}
-        meta={
-          request.note ? (
-            <span className="rs-list-row__hint">“{request.note}”</span>
-          ) : undefined
-        }
-        trailing={
-          <div className="rs-queue-decision">
-            <span className="rs-pill rs-pill--ink rs-queue-decision__slot">
-              {slotLabel}
-            </span>
-            <button
-              type="button"
-              className="rs-queue-decision__name"
-              onClick={(e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                onOpenProfile();
-              }}
-            >
-              {name} ({level})
-            </button>
-            {cityState ? (
-              <p className="rs-queue-decision__dist">{cityState}</p>
-            ) : null}
-            <div className="rs-queue-decision__actions">
-              <Button size="sm" variant="primary" onClick={onApprove}>
-                Approve
-              </Button>
-              <Button size="sm" variant="danger" onClick={onDecline}>
-                Decline
-              </Button>
-            </div>
-          </div>
-        }
-      />
-      <CoverageMatchCrewSummary match={match} />
-    </li>
   );
 }

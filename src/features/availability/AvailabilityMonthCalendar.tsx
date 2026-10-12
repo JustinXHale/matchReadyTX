@@ -84,7 +84,7 @@ export function AvailabilityMonthCalendar({
           >
             ‹
           </Button>
-          <h3 className="rs-avail-cal__title">{monthTitle(year, month)}</h3>
+          <h2 className="rs-avail-cal__title">{monthTitle(year, month)}</h2>
           <Button
             variant="plain"
             className="rs-avail-cal__nav-btn"

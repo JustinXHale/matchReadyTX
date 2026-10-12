@@ -182,8 +182,8 @@ export function FeeDefaultsPanel({
 
   return (
     <section className="rs-detail-card rs-stack" aria-label="Default match fees">
-      <Title headingLevel="h2" size="lg">
-        Default match fees
+      <Title headingLevel="h1" size="lg">
+        Crew defaults
       </Title>
       <p className="rs-match-card__meta">
         Set society payout rates for league matches and tournament levels (Tourney,

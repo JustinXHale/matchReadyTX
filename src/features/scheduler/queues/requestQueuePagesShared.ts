@@ -21,6 +21,7 @@ import {
   declineRaiseHandRequest,
 } from '@/features/scheduler/queues/raiseHandActions';
 import { useApp } from '@/app/AppContext';
+import { useAppFeedback } from '@/app/feedback/feedbackContext';
 import { isFirebaseConfigured } from '@/services/firebase';
 import {
   callApproveFixtureRequest,
@@ -171,6 +172,7 @@ export function useRequestDivisionFilters(state: AppState) {
 
 export function useSchedulerRequestActions() {
   const { store, dataMode, refresh, currentUser } = useApp();
+  const { notify } = useAppFeedback();
   const [fixtureBusyId, setFixtureBusyId] = useState<string | null>(null);
   const [teamLinkBusyId, setTeamLinkBusyId] = useState<string | null>(null);
 
@@ -182,10 +184,11 @@ export function useSchedulerRequestActions() {
       slot,
     }).catch((err) => {
       console.error('Failed to save/email raise-hand approve', err);
-      window.alert(
+      notify(
         err instanceof Error
           ? `Approved locally, but save failed: ${err.message}`
           : 'Approved locally, but save failed.',
+        'error',
       );
     });
   };
@@ -216,8 +219,9 @@ export function useSchedulerRequestActions() {
     } catch (err) {
       console.error('Approve fixture failed', err);
       refresh();
-      window.alert(
+      notify(
         callableErrorMessage(err, 'Failed to approve fixture request.'),
+        'error',
       );
     } finally {
       setFixtureBusyId(null);
@@ -239,10 +243,11 @@ export function useSchedulerRequestActions() {
         );
       } catch (err) {
         console.error('Decline fixture failed', err);
-        window.alert(
+        notify(
           err instanceof Error
             ? err.message
             : 'Failed to save decline to Firestore.',
+          'error',
         );
       }
     }
@@ -270,8 +275,9 @@ export function useSchedulerRequestActions() {
     } catch (err) {
       console.error('Team link review failed', err);
       refresh();
-      window.alert(
+      notify(
         callableErrorMessage(err, 'Failed to review Team Admin request.'),
+        'error',
       );
     } finally {
       setTeamLinkBusyId(null);

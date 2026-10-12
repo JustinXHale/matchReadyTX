@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Button, FormSelect, FormSelectOption, Title } from '@patternfly/react-core';
+import { Button, Title } from '@patternfly/react-core';
 import { useApp, useAppHref } from '@/app/AppContext';
 import { CARD_CONFERENCE_LABELS } from '@/domain/reports';
 import {
@@ -19,6 +19,7 @@ import {
 import { useJudicialSeasonParams } from '@/features/judicial/judicialFilters';
 import { BrandLogo } from '@/ui/BrandLogo';
 import { RsDateField } from '@/ui/RsDateField';
+import { RsFilterSelect } from '@/ui/RsFilterSelect';
 
 const TOP_N = 5;
 
@@ -229,6 +230,9 @@ export function JudicialDashboardPage() {
   );
 
   const season = rugbySeasonLabel();
+  const dateRangeError = from && to && from > to
+    ? 'From date must be on or before To date.'
+    : null;
   const conferenceTitle =
     conference === 'all'
       ? 'Lonestar Men’s & Women’s Conference'
@@ -254,28 +258,28 @@ export function JudicialDashboardPage() {
         </div>
       </header>
 
-      <div className="rs-filter-bar">
-        <div className="rs-filter-bar__row">
-          <label className="rs-filter-field">
-            <span className="rs-filter-field__label">Conference</span>
-            <FormSelect
-              value={conference}
-              onChange={(_e, v) =>
-                patch({ conference: v as typeof conference })
-              }
-              aria-label="Conference filter"
-            >
-              <FormSelectOption value="all" label="All" />
-              <FormSelectOption
-                value="lonestar_men"
-                label={CARD_CONFERENCE_LABELS.lonestar_men}
-              />
-              <FormSelectOption
-                value="lonestar_women"
-                label={CARD_CONFERENCE_LABELS.lonestar_women}
-              />
-            </FormSelect>
-          </label>
+      <div className="rs-filter-bar rs-judicial-dashboard__filters">
+        <div className="rs-filter-bar__row rs-judicial-dashboard__conference-row">
+          <RsFilterSelect
+            label="Conference"
+            value={conference === 'all' ? null : conference}
+            placeholder="All conferences"
+            options={[
+              {
+                value: 'lonestar_men',
+                label: CARD_CONFERENCE_LABELS.lonestar_men,
+              },
+              {
+                value: 'lonestar_women',
+                label: CARD_CONFERENCE_LABELS.lonestar_women,
+              },
+            ]}
+            onChange={(next) =>
+              patch({ conference: (next ?? 'all') as typeof conference })
+            }
+          />
+        </div>
+        <div className="rs-filter-bar__row rs-judicial-dashboard__date-row">
           <label className="rs-filter-field">
             <span className="rs-filter-field__label">From</span>
             <RsDateField
@@ -293,6 +297,11 @@ export function JudicialDashboardPage() {
             />
           </label>
         </div>
+        {dateRangeError ? (
+          <p className="rs-field-error" role="alert">
+            {dateRangeError}
+          </p>
+        ) : null}
         <p className="rs-match-card__meta">
           Tap a tile, bar segment, or name to open the caseload. Cases live under
           the Cases tab. School and offender cards are always split by Lonestar

@@ -67,6 +67,9 @@ export function GlobalStandingsPage() {
 
   return (
     <>
+      <Title headingLevel="h1" size="lg">
+        Standings
+      </Title>
       {hasBase && (
         <>
           <GlobalDivisionFilters
@@ -79,29 +82,34 @@ export function GlobalStandingsPage() {
             onCompetitionChange={setCompetitionFilter}
             hideLevels={viewMode === 'combined'}
             ariaLabel="Filter standings"
+            rowEnd={
+              <div
+                className="rs-filter-field rs-filter-inline-actions"
+                role="group"
+                aria-label="Standings layout"
+              >
+                <span className="rs-filter-field__label">View</span>
+                <div className="rs-filter-chips">
+                  <button
+                    type="button"
+                    className={`rs-filter-chip${viewMode === 'combined' ? ' rs-filter-chip--selected' : ''}`}
+                    aria-pressed={viewMode === 'combined'}
+                    onClick={() => setViewModeAndClearTier('combined')}
+                  >
+                    All teams
+                  </button>
+                  <button
+                    type="button"
+                    className={`rs-filter-chip${viewMode === 'by_tier' ? ' rs-filter-chip--selected' : ''}`}
+                    aria-pressed={viewMode === 'by_tier'}
+                    onClick={() => setViewModeAndClearTier('by_tier')}
+                  >
+                    By tier
+                  </button>
+                </div>
+              </div>
+            }
           />
-          <div
-            className="rs-filter-chips rs-schedule-sort"
-            role="group"
-            aria-label="Standings layout"
-          >
-            <button
-              type="button"
-              className={`rs-filter-chip${viewMode === 'combined' ? ' rs-filter-chip--selected' : ''}`}
-              aria-pressed={viewMode === 'combined'}
-              onClick={() => setViewModeAndClearTier('combined')}
-            >
-              All teams
-            </button>
-            <button
-              type="button"
-              className={`rs-filter-chip${viewMode === 'by_tier' ? ' rs-filter-chip--selected' : ''}`}
-              aria-pressed={viewMode === 'by_tier'}
-              onClick={() => setViewModeAndClearTier('by_tier')}
-            >
-              By tier
-            </button>
-          </div>
         </>
       )}
 
@@ -121,7 +129,7 @@ export function GlobalStandingsPage() {
         <div className="rs-standings">
           {groups.map((group) => (
             <section key={group.key} className="rs-standings__group">
-              <Title headingLevel="h3" size="md" className="rs-month-heading">
+              <Title headingLevel="h2" size="md" className="rs-month-heading">
                 {group.label}
               </Title>
               <div className="rs-standings__scroll">

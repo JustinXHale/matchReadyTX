@@ -9,6 +9,7 @@ import {
 } from '@patternfly/react-core';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useApp, useAppHref } from '@/app/AppContext';
+import { useContextualAppBack } from '@/app/shell/contextualBar';
 import {
   COACH_FEEDBACK_COMMENT_BLOCKS,
   COACH_FEEDBACK_CRITERION_HINTS,
@@ -153,6 +154,11 @@ export function CoachFeedbackFormPage() {
   const { currentUser, state, store, dataMode, refresh } = useApp();
   const navigate = useNavigate();
   const reportListHref = useAppHref('/team-admin/report');
+  const feedbackBack = useMemo(
+    () => ({ to: reportListHref, label: 'Referee Feedback' }),
+    [reportListHref],
+  );
+  useContextualAppBack(feedbackBack);
 
   const match = state.matches.find((m) => m.id === matchId);
 
@@ -255,13 +261,6 @@ export function CoachFeedbackFormPage() {
   if (!match || !context) {
     return (
       <div className="rs-stack">
-        <Button
-          variant="link"
-          className="rs-detail__back"
-          onClick={() => navigate(reportListHref)}
-        >
-          ← Referee Feedback
-        </Button>
         <Title headingLevel="h2" size="lg">
           Feedback not available
         </Title>
@@ -379,13 +378,6 @@ export function CoachFeedbackFormPage() {
 
   return (
     <div className="rs-stack">
-      <Button
-        variant="link"
-        className="rs-detail__back"
-        onClick={() => navigate(reportListHref)}
-      >
-        ← Referee Feedback
-      </Button>
       <Title headingLevel="h1" size="lg">
         {title}
       </Title>

@@ -21,13 +21,21 @@ export function isComplianceHeld(
   return Boolean(match.complianceHold?.lockedAt);
 }
 
-/** Schedule/detail lock UI — team admin, referee, and fan lenses only. */
+/** Schedule/detail lock UI — team admin, appointed-official, and fan lenses only. */
 export function shouldShowComplianceHoldUi(
-  roleView: 'referee' | 'teamAdmin' | 'fan' | 'scheduler' | 'judicial' | 'finance',
+  roleView:
+    | 'referee'
+    | 'cmo'
+    | 'teamAdmin'
+    | 'fan'
+    | 'scheduler'
+    | 'judicial'
+    | 'finance',
 ): boolean {
   return (
     roleView === 'teamAdmin' ||
     roleView === 'referee' ||
+    roleView === 'cmo' ||
     roleView === 'fan'
   );
 }

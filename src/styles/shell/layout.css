@@ -35,10 +35,10 @@
   display: flex;
   flex-direction: column;
   margin-bottom: 0;
-  border: 1px solid var(--rs-color-border) !important;
+  border: 1px solid var(--rs-color-surface-border) !important;
   border-radius: var(--rs-radius-card) !important;
   box-shadow: var(--rs-shadow) !important;
-  background: var(--rs-color-surface) !important;
+  background: var(--rs-content-surface) !important;
   overflow: hidden;
 }
 
@@ -183,7 +183,7 @@
 }
 
 .rs-request-btn {
-  min-height: 32px !important;
+  min-height: var(--rs-tap-min) !important;
   padding-block: 4px !important;
   border-radius: var(--rs-radius-chip) !important;
   font-weight: 600 !important;
@@ -198,7 +198,7 @@
   width: 18px;
   height: 18px;
   border: 2px solid currentColor;
-  border-radius: 3px 3px 2px 2px;
+  border-radius: var(--rs-radius-xs);
   position: relative;
   vertical-align: middle;
 }
@@ -213,7 +213,7 @@
   margin-left: -3px;
   border: 2px solid currentColor;
   border-bottom: none;
-  border-radius: 4px 4px 0 0;
+  border-radius: var(--rs-radius-xs) var(--rs-radius-xs) 0 0;
 }
 
 .rs-request-list {
@@ -341,7 +341,7 @@
 .rs-ref-profile__match:focus-visible {
   outline: none;
   box-shadow: inset 0 0 0 2px var(--rs-color-border);
-  border-radius: 4px;
+  border-radius: var(--rs-radius-xs);
 }
 
 .rs-ref-profile__match-top {
@@ -591,7 +591,7 @@ input.rs-filter-search {
   visibility: hidden;
   white-space: nowrap;
   pointer-events: none;
-  min-height: 40px;
+  min-height: var(--rs-tap-min);
   padding: var(--pf-t--global--spacer--xs) var(--pf-t--global--spacer--sm);
   padding-inline-end: calc(var(--pf-t--global--spacer--sm) + 1.25em);
   font: var(--rs-font-chip);
@@ -600,7 +600,7 @@ input.rs-filter-search {
 .rs-filter-select {
   width: 100%;
   min-width: 0;
-  min-height: 40px;
+  min-height: var(--rs-tap-min);
   border: var(--pf-t--global--border--width--regular) solid var(--rs-color-border);
   background: var(--rs-color-surface);
   color: var(--rs-color-ink);
@@ -651,7 +651,8 @@ input.rs-filter-search {
   border-radius: var(--rs-radius-pill);
   padding: var(--pf-t--global--spacer--xs) var(--pf-t--global--spacer--sm);
   font: var(--rs-font-chip);
-  min-height: 40px;
+  min-height: var(--rs-tap-min);
+  min-width: var(--rs-tap-min);
   line-height: 1.2;
   cursor: pointer;
   white-space: nowrap;
@@ -748,7 +749,7 @@ input.rs-filter-search {
   background: var(--rs-color-surface);
   border: 1px solid var(--rs-color-border);
   border-radius: var(--rs-radius-chip);
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+  box-shadow: var(--rs-shadow-overlay);
   animation: rs-update-toast-in 0.3s ease-out;
   max-width: calc(100vw - 2rem);
   box-sizing: border-box;
@@ -765,13 +766,13 @@ input.rs-filter-search {
   background: var(--rs-color-primary);
   color: var(--rs-color-on-primary);
   border: none;
-  border-radius: 6px;
+  border-radius: var(--rs-radius-chip);
   padding: 0.35rem 0.75rem;
   font: var(--rs-font-body);
   font-weight: 600;
   cursor: pointer;
   -webkit-tap-highlight-color: transparent;
-  min-height: 32px;
+  min-height: var(--rs-tap-min);
 }
 
 .rs-update-toast__btn:active {
@@ -846,7 +847,8 @@ input.rs-filter-search {
   font: var(--rs-font-nav);
   font-weight: 600;
   border-bottom: 2px solid transparent;
-  white-space: nowrap;
+  white-space: normal;
+  overflow-wrap: anywhere;
   line-height: 1.2;
 }
 
@@ -914,6 +916,15 @@ input.rs-filter-search {
   margin-bottom: 8px;
 }
 
+.rs-schedule-sort-field .rs-filter-chip,
+.rs-filter-inline-actions .rs-filter-chip {
+  min-height: var(--rs-tap-min);
+}
+
+.rs-filter-inline-actions .rs-filter-chips {
+  padding-bottom: 0;
+}
+
 .rs-competition-filter {
   margin-bottom: 4px;
 }
@@ -922,25 +933,12 @@ input.rs-filter-search {
   width: 100%;
 }
 
-/* Leading calendar/clock icon field (TO3-style), not native picker glyph. */
+/* Shared native date/time field — one platform picker affordance app-wide. */
 .rs-icon-field {
   position: relative;
   display: block;
   width: 100%;
   min-width: 0;
-}
-
-.rs-icon-field__icon {
-  position: absolute;
-  z-index: 2;
-  inset-block: 0;
-  inset-inline-start: 0.75rem;
-  display: inline-flex;
-  align-items: center;
-  pointer-events: none;
-  color: var(--rs-color-ink);
-  font-size: 0.95rem;
-  line-height: 1;
 }
 
 .rs-icon-field .pf-v6-c-form-control {
@@ -949,7 +947,6 @@ input.rs-filter-search {
 }
 
 .rs-icon-field .pf-v6-c-form-control > input {
-  padding-inline-start: 2.35rem !important;
   min-width: 0;
   width: 100%;
 }
@@ -958,47 +955,82 @@ input.rs-filter-search {
 .rs-date-range {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-  gap: 8px;
-}
-
-.rs-date-range .rs-icon-field__icon {
-  inset-inline-start: auto;
-  inset-inline-end: 0.65rem;
-  font-size: 0.85rem;
+  gap: var(--rs-space-sm);
 }
 
 .rs-date-range .rs-icon-field .pf-v6-c-form-control > input {
   padding-inline-start: 0.75rem !important;
-  padding-inline-end: 2.1rem !important;
   font-size: 0.9rem !important;
 }
 
-.pf-v6-c-form-control > input[type='date'],
-.pf-v6-c-form-control > input[type='time'],
-.pf-v6-c-form-control > input[type='datetime-local'],
-.pf-v6-c-form-control > input[type='month'],
-.pf-v6-c-form-control > input[type='week'] {
-  appearance: none;
-  -webkit-appearance: none;
+.rs-filter-dialog__fields {
+  display: grid;
+  gap: var(--rs-space-md);
 }
 
-.pf-v6-c-form-control
-  > input[type='date']::-webkit-calendar-picker-indicator,
-.pf-v6-c-form-control
-  > input[type='time']::-webkit-calendar-picker-indicator,
-.pf-v6-c-form-control
-  > input[type='datetime-local']::-webkit-calendar-picker-indicator,
-.pf-v6-c-form-control
-  > input[type='month']::-webkit-calendar-picker-indicator,
-.pf-v6-c-form-control
-  > input[type='week']::-webkit-calendar-picker-indicator {
-  position: absolute;
-  inset: 0;
+.rs-filter-summary {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  align-items: end;
+  gap: var(--rs-space-sm);
+}
+
+.rs-filter-summary > .pf-v6-c-button {
+  min-height: var(--rs-tap-min);
+}
+
+.rs-filter-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.5rem;
+  min-height: 1.5rem;
+  margin-inline-start: var(--rs-space-sm);
+  padding-inline: var(--rs-space-xs);
+  border-radius: var(--rs-radius-pill);
+  background: var(--rs-m3-primary);
+  color: var(--rs-m3-on-primary);
+  font: var(--rs-font-chip);
+}
+
+@media (min-width: 600px) {
+  .rs-filter-summary {
+    grid-template-columns: minmax(14rem, 2fr) minmax(10rem, 1fr);
+    max-width: 36rem;
+  }
+}
+
+.rs-filter-dialog__fields .rs-filter-field,
+.rs-filter-dialog__fields .pf-v6-c-form-select {
   width: 100%;
-  height: 100%;
-  margin: 0;
-  opacity: 0;
-  cursor: pointer;
+  max-width: none;
+}
+
+.rs-filter-dialog__actions {
+  gap: var(--rs-space-sm);
+  padding: var(--rs-space-md) !important;
+}
+
+@media (max-width: 599px) {
+  .rs-filter-dialog .MuiDialog-container {
+    align-items: flex-end;
+  }
+
+  .rs-filter-dialog .pf-v6-c-modal-box {
+    max-height: min(88dvh, 44rem);
+    margin: 0 !important;
+    border-radius: var(--rs-radius-dialog) var(--rs-radius-dialog) 0 0 !important;
+  }
+
+  .rs-filter-dialog__actions {
+    display: grid !important;
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .rs-filter-dialog__actions > :last-child {
+    grid-column: 1 / -1;
+    grid-row: 1;
+  }
 }
 
 .rs-org-steps {
@@ -1053,6 +1085,8 @@ input.rs-filter-search {
   white-space: nowrap;
   text-decoration: underline;
   text-underline-offset: 2px;
+  min-width: var(--rs-tap-min);
+  min-height: var(--rs-tap-min);
 }
 
 .rs-coach-feedback-decline:hover,
@@ -1341,7 +1375,7 @@ input.rs-filter-search {
   max-height: min(78vh, 900px);
   overflow: auto;
   -webkit-overflow-scrolling: touch;
-  border-radius: 8px;
+  border-radius: var(--rs-radius-chip);
   background: var(--rs-color-surface);
 }
 
@@ -1612,7 +1646,7 @@ input.rs-filter-search {
   gap: 6px;
   padding: 12px;
   background: var(--rs-color-surface);
-  border: 1px solid var(--rs-color-border);
+  border: 1px solid var(--rs-color-surface-border);
   border-radius: var(--rs-radius-card);
 }
 
@@ -1646,10 +1680,8 @@ input.rs-filter-search {
 }
 
 .rs-team-card__abbr {
-  margin: 0;
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--rs-color-muted);
+  font: inherit;
+  color: inherit;
   letter-spacing: 0.04em;
 }
 

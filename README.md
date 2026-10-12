@@ -9,7 +9,8 @@ Product: [`docs/PRD.md`](docs/PRD.md) · Implementation: [`docs/IMPLEMENTATION_S
 ## Stack
 
 - Vite + React 19 + TypeScript
-- PatternFly React v6 (mobile-first cards / bottom nav)
+- Material 3 / MUI v6 (`createTheme`, AppShell, cards, form controls)
+- PatternFly import paths alias to MUI shims (`src/lib/pf-mui`) — PF packages removed
 - Firebase Auth, Firestore, Cloud Functions, Hosting
 - Resend (email)
 - PWA via `vite-plugin-pwa`

@@ -58,7 +58,7 @@ export function MatchReportsPage() {
   return (
     <div className="rs-stack">
       <ReportsSubNav />
-      <Title headingLevel="h2" size="lg">
+      <Title headingLevel="h1" size="lg">
         Match Reports
       </Title>
       <p className="rs-match-card__meta">
@@ -130,6 +130,9 @@ export function MatchReportsPage() {
                   back={MATCH_REPORTS_BACK}
                   hideScore={r.status === 'pending'}
                   showTime={r.source !== 'legacy_form'}
+                  urgent={r.status === 'pending'}
+                  urgentFilled={r.status === 'pending'}
+                  submitted={r.status === 'submitted'}
                   meta={
                     <>
                       <span className="rs-pill">{slotLabel}</span>{' '}

@@ -101,7 +101,7 @@ export function CardReportsPage() {
   return (
     <div className="rs-stack">
       <ReportsSubNav />
-      <Title headingLevel="h2" size="lg">
+      <Title headingLevel="h1" size="lg">
         Card Reports
       </Title>
       <p className="rs-match-card__meta">
@@ -162,6 +162,9 @@ export function CardReportsPage() {
                   back={CARD_REPORTS_BACK}
                   hideScore={!entry.filed}
                   showTime
+                  urgent={entry.required && !entry.filed}
+                  urgentFilled={entry.required && !entry.filed}
+                  submitted={entry.filed}
                   meta={
                     <span
                       className={`rs-pill${

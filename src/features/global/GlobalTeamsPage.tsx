@@ -1,4 +1,4 @@
-import { EmptyState, EmptyStateBody } from '@patternfly/react-core';
+import { EmptyState, EmptyStateBody, Title } from '@patternfly/react-core';
 import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useApp } from '@/app/AppContext';
@@ -9,6 +9,7 @@ import { formatTeamAddress } from '@/domain/teams';
 import {
   genderLabel,
   type MatchGender,
+  type Team,
 } from '@/domain/types';
 import { GlobalDivisionFilters } from '@/features/global/GlobalDivisionFilters';
 import { backState } from '@/nav/backNav';
@@ -36,7 +37,7 @@ export function GlobalTeamsPage() {
     const byId = new Map<
       string,
       {
-        team: (typeof state.teams)[number];
+        team: Team;
         genders: MatchGender[];
         competitions: string[];
         matchCount: number;
@@ -90,6 +91,9 @@ export function GlobalTeamsPage() {
 
   return (
     <>
+      <Title headingLevel="h1" size="lg">
+        Teams
+      </Title>
       {hasBase && (
         <GlobalDivisionFilters
           options={filterOptions}
@@ -129,10 +133,12 @@ export function GlobalTeamsPage() {
                   className="rs-team-card rs-team-card--link"
                 >
                   <div className="rs-team-card__head">
-                    <p className="rs-team-card__name">{team.name}</p>
-                    {abbr ? (
-                      <p className="rs-team-card__abbr">{abbr}</p>
-                    ) : null}
+                    <p className="rs-team-card__name">
+                      {abbr ? (
+                        <span className="rs-team-card__abbr">({abbr}) </span>
+                      ) : null}
+                      {team.name}
+                    </p>
                     <div className="rs-label-row" aria-label="Gender">
                       {genders.map((g) => (
                         <span

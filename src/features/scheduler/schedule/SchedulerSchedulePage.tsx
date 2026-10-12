@@ -9,8 +9,6 @@ import {
 import { useApp } from '@/app/AppContext';
 import { isComplianceHeld } from '@/domain/complianceHold';
 import { namedOfficialsNeedingAvailability } from '@/domain/crew';
-import { matchHasForfeitOutcome } from '@/domain/matchCardFooter';
-import { matchStatusLabel } from '@/domain/matchTransitions';
 import {
   compareKickoffAsc,
   divisionFilterOptionsFromMatches,
@@ -21,15 +19,16 @@ import { matchInCompetition } from '@/domain/competitions';
 import { pendingRaiseHandRequestsForMatch } from '@/domain/requests';
 import {
   crewPeople,
+  genderLabel,
   rolesNeededForMatch,
   type CrewSlot,
   type Match,
+  type MatchGender,
 } from '@/domain/types';
 import {
   doubleBookedOfficialIdsForMatch,
   memberListName,
 } from '@/domain/members';
-import { GlobalDivisionFilters } from '@/features/global/GlobalDivisionFilters';
 import {
   AssignOfficialModal,
   type CrewPickTarget,
@@ -41,16 +40,23 @@ import {
   matchesNeedingReassignment,
 } from '@/features/scheduler/queues/selectors';
 import { SchedulerAssignTrailing } from '@/features/scheduler/schedule/SchedulerAssignTrailing';
+import {
+  MatchSummaryCard,
+} from '@/components/MatchSummaryCard';
+import { workflowMatchCardStatus } from '@/ui/matchCardStatus';
 import type { BackNav } from '@/nav/backNav';
 import {
   pathWithSearch,
   useSchedulerScheduleFilterParams,
+  type SchedulerScheduleFilters,
   type SchedulerStatusFilter,
 } from '@/nav/listFilterParams';
-import { MatchListRow } from '@/ui/MatchListRow';
 import { orgTimeZone } from '@/domain/matchTime';
 import { ScheduleMatchListWithPast } from '@/ui/ScheduleMatchListLayout';
 import { useScheduleListSections } from '@/ui/useScheduleListSections';
+import { FilterDialog } from '@/ui/FilterDialog';
+import { RsFilterSelect } from '@/ui/RsFilterSelect';
+import { MatchFilterSummary } from '@/ui/MatchFilterSummary';
 
 const SCHEDULER_SCHEDULE_PATH = '/scheduler/schedule';
 
@@ -125,11 +131,8 @@ export function SchedulerSchedulePage() {
     competitionFilter,
     dateFilter,
     statusFilter,
-    setGenderFilter,
-    setLevelFilter,
-    setCompetitionFilter,
     setDateFilter,
-    setStatusFilter,
+    setScheduleFilters,
   } = useSchedulerScheduleFilterParams();
   const scheduleBack: BackNav = useMemo(
     () => ({
@@ -143,6 +146,15 @@ export function SchedulerSchedulePage() {
     match: Match;
     target: CrewPickTarget;
   } | null>(null);
+  const [filtersOpen, setFiltersOpen] = useState(false);
+  const [draftFilters, setDraftFilters] = useState<SchedulerScheduleFilters>(
+    () => ({
+      gender: genderFilter,
+      level: levelFilter,
+      competition: competitionFilter,
+      status: statusFilter,
+    }),
+  );
 
   const needsOfficialsPool = useMemo(
     () => matchesNeedingOfficials(state.matches),
@@ -207,10 +219,8 @@ export function SchedulerSchedulePage() {
     genderFilter,
     levelFilter,
     competitionFilter,
-    statusFilter,
     dateFilter,
-    needsOfficialsPool,
-    needsReassignmentPool,
+    matchesStatus,
   ]);
 
   const { upcomingByMonth, pastByMonth, pastCount, showPastCollapsed } =
@@ -247,45 +257,39 @@ export function SchedulerSchedulePage() {
           key={m.id}
           className={raiseHand.length > 0 ? 'rs-coverage-match' : undefined}
         >
-          <MatchListRow
+          <MatchSummaryCard
             match={m}
             to={`/matches/${m.id}`}
             showTime
-            split="action"
-            urgent={urgent}
             back={scheduleBack}
-            meta={
-              <>
-                {!matchHasForfeitOutcome(m) ? (
-                  <span className="rs-pill">{matchStatusLabel(m)}</span>
-                ) : null}
-                {doubleBookedNames.length > 0 ? (
-                  <span className="rs-pill rs-pill--warn">Double-booked</span>
-                ) : null}
-              </>
-            }
-            trailing={
+            statusPresentation={workflowMatchCardStatus(m, {
+              needsReassignment: urgent,
+            })}
+            topBanner={
               <SchedulerAssignTrailing
                 match={m}
                 back={scheduleBack}
                 highlightUserId={currentUser?.uid}
+                doubleBookedUserIds={doubleBookedIds}
                 onPick={(target) => setPick({ match: m, target })}
               />
+            }
+            footer={
+              raiseHand.length > 0 ? (
+                <CoverageMatchRequesters
+                  match={m}
+                  requests={raiseHand}
+                  matchBack={scheduleBack}
+                  onApprove={onApproveRaiseHand}
+                  onDecline={onDeclineRaiseHand}
+                />
+              ) : undefined
             }
           />
           {doubleBookedNames.length > 0 ? (
             <p className="rs-assign-overlap rs-assign-overlap--warn">
               {doubleBookedNames.join(', ')} assigned to another game this day.
             </p>
-          ) : null}
-          {raiseHand.length > 0 ? (
-            <CoverageMatchRequesters
-              match={m}
-              requests={raiseHand}
-              matchBack={scheduleBack}
-              onApprove={onApproveRaiseHand}
-              onDecline={onDeclineRaiseHand}
-            />
           ) : null}
         </li>
       );
@@ -303,9 +307,37 @@ export function SchedulerSchedulePage() {
     ],
   );
 
-  const selectStatusFilter = (id: StatusFilter) => {
-    setStatusFilter(id);
+  const activeFilterCount = [
+    genderFilter,
+    levelFilter,
+    competitionFilter,
+    statusFilter === 'all' ? null : statusFilter,
+  ].filter(Boolean).length;
+  const draftOptions = divisionFilterOptionsFromMatches(
+    state.matches,
+    draftFilters.competition,
+  );
+  const openFilters = () => {
+    setDraftFilters({
+      gender: genderFilter,
+      level: levelFilter,
+      competition: competitionFilter,
+      status: statusFilter,
+    });
+    setFiltersOpen(true);
   };
+
+  const statusOptions = STATUS_FILTERS.filter((option) => option.id !== 'all').map(
+    (option) => ({
+      value: option.id,
+      label:
+        option.id === 'needs_assignment' && assignmentCount > 0
+          ? `${option.label} (${assignmentCount})`
+          : option.id === 'compliance_hold' && complianceHoldCount > 0
+            ? `${option.label} (${complianceHoldCount})`
+            : option.label,
+    }),
+  );
 
   return (
     <div className="rs-stack">
@@ -322,41 +354,86 @@ export function SchedulerSchedulePage() {
         </Button>
       </Link>
 
-      <GlobalDivisionFilters
-        options={filterOptions}
-        genderFilter={genderFilter}
-        levelFilter={levelFilter}
-        competitionFilter={competitionFilter}
-        onGenderChange={setGenderFilter}
-        onLevelChange={setLevelFilter}
-        onCompetitionChange={setCompetitionFilter}
-        showDate
-        dateFilter={dateFilter}
-        onDateChange={setDateFilter}
+      <MatchFilterSummary
+        ariaLabel="Filter scheduler matches"
+        dateValue={dateFilter}
         availableDates={availableDates}
-        ariaLabel="Filter schedule by division"
+        onDateChange={setDateFilter}
+        activeFilterCount={activeFilterCount}
+        onOpenFilters={openFilters}
       />
 
-      <div className="rs-filter-chips" role="group" aria-label="Status filter">
-        {STATUS_FILTERS.map((f) => (
-          <button
-            key={f.id}
-            type="button"
-            className={`rs-filter-chip${
-              statusFilter === f.id ? ' rs-filter-chip--selected' : ''
-            }`}
-            onClick={() => selectStatusFilter(f.id)}
-          >
-            {f.label}
-            {f.id === 'needs_assignment' && assignmentCount > 0
-              ? ` (${assignmentCount})`
-              : ''}
-            {f.id === 'compliance_hold' && complianceHoldCount > 0
-              ? ` (${complianceHoldCount})`
-              : ''}
-          </button>
-        ))}
-      </div>
+      <FilterDialog
+        id="scheduler-match-filters"
+        open={filtersOpen}
+        onCancel={() => setFiltersOpen(false)}
+        onClear={() =>
+          setDraftFilters({
+            gender: null,
+            level: null,
+            competition: null,
+            status: 'all',
+          })
+        }
+        onApply={() => {
+          setScheduleFilters(draftFilters);
+          setFiltersOpen(false);
+        }}
+      >
+        <RsFilterSelect
+          label="Competition"
+          value={draftFilters.competition}
+          onChange={(next) =>
+            setDraftFilters((current) => ({
+              ...current,
+              competition: next,
+              level: null,
+              gender: null,
+            }))
+          }
+          placeholder="All competitions"
+          options={filterOptions.competitions.map((value) => ({
+            value,
+            label: value,
+          }))}
+        />
+        <RsFilterSelect
+          label="Tier"
+          value={draftFilters.level}
+          onChange={(next) =>
+            setDraftFilters((current) => ({ ...current, level: next }))
+          }
+          placeholder="All tiers"
+          options={draftOptions.levels.map((value) => ({ value, label: value }))}
+        />
+        <RsFilterSelect
+          label="Gender"
+          value={draftFilters.gender}
+          onChange={(next) =>
+            setDraftFilters((current) => ({
+              ...current,
+              gender: next as MatchGender | null,
+            }))
+          }
+          placeholder="All genders"
+          options={draftOptions.genders.map((value) => ({
+            value,
+            label: genderLabel(value),
+          }))}
+        />
+        <RsFilterSelect
+          label="Status"
+          value={draftFilters.status === 'all' ? null : draftFilters.status}
+          onChange={(next) =>
+            setDraftFilters((current) => ({
+              ...current,
+              status: (next ?? 'all') as StatusFilter,
+            }))
+          }
+          placeholder="All statuses"
+          options={statusOptions}
+        />
+      </FilterDialog>
 
       {state.matches.length === 0 ? (
         <EmptyState titleText="No matches" headingLevel="h3">

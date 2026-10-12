@@ -1,23 +1,15 @@
-import { EmptyState, EmptyStateBody } from '@patternfly/react-core';
+import { EmptyState, EmptyStateBody, Title } from '@patternfly/react-core';
 import { useMemo } from 'react';
-import { Navigate, useParams } from 'react-router-dom';
 import { useApp, useAppHref } from '@/app/AppContext';
-import {
-  isScheduleUpcoming,
-  matchMatchesCompletedOutcome,
-} from '@/domain/requests';
 import { divisionFilterOptionsFromMatches, matchOnCalendarDate, uniqueMatchCalendarDates } from '@/domain/divisionFilters';
 import {
-  competitionsForUser,
   matchInCompetition,
-  uniqueDisplayedCompetitions,
 } from '@/domain/competitions';
 import { globalScheduleMatches, isTeamMatch } from '@/domain/visibility';
-import { MatchListRow } from '@/ui/MatchListRow';
+import { MatchSummaryCard } from '@/components/MatchSummaryCard';
 import { MatchCrewTrailing } from '@/ui/MatchCrewTrailing';
-import type { Match } from '@/domain/types';
+import { workflowMatchCardStatus } from '@/ui/matchCardStatus';
 import { GlobalDivisionFilters } from '@/features/global/GlobalDivisionFilters';
-import { GlobalScheduleSubNav } from '@/features/global/GlobalScheduleSubNav';
 import type { BackNav } from '@/nav/backNav';
 import {
   pathWithSearch,
@@ -27,21 +19,11 @@ import { orgTimeZone } from '@/domain/matchTime';
 import { ScheduleMatchListWithPast } from '@/ui/ScheduleMatchListLayout';
 import { useScheduleListSections } from '@/ui/useScheduleListSections';
 
-type SchedulePane = 'upcoming' | 'completed';
-
-function parsePane(raw: string | undefined): SchedulePane | null {
-  if (raw === 'upcoming' || raw === 'completed') return raw;
-  return null;
-}
-
 /** Society-wide schedule browse (bottom League tab — not Appointments → Available matches). */
 export function GlobalSchedulePage() {
-  const { pane: paneParam } = useParams<{ pane?: string }>();
-  const pane = parsePane(paneParam);
   const { currentUser, state, isFanView } = useApp();
   const timeZone = orgTimeZone(state.org.timezone);
-  const upcomingHref = useAppHref('/global/schedule/upcoming');
-  const completedHref = useAppHref('/global/schedule/completed');
+  const scheduleHref = useAppHref('/global/schedule');
   const {
     searchParams,
     genderFilter,
@@ -56,8 +38,6 @@ export function GlobalSchedulePage() {
     setDateFilter,
     setSortDir,
     setMyTeamsOnly,
-    completedOutcome,
-    setCompletedOutcome,
   } = useGlobalScheduleFilterParams();
 
   const fanFavorites = currentUser?.fanTeamIds;
@@ -69,46 +49,21 @@ export function GlobalSchedulePage() {
     [state.matches],
   );
 
-  const paneMatches = useMemo(() => {
-    if (!pane) return [] as Match[];
-    return allSchedule.filter((m) => {
-      const upcoming = isScheduleUpcoming(m);
-      if (pane === 'upcoming' && !upcoming) return false;
-      if (pane === 'completed' && upcoming) return false;
-      return true;
-    });
-  }, [allSchedule, pane]);
-
-  const filterOptions = useMemo(() => {
-    const base = divisionFilterOptionsFromMatches(paneMatches, competitionFilter);
-    if (pane !== 'completed') return base;
-    const competitions = uniqueDisplayedCompetitions([
-      ...competitionsForUser(state.org, currentUser),
-      ...base.competitions,
-      ...divisionFilterOptionsFromMatches(allSchedule).competitions,
-    ]);
-    return { ...base, competitions };
-  }, [
-    paneMatches,
-    pane,
-    allSchedule,
-    competitionFilter,
-    state.org,
-    currentUser,
-  ]);
+  const filterOptions = useMemo(
+    () => divisionFilterOptionsFromMatches(allSchedule, competitionFilter),
+    [allSchedule, competitionFilter],
+  );
 
   const scheduleBack: BackNav = useMemo(() => {
-    const base = pane === 'completed' ? completedHref : upcomingHref;
     return {
-      to: pathWithSearch(base, searchParams),
-      label: pane === 'completed' ? 'Completed Matches' : 'Upcoming Matches',
+      to: pathWithSearch(scheduleHref, searchParams),
+      label: 'Schedule',
     };
-  }, [pane, completedHref, upcomingHref, searchParams]);
+  }, [scheduleHref, searchParams]);
 
   const list = useMemo(() => {
-    if (!pane) return [];
     const dir = sortDir === 'asc' ? 1 : -1;
-    return [...paneMatches]
+    return [...allSchedule]
       .filter((m) => {
         if (genderFilter && m.gender !== genderFilter) return false;
         if (levelFilter && m.level !== levelFilter) return false;
@@ -116,12 +71,6 @@ export function GlobalSchedulePage() {
           return false;
         }
         if (!matchOnCalendarDate(m, dateFilter)) return false;
-        if (
-          pane === 'completed' &&
-          !matchMatchesCompletedOutcome(m, completedOutcome)
-        ) {
-          return false;
-        }
         if (myTeamsOnly && fanFavorites && fanFavorites.length > 0) {
           if (!isTeamMatch(m, fanFavorites)) return false;
         }
@@ -133,14 +82,12 @@ export function GlobalSchedulePage() {
           (new Date(a.kickoffAt).getTime() - new Date(b.kickoffAt).getTime()),
       );
   }, [
-    paneMatches,
+    allSchedule,
     genderFilter,
     levelFilter,
     competitionFilter,
     dateFilter,
-    pane,
     sortDir,
-    completedOutcome,
     myTeamsOnly,
     fanFavorites,
   ]);
@@ -148,7 +95,7 @@ export function GlobalSchedulePage() {
   const availableDates = useMemo(
     () =>
       uniqueMatchCalendarDates(
-        paneMatches.filter((m) => {
+        allSchedule.filter((m) => {
           if (genderFilter && m.gender !== genderFilter) return false;
           if (levelFilter && m.level !== levelFilter) return false;
           if (!matchInCompetition(m, competitionFilter)) {
@@ -161,7 +108,7 @@ export function GlobalSchedulePage() {
         }),
       ),
     [
-      paneMatches,
+      allSchedule,
       genderFilter,
       levelFilter,
       competitionFilter,
@@ -170,25 +117,17 @@ export function GlobalSchedulePage() {
     ],
   );
 
-  const collapsePast = pane === 'upcoming' && !dateFilter;
+  const collapsePast = !dateFilter;
   const { upcomingByMonth, pastByMonth, pastCount, showPastCollapsed } =
     useScheduleListSections(list, timeZone, collapsePast);
 
-  if (!pane) {
-    return <Navigate to={upcomingHref} replace />;
-  }
-
   const hasBase = allSchedule.length > 0;
-  const emptyTitle =
-    pane === 'upcoming' ? 'No upcoming matches' : 'No completed matches';
-  const emptyBody =
-    pane === 'upcoming'
-      ? 'No upcoming released matches yet.'
-      : 'No completed matches yet.';
 
   return (
     <>
-      <GlobalScheduleSubNav />
+      <Title headingLevel="h1" size="lg">
+        Schedule
+      </Title>
 
       {hasBase && (
         <>
@@ -205,13 +144,22 @@ export function GlobalSchedulePage() {
             onDateChange={setDateFilter}
             availableDates={availableDates}
             ariaLabel="Filter schedule"
+            rowEnd={
+              <div className="rs-filter-field rs-schedule-sort-field">
+                <span className="rs-filter-field__label">Sort</span>
+                <button
+                  type="button"
+                  className="rs-filter-chip"
+                  aria-label={`Date ${sortDir === 'asc' ? 'ascending' : 'descending'}. Activate to sort ${sortDir === 'asc' ? 'descending' : 'ascending'}.`}
+                  onClick={() => setSortDir(sortDir === 'asc' ? 'desc' : 'asc')}
+                >
+                  Date {sortDir === 'asc' ? '↑' : '↓'}
+                </button>
+              </div>
+            }
           />
-          <div
-            className="rs-filter-chips rs-schedule-sort"
-            role="group"
-            aria-label="Sort by date"
-          >
-            {showMyTeamsChip && (
+          {showMyTeamsChip && (
+            <div className="rs-filter-chips rs-schedule-sort">
               <button
                 type="button"
                 className={`rs-filter-chip${myTeamsOnly ? ' rs-filter-chip--selected' : ''}`}
@@ -220,52 +168,8 @@ export function GlobalSchedulePage() {
               >
                 My teams
               </button>
-            )}
-            <button
-              type="button"
-              className={`rs-filter-chip${sortDir === 'asc' ? ' rs-filter-chip--selected' : ''}`}
-              aria-pressed={sortDir === 'asc'}
-              onClick={() => setSortDir('asc')}
-            >
-              Date ascending
-            </button>
-            <button
-              type="button"
-              className={`rs-filter-chip${sortDir === 'desc' ? ' rs-filter-chip--selected' : ''}`}
-              aria-pressed={sortDir === 'desc'}
-              onClick={() => setSortDir('desc')}
-            >
-              Date descending
-            </button>
-            {pane === 'completed' && (
-              <>
-                <button
-                  type="button"
-                  className={`rs-filter-chip${completedOutcome === 'played' ? ' rs-filter-chip--selected' : ''}`}
-                  aria-pressed={completedOutcome === 'played'}
-                  onClick={() =>
-                    setCompletedOutcome(
-                      completedOutcome === 'played' ? 'all' : 'played',
-                    )
-                  }
-                >
-                  Played matches
-                </button>
-                <button
-                  type="button"
-                  className={`rs-filter-chip${completedOutcome === 'not_played' ? ' rs-filter-chip--selected' : ''}`}
-                  aria-pressed={completedOutcome === 'not_played'}
-                  onClick={() =>
-                    setCompletedOutcome(
-                      completedOutcome === 'not_played' ? 'all' : 'not_played',
-                    )
-                  }
-                >
-                  Forfeit / cancelled
-                </button>
-              </>
-            )}
-          </div>
+            </div>
+          )}
         </>
       )}
 
@@ -274,16 +178,15 @@ export function GlobalSchedulePage() {
           <EmptyStateBody>No released matches yet.</EmptyStateBody>
         </EmptyState>
       ) : list.length === 0 ? (
-        <EmptyState titleText={emptyTitle} headingLevel="h3">
+        <EmptyState titleText="No matching games" headingLevel="h3">
           <EmptyStateBody>
             {genderFilter ||
             levelFilter ||
             competitionFilter ||
             dateFilter ||
-            (pane === 'completed' && completedOutcome !== 'all') ||
             myTeamsOnly
               ? 'No games match these filters. Clear competition, date, or chips to widen.'
-              : emptyBody}
+              : 'No released matches yet.'}
           </EmptyStateBody>
         </EmptyState>
       ) : (
@@ -294,13 +197,13 @@ export function GlobalSchedulePage() {
           showPastCollapsed={showPastCollapsed}
           renderMatchRow={(m) => (
             <li key={m.id}>
-              <MatchListRow
+              <MatchSummaryCard
                 match={m}
                 to={`/matches/${m.id}`}
                 showTime
-                split="action"
                 back={scheduleBack}
-                trailing={
+                statusPresentation={workflowMatchCardStatus(m)}
+                footer={
                   <MatchCrewTrailing
                     match={m}
                     highlightUserId={currentUser?.uid}

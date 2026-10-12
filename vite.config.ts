@@ -65,6 +65,9 @@ export default defineConfig({
   resolve: {
     alias: {
       '@': path.resolve(__dirname, 'src'),
+      // Full M3 migration: PatternFly imports resolve to MUI shims
+      '@patternfly/react-core': path.resolve(__dirname, 'src/lib/pf-mui/index.ts'),
+      '@patternfly/react-icons': path.resolve(__dirname, 'src/lib/pf-mui/icons.tsx'),
     },
   },
   build: {
@@ -86,10 +89,10 @@ export default defineConfig({
             return 'vendor-firebase-core';
           }
           if (
-            id.includes('node_modules/@patternfly/react-core/') ||
-            id.includes('node_modules/@patternfly/react-icons/')
+            id.includes('node_modules/@mui/') ||
+            id.includes('node_modules/@emotion/')
           ) {
-            return 'vendor-patternfly';
+            return 'vendor-mui';
           }
           if (id.includes('node_modules/react-router-dom/')) {
             return 'vendor-router';

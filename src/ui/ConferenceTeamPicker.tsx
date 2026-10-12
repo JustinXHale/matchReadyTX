@@ -96,20 +96,17 @@ export function ConferenceTeamPicker({
       }));
   }, [options]);
 
-  const isChecked = (item: TreeViewDataItem): boolean =>
-    typeof item.id === 'string' && selectedSet.has(item.id);
-
-  const allDescendantsChecked = (item: TreeViewDataItem): boolean =>
-    item.children
-      ? item.children.every((child) => allDescendantsChecked(child))
-      : isChecked(item);
-
-  const someDescendantsChecked = (item: TreeViewDataItem): boolean =>
-    item.children
-      ? item.children.some((child) => someDescendantsChecked(child))
-      : isChecked(item);
-
   const mapped = useMemo(() => {
+    const isChecked = (item: TreeViewDataItem): boolean =>
+      typeof item.id === 'string' && selectedSet.has(item.id);
+    const allDescendantsChecked = (item: TreeViewDataItem): boolean =>
+      item.children
+        ? item.children.every((child) => allDescendantsChecked(child))
+        : isChecked(item);
+    const someDescendantsChecked = (item: TreeViewDataItem): boolean =>
+      item.children
+        ? item.children.some((child) => someDescendantsChecked(child))
+        : isChecked(item);
     const mapOne = (item: TreeViewDataItem): TreeViewDataItem => {
       const next: TreeViewDataItem = {
         ...item,

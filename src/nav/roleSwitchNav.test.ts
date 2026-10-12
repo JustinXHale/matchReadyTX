@@ -55,6 +55,18 @@ describe('resolveRoleSwitchTarget', () => {
     ).toBe('/referee/appointments');
   });
 
+  it('maps duty-specific report routes between Referee and CMO lenses', () => {
+    expect(
+      resolveRoleSwitchTarget('/referee/reports/match', '', 'cmo'),
+    ).toBe('/referee/reports/coaching');
+    expect(
+      resolveRoleSwitchTarget('/referee/reports/coaching', '', 'referee'),
+    ).toBe('/referee/reports/match');
+    expect(
+      resolveRoleSwitchTarget('/referee/appointments', '?date=2026-10-10', 'cmo'),
+    ).toBe('/referee/appointments?date=2026-10-10');
+  });
+
   it('preserves demo prefix', () => {
     expect(
       resolveRoleSwitchTarget(

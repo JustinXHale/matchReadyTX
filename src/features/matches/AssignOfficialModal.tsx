@@ -9,6 +9,7 @@ import {
   Title,
 } from '@patternfly/react-core';
 import { useApp } from '@/app/AppContext';
+import { useAppFeedback } from '@/app/feedback/feedbackContext';
 import { orgTimeZone } from '@/domain/matchTime';
 import { formatAssignMatchBlurb } from '@/domain/territory';
 import { OfficialAssignPicker } from '@/features/matches/OfficialAssignPicker';
@@ -48,6 +49,7 @@ export function AssignOfficialModal({
   onClose: () => void;
 }) {
   const { state, store, dataMode } = useApp();
+  const { notify } = useAppFeedback();
   const orgTz = orgTimeZone(state.org.timezone);
   const officials = useMemo(
     () =>
@@ -87,10 +89,11 @@ export function AssignOfficialModal({
           })
           .catch((err) => {
             console.error('Failed to save/email assignment', err);
-            window.alert(
+            notify(
               err instanceof Error
                 ? `Assigned locally, but email/save failed: ${err.message}`
                 : 'Assigned locally, but email/save failed. Check the console.',
+              'error',
             );
           });
       }
@@ -148,10 +151,11 @@ export function AssignOfficialModal({
           userId: currentPickUserId,
         }).catch((err) => {
           console.error('Failed to save/email unassignment', err);
-          window.alert(
+          notify(
             err instanceof Error
               ? `Cleared locally, but email/save failed: ${err.message}`
               : 'Cleared locally, but email/save failed. Check the console.',
+            'error',
           );
         });
       }

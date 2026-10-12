@@ -79,44 +79,33 @@ function RaiseHandRequesterRow({
   const cityState = user ? formatMemberCityState(user) : null;
 
   return (
-    <li className="rs-coverage-requesters__item">
-      <div className="rs-coverage-requesters__main">
-        <div className="rs-coverage-requesters__title-row">
-          <button
-            type="button"
-            className="rs-coverage-requesters__name"
-            onClick={() => openOfficial(request.userId, { matchBack })}
-          >
-            {name}
-          </button>
-          <span className="rs-pill rs-pill--warn rs-coverage-requesters__slot">
-            {slots}
-          </span>
-        </div>
-        {!compact && (cityState || request.note) ? (
-          <p className="rs-coverage-requesters__meta">
-            {[cityState, request.note ? `“${request.note}”` : null]
-              .filter(Boolean)
-              .join(' · ')}
-          </p>
+    <li className="rs-raise-hand-footer__row">
+      <span className="rs-pill rs-pill--warn rs-raise-hand-footer__slot">
+        {slots}
+      </span>
+      <button
+        type="button"
+        className="rs-raise-hand-footer__name"
+        onClick={() => openOfficial(request.userId, { matchBack })}
+      >
+        <span className="rs-raise-hand-footer__name-line">{name}</span>
+        {!compact && cityState ? (
+          <span className="rs-raise-hand-footer__city">{cityState}</span>
         ) : null}
-      </div>
-      <div className="rs-coverage-requesters__actions">
+      </button>
+      <div className="rs-raise-hand-footer__actions">
         <Button size="sm" variant="primary" onClick={onApprove}>
           Approve
         </Button>
-        <Button size="sm" variant="secondary" onClick={onDecline}>
+        <Button size="sm" variant="danger" onClick={onDecline}>
           Decline
         </Button>
-        <Button
-          size="sm"
-          variant="link"
-          isInline
-          onClick={() => openOfficial(request.userId, { matchBack })}
-        >
-          Profile
-        </Button>
       </div>
+      {!compact && request.note ? (
+        <p className="rs-coverage-requesters__meta rs-raise-hand-footer__note">
+          “{request.note}”
+        </p>
+      ) : null}
     </li>
   );
 }
@@ -148,49 +137,30 @@ export function CoverageMatchRequesters({
 
   if (requests.length === 0) return null;
 
-  const single = requests.length === 1;
-  const onlyRequest = single ? requests[0] : null;
-  const onlyUser =
-    onlyRequest != null
-      ? state.users.find((u) => u.uid === onlyRequest.userId)
-      : undefined;
-
   return (
     <>
       <div className="rs-coverage-requesters" aria-label="Raise-hand requests">
-        {single && onlyRequest ? (
-          <ul className="rs-coverage-requesters__list">
-            <RaiseHandRequesterRow
-              request={onlyRequest}
-              user={onlyUser}
-              matchBack={matchBack}
-              onApprove={() => startApprove(onlyRequest)}
-              onDecline={() => startDecline(onlyRequest)}
-              compact
-            />
-          </ul>
-        ) : (
-          <button
-            type="button"
-            className="rs-coverage-requesters__summary-hit"
-            onClick={() => setReviewOpen(true)}
-            aria-label={`Review ${requests.length} raise-hand volunteers`}
-          >
-            <div className="rs-coverage-requesters__summary-main">
-              <span className="rs-coverage-requesters__label">Raise-hand</span>
-              <span className="rs-coverage-requesters__headline">
-                {requests.length} volunteers
-              </span>
-              <span className="rs-coverage-requesters__preview">{summary}</span>
-              <span className="rs-coverage-requesters__hint">
-                Tap to review and approve one per open slot
-              </span>
-            </div>
-            <span className="rs-coverage-requesters__cta" aria-hidden>
-              Review
+        <button
+          type="button"
+          className="rs-coverage-requesters__summary-hit"
+          onClick={() => setReviewOpen(true)}
+          aria-label={`Review ${requests.length} raise-hand ${requests.length === 1 ? 'volunteer' : 'volunteers'}`}
+        >
+          <div className="rs-coverage-requesters__summary-main">
+            <span className="rs-coverage-requesters__label">Raise-hand</span>
+            <span className="rs-coverage-requesters__headline">
+              {requests.length}{' '}
+              {requests.length === 1 ? 'volunteer' : 'volunteers'}
             </span>
-          </button>
-        )}
+            <span className="rs-coverage-requesters__preview">{summary}</span>
+            <span className="rs-coverage-requesters__hint">
+              Tap to review and approve one per open slot
+            </span>
+          </div>
+          <span className="rs-coverage-requesters__cta" aria-hidden>
+            Review
+          </span>
+        </button>
       </div>
 
       <Modal
@@ -209,7 +179,7 @@ export function CoverageMatchRequesters({
           </p>
         </ModalHeader>
         <ModalBody className="rs-coverage-requesters-modal">
-          <ul className="rs-coverage-requesters__list">
+          <ul className="rs-raise-hand-footer">
             {requests.map((request) => (
               <RaiseHandRequesterRow
                 key={request.id}

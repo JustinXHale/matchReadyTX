@@ -18,7 +18,6 @@ import {
   type OutsideCoachingSession,
 } from '@/domain/outsideCoaching';
 import { cmoSubjectName } from '@/features/insights/insightsDisplay';
-import { CoachingSubNav } from '@/features/referee/reports/CoachingSubNav';
 import { ReportsSubNav } from '@/features/referee/reports/ReportsSubNav';
 import {
   COACHING_CMO_BACK,
@@ -43,11 +42,11 @@ function paneFromPath(pathname: string): CoachingPane | 'index' {
 }
 
 export function CoachingReportsPage() {
-  const { currentUser, state } = useApp();
+  const { currentUser, state, roleView } = useApp();
   const location = useLocation();
   const pathPane = paneFromPath(location.pathname);
   const coachingIndexHref = useAppHref('/referee/reports/coaching');
-  const coachingCmoHref = useAppHref('/referee/reports/coaching/cmo');
+  const coachingMineHref = useAppHref('/referee/reports/coaching/mine');
   const createAsCoachHref = useAppHref(createOutsideReportPath('coach'));
   const createAsRefereeHref = useAppHref(createOutsideReportPath('referee'));
 
@@ -84,9 +83,7 @@ export function CoachingReportsPage() {
   const hasOutsideAsReferee = mySessions.some(
     (s) => currentUser && s.refereeId === currentUser.uid,
   );
-  /** Split only when both a CMO filer and a subject of coaching. */
-  const showSubNav =
-    (hasCmoDuty || hasOutsideAsCoach) && (hasReceived || hasOutsideAsReferee);
+  const isCmoLens = roleView === 'cmo';
 
   const hasDue = useMemo(
     () => toFile.some((r) => r.status === 'pending'),
@@ -121,52 +118,21 @@ export function CoachingReportsPage() {
 
   if (!currentUser) return null;
 
-  if (showSubNav && pathPane === 'index') {
-    return <Navigate to={coachingCmoHref} replace />;
-  }
-
-  if (pathPane === 'cmo' && !showSubNav) {
+  if (isCmoLens && pathPane === 'mine') {
     return <Navigate to={coachingIndexHref} replace />;
   }
-  if (pathPane === 'mine' && !showSubNav) {
-    return <Navigate to={coachingIndexHref} replace />;
+  if (!isCmoLens && pathPane !== 'mine') {
+    return <Navigate to={coachingMineHref} replace />;
   }
 
-  const pane: CoachingPane =
-    showSubNav && (pathPane === 'cmo' || pathPane === 'mine')
-      ? pathPane
-      : hasCmoDuty || hasOutsideAsCoach
-        ? 'cmo'
-        : 'mine';
-
-  const showingCmo =
-    (hasCmoDuty || hasOutsideAsCoach) && (!showSubNav || pane === 'cmo');
-  const showingMine =
-    (hasReceived || hasOutsideAsReferee) && (!showSubNav || pane === 'mine');
-  /** Official-only: received under main Coaching Reports (no sub-tabs). */
-  const officialOnlyReceived =
-    !hasCmoDuty && !hasOutsideAsCoach && (hasReceived || hasOutsideAsReferee);
-
-  const listBack = showSubNav
-    ? pane === 'mine'
-      ? COACHING_MINE_BACK
-      : COACHING_CMO_BACK
-    : COACHING_REPORTS_BACK;
-
-  const pageTitle = showSubNav
-    ? showingMine && !showingCmo
-      ? COACHING_MINE_BACK.label
-      : 'CMO Reports'
-    : 'Coaching Reports';
-
-  const pageMeta = officialOnlyReceived
-    ? 'Coaching reports filed about you as Match Official (read-only).'
-    : showingMine && !showingCmo
-      ? 'Coaching reports filed about you as Match Official (read-only).'
-      : 'Reports you file as CMO after kickoff. Complete within 48 hours.';
-
-  const createHref =
-    showingMine && !showingCmo ? createAsRefereeHref : createAsCoachHref;
+  const showingCmo = isCmoLens;
+  const showingMine = !isCmoLens;
+  const listBack = isCmoLens ? COACHING_CMO_BACK : COACHING_MINE_BACK;
+  const pageTitle = isCmoLens ? 'CMO Reports' : COACHING_MINE_BACK.label;
+  const pageMeta = isCmoLens
+    ? 'Reports you file as CMO after kickoff. Complete within 48 hours.'
+    : 'Coaching reports filed about you as Match Official (read-only).';
+  const createHref = isCmoLens ? createAsCoachHref : createAsRefereeHref;
 
   const coachSessions = mySessions.filter((s) => s.coachId === currentUser.uid);
   const refereeSessions = mySessions.filter(
@@ -176,9 +142,8 @@ export function CoachingReportsPage() {
   return (
     <div className="rs-stack">
       <ReportsSubNav />
-      {showSubNav && <CoachingSubNav />}
       <div className="rs-page-title-row">
-        <Title headingLevel="h2" size="lg">
+        <Title headingLevel="h1" size="lg">
           {pageTitle}
         </Title>
         <Button
@@ -267,10 +232,13 @@ export function CoachingReportsPage() {
                       to={to}
                       back={listBack}
                       hideScore={r.status === 'pending'}
+                      urgent={r.status === 'pending'}
+                      urgentFilled={r.status === 'pending'}
+                      submitted={r.status === 'submitted'}
                       meta={
                         <>
                           <span
-                            className={`rs-pill${
+                            className={`rs-pill rs-list-row__chip${
                               r.status === 'pending' ? ' rs-pill--urgent' : ''
                             }`}
                           >
@@ -278,7 +246,9 @@ export function CoachingReportsPage() {
                               ? 'Due — you file as CMO'
                               : 'You filed as CMO'}
                           </span>{' '}
-                          <span className="rs-pill">About {moName}</span>
+                          <span className="rs-pill rs-list-row__chip">
+                            About {moName}
+                          </span>
                         </>
                       }
                     />
@@ -338,10 +308,15 @@ export function CoachingReportsPage() {
                       })}
                       back={listBack}
                       showTime={r.source !== 'legacy_form'}
+                      submitted
                       meta={
                         <>
-                          <span className="rs-pill">About you</span>{' '}
-                          <span className="rs-pill">Filed by {author}</span>
+                          <span className="rs-pill rs-list-row__chip">
+                            About you
+                          </span>{' '}
+                          <span className="rs-pill rs-list-row__chip">
+                            Filed by {author}
+                          </span>
                         </>
                       }
                     />
@@ -353,14 +328,13 @@ export function CoachingReportsPage() {
         </>
       )}
 
-      {!hasCmoDuty &&
-        !hasReceived &&
-        !hasOutsideAsCoach &&
-        !hasOutsideAsReferee && (
+      {((isCmoLens && !hasCmoDuty && !hasOutsideAsCoach) ||
+        (!isCmoLens && !hasReceived && !hasOutsideAsReferee)) && (
         <EmptyState titleText="No coaching reports" headingLevel="h3">
           <EmptyStateBody>
-            CMO duty reports and coaching reports about you appear here when
-            available. Use Create outside report for club or society games.
+            {isCmoLens
+              ? 'CMO duty reports appear here when available. Use Create outside report for club or society games.'
+              : 'Coaching reports about you appear here when available. Use Create outside report for club or society games.'}
           </EmptyStateBody>
         </EmptyState>
       )}
@@ -424,10 +398,13 @@ function OutsideSessionCoachRow({
         back={back}
         hideScore={status === 'pending'}
         showTime={false}
+        urgent={status === 'pending'}
+        urgentFilled={status === 'pending'}
+        submitted={status === 'submitted'}
         meta={
           <>
             <span
-              className={`rs-pill${
+              className={`rs-pill rs-list-row__chip${
                 status === 'pending' ? ' rs-pill--urgent' : ''
               }`}
             >
@@ -435,7 +412,7 @@ function OutsideSessionCoachRow({
                 ? 'Outside — complete coaching report'
                 : 'Outside — you filed'}
             </span>{' '}
-            <span className="rs-pill">About {moName}</span>
+            <span className="rs-pill rs-list-row__chip">About {moName}</span>
           </>
         }
       />
@@ -518,12 +495,19 @@ function OutsideSessionRefereeRow({
         back={back}
         hideScore={perf?.status !== 'submitted'}
         showTime={false}
+        urgent={urgent}
+        urgentFilled={urgent}
+        submitted={!urgent}
         meta={
           <>
-            <span className={`rs-pill${urgent ? ' rs-pill--urgent' : ''}`}>
+            <span
+              className={`rs-pill rs-list-row__chip${urgent ? ' rs-pill--urgent' : ''}`}
+            >
               {label}
             </span>{' '}
-            <span className="rs-pill">Coach {coachName}</span>
+            <span className="rs-pill rs-list-row__chip">
+              Coach {coachName}
+            </span>
           </>
         }
       />

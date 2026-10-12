@@ -16,9 +16,11 @@ import {
   deleteMeetingResourceInFirestore,
   saveMeetingResourceInFirestore,
 } from '@/services/orgData';
+import { useAppFeedback } from '@/app/feedback/feedbackContext';
 
 export function AboutResourcesPage() {
   const { state, hasAssignerRole, isDemoShowcase } = useApp();
+  const { confirm } = useAppFeedback();
   const [formOpen, setFormOpen] = useState(false);
   const [editing, setEditing] = useState<MeetingResource | null>(null);
   const [busy, setBusy] = useState(false);
@@ -71,7 +73,12 @@ export function AboutResourcesPage() {
 
   const onDelete = async (resource: MeetingResource) => {
     if (!canManage) return;
-    const ok = window.confirm(`Remove “${resource.title}” from Resources?`);
+    const ok = await confirm({
+      title: 'Remove resource?',
+      message: `Remove “${resource.title}” from Resources?`,
+      confirmLabel: 'Remove',
+      destructive: true,
+    });
     if (!ok) return;
     setBusy(true);
     setActionError(null);

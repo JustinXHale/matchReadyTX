@@ -11,6 +11,7 @@ import {
   Title,
 } from '@patternfly/react-core';
 import { useApp } from '@/app/AppContext';
+import { useAppFeedback } from '@/app/feedback/feedbackContext';
 import {
   approvalSlotsForRaiseHand,
   gameRequestPreferredSlots,
@@ -32,6 +33,7 @@ export function useRaiseHandRequestModals(
   onDecline: (id: string, reason?: string) => void,
 ) {
   const { state } = useApp();
+  const { notify } = useAppFeedback();
   const [declineTarget, setDeclineTarget] = useState<GameRequest | null>(null);
   const [declineReason, setDeclineReason] = useState('');
   const [approveTarget, setApproveTarget] = useState<GameRequest | null>(null);
@@ -52,7 +54,7 @@ export function useRaiseHandRequestModals(
     if (!match) return;
     const slots = approvalSlotsForRaiseHand(match, request);
     if (slots.length === 0) {
-      window.alert('No open slots match this request anymore.');
+      notify('No open slots match this request anymore.', 'warning');
       return;
     }
     if (slots.length === 1) {

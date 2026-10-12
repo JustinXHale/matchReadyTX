@@ -673,13 +673,13 @@ function FeatureRoutes() {
       <Route path="global" element={<GlobalLayout />}>
         <Route
           index
-          element={<AppNavigate to="/global/schedule/upcoming" replace />}
+          element={<AppNavigate to="/global/schedule" replace />}
         />
+        <Route path="schedule" element={<GlobalSchedulePage />} />
         <Route
-          path="schedule"
-          element={<AppNavigate to="/global/schedule/upcoming" replace />}
+          path="schedule/:pane"
+          element={<AppNavigate to="/global/schedule" replace />}
         />
-        <Route path="schedule/:pane" element={<GlobalSchedulePage />} />
         <Route path="standings" element={<GlobalStandingsPage />} />
         <Route path="teams">
           <Route index element={<GlobalTeamsPage />} />

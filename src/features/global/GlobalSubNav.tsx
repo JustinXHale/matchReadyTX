@@ -5,14 +5,14 @@ import { stripDemoPrefix } from '@/app/demoPaths';
 export function GlobalSubNav() {
   const { pathname } = useLocation();
   const scheduleActive = stripDemoPrefix(pathname).startsWith('/global/schedule');
-  const upcomingHref = useAppHref('/global/schedule/upcoming');
+  const scheduleHref = useAppHref('/global/schedule');
   const standingsHref = useAppHref('/global/standings');
   const teamsHref = useAppHref('/global/teams');
 
   return (
     <nav className="rs-sub-tabs" aria-label="League">
       <NavLink
-        to={upcomingHref}
+        to={scheduleHref}
         className={() => (scheduleActive ? 'active' : '')}
       >
         Schedule

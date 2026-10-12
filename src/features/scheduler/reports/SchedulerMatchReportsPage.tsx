@@ -32,22 +32,19 @@ function summaryMeta(summary: MatchCrewReportSummary) {
   return parts.join(' · ');
 }
 
-function summaryTrailing(summary: MatchCrewReportSummary) {
-  if (summary.pendingMatchReports > 0) {
-    return (
-      <span className="rs-pill rs-pill--warn">
-        {summary.pendingMatchReports} pending
-      </span>
-    );
-  }
-  if (summary.pendingCardReports > 0) {
-    return (
-      <span className="rs-pill rs-pill--quiet">
-        Card{summary.pendingCardReports === 1 ? '' : 's'} pending
-      </span>
-    );
-  }
-  return <span className="rs-pill rs-pill--ok">Complete</span>;
+function summaryBanner(summary: MatchCrewReportSummary) {
+  const tone =
+    summary.pendingMatchReports > 0
+      ? 'pending'
+      : summary.pendingCardReports > 0
+        ? 'card-pending'
+        : 'complete';
+
+  return (
+    <div className={`rs-report-status-banner rs-report-status-banner--${tone}`}>
+      {summaryMeta(summary)}
+    </div>
+  );
 }
 
 export function SchedulerMatchReportsPage() {
@@ -165,13 +162,7 @@ export function SchedulerMatchReportsPage() {
                 match={match}
                 to={`${matchDetailBase}/${match.id}`}
                 back={matchReportsBack}
-                split="action"
-                meta={
-                  <span className="rs-match-card__meta">
-                    {summaryMeta(summary)}
-                  </span>
-                }
-                trailing={summaryTrailing(summary)}
+                topBanner={summaryBanner(summary)}
               />
             </li>
           ))}

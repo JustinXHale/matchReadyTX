@@ -138,7 +138,7 @@ const detailShared = readFileSync(
   'utf8',
 );
 const sharedDetailSelectors = [
-  'rs-detail__back',
+  'rs-report-step-back',
   'rs-detail-sticky',
   'rs-detail-tools',
 ];

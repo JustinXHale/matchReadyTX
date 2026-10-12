@@ -291,8 +291,12 @@ export function matchDetailHeaderReportLinks(
   matchReports: MatchReport[],
   cardReports: CardReport[],
   now = Date.now(),
-): { label: string; to: string }[] {
-  const links: { label: string; to: string }[] = [];
+): { kind: 'match' | 'coaching' | 'card'; label: string; to: string }[] {
+  const links: {
+    kind: 'match' | 'coaching' | 'card';
+    label: string;
+    to: string;
+  }[] = [];
   const pendings = pendingReportsForOfficialOnMatch(
     matchReports,
     match.id,
@@ -313,6 +317,7 @@ export function matchDetailHeaderReportLinks(
 
   if (crewPending) {
     links.push({
+      kind: 'match',
       label:
         crewPending.slot === 'mo'
           ? 'Complete match report'
@@ -321,6 +326,7 @@ export function matchDetailHeaderReportLinks(
     });
   } else if (moSubmitted) {
     links.push({
+      kind: 'match',
       label: 'Match report',
       to: matchReportViewPath(match.id, {
         officialId: moSubmitted.officialId,
@@ -331,16 +337,19 @@ export function matchDetailHeaderReportLinks(
 
   if (cmoPendings.length === 1) {
     links.push({
+      kind: 'coaching',
       label: 'Complete coaching report',
       to: cmoReportPath(match.id, cmoPendings[0]!.subjectOfficialId),
     });
   } else if (cmoPendings.length > 1) {
     links.push({
+      kind: 'coaching',
       label: `Complete coaching reports (${cmoPendings.length})`,
       to: cmoReportPath(match.id),
     });
   } else if (cmoSubmittedList.length === 1) {
     links.push({
+      kind: 'coaching',
       label: 'Coaching report',
       to: cmoReportViewPath(
         match.id,
@@ -349,15 +358,24 @@ export function matchDetailHeaderReportLinks(
     });
   } else if (cmoSubmittedList.length > 1) {
     links.push({
+      kind: 'coaching',
       label: 'Coaching reports',
       to: cmoReportPath(match.id),
     });
   }
 
   if (cardSubmitted) {
-    links.push({ label: 'Card report', to: cardReportPath(match.id) });
+    links.push({
+      kind: 'card',
+      label: 'Card report',
+      to: cardReportPath(match.id),
+    });
   } else if (isMo && kickoffHasPassed(match.kickoffAt, now)) {
-    links.push({ label: 'Card report', to: cardReportPath(match.id) });
+    links.push({
+      kind: 'card',
+      label: 'Card report',
+      to: cardReportPath(match.id),
+    });
   }
 
   return links;

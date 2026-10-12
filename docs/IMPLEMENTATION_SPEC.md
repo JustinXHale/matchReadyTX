@@ -28,7 +28,7 @@
 
 ## 2. Locked product defaults
 
-See PRD §0 and §14. Summary: Sheet = schedule SoR; fees in-app **display only (never payouts)**; dual team confirm; MO visibility gate; auto-release on unavailable; history chain; availability ranges; game requests; T-72; **email-only notifications**; **Team Admin** lens; **Referee/CMO = one lens (Q-R6)**; **Fan XOR working roles** on onboarding/profile; incomplete Members hidden except Scheduler view.
+See PRD §0 and §14. Summary: Sheet = schedule SoR; fees in-app **display only (never payouts)**; dual team confirm; MO visibility gate; auto-release on unavailable; history chain; availability ranges; game requests; T-72; **email-only notifications**; **Team Admin** lens; separate **Referee** and **CMO** presentation lenses with shared Appointments; **Fan XOR working roles** on onboarding/profile; incomplete Members hidden except Scheduler view.
 
 **Follow-up (not this release):** driving-distance / mileage display (home ZIP ↔ venue via Google Maps APIs). Geocode callable may still stub until then.
 
@@ -179,7 +179,7 @@ mail/{mailId}   // outbound queue — Admin SDK only; see docs/EMAIL.md
 - **Match reports** (`matchReports`): filer (`officialId`) read/write own; assigner, CMO, `reportAnalytics`, and finance staff read all; MO may read CMO reports where `subjectOfficialId == auth.uid`. Any org member may read **submitted CMO** reports (`slot == 'cmo'`, `status == 'submitted'`) for public profile write-ups (includes outside/club filings — they appear in Insights). Pending MO/AR/CMO and all card reports stay private to non-Insights/finance readers. Pending create + submit with shape validation; assigner may **create/submit** MO/AR reports on an official's behalf, **reset** submitted reports to pending (answers cleared), or **delete** any report row.
 - **Card reports** (`cardReports`): filer MO read/write own after kickoff; assigner, `reportAnalytics`, `judicial`, and finance staff read all; assigner delete. CMO does not get global card-report read.
 - **`reportAnalytics` role:** Scheduler grants on member profile only (not self-assignable, not in onboarding). Enables Insights for people who are not CMOs. CMO is self-selectable on profile/onboarding and also enables Insights + global read of coach feedback + match reports.
-- **`cmo` role:** Self-selectable on profile and onboarding. Unlocks Referee/CMO lens tools and the Insights tab.
+- **`cmo` role:** Self-selectable on profile and onboarding. Unlocks the CMO lens, Coaching Reports, shared Appointments, and Insights.
 - **`judicial` role:** Scheduler or existing Judicial grants (Members checkbox for assigner; `setJudicialRole` callable for Judicial-only). Not self-assignable. Unlocks Judicial lens: dashboard, cases, comments, rulings. Phone required. Cases and comments are assigner/judicial only — not visible to the filing referee, teams, or Insights. Filing MOs may **create** `judicialCases` for their own submitted card report (recorded/pending only); rulings are assigner/judicial updates.
 - **`treasurer` role:** Scheduler grants on member profile only (not self-assignable). Unlocks **Finance** lens with assigner: payout readiness (`ready_to_pay` when match/coaching reports are in; card reports tracked separately and do not block pay), per-assignment mark paid, conference invoice builder + print. Phone required. Writes: `officialPayments`, `conferenceInvoices`. No Stripe/payout rails.
 
@@ -231,11 +231,11 @@ mail/{mailId}   // outbound queue — Admin SDK only; see docs/EMAIL.md
 | `/finance/invoices/:id/print` | Print-friendly invoice |
 | `/matches/:id` | Canonical match detail |
 
-**Bottom nav (by lens):** About · (Referee/CMO \| Team Admin \| Scheduler \| Judicial home) · Global (except Judicial lens) · **Insights** (when assigner / CMO / `reportAnalytics`) · Profile — Members lives under Info sub-nav for all lenses.  
+**Bottom nav (by lens):** About · (Referee \| CMO \| Team Admin \| Scheduler \| Judicial home) · Global (except Judicial lens) · **Insights** (CMO and other eligible non-Referee lenses) · Profile/Sign in — Members lives under Info sub-nav for all lenses.
 
 **Judicial top tabs:** Dashboard · Cases.  
 
-**Referee/CMO top tabs:** Availability · Appointments · Request · Reports.  
+**Referee top tabs:** Availability · Appointments · Reports (Match and Card). **CMO top tabs:** Appointments · Coaching reports.
 
 **Team Admin top tabs:** Schedule · Report.
 

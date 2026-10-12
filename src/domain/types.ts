@@ -402,7 +402,7 @@ export interface UserProfile {
 export const APPAREL_SIZES = ['XS', 'S', 'M', 'L', 'XL', 'XXL'] as const;
 export type ApparelSize = (typeof APPAREL_SIZES)[number];
 
-/** Roles that unlock the Referee/CMO app lens (Q-R6). */
+/** Roles that unlock an appointed-official app lens. */
 export function hasRefereeLensRole(roles: Role[]): boolean {
   return roles.includes('official') || roles.includes('cmo');
 }

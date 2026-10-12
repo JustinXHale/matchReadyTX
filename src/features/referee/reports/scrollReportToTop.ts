@@ -34,7 +34,7 @@ export function scrollReportSectionIntoView(el: HTMLElement | null): void {
   const margin = Number.parseFloat(getComputedStyle(el).scrollMarginTop) || 0;
   const back = el
     .closest('.rs-cmo-report, .rs-perf-report, .rs-stack')
-    ?.querySelector<HTMLElement>('.rs-detail__back');
+    ?.querySelector<HTMLElement>('.rs-report-step-back');
   const stickyH =
     back && getComputedStyle(back).position === 'sticky'
       ? back.getBoundingClientRect().height
