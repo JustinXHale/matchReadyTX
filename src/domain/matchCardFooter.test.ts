@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   formatTeamDisplayLabel,
   matchCardEventLabel,
+  matchTeamConfirmationState,
   matchTeamDisplayNames,
   matchUnconfirmedTeamBadges,
   teamDisplayAbbreviation,
@@ -99,6 +100,22 @@ describe('matchCardFooter', () => {
       new Map([['a1', { abbreviation: 'OU', name: 'Oklahoma University' }]]),
     );
     expect(badges).toEqual([]);
+  });
+
+  it('returns the confirmation state for each team', () => {
+    const m = match({
+      id: 'm1',
+      homeConfirmedAt: '2026-09-01T00:00:00.000Z',
+      awayConfirmedAt: undefined,
+    });
+    expect(matchTeamConfirmationState(m, 'home')).toBe('confirmed');
+    expect(matchTeamConfirmationState(m, 'away')).toBe('unconfirmed');
+  });
+
+  it('omits team confirmation states when confirmation is not applicable', () => {
+    const m = match({ id: 'm1', status: 'cancelled' });
+    expect(matchTeamConfirmationState(m, 'home')).toBeNull();
+    expect(matchTeamConfirmationState(m, 'away')).toBeNull();
   });
 
   it('falls back to initials when abbreviation missing', () => {

@@ -9,8 +9,9 @@ import { matchGameplayFormat } from '@/domain/matchGameplayFormat';
 import {
   formatTeamDisplayLabel,
   matchCardEventLabel,
+  matchTeamConfirmationState,
   matchTeamDisplayNames,
-  matchUnconfirmedTeamBadges,
+  type TeamConfirmationState,
   type TeamDisplayLabel,
 } from '@/domain/matchCardFooter';
 import {
@@ -54,11 +55,15 @@ function SideLabel({
   label,
   ha,
   className,
+  confirmation,
 }: {
   label: TeamDisplayLabel;
   ha: 'H' | 'A';
   className: string;
+  confirmation: TeamConfirmationState;
 }) {
+  const confirmationLabel =
+    confirmation === 'confirmed' ? 'Confirmed' : 'Unconfirmed';
   return (
     <span className="rs-list-row__name">
       <span className="rs-list-row__ha" aria-hidden>
@@ -70,6 +75,13 @@ function SideLabel({
           <span className="rs-list-row__team-abbr"> ({label.abbreviation})</span>
         ) : null}
       </span>
+      {confirmation ? (
+        <span
+          className={`rs-pill rs-list-row__team-confirmation rs-list-row__team-confirmation--${confirmation}`}
+        >
+          {confirmationLabel}
+        </span>
+      ) : null}
     </span>
   );
 }
@@ -151,7 +163,14 @@ export function MatchListRow({
   const homeTeamName = formatTeamDisplayLabel(homeTeam);
   const awayTeamName = formatTeamDisplayLabel(awayTeam);
   const eventLabel = matchCardEventLabel(match);
-  const unconfirmedTeams = matchUnconfirmedTeamBadges(match, teamsById);
+  const homeConfirmation = matchTeamConfirmationState(match, 'home');
+  const awayConfirmation = matchTeamConfirmationState(match, 'away');
+  const homeConfirmationText = homeConfirmation
+    ? `, ${homeConfirmation}`
+    : '';
+  const awayConfirmationText = awayConfirmation
+    ? `, ${awayConfirmation}`
+    : '';
   const { month, day } = formatCardDate(match.kickoffAt, timeZone);
   const weekday = formatMatchCardWeekday(match.kickoffAt, timeZone);
   const linkState = back ? backState(back) : undefined;
@@ -168,14 +187,15 @@ export function MatchListRow({
         className="rs-list-row__teams rs-list-row__teams--inline"
         aria-label={
           scored
-            ? `Home ${homeTeamName} ${match.homeScore}, away ${awayTeamName} ${match.awayScore}`
-            : `Home ${homeTeamName}, away ${awayTeamName}`
+            ? `Home ${homeTeamName}${homeConfirmationText}, score ${match.homeScore}; away ${awayTeamName}${awayConfirmationText}, score ${match.awayScore}`
+            : `Home ${homeTeamName}${homeConfirmationText}; away ${awayTeamName}${awayConfirmationText}`
         }
       >
         <SideLabel
           label={homeTeam}
           ha="H"
           className="rs-list-row__inline-home"
+          confirmation={homeConfirmation}
         />
         <span
           className={`rs-list-row__score${scored ? '' : ' rs-list-row__score--empty'}`}
@@ -195,6 +215,7 @@ export function MatchListRow({
             label={awayTeam}
             ha="A"
             className="rs-list-row__inline-away"
+            confirmation={awayConfirmation}
           />
         </span>
       </p>
@@ -203,8 +224,8 @@ export function MatchListRow({
         className="rs-list-row__teams"
         aria-label={
           scored
-            ? `Home ${homeTeamName} ${match.homeScore}, away ${awayTeamName} ${match.awayScore}`
-            : `Home ${homeTeamName}, away ${awayTeamName}`
+            ? `Home ${homeTeamName}${homeConfirmationText}, score ${match.homeScore}; away ${awayTeamName}${awayConfirmationText}, score ${match.awayScore}`
+            : `Home ${homeTeamName}${homeConfirmationText}; away ${awayTeamName}${awayConfirmationText}`
         }
       >
         <span className="rs-list-row__side">
@@ -212,6 +233,7 @@ export function MatchListRow({
             label={homeTeam}
             ha="H"
             className="rs-list-row__home"
+            confirmation={homeConfirmation}
           />
           <span
             className={`rs-list-row__score${scored ? '' : ' rs-list-row__score--empty'}`}
@@ -224,6 +246,7 @@ export function MatchListRow({
             label={awayTeam}
             ha="A"
             className="rs-list-row__away"
+            confirmation={awayConfirmation}
           />
           <span
             className={`rs-list-row__score${scored ? '' : ' rs-list-row__score--empty'}`}
@@ -321,23 +344,6 @@ export function MatchListRow({
               ) : null}
             </div>
           ) : null}
-        {unconfirmedTeams.length > 0 && (
-          <div className="rs-list-row__footer">
-            <div
-              className="rs-list-row__footer-badges"
-              aria-label="Teams awaiting confirmation"
-            >
-              {unconfirmedTeams.map((badge) => (
-                <span
-                  key={badge.side}
-                  className="rs-pill rs-pill--urgent rs-list-row__chip"
-                >
-                  {badge.label}
-                </span>
-              ))}
-            </div>
-          </div>
-        )}
         {meta && <div className="rs-list-row__meta">{meta}</div>}
         </div>
       </div>

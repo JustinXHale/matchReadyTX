@@ -71,6 +71,7 @@ function AppointmentRow({
       statusPresentation={
         awaitingResponse ? { tone: 'declined', label: 'Pending' } : undefined
       }
+      hidePrimaryStatus={awaitingResponse}
       topBanner={
         awaitingResponse && mySlot ? (
           <MatchActionPrompt

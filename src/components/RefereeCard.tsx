@@ -25,7 +25,10 @@ import { matchGameplayFormat } from '@/domain/matchGameplayFormat';
 import {
   formatTeamDisplayLabel,
   matchCardEventLabel,
+  matchShowsTeamConfirmation,
+  matchTeamConfirmationState,
   matchTeamDisplayNames,
+  type TeamConfirmationState,
 } from '@/domain/matchCardFooter';
 import { genderLabel, type GameRequest, type Match } from '@/domain/types';
 import { backState, type BackNav } from '@/nav/backNav';
@@ -66,6 +69,30 @@ function hasMatchScore(match: Match): boolean {
   );
 }
 
+function TeamConfirmationChip({ state }: { state: TeamConfirmationState }) {
+  if (!state) return null;
+  const confirmed = state === 'confirmed';
+  return (
+    <Chip
+      size="small"
+      label={confirmed ? 'Confirmed' : 'Unconfirmed'}
+      sx={{
+        flex: '0 0 auto',
+        alignSelf: 'center',
+        height: 20,
+        minHeight: 20,
+        bgcolor: confirmed ? 'success.main' : 'error.main',
+        color: confirmed ? 'success.contrastText' : 'error.contrastText',
+        border: (theme) =>
+          `1px solid ${confirmed ? theme.palette.success.main : theme.palette.error.main}`,
+        fontSize: '0.625rem',
+        fontWeight: 800,
+        '& .MuiChip-label': { px: 0.625 },
+      }}
+    />
+  );
+}
+
 export type MatchSummaryCardProps = {
   /** Firestore-backed match from AppContext / org listeners. */
   match: Match;
@@ -77,6 +104,8 @@ export type MatchSummaryCardProps = {
   assignmentStatus?: AssignmentAlertStatus;
   /** Persona-specific status copy using the same semantic card treatment. */
   statusPresentation?: MatchCardStatusPresentation;
+  /** Hide a redundant primary status label while preserving its card treatment. */
+  hidePrimaryStatus?: boolean;
   /** Additional non-primary states displayed beside the primary status. */
   supportingStatuses?: MatchCardStatusPresentation[];
   to?: string;
@@ -101,6 +130,7 @@ export function MatchSummaryCard({
   request = null,
   assignmentStatus: statusOverride,
   statusPresentation,
+  hidePrimaryStatus = false,
   supportingStatuses = [],
   to,
   back,
@@ -125,6 +155,14 @@ export function MatchSummaryCard({
   const homeName = formatTeamDisplayLabel(home);
   const awayName = formatTeamDisplayLabel(away);
   const eventLabel = matchCardEventLabel(match);
+  const homeConfirmation = matchTeamConfirmationState(match, 'home');
+  const awayConfirmation = matchTeamConfirmationState(match, 'away');
+  const homeConfirmationText = homeConfirmation
+    ? `, ${homeConfirmation}`
+    : '';
+  const awayConfirmationText = awayConfirmation
+    ? `, ${awayConfirmation}`
+    : '';
   const { month, day } = formatCardDate(match.kickoffAt, timeZone);
   const weekday = formatMatchCardWeekday(match.kickoffAt, timeZone);
   const format = matchGameplayFormat(match);
@@ -141,7 +179,16 @@ export function MatchSummaryCard({
   const statusTokens = theme.palette[statusKey];
   const statusLabel =
     statusPresentation?.label ?? assignmentAlertLabel(status);
-  const showPrimaryStatus = statusLabel !== 'Crew confirmed';
+  const redundantTeamStatus =
+    matchShowsTeamConfirmation(match) &&
+    ['Confirmed', 'Teams confirmed', 'Needs confirm', 'Needs team confirm'].includes(
+      statusLabel,
+    );
+  const showPrimaryStatus =
+    !hidePrimaryStatus &&
+    statusLabel !== 'Crew confirmed' &&
+    !redundantTeamStatus;
+  const primaryStatusAria = showPrimaryStatus ? `; ${statusLabel}` : '';
 
   const venue =
     match.venueAddress?.trim() || match.venueName?.trim() || null;
@@ -272,8 +319,8 @@ export function MatchSummaryCard({
           role="group"
           aria-label={
             scored
-              ? `Home ${homeName} ${homeScore}, away ${awayName} ${awayScore}`
-              : `Home ${homeName}, away ${awayName}`
+              ? `Home ${homeName}, ${homeConfirmation ?? 'confirmation not applicable'}, score ${homeScore}; away ${awayName}, ${awayConfirmation ?? 'confirmation not applicable'}, score ${awayScore}`
+              : `Home ${homeName}, ${homeConfirmation ?? 'confirmation not applicable'}; away ${awayName}, ${awayConfirmation ?? 'confirmation not applicable'}`
           }
           sx={{ m: 0 }}
         >
@@ -289,6 +336,7 @@ export function MatchSummaryCard({
               </Typography>
               {homeName}
             </Typography>
+            <TeamConfirmationChip state={homeConfirmation} />
             <Typography
               component="span"
               variant="subtitle1"
@@ -312,6 +360,7 @@ export function MatchSummaryCard({
               </Typography>
               {awayName}
             </Typography>
+            <TeamConfirmationChip state={awayConfirmation} />
             <Typography
               component="span"
               variant="subtitle1"
@@ -436,8 +485,8 @@ export function MatchSummaryCard({
             }}
             aria-label={
               scored
-                ? `${homeName} ${homeScore} versus ${awayName} ${awayScore}, ${statusLabel}`
-                : `${homeName} versus ${awayName}, ${statusLabel}`
+                ? `${homeName}${homeConfirmationText}, score ${homeScore}, versus ${awayName}${awayConfirmationText}, score ${awayScore}${primaryStatusAria}`
+                : `${homeName}${homeConfirmationText} versus ${awayName}${awayConfirmationText}${primaryStatusAria}`
             }
           >
             {content}

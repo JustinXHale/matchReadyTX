@@ -100,6 +100,26 @@ export function matchShowsTeamConfirmation(
   );
 }
 
+export type TeamConfirmationState = 'confirmed' | 'unconfirmed' | null;
+
+/** Per-side confirmation state for shared match cards; null when not applicable. */
+export function matchTeamConfirmationState(
+  match: Pick<
+    Match,
+    | 'status'
+    | 'forfeitTeamId'
+    | 'playedForfeit'
+    | 'homeConfirmedAt'
+    | 'awayConfirmedAt'
+  >,
+  side: 'home' | 'away',
+): TeamConfirmationState {
+  if (!matchShowsTeamConfirmation(match)) return null;
+  const confirmedAt =
+    side === 'home' ? match.homeConfirmedAt : match.awayConfirmedAt;
+  return confirmedAt ? 'confirmed' : 'unconfirmed';
+}
+
 export type MatchUnconfirmedTeamBadge = {
   side: 'home' | 'away';
   abbreviation: string;

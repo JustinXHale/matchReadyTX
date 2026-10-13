@@ -678,6 +678,27 @@
   letter-spacing: 0.03em;
 }
 
+.rs-list-row__team-confirmation {
+  flex: 0 0 auto;
+  padding: 2px 5px;
+  font-size: 9px;
+  line-height: 1.15;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.rs-list-row__team-confirmation--confirmed {
+  background: var(--rs-color-success-container);
+  color: var(--rs-color-on-success-container);
+  border-color: var(--rs-color-success-container);
+}
+
+.rs-list-row__team-confirmation--unconfirmed {
+  background: var(--rs-color-error-container);
+  color: var(--rs-color-on-error-container);
+  border-color: var(--rs-color-error-container);
+}
+
 .rs-list-row__ha {
   flex: 0 0 auto;
   font-weight: 700;
