@@ -146,6 +146,21 @@ const detailSharedMissing = sharedDetailSelectors.filter(
   (sel) => !detailShared.includes(`.${sel}`),
 );
 
+// Authenticated app chrome must have one vertical scroller: .rs-page-body.
+const appShellCss = readFileSync(
+  join(SRC, 'styles/shell/app-shell.css'),
+  'utf8',
+);
+const appShellScrollContracts = [
+  'html:has(.rs-app-shell--compact)',
+  'body:has(.rs-app-shell--medium)',
+  '#root:has(.rs-app-shell--medium)',
+  '.rs-app-shell--medium .rs-page-body',
+];
+const appShellScrollMissing = appShellScrollContracts.filter(
+  (contract) => !appShellCss.includes(contract),
+);
+
 let exitCode = 0;
 const problems = [];
 
@@ -172,6 +187,13 @@ if (detailSharedMissing.length) {
   exitCode = 1;
   problems.push(
     `Shared detail chrome missing from detail-shared.css:\n  ${detailSharedMissing.join(', ')}`,
+  );
+}
+
+if (appShellScrollMissing.length) {
+  exitCode = 1;
+  problems.push(
+    `App shell single-scroll contract missing:\n  ${appShellScrollMissing.join('\n  ')}`,
   );
 }
 

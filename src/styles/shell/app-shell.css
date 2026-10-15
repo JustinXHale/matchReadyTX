@@ -49,6 +49,16 @@
   overflow: hidden;
 }
 
+/* The authenticated shell owns vertical scrolling through .rs-page-body. */
+html:has(.rs-app-shell--compact),
+html:has(.rs-app-shell--medium),
+body:has(.rs-app-shell--compact),
+body:has(.rs-app-shell--medium),
+#root:has(.rs-app-shell--compact),
+#root:has(.rs-app-shell--medium) {
+  overflow: hidden;
+}
+
 .rs-app-shell__frame {
   display: flex;
   flex: 1 1 auto;
