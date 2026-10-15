@@ -67,6 +67,9 @@ const sharedCardContracts = [
       'matchTeamConfirmationState',
       'TeamConfirmationChip',
       'hidePrimaryStatus',
+      'emphasizeOfficialNeeded',
+      "data-card-emphasis={officialNeededEmphasis ? 'official-needed' : undefined}",
+      "data-match-inactive={inactiveMatch ? 'true' : undefined}",
       't.palette.outlineVariant',
     ],
   },
@@ -78,6 +81,14 @@ const sharedCardContracts = [
       'matchTeamConfirmationState',
       'aria-label="Game type"',
       'aria-label="Match status"',
+    ],
+  },
+  {
+    file: 'src/features/scheduler/schedule/SchedulerSchedulePage.tsx',
+    includes: [
+      "rolesNeededForMatch(m).includes('mo')",
+      'crewPeople(m.crew.mo).length === 0',
+      'emphasizeOfficialNeeded={needsOpenMo}',
     ],
   },
   {

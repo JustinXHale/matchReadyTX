@@ -241,6 +241,10 @@ export function SchedulerSchedulePage() {
         m,
       );
       const urgent = needsReassignmentPool.some((x) => x.id === m.id);
+      const needsOpenMo =
+        needsOfficialsPool.some((x) => x.id === m.id) &&
+        rolesNeededForMatch(m).includes('mo') &&
+        crewPeople(m.crew.mo).length === 0;
       const doubleBookedIds = doubleBookedOfficialIdsForMatch(
         state.matches,
         m,
@@ -265,6 +269,7 @@ export function SchedulerSchedulePage() {
             statusPresentation={workflowMatchCardStatus(m, {
               needsReassignment: urgent,
             })}
+            emphasizeOfficialNeeded={needsOpenMo}
             topBanner={
               <SchedulerAssignTrailing
                 match={m}
@@ -298,6 +303,7 @@ export function SchedulerSchedulePage() {
       state.requests,
       state.matches,
       state.users,
+      needsOfficialsPool,
       needsReassignmentPool,
       timeZone,
       scheduleBack,

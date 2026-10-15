@@ -106,6 +106,8 @@ export type MatchSummaryCardProps = {
   statusPresentation?: MatchCardStatusPresentation;
   /** Hide a redundant primary status label while preserving its card treatment. */
   hidePrimaryStatus?: boolean;
+  /** Stronger scheduler treatment when the match still needs its MO assigned. */
+  emphasizeOfficialNeeded?: boolean;
   /** Additional non-primary states displayed beside the primary status. */
   supportingStatuses?: MatchCardStatusPresentation[];
   to?: string;
@@ -131,6 +133,7 @@ export function MatchSummaryCard({
   assignmentStatus: statusOverride,
   statusPresentation,
   hidePrimaryStatus = false,
+  emphasizeOfficialNeeded = false,
   supportingStatuses = [],
   to,
   back,
@@ -189,6 +192,11 @@ export function MatchSummaryCard({
     statusLabel !== 'Crew confirmed' &&
     !redundantTeamStatus;
   const primaryStatusAria = showPrimaryStatus ? `; ${statusLabel}` : '';
+  const inactiveMatch =
+    match.status === 'cancelled' ||
+    Boolean(match.forfeitTeamId) ||
+    match.playedForfeit === true;
+  const officialNeededEmphasis = emphasizeOfficialNeeded && !inactiveMatch;
 
   const venue =
     match.venueAddress?.trim() || match.venueName?.trim() || null;
@@ -202,6 +210,10 @@ export function MatchSummaryCard({
         p: 2,
         '&:last-child': { pb: 2 },
         minHeight: 88,
+        color: inactiveMatch ? 'text.secondary' : 'text.primary',
+        '& .MuiTypography-root': inactiveMatch
+          ? { opacity: 0.72 }
+          : undefined,
       }}
     >
       <Box
@@ -451,12 +463,19 @@ export function MatchSummaryCard({
       className="rs-match-summary-card"
       elevation={0}
       sx={{
-        bgcolor: 'background.paper',
-        border: (t) => `1px solid ${t.palette.outlineVariant}`,
-        borderLeft: `4px solid ${statusTokens.main}`,
+        bgcolor: inactiveMatch ? 'surfaceContainerHigh' : 'background.paper',
+        border: (t) =>
+          officialNeededEmphasis
+            ? `2px solid ${t.palette.assignmentPending.main}`
+            : `1px solid ${t.palette.outlineVariant}`,
+        borderLeft: officialNeededEmphasis
+          ? `2px solid ${theme.palette.assignmentPending.main}`
+          : `4px solid ${statusTokens.main}`,
         overflow: 'hidden',
       }}
       data-assignment-status={status}
+      data-card-emphasis={officialNeededEmphasis ? 'official-needed' : undefined}
+      data-match-inactive={inactiveMatch ? 'true' : undefined}
     >
       {topBanner ? (
         <Box
@@ -465,6 +484,7 @@ export function MatchSummaryCard({
             width: '100%',
             borderBottom: (t) => `1px solid ${t.palette.outlineVariant}`,
             bgcolor: (t) => t.palette.surfaceContainerHigh,
+            '& > *': inactiveMatch ? { opacity: 0.72 } : undefined,
           }}
           onClick={(e) => e.stopPropagation()}
         >
