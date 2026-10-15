@@ -4,6 +4,7 @@ import { Button } from '@patternfly/react-core';
 import {
   dayAvailability,
   formatDayWindowsLabel,
+  type DayAvailabilityState,
 } from '@/domain/availability';
 import type { AvailabilityRange } from '@/domain/types';
 import {
@@ -27,6 +28,15 @@ type Props = {
   onDayTimeEdit?: (dayKey: string, e: MouseEvent) => void;
   showLegend?: boolean;
   className?: string;
+};
+
+const DAY_STATE_PRESENTATION: Record<
+  DayAvailabilityState,
+  { label: string; symbol: string; nextLabel: string }
+> = {
+  available: { label: 'Available', symbol: '✓', nextLabel: 'blocked' },
+  blocked: { label: 'Blocked', symbol: '×', nextLabel: 'closed' },
+  unmarked: { label: 'Closed', symbol: '—', nextLabel: 'available' },
 };
 
 /**
@@ -58,15 +68,31 @@ export function AvailabilityMonthCalendar({
       {showLegend && (
         <div className="rs-avail-legend" aria-label="Legend">
           <span className="rs-avail-legend__item">
-            <span className="rs-avail-swatch rs-avail-swatch--available" />{' '}
+            <span
+              className="rs-avail-swatch rs-avail-swatch--available"
+              aria-hidden
+            >
+              ✓
+            </span>{' '}
             Available
           </span>
           <span className="rs-avail-legend__item">
-            <span className="rs-avail-swatch rs-avail-swatch--blocked" />{' '}
+            <span
+              className="rs-avail-swatch rs-avail-swatch--blocked"
+              aria-hidden
+            >
+              ×
+            </span>{' '}
             Blocked
           </span>
           <span className="rs-avail-legend__item">
-            <span className="rs-avail-swatch rs-avail-swatch--unmarked" /> Closed
+            <span
+              className="rs-avail-swatch rs-avail-swatch--unmarked"
+              aria-hidden
+            >
+              —
+            </span>{' '}
+            Closed
           </span>
         </div>
       )}
@@ -128,11 +154,28 @@ export function AvailabilityMonthCalendar({
             const isToday = dayKey === todayKey;
             const windowLabel = formatDayWindowsLabel(day.windows);
             const interactive = !readOnly && onDayTap;
+            const statePresentation = DAY_STATE_PRESENTATION[day.state];
+            const stateIndicator = (
+              <span className="rs-avail-day__state">
+                <span className="rs-avail-day__state-symbol" aria-hidden>
+                  {statePresentation.symbol}
+                </span>
+                <span>{statePresentation.label}</span>
+              </span>
+            );
+            const dayAriaLabel = `${dayKey}, ${statePresentation.label}${
+              windowLabel ? `, ${windowLabel}` : ''
+            }${
+              interactive
+                ? `. Tap to mark ${statePresentation.nextLabel}`
+                : ''
+            }`;
 
             return (
               <div
                 key={dayKey}
                 role="gridcell"
+                aria-current={isToday ? 'date' : undefined}
                 className={`rs-avail-day rs-avail-day--${day.state}${
                   isToday ? ' rs-avail-day--today' : ''
                 }`}
@@ -141,14 +184,13 @@ export function AvailabilityMonthCalendar({
                   <button
                     type="button"
                     className="rs-avail-day__hit"
-                    aria-label={`${dayKey}, ${day.state}${
-                      windowLabel ? `, ${windowLabel}` : ''
-                    }`}
+                    aria-label={dayAriaLabel}
                     disabled={busy}
                     onClick={() => onDayTap(dayKey)}
                     onContextMenu={(e) => onDayTimeEdit?.(dayKey, e)}
                   >
                     <span className="rs-avail-day__num">{dom}</span>
+                    {stateIndicator}
                     {day.state === 'available' && windowLabel && (
                       <span className="rs-avail-day__time">{windowLabel}</span>
                     )}
@@ -156,11 +198,10 @@ export function AvailabilityMonthCalendar({
                 ) : (
                   <div
                     className="rs-avail-day__hit rs-avail-day__hit--static"
-                    aria-label={`${dayKey}, ${day.state}${
-                      windowLabel ? `, ${windowLabel}` : ''
-                    }`}
+                    aria-label={dayAriaLabel}
                   >
                     <span className="rs-avail-day__num">{dom}</span>
+                    {stateIndicator}
                     {day.state === 'available' && windowLabel && (
                       <span className="rs-avail-day__time">{windowLabel}</span>
                     )}

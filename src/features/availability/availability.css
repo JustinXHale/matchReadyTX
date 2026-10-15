@@ -11,6 +11,12 @@
 }
 
 /* —— Availability calendar —— */
+.rs-avail-cal {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+}
+
 .rs-avail-legend {
   display: flex;
   flex-wrap: wrap;
@@ -26,20 +32,29 @@
 }
 
 .rs-avail-swatch {
-  width: 12px;
-  height: 12px;
+  display: inline-grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
   border-radius: var(--rs-radius-xs);
   border: 1px solid var(--rs-color-border);
+  color: var(--rs-color-ink);
+  font-size: 0.75rem;
+  font-weight: 900;
+  line-height: 1;
 }
 
 .rs-avail-swatch--available {
   background: color-mix(in srgb, var(--rs-color-ok) 35%, var(--rs-color-surface));
   border-color: var(--rs-color-ok);
+  border-width: 2px;
 }
 
 .rs-avail-swatch--blocked {
   background: color-mix(in srgb, var(--rs-color-urgent) 25%, var(--rs-color-surface));
   border-color: var(--rs-color-urgent);
+  border-style: dashed;
+  border-width: 2px;
 }
 
 .rs-avail-swatch--unmarked {
@@ -72,7 +87,7 @@
 
 .rs-avail-cal__dow {
   display: grid;
-  grid-template-columns: repeat(7, 1fr);
+  grid-template-columns: repeat(7, minmax(0, 1fr));
   gap: var(--rs-space-xs);
   margin-bottom: var(--rs-space-xs);
   text-align: center;
@@ -87,8 +102,10 @@
 
 .rs-avail-cal__grid {
   display: grid;
-  grid-template-columns: repeat(7, 1fr);
+  grid-template-columns: repeat(7, minmax(0, 1fr));
   gap: var(--rs-space-xs);
+  width: 100%;
+  min-width: 0;
 }
 
 .rs-avail-day {
@@ -98,6 +115,7 @@
   align-items: stretch;
   justify-content: flex-start;
   min-height: 3.4rem;
+  min-width: 0;
   padding: 0;
   border: 1px solid var(--rs-color-border);
   border-radius: var(--rs-radius-card);
@@ -114,6 +132,7 @@
   gap: 2px;
   flex: 1;
   width: 100%;
+  min-width: 0;
   min-height: 2.6rem;
   padding: 6px 2px 2px;
   margin: 0;
@@ -138,11 +157,13 @@
 .rs-avail-day--available {
   background: color-mix(in srgb, var(--rs-color-ok) 22%, var(--rs-color-surface));
   border-color: color-mix(in srgb, var(--rs-color-ok) 55%, var(--rs-color-border));
+  border-width: 2px;
 }
 
 .rs-avail-day--blocked {
   background: color-mix(in srgb, var(--rs-color-urgent) 16%, var(--rs-color-surface));
-  border-color: color-mix(in srgb, var(--rs-color-urgent) 45%, var(--rs-color-border));
+  /* Match the legend exactly so Blocked never depends on the red tint alone. */
+  border: 2px dashed var(--rs-color-urgent);
 }
 
 .rs-avail-day--today {
@@ -153,6 +174,40 @@
   font-size: 0.9rem;
   font-weight: 650;
   line-height: 1.1;
+}
+
+.rs-avail-day__state {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  max-width: 100%;
+  min-width: 0;
+  color: var(--rs-color-ink);
+  font-size: clamp(0.5rem, 1.8vw, 0.65rem);
+  font-weight: 800;
+  line-height: 1.05;
+  white-space: nowrap;
+}
+
+.rs-avail-day__state-symbol {
+  flex: 0 0 auto;
+  font-size: 0.72rem;
+  font-weight: 900;
+}
+
+.rs-avail-update {
+  margin: 0;
+  color: var(--rs-color-ink);
+  font-size: 0.85rem;
+  font-weight: 650;
+}
+
+@media (max-width: 419px) {
+  .rs-avail-day__state {
+    flex-direction: column;
+    gap: 0;
+  }
 }
 
 .rs-avail-day__edit {

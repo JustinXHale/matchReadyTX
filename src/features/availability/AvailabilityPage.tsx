@@ -20,6 +20,7 @@ import {
   dayAvailability,
   DEFAULT_AVAIL_END_HM,
   DEFAULT_AVAIL_START_HM,
+  formatDayWindowsLabel,
   setDayState,
   setWeekdayInMonth,
   type TimeWindow,
@@ -51,6 +52,14 @@ function defaultWindow(): TimeWindow {
   };
 }
 
+function readableDay(dayKey: string): string {
+  return new Date(`${dayKey}T12:00:00Z`).toLocaleDateString(undefined, {
+    month: 'long',
+    day: 'numeric',
+    timeZone: 'UTC',
+  });
+}
+
 /**
  * Referee availability — month calendar with tap cycle,
  * pattern apply, and bulk month actions. Persists to Firestore when live.
@@ -72,6 +81,7 @@ export function AvailabilityPage() {
   ]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [lastUpdate, setLastUpdate] = useState<string | null>(null);
 
   const [patFrom, setPatFrom] = useState('');
   const [patTo, setPatTo] = useState('');
@@ -136,16 +146,23 @@ export function AvailabilityPage() {
   };
 
   const onTapDay = (dayKey: string) => {
-    void persist(
-      cycleDayState(
-        state.availability,
-        uid,
-        dayKey,
-        timeZone,
-        defaultWindow(),
-        nextId,
-      ),
+    const next = cycleDayState(
+      state.availability,
+      uid,
+      dayKey,
+      timeZone,
+      defaultWindow(),
+      nextId,
     );
+    const updated = dayAvailability(next, uid, dayKey, timeZone);
+    const updateLabel =
+      updated.state === 'available'
+        ? `available, ${formatDayWindowsLabel(updated.windows)}`
+        : updated.state === 'blocked'
+          ? 'blocked'
+          : 'closed';
+    setLastUpdate(`${readableDay(dayKey)} marked ${updateLabel}.`);
+    void persist(next);
   };
 
   const openTimeEdit = (dayKey: string, e: MouseEvent) => {
@@ -274,8 +291,8 @@ export function AvailabilityPage() {
     <div className="rs-stack rs-avail-page">
       <Title headingLevel="h1">Availability</Title>
       <p className="rs-match-card__meta">
-        Days start closed. Tap to cycle: open (available) → blocked → closed.
-        Use Edit on an open day to set one or more time windows.
+        Every day shows its status. Tap to cycle: ✓ Available → × Blocked →
+        — Closed. Use Edit on an available day to set one or more time windows.
       </p>
 
       <div className="rs-avail-toolbar">
@@ -298,6 +315,12 @@ export function AvailabilityPage() {
         onDayTap={onTapDay}
         onDayTimeEdit={openTimeEdit}
       />
+
+      {lastUpdate && (
+        <p className="rs-avail-update" role="status" aria-live="polite">
+          {lastUpdate}
+        </p>
+      )}
 
       {error && (
         <p className="rs-match-card__meta" role="alert">
