@@ -44,6 +44,17 @@
   gap: 10px;
 }
 
+.rs-members-email-all {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--rs-space-sm) var(--rs-space-md);
+}
+
+.rs-members-email-all .rs-member-row__meta {
+  flex: 1 1 16rem;
+}
+
 .rs-members-team-groups {
   display: flex;
   flex-direction: column;

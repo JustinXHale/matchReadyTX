@@ -1,6 +1,7 @@
 import { useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import {
+  Button,
   EmptyState,
   EmptyStateBody,
   TextInput,
@@ -14,6 +15,7 @@ import {
   memberListName,
   membersForTab,
   nextMatchForMember,
+  refereeContactEmails,
   rolePillsForMember,
   teamAdminMatchesGender,
   teamGendersFromMatches,
@@ -32,6 +34,7 @@ import {
   useMembersFilterParams,
 } from '@/nav/listFilterParams';
 import { UserAvatar } from '@/ui/UserAvatar';
+import { openGroupBccMailto } from '@/services/mailto';
 
 function memberSearchHaystack(
   user: UserProfile,
@@ -130,6 +133,10 @@ export function MembersPage() {
   const { state, hasAssignerRole, isAssignerView } = useApp();
   const showIncomplete = hasAssignerRole && isAssignerView;
   const canFilterCompleteness = showIncomplete;
+  const refereeEmails = useMemo(
+    () => refereeContactEmails(state.users),
+    [state.users],
+  );
   const {
     searchParams,
     tab,
@@ -254,6 +261,27 @@ export function MembersPage() {
           </button>
         ))}
       </div>
+      {tab === 'referees' && hasAssignerRole && isAssignerView && (
+        <div className="rs-members-email-all">
+          <Button
+            variant="secondary"
+            isDisabled={refereeEmails.length === 0}
+            onClick={() =>
+              openGroupBccMailto(
+                refereeEmails,
+                'MatchReadyTX referee announcement',
+              )
+            }
+          >
+            Email all referees
+          </Button>
+          <p className="rs-member-row__meta">
+            {refereeEmails.length}{' '}
+            {refereeEmails.length === 1 ? 'recipient' : 'recipients'} · Opens
+            your email app with addresses in BCC.
+          </p>
+        </div>
+      )}
       {canFilterCompleteness && (
         <div className="rs-filter-chips" role="group" aria-label="Profile status">
           {(

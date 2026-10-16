@@ -10,6 +10,10 @@ import {
   REQUESTABLE_SLOT_SHORT,
 } from '@/domain/types';
 import { dayKeyInZone, zonedLocalToUtcIso } from '@/domain/availability';
+import {
+  effectiveContactEmail,
+  isUsableContactEmail,
+} from '@/domain/contactEmail';
 import { formatMatchKickoff } from '@/domain/matchTime';
 
 export type MemberTab = 'referees' | 'teamAdmins' | 'cmos' | 'fans';
@@ -70,6 +74,24 @@ export function membersForTab(
     .filter((u) => memberMatchesTab(u, tab))
     .filter((u) => includeIncomplete || u.profileComplete)
     .sort((a, b) => memberListName(a).localeCompare(memberListName(b)));
+}
+
+/** Reachable, deduplicated addresses for every registered referee in the org. */
+export function refereeContactEmails(users: UserProfile[]): string[] {
+  const seen = new Set<string>();
+  const emails: string[] = [];
+
+  for (const user of users) {
+    if (!user.roles.includes('official')) continue;
+    const email = effectiveContactEmail(user);
+    if (!isUsableContactEmail(email)) continue;
+    const key = email.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    emails.push(email);
+  }
+
+  return emails;
 }
 
 /** Format membership join date for Scheduler-only UI. */
