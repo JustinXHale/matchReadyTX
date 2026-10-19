@@ -111,8 +111,8 @@ import { notifyComplianceHoldChange } from '@/services/complianceHoldNotify';
 import { defaultOrgId, clearMatchForfeitInFirestore, createGameRequestInFirestore, patchGameRequestContentInFirestore, saveComplianceHoldInFirestore, saveMatchCrewAssignment, saveMatchDetailsInFirestore, saveMatchForfeitInFirestore, saveMatchPlayedForfeitInFirestore, saveMatchRaiseHandInterest, saveMatchWorkflowInFirestore, callMatchSelfService } from '@/services/orgData';
 import {
   formatRaiseHandInterestSlots,
+  mergedRaiseHandInterest,
   raiseHandInterestStatusLabel,
-  sortedRaiseHandInterest,
 } from '@/domain/raiseHandInterest';
 import { isFirebaseConfigured } from '@/services/firebase';
 import {
@@ -449,8 +449,8 @@ export function MatchDetailPage() {
     [match],
   );
   const raiseHandInterest = useMemo(
-    () => (match ? sortedRaiseHandInterest(match) : []),
-    [match],
+    () => (match ? mergedRaiseHandInterest(match, state.requests) : []),
+    [match, state.requests],
   );
 
   const teamEmails = useMemo(() => {

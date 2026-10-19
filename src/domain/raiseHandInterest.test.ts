@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   applyRaiseHandInterestBatch,
+  mergedRaiseHandInterest,
   raiseHandInterestStatusLabel,
   sortedRaiseHandInterest,
   syncRaiseHandInterestOnMatch,
@@ -56,5 +57,31 @@ describe('raiseHandInterest', () => {
     expect(rows[0]?.status).toBe('declined');
     expect(rows[0]?.declineReason).toContain('fulfilled');
     expect(raiseHandInterestStatusLabel(rows[0]!)).toBe('Declined');
+  });
+
+  it('merges live pending requests when match audit is empty', () => {
+    const match = testMatch();
+    const pending = [
+      request({ id: 'gr1', userId: 'u1', userName: 'Troy' }),
+      request({ id: 'gr2', userId: 'u2', userName: 'Chris' }),
+    ];
+    const rows = mergedRaiseHandInterest(match, pending);
+    expect(rows).toHaveLength(2);
+    expect(rows.map((r) => r.userName).sort()).toEqual(['Chris', 'Troy']);
+    expect(rows.every((r) => r.status === 'pending')).toBe(true);
+  });
+
+  it('prefers live request status over stale audit row', () => {
+    let match = testMatch();
+    const pending = request({ id: 'gr1', userId: 'u1' });
+    match = syncRaiseHandInterestOnMatch(match, pending);
+    const declined = {
+      ...pending,
+      status: 'declined' as const,
+      declineReason: 'Filled',
+    };
+    const rows = mergedRaiseHandInterest(match, [declined]);
+    expect(rows).toHaveLength(1);
+    expect(rows[0]?.status).toBe('declined');
   });
 });

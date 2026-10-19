@@ -86,6 +86,29 @@ export function sortedRaiseHandInterest(
   );
 }
 
+/**
+ * Match-detail / audit view: union of persisted `raiseHandInterest` with live
+ * `gameRequests` for this match. Pending volunteers live in requests and may
+ * not yet be mirrored onto the match doc (older filings / partial writes).
+ */
+export function mergedRaiseHandInterest(
+  match: Match,
+  requests: GameRequest[],
+): RaiseHandInterestRecord[] {
+  const byId = new Map<string, RaiseHandInterestRecord>();
+  for (const row of match.raiseHandInterest ?? []) {
+    byId.set(row.requestId, row);
+  }
+  for (const req of requests) {
+    if (req.matchId !== match.id) continue;
+    byId.set(req.id, raiseHandInterestFromRequest(req));
+  }
+  return [...byId.values()].sort(
+    (a, b) =>
+      new Date(b.requestedAt).getTime() - new Date(a.requestedAt).getTime(),
+  );
+}
+
 export function formatRaiseHandInterestSlots(
   record: RaiseHandInterestRecord,
 ): string {

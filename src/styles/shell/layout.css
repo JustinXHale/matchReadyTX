@@ -620,7 +620,7 @@ input.rs-filter-search {
   max-width: 100%;
 }
 
-/* Portaled PF calendars — above bottom nav (300) and quick-look drawer (1200). */
+/* Portaled PF calendars — above bottom nav (300); below official quick-look (1400). */
 .pf-v6-c-date-picker__calendar {
   z-index: 1300 !important;
 }

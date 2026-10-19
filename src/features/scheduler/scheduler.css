@@ -438,6 +438,11 @@
 .rs-raise-hand-footer__note {
   flex: 1 0 100%;
   margin: 0;
+  white-space: normal;
+  overflow: visible;
+  text-overflow: unset;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .rs-fixture-request-card.rs-list-row {
@@ -566,10 +571,11 @@
   }
 }
 
+/* Above MUI Dialog / raise-hand review modal (default modal z-index 1300). */
 .rs-official-drawer {
   position: fixed;
   inset: 0;
-  z-index: 1200;
+  z-index: 1400;
   pointer-events: none;
 }
 
