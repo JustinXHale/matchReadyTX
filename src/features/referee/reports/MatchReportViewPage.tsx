@@ -104,20 +104,37 @@ export function MatchReportViewPage() {
           : report.slot.toUpperCase();
 
   return (
-    <div className="rs-stack rs-report-view">
+    <div
+      className={`rs-stack rs-report-view${
+        isAssignerView ? ' rs-report-view--has-mobile-action' : ''
+      }`}
+    >
       <div className="rs-report-view__title-row">
         <Title headingLevel="h2" size="lg">
           Match report ({kindLabel})
         </Title>
         {isAssignerView && (
+          <div className="rs-report-view__desktop-action-menu">
+            <ReportAdminMenu
+              kind="match"
+              report={report}
+              match={match}
+              onFinished={() => navigate(matchHref, { replace: true })}
+            />
+          </div>
+        )}
+      </div>
+      {isAssignerView && (
+        <div className="rs-report-view__mobile-action-bar">
           <ReportAdminMenu
             kind="match"
             report={report}
             match={match}
+            presentation="bottom-bar"
             onFinished={() => navigate(matchHref, { replace: true })}
           />
-        )}
-      </div>
+        </div>
+      )}
       <MatchListRow
         match={match}
         showTime={report.source !== 'legacy_form'}
@@ -411,7 +428,11 @@ export function CmoReportViewPage() {
   }
 
   return (
-    <div className="rs-stack rs-report-view">
+    <div
+      className={`rs-stack rs-report-view${
+        isAssignerView ? ' rs-report-view--has-mobile-action' : ''
+      }`}
+    >
       <div className="rs-report-view__title-row">
         <Title headingLevel="h2" size="lg">
           {youFiled
@@ -421,14 +442,27 @@ export function CmoReportViewPage() {
               : 'CMO coaching report'}
         </Title>
         {isAssignerView && (
+          <div className="rs-report-view__desktop-action-menu">
+            <ReportAdminMenu
+              kind="match"
+              report={report}
+              match={match}
+              onFinished={() => navigate(matchHref, { replace: true })}
+            />
+          </div>
+        )}
+      </div>
+      {isAssignerView && (
+        <div className="rs-report-view__mobile-action-bar">
           <ReportAdminMenu
             kind="match"
             report={report}
             match={match}
+            presentation="bottom-bar"
             onFinished={() => navigate(matchHref, { replace: true })}
           />
-        )}
-      </div>
+        </div>
+      )}
       <p className="rs-match-card__meta">
         {youFiled
           ? `You filed this as CMO · about ${moName} (Match Official)`
@@ -533,13 +567,29 @@ export function CardReportViewBody({
   const showAdmin = isAssignerView || isJudicialView;
 
   return (
-    <div className="rs-stack rs-report-view">
+    <div
+      className={`rs-stack rs-report-view${
+        showAdmin ? ' rs-report-view--has-mobile-action' : ''
+      }`}
+    >
       {showAdmin && (
         <div className="rs-report-view__admin-row">
           <span className="rs-match-card__meta">Submitted card report</span>
+          <div className="rs-report-view__desktop-action-menu">
+            <ReportAdminMenu
+              kind="card"
+              report={report}
+              onFinished={() => navigate(matchHref, { replace: true })}
+            />
+          </div>
+        </div>
+      )}
+      {showAdmin && (
+        <div className="rs-report-view__mobile-action-bar">
           <ReportAdminMenu
             kind="card"
             report={report}
+            presentation="bottom-bar"
             onFinished={() => navigate(matchHref, { replace: true })}
           />
         </div>

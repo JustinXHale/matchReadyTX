@@ -169,6 +169,10 @@
   min-width: 0;
 }
 
+.rs-report-view__mobile-action-bar {
+  display: none;
+}
+
 .rs-report-admin {
   flex: 0 0 auto;
 }
@@ -182,6 +186,159 @@
 
 .rs-report-admin__danger {
   color: var(--rs-color-urgent) !important;
+}
+
+/* Same bottom-sheet chrome as event Match actions (match-detail.css). */
+.rs-match-actions-sheet .MuiDialog-container {
+  align-items: flex-end;
+}
+
+.rs-match-actions-sheet .pf-v6-c-modal-box {
+  width: min(100%, var(--rs-content-max)) !important;
+  max-width: var(--rs-content-max) !important;
+  max-height: min(80dvh, 40rem);
+  margin: 0 !important;
+  border-right: 1px solid var(--rs-m3-outline-variant);
+  border-bottom: 0;
+  border-left: 1px solid var(--rs-m3-outline-variant);
+  border-radius: var(--rs-radius-dialog) var(--rs-radius-dialog) 0 0 !important;
+  background: var(--rs-m3-surface-container);
+}
+
+.rs-match-actions-sheet .MuiDialogTitle-root {
+  padding: var(--rs-space-md) var(--rs-page-pad) var(--rs-space-sm);
+  color: var(--rs-m3-on-surface);
+}
+
+.rs-match-actions-sheet__actions {
+  display: flex;
+  flex-direction: column;
+  padding: 0 var(--rs-page-pad)
+    calc(var(--rs-space-md) + env(safe-area-inset-bottom, 0px));
+}
+
+.rs-match-actions-sheet__action {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  min-height: 3.5rem;
+  margin: 0;
+  padding: 0 var(--rs-space-md);
+  border: 0;
+  border-radius: var(--rs-radius-chip);
+  background: transparent;
+  color: var(--rs-m3-on-surface);
+  font: var(--rs-font-action);
+  text-align: left;
+  cursor: pointer;
+}
+
+.rs-match-actions-sheet__action:hover {
+  background: var(--rs-m3-surface-container-high);
+}
+
+.rs-match-actions-sheet__action:focus-visible {
+  outline: 2px solid var(--rs-color-focus-ring);
+  outline-offset: -2px;
+}
+
+.rs-match-actions-sheet__action--danger {
+  margin-top: var(--rs-space-sm);
+  border-top: 1px solid var(--rs-m3-outline-variant);
+  border-radius: 0 0 var(--rs-radius-chip) var(--rs-radius-chip);
+  color: var(--rs-m3-error);
+}
+
+.rs-match-actions-sheet__action:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+@media (max-width: 599px) {
+  .rs-report-view--has-mobile-action {
+    padding-bottom: calc(
+      var(--rs-action-bar-height, 3.5rem) + var(--rs-space-md)
+    );
+  }
+
+  .rs-report-view__desktop-action-menu {
+    display: none;
+  }
+
+  .rs-report-view__mobile-action-bar {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: calc(var(--rs-bottom-nav-height) + env(safe-area-inset-bottom, 0px));
+    z-index: 250;
+    display: flex;
+    max-width: var(--rs-content-max);
+    margin: 0 auto;
+    padding: 0;
+    border-top: 1px solid var(--rs-m3-inverse-surface);
+    background: var(--rs-m3-inverse-surface);
+    box-sizing: border-box;
+  }
+
+  .rs-report-view__mobile-action-bar .rs-report-admin--bottom-bar {
+    display: flex;
+    flex: 1 1 100%;
+    width: 100%;
+  }
+
+  .rs-report-admin__bar-toggle {
+    display: grid;
+    place-items: center;
+    flex: 1 1 auto;
+    width: 100%;
+    min-height: var(--rs-action-bar-height, 3.5rem);
+    padding: 0 var(--rs-page-pad);
+    border: 0;
+    border-radius: 0;
+    box-sizing: border-box;
+    background: var(--rs-m3-inverse-surface);
+    color: var(--rs-m3-inverse-on-surface);
+    font: var(--rs-font-action);
+    cursor: pointer;
+  }
+
+  .rs-report-admin__bar-toggle-content {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--rs-space-sm);
+    line-height: 1;
+  }
+
+  .rs-report-admin__bar-toggle-content svg {
+    flex: 0 0 auto;
+    width: 1em;
+    height: 1em;
+  }
+
+  .rs-report-admin__bar-toggle:hover,
+  .rs-report-admin__bar-toggle:focus-visible,
+  .rs-report-admin__bar-toggle[aria-expanded='true'] {
+    background: color-mix(
+      in srgb,
+      var(--rs-m3-inverse-on-surface) 12%,
+      var(--rs-m3-inverse-surface)
+    );
+    color: var(--rs-m3-inverse-on-surface);
+  }
+
+  .rs-report-admin__bar-toggle:focus-visible {
+    outline: 2px solid var(--rs-m3-inverse-on-surface);
+    outline-offset: -2px;
+  }
+
+  /* Errors from the bar menu — keep readable above the sticky chrome. */
+  .rs-report-view__mobile-action-bar .pf-v6-c-alert {
+    position: absolute;
+    left: var(--rs-page-pad);
+    right: var(--rs-page-pad);
+    bottom: calc(100% + var(--rs-space-sm));
+  }
 }
 
 .rs-report-view__label {
