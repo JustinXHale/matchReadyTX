@@ -190,7 +190,7 @@ mail/{mailId}   // outbound queue — Admin SDK only; see docs/EMAIL.md
 - **Card reports** (`cardReports`): filer MO create/update own draft after kickoff; submitted reports are locked until Scheduler or Judicial unlocks (`editUnlockedAt` via callables). While unlocked (or still draft), the filer and assigner/judicial may update; re-submit clears unlock and merges judicial case source fields without wiping rulings. Assigner, `reportAnalytics`, `judicial`, and finance staff read all; assigner delete. CMO does not get global card-report read. Reopen requests: `cardReportReopenRequests` (members read; create/review via callables only).
 - **`reportAnalytics` role:** Scheduler grants on member profile only (not self-assignable, not in onboarding). Enables Insights for people who are not CMOs. CMO is self-selectable on profile/onboarding and also enables Insights + global read of coach feedback + match reports.
 - **`cmo` role:** Self-selectable on profile and onboarding. Unlocks the CMO lens, Coaching Reports, shared Appointments, and Insights.
-- **`judicial` role:** Scheduler or existing Judicial grants (Members checkbox for assigner; `setJudicialRole` callable for Judicial-only). Not self-assignable. Unlocks Judicial lens: dashboard, cases, comments, rulings. Phone required. Cases and comments are assigner/judicial only — not visible to the filing referee, teams, or Insights. Filing MOs may **create** `judicialCases` for their own submitted card report (recorded/pending only); rulings are assigner/judicial updates.
+- **`judicial` role:** Scheduler or existing Judicial grants (Members checkbox for assigner; `setJudicialRole` callable for Judicial-only). Not self-assignable. Unlocks Judicial lens: dashboard, cases, comments, rulings. Phone required. Cases and comments are assigner/judicial only — not visible to the filing referee, teams, or Insights. Filing MOs may **create** `judicialCases` for their own submitted card report (recorded/pending only); rulings are assigner/judicial updates. Assigner or Judicial may **delete** a case (and its comments) — used for duplicate cleanup; irreversible.
 - **`treasurer` role:** Scheduler grants on member profile only (not self-assignable). Unlocks **Finance** lens with assigner: payout readiness (`ready_to_pay` when match/coaching reports are in; card reports tracked separately and do not block pay), per-assignment mark paid, conference invoice builder + print. Phone required. Writes: `officialPayments`, `conferenceInvoices`. No Stripe/payout rails.
 
 ---
@@ -302,6 +302,7 @@ See also [`SHEET_SYNC.md`](./SHEET_SYNC.md).
 | `requestCardReportReopen` | Filing MO — request unlock of submitted card report |
 | `reviewCardReportReopen` | Assigner or Judicial — approve (unlock) / deny with reason |
 | `unlockCardReportForEdit` | Assigner or Judicial — direct unlock for edit |
+| `deleteJudicialCase` | Assigner or Judicial — permanently delete case + comments |
 
 ---
 

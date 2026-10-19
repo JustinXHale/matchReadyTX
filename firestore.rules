@@ -834,7 +834,8 @@ service cloud.firestore {
               && request.resource.data.get('ruledByUid', null) == resource.data.get('ruledByUid', null)
             )
           );
-        allow delete: if isAssigner(orgId);
+        // Case delete (and comment cascade) via Admin SDK callable only.
+        allow delete: if false;
         match /comments/{commentId} {
           allow read: if isAssigner(orgId) || isJudicial(orgId);
           allow create: if (isAssigner(orgId) || isJudicial(orgId))

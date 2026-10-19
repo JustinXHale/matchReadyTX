@@ -3413,6 +3413,19 @@ export async function saveJudicialCaseInFirestore(
   );
 }
 
+/** Delete a judicial case + comments via Admin SDK callable. */
+export async function callDeleteJudicialCase(input: {
+  orgId?: string;
+  caseId: string;
+}): Promise<{ ok: true }> {
+  const fn = httpsCallable(requireFunctions(), 'deleteJudicialCase');
+  const result = await fn({
+    orgId: input.orgId ?? DEFAULT_ORG,
+    caseId: input.caseId,
+  });
+  return result.data as { ok: true };
+}
+
 export async function saveJudicialCasesInFirestore(
   orgId: string,
   cases: JudicialCase[],

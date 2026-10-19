@@ -3726,6 +3726,17 @@ class DemoStore {
     }));
   }
 
+  removeJudicialCase(caseId: string): void {
+    this.set((s) => {
+      const { [caseId]: _removed, ...restComments } = s.judicialComments;
+      return {
+        ...s,
+        judicialCases: s.judicialCases.filter((c) => c.id !== caseId),
+        judicialComments: restComments,
+      };
+    });
+  }
+
   addJudicialComment(caseId: string, comment: JudicialComment): void {
     this.set((s) => ({
       ...s,

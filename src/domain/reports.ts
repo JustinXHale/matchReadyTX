@@ -55,6 +55,26 @@ export const CARD_CONFERENCE_LABELS: Record<CardConference, string> = {
   lonestar_women: 'Lonestar Women',
 };
 
+/**
+ * Display label for a card report’s competition. Lonestar college uses
+ * conference so we show Men or Women, not the generic “Men’s/Women’s” union.
+ */
+export function cardCompetitionDisplayLabel(
+  union: CompetitionUnion | '' | undefined,
+  conference?: CardConference | '' | null,
+): string {
+  if (union === 'ncr_lonestar_college') {
+    if (conference === 'lonestar_men') return 'Lone Star College Rugby (Men)';
+    if (conference === 'lonestar_women') {
+      return 'Lone Star College Rugby (Women)';
+    }
+  }
+  if (union && union in COMPETITION_UNION_LABELS) {
+    return COMPETITION_UNION_LABELS[union as CompetitionUnion];
+  }
+  return '';
+}
+
 export type SecondOffenseColor = 'second_yellow_red' | 'red';
 
 export interface SecondOffense {

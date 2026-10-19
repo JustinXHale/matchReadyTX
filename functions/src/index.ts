@@ -26,6 +26,7 @@ import {
   runUnlockCardReportForEdit,
 } from './cardReportReopen';
 import { setJudicialRole } from './setJudicialRole';
+import { runDeleteJudicialCase } from './deleteJudicialCase';
 import {
   MATCH_SELF_SERVICE_ACTIONS,
   runMatchSelfService,
@@ -989,6 +990,26 @@ export const sendTestEmail = onCall(async (request) => {
 });
 
 export { setJudicialRole };
+
+/**
+ * Assigner or Judicial: permanently delete a judicial case and its comments.
+ * Body: { orgId?, caseId }
+ */
+export const deleteJudicialCase = onCall(async (request) => {
+  if (!request.auth?.uid) {
+    throw new HttpsError('unauthenticated', 'Sign in required');
+  }
+  const orgId =
+    String(request.data?.orgId ?? '').trim() ||
+    process.env.DEFAULT_ORG_ID ||
+    'lonestar';
+  return runDeleteJudicialCase({
+    db,
+    orgId,
+    caseId: String(request.data?.caseId ?? '').trim(),
+    callerUid: request.auth.uid,
+  });
+});
 
 /**
  * Assigner-only: remove a member from the org and delete their Firebase Auth

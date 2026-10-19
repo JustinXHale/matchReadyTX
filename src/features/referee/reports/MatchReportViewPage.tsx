@@ -5,10 +5,9 @@ import { useApp, useAppHref } from '@/app/AppContext';
 import {
   AR_COMFORT_QUESTION,
   ROUND_TRIP_MILES_LABEL,
-  CARD_CONFERENCE_LABELS,
   CMO_SCALE_KEYS,
   CMO_SCALE_LABELS,
-  COMPETITION_UNION_LABELS,
+  cardCompetitionDisplayLabel,
   MATCH_FEEDBACK_LABEL,
   MATCH_REPORT_SOURCE_OUTSIDE,
   displayMatchForArchivedReport,
@@ -599,16 +598,12 @@ export function CardReportViewBody({
       <Field label="Email">{report.officialEmail}</Field>
       <Field label="Phone">{report.officialPhone}</Field>
       <Field label="Match date">{report.matchDate}</Field>
-      <Field label="Competition union">
-        {report.competitionUnion
-          ? COMPETITION_UNION_LABELS[report.competitionUnion]
-          : '—'}
+      <Field label="Competition">
+        {cardCompetitionDisplayLabel(
+          report.competitionUnion,
+          report.conference,
+        ) || '—'}
       </Field>
-      {report.conference ? (
-        <Field label="Conference">
-          {CARD_CONFERENCE_LABELS[report.conference]}
-        </Field>
-      ) : null}
       {report.matchFilmed != null && (
         <Field label="Match filmed">{report.matchFilmed ? 'Yes' : 'No'}</Field>
       )}
