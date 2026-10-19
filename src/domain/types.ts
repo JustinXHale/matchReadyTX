@@ -284,6 +284,28 @@ export interface TeamLinkRequest {
   autoApproved?: boolean;
 }
 
+/** MO request to reopen a submitted card report for editing. */
+export type CardReportReopenRequestStatus = 'pending' | 'approved' | 'denied';
+
+export interface CardReportReopenRequest {
+  id: string;
+  orgId: string;
+  matchId: string;
+  reportId: string;
+  requesterUserId: string;
+  requesterName: string;
+  requesterEmail: string;
+  /** Match label for queue UI, e.g. "Home vs Away". */
+  matchLabel: string;
+  requestReason: string;
+  status: CardReportReopenRequestStatus;
+  createdAt: string;
+  reviewedAt?: string;
+  reviewedByUserId?: string;
+  reviewedByName?: string;
+  denyReason?: string;
+}
+
 /** Team Admin request for a new fixture (not official raise-hand). */
 export type FixtureRequestStatus = 'pending' | 'approved' | 'declined';
 

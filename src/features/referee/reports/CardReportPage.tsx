@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import {
   Button,
@@ -12,12 +12,16 @@ import {
   Title,
 } from '@patternfly/react-core';
 import { useApp } from '@/app/AppContext';
+import { useAppFeedback } from '@/app/feedback/feedbackContext';
 import {
   CARD_CONFERENCE_LABELS,
   COMPETITION_UNION_LABELS,
+  cardReportDocId,
   defaultCardConference,
   defaultCompetitionUnion,
   feeCrewSlotForUser,
+  isCardReportEditable,
+  isCardReportLocked,
   kickoffHasPassed,
   prefillOfficialContact,
   validateCardReportIdentity,
@@ -35,11 +39,24 @@ import {
   type PlayerPosition,
 } from '@/domain/cardLaws';
 import { assignmentForUser } from '@/domain/types';
+import {
+  latestReopenForReport,
+  pendingReopenForReport,
+  validateReopenRequestReason,
+} from '@/domain/cardReportReopen';
+import { hasJudicialCaseForIncident } from '@/domain/judicial';
 import { CardReportViewBody } from '@/features/referee/reports/MatchReportViewPage';
 import { CARD_REPORTS_BACK } from '@/features/referee/reports/reportLinks';
 import { useAppBack } from '@/nav/backNav';
 import { useContextualBackBar } from '@/app/shell/contextualBar';
-import { persistSubmittedCardReport } from '@/services/reportsLive';
+import {
+  persistDraftCardReport,
+  persistSubmittedCardReport,
+} from '@/services/reportsLive';
+import {
+  callRequestCardReportReopen,
+  callableErrorMessage,
+} from '@/services/orgData';
 import { useScrollReportToTopOnChange } from '@/features/referee/reports/scrollReportToTop';
 import { IconDateInput } from '@/ui/IconDateInput';
 import { CardLawPicker } from '@/ui/CardLawPicker';
@@ -68,9 +85,17 @@ function emptyCard(homeId: string, homeName: string): CardIncident {
 export function CardReportPage() {
   const { matchId = '' } = useParams();
   const { currentUser, state, store, dataMode } = useApp();
+  const { confirm } = useAppFeedback();
   const { goBack, backLabel } = useAppBack(CARD_REPORTS_BACK);
 
   const match = state.matches.find((m) => m.id === matchId);
+  const ownReport = useMemo(() => {
+    if (!currentUser || !matchId) return undefined;
+    return state.cardReports.find(
+      (c) => c.matchId === matchId && c.officialId === currentUser.uid,
+    );
+  }, [currentUser, matchId, state.cardReports]);
+
   const submittedForMatch = useMemo(() => {
     if (!matchId) return undefined;
     return state.cardReports.find(
@@ -78,15 +103,38 @@ export function CardReportPage() {
     );
   }, [matchId, state.cardReports]);
 
-  const already = useMemo(() => {
-    if (!currentUser || !matchId) return undefined;
-    return state.cardReports.find(
-      (c) =>
-        c.matchId === matchId &&
-        c.officialId === currentUser.uid &&
-        c.status === 'submitted',
-    );
-  }, [currentUser, matchId, state.cardReports]);
+  const canPrivilegedEdit = Boolean(
+    currentUser?.roles.includes('assigner') ||
+      currentUser?.roles.includes('judicial'),
+  );
+
+  const editableReport = useMemo(() => {
+    if (ownReport && isCardReportEditable(ownReport)) return ownReport;
+    if (
+      canPrivilegedEdit &&
+      submittedForMatch &&
+      isCardReportEditable(submittedForMatch)
+    ) {
+      return submittedForMatch;
+    }
+    return undefined;
+  }, [ownReport, submittedForMatch, canPrivilegedEdit]);
+
+  const lockedOwn =
+    ownReport && isCardReportLocked(ownReport) ? ownReport : undefined;
+  const lockedAny =
+    !editableReport &&
+    submittedForMatch &&
+    isCardReportLocked(submittedForMatch)
+      ? submittedForMatch
+      : undefined;
+
+  const pendingReopen = lockedOwn
+    ? pendingReopenForReport(state.cardReportReopenRequests, lockedOwn.id)
+    : undefined;
+  const latestReopen = lockedOwn
+    ? latestReopenForReport(state.cardReportReopenRequests, lockedOwn.id)
+    : undefined;
 
   const contact = currentUser
     ? prefillOfficialContact(currentUser)
@@ -118,6 +166,53 @@ export function CardReportPage() {
   );
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [savingDraft, setSavingDraft] = useState(false);
+  const [reopenReason, setReopenReason] = useState('');
+  const [showReopenForm, setShowReopenForm] = useState(false);
+  const [reopenBusy, setReopenBusy] = useState(false);
+  const [hydratedId, setHydratedId] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!editableReport || !match) return;
+    if (hydratedId === editableReport.id) return;
+    setOfficialName(editableReport.officialName || contact.officialName);
+    setOfficialEmail(editableReport.officialEmail || contact.officialEmail);
+    setOfficialPhone(editableReport.officialPhone || contact.officialPhone);
+    setCompetitionUnion(editableReport.competitionUnion || '');
+    setConference(editableReport.conference || '');
+    setMatchDate(editableReport.matchDate || match.kickoffAt.slice(0, 10));
+    setMatchFilmed(
+      typeof editableReport.matchFilmed === 'boolean'
+        ? editableReport.matchFilmed
+        : null,
+    );
+    setHomeScore(
+      editableReport.homeScore != null
+        ? String(editableReport.homeScore)
+        : match.homeScore != null
+          ? String(match.homeScore)
+          : '',
+    );
+    setAwayScore(
+      editableReport.awayScore != null
+        ? String(editableReport.awayScore)
+        : match.awayScore != null
+          ? String(match.awayScore)
+          : '',
+    );
+    setCards(
+      editableReport.cards.length
+        ? editableReport.cards
+        : [emptyCard(match.homeTeamId, match.homeTeamName)],
+    );
+    setStep(
+      editableReport.cards.length && editableReport.matchFilmed != null
+        ? 'cards'
+        : 'identity',
+    );
+    setHydratedId(editableReport.id);
+  }, [editableReport, match, contact, hydratedId]);
+
   const handleContextualBack = useCallback(() => {
     if (step === 'cards') {
       setStep('identity');
@@ -145,13 +240,30 @@ export function CardReportPage() {
   const isMo = assignmentForUser(match, currentUser.uid)?.slot === 'mo';
   const crewSlot = feeCrewSlotForUser(match, currentUser.uid);
   const kickoffPassed = kickoffHasPassed(match.kickoffAt);
+  const filingOfficialId = editableReport?.officialId ?? currentUser.uid;
+  const reportId =
+    editableReport?.id ?? cardReportDocId(match.id, filingOfficialId);
 
-  if (!isMo) {
-    if (submittedForMatch) {
+  if (!kickoffPassed) {
+    return (
+      <div className="rs-stack">
+        <Title headingLevel="h2" size="lg">
+          Card report
+        </Title>
+        <p className="rs-match-card__meta">
+          Available after kickoff for yellow and red cards.
+        </p>
+      </div>
+    );
+  }
+
+  // Non-MO: view locked report (with unlock menu) or wait for MO / unlock.
+  if (!isMo && !editableReport) {
+    if (submittedForMatch || lockedAny) {
       return (
         <div className="rs-stack">
           <Title headingLevel="h2" size="lg">
-            Card report
+            Card report on file
           </Title>
           <CardReportViewBody matchId={match.id} />
         </div>
@@ -170,26 +282,77 @@ export function CardReportPage() {
     );
   }
 
-  if (!kickoffPassed) {
-    return (
-      <div className="rs-stack">
-        <Title headingLevel="h2" size="lg">
-          Card report
-        </Title>
-        <p className="rs-match-card__meta">
-          Available after kickoff for yellow and red cards.
-        </p>
-      </div>
-    );
-  }
-
-  if ((already || submittedForMatch) && step !== 'done') {
+  // Locked submitted — read-only + MO reopen request
+  if ((lockedOwn || lockedAny) && step !== 'done' && !editableReport) {
+    const locked = lockedOwn ?? lockedAny!;
     return (
       <div className="rs-stack">
         <Title headingLevel="h2" size="lg">
           Card report on file
         </Title>
         <CardReportViewBody matchId={match.id} />
+        {lockedOwn && isMo && (
+          <div className="rs-stack">
+            {pendingReopen ? (
+              <p className="rs-match-card__meta" role="status">
+                Reopen request pending review by Scheduler or Judicial.
+              </p>
+            ) : latestReopen?.status === 'denied' ? (
+              <p className="rs-match-card__meta" role="status">
+                Reopen denied
+                {latestReopen.denyReason
+                  ? `: ${latestReopen.denyReason}`
+                  : '.'}{' '}
+                You may submit a new request.
+              </p>
+            ) : null}
+            {showReopenForm ? (
+              <>
+                <FormGroup label="Why do you need to reopen?" isRequired>
+                  <TextArea
+                    value={reopenReason}
+                    onChange={(_e, v) => setReopenReason(v)}
+                    rows={3}
+                    placeholder="e.g. Need to add remaining yellow cards"
+                  />
+                </FormGroup>
+                {error && (
+                  <p className="rs-match-card__meta" role="alert">
+                    {error}
+                  </p>
+                )}
+                <div className="rs-actions rs-actions--inline">
+                  <Button
+                    variant="primary"
+                    isDisabled={reopenBusy}
+                    isLoading={reopenBusy}
+                    onClick={() => void requestReopen(locked.id)}
+                  >
+                    Submit request
+                  </Button>
+                  <Button
+                    variant="link"
+                    onClick={() => {
+                      setShowReopenForm(false);
+                      setError(null);
+                    }}
+                  >
+                    Cancel
+                  </Button>
+                </div>
+              </>
+            ) : (
+              !pendingReopen && (
+                <Button
+                  variant="secondary"
+                  onClick={() => setShowReopenForm(true)}
+                >
+                  Request reopen
+                </Button>
+              )
+            )}
+          </div>
+        )}
       </div>
     );
   }
@@ -205,6 +368,42 @@ export function CardReportPage() {
         </p>
       </div>
     );
+  }
+
+  async function requestReopen(id: string) {
+    const reasonError = validateReopenRequestReason(reopenReason);
+    if (reasonError) {
+      setError(reasonError);
+      return;
+    }
+    setReopenBusy(true);
+    setError(null);
+    try {
+      if (dataMode === 'live') {
+        await callRequestCardReportReopen({
+          reportId: id,
+          requestReason: reopenReason.trim(),
+        });
+      } else {
+        store.requestCardReportReopen({
+          reportId: id,
+          matchId: match!.id,
+          matchLabel: `${match!.homeTeamName} vs ${match!.awayTeamName}`,
+          requesterUserId: currentUser!.uid,
+          requesterName: currentUser!.displayName || 'Official',
+          requesterEmail: currentUser!.email || '',
+          requestReason: reopenReason.trim(),
+        });
+      }
+      setShowReopenForm(false);
+      setReopenReason('');
+    } catch (err) {
+      setError(
+        callableErrorMessage(err, 'Could not submit reopen request.'),
+      );
+    } finally {
+      setReopenBusy(false);
+    }
   }
 
   const updateCard = (id: string, patch: Partial<CardIncident>) => {
@@ -238,6 +437,27 @@ export function CardReportPage() {
     );
   };
 
+  const buildInput = () => ({
+    id: reportId,
+    matchId: match.id,
+    officialId: filingOfficialId,
+    competitionUnion,
+    conference:
+      competitionUnion === 'ncr_lonestar_college' ? conference : ('' as const),
+    officialName: officialName.trim(),
+    officialEmail: officialEmail.trim(),
+    officialPhone: officialPhone.trim(),
+    matchDate,
+    matchFilmed: matchFilmed ?? undefined,
+    homeScore: homeScore.trim() ? Number(homeScore) : undefined,
+    awayScore: awayScore.trim() ? Number(awayScore) : undefined,
+    cards,
+    additionalInfoPrivate: cards
+      .map((c) => c.additionalInfoPrivate)
+      .filter((t): t is string => Boolean(t))
+      .join('\n\n') || undefined,
+  });
+
   const goCards = () => {
     const identityError = validateCardReportIdentity({
       officialName,
@@ -255,8 +475,39 @@ export function CardReportPage() {
     setStep('cards');
   };
 
+  const saveDraft = async () => {
+    if (savingDraft || submitting) return;
+    const identityError = validateCardReportIdentity({
+      officialName,
+      officialEmail,
+      officialPhone,
+      competitionUnion,
+      conference,
+      matchDate,
+    });
+    if (identityError) {
+      setError(identityError);
+      return;
+    }
+    setError(null);
+    setSavingDraft(true);
+    try {
+      if (dataMode === 'live') {
+        await persistDraftCardReport(buildInput());
+      } else {
+        store.saveDraftCardReport(buildInput());
+      }
+    } catch (err) {
+      setError(
+        err instanceof Error ? err.message : 'Could not save draft.',
+      );
+    } finally {
+      setSavingDraft(false);
+    }
+  };
+
   const submit = async () => {
-    if (submitting) return;
+    if (submitting || savingDraft) return;
     const incidentsError = validateCardReportIncidents(cards, matchFilmed);
     if (incidentsError) {
       setError(incidentsError);
@@ -264,28 +515,20 @@ export function CardReportPage() {
     }
     if (matchFilmed == null) return;
     const cleaned = cardIncidentsForSubmit(cards);
-    const joinedPrivate = cleaned
-      .map((c) => c.additionalInfoPrivate)
-      .filter((t): t is string => Boolean(t))
-      .join('\n\n');
+    const ok = await confirm({
+      title: 'Submit card report?',
+      message: `Submit ${cleaned.length} card${cleaned.length === 1 ? '' : 's'} for ${match.homeTeamName} vs ${match.awayTeamName}? This locks the report until Scheduler or Judicial unlocks it.`,
+      confirmLabel: 'Submit',
+    });
+    if (!ok) return;
+
     setError(null);
     setSubmitting(true);
     try {
       const input = {
-        matchId: match.id,
-        officialId: currentUser.uid,
-        competitionUnion,
-        conference:
-          competitionUnion === 'ncr_lonestar_college' ? conference : '',
-        officialName: officialName.trim(),
-        officialEmail: officialEmail.trim(),
-        officialPhone: officialPhone.trim(),
-        matchDate,
-        matchFilmed,
-        homeScore: homeScore.trim() ? Number(homeScore) : undefined,
-        awayScore: awayScore.trim() ? Number(awayScore) : undefined,
+        ...buildInput(),
         cards: cleaned,
-        additionalInfoPrivate: joinedPrivate || undefined,
+        matchFilmed,
       };
       if (dataMode === 'live') {
         await persistSubmittedCardReport(input);
@@ -302,11 +545,30 @@ export function CardReportPage() {
     }
   };
 
+  const removeCard = (cardId: string) => {
+    if (
+      editableReport?.status === 'submitted' &&
+      hasJudicialCaseForIncident(
+        state.judicialCases,
+        editableReport.id,
+        cardId,
+      )
+    ) {
+      setError(
+        'This card already has a judicial case and cannot be removed. Edit fields instead, or ask Scheduler to help.',
+      );
+      return;
+    }
+    setCards((list) => list.filter((c) => c.id !== cardId));
+  };
+
   return (
     <div className="rs-stack">
       <div ref={reportTopRef}>
         <Title headingLevel="h2" size="lg">
           Card report
+          {editableReport?.status === 'draft' ? ' (draft)' : ''}
+          {editableReport?.editUnlockedAt ? ' (unlocked for edit)' : ''}
         </Title>
       </div>
       <p className="rs-match-card__meta">
@@ -316,8 +578,6 @@ export function CardReportPage() {
       <Form
         onSubmit={(e) => {
           e.preventDefault();
-          if (step === 'identity') goCards();
-          else submit();
         }}
       >
         {step === 'identity' && (
@@ -392,8 +652,23 @@ export function CardReportPage() {
                 />
               </FormGroup>
             )}
-            <Button type="submit" variant="primary" isBlock>
+            <Button
+              type="button"
+              variant="primary"
+              isBlock
+              onClick={goCards}
+            >
               Continue to cards
+            </Button>
+            <Button
+              type="button"
+              variant="secondary"
+              isBlock
+              isDisabled={savingDraft}
+              isLoading={savingDraft}
+              onClick={() => void saveDraft()}
+            >
+              Save as draft
             </Button>
           </>
         )}
@@ -438,9 +713,7 @@ export function CardReportPage() {
                     <Button
                       variant="link"
                       isInline
-                      onClick={() =>
-                        setCards((list) => list.filter((c) => c.id !== card.id))
-                      }
+                      onClick={() => removeCard(card.id)}
                     >
                       Remove
                     </Button>
@@ -578,6 +851,7 @@ export function CardReportPage() {
               </div>
             ))}
             <Button
+              type="button"
               variant="secondary"
               className="rs-btn--gold"
               isBlock
@@ -590,8 +864,27 @@ export function CardReportPage() {
             >
               Add another card
             </Button>
-            <Button type="submit" variant="primary" isBlock isDisabled={submitting} isLoading={submitting}>
-              Submit card report
+            <Button
+              type="button"
+              variant="secondary"
+              isBlock
+              isDisabled={savingDraft || submitting}
+              isLoading={savingDraft}
+              onClick={() => void saveDraft()}
+            >
+              Save as draft
+            </Button>
+            <Button
+              type="button"
+              variant="primary"
+              isBlock
+              isDisabled={submitting || savingDraft}
+              isLoading={submitting}
+              onClick={() => void submit()}
+            >
+              {editableReport?.editUnlockedAt
+                ? 'Submit and lock'
+                : 'Submit card report'}
             </Button>
           </>
         )}

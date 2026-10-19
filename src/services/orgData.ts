@@ -5,6 +5,7 @@ import {
   deleteField,
   doc,
   getDoc,
+  getDocs,
   onSnapshot,
   query,
   setDoc,
@@ -99,6 +100,7 @@ import {
   type Team,
   type TeamContactPerson,
   type TeamLinkRequest,
+  type CardReportReopenRequest,
   type RequestableSlot,
 } from '@/domain/types';
 
@@ -532,6 +534,7 @@ export type LiveOrgSnapshot = {
   teams: Team[];
   fixtureRequests: FixtureRequest[];
   teamLinkRequests: TeamLinkRequest[];
+  cardReportReopenRequests: CardReportReopenRequest[];
   meetingResources: MeetingResource[];
   proposals?: ChangeProposal[];
   gameRequests?: GameRequest[];
@@ -872,6 +875,40 @@ export function gameRequestFromFirestore(
   };
 }
 
+export function cardReportReopenRequestFromFirestore(
+  id: string,
+  data: Record<string, unknown>,
+): CardReportReopenRequest {
+  return {
+    id,
+    orgId: typeof data.orgId === 'string' ? data.orgId : '',
+    matchId: String(data.matchId ?? ''),
+    reportId: String(data.reportId ?? ''),
+    requesterUserId: String(data.requesterUserId ?? ''),
+    requesterName: String(data.requesterName ?? ''),
+    requesterEmail: String(data.requesterEmail ?? ''),
+    matchLabel: String(data.matchLabel ?? ''),
+    requestReason: String(data.requestReason ?? ''),
+    status:
+      data.status === 'approved' || data.status === 'denied'
+        ? data.status
+        : 'pending',
+    createdAt: String(data.createdAt ?? ''),
+    reviewedAt:
+      typeof data.reviewedAt === 'string' ? data.reviewedAt : undefined,
+    reviewedByUserId:
+      typeof data.reviewedByUserId === 'string'
+        ? data.reviewedByUserId
+        : undefined,
+    reviewedByName:
+      typeof data.reviewedByName === 'string'
+        ? data.reviewedByName
+        : undefined,
+    denyReason:
+      typeof data.denyReason === 'string' ? data.denyReason : undefined,
+  };
+}
+
 export function teamLinkRequestFromFirestore(
   id: string,
   data: Record<string, unknown>,
@@ -944,6 +981,7 @@ export function subscribeLiveOrg(
   let teams: Team[] = [];
   let fixtureRequests: FixtureRequest[] = [];
   let teamLinkRequests: TeamLinkRequest[] = [];
+  let cardReportReopenRequests: CardReportReopenRequest[] = [];
   let meetingResources: MeetingResource[] = [];
   let proposals: ChangeProposal[] = [];
   let gameRequests: GameRequest[] = [];
@@ -957,6 +995,7 @@ export function subscribeLiveOrg(
       teams,
       fixtureRequests,
       teamLinkRequests,
+      cardReportReopenRequests,
       meetingResources,
       ...(proposalsHydrated ? { proposals } : {}),
       ...(gameRequestsHydrated ? { gameRequests } : {}),
@@ -1034,6 +1073,22 @@ export function subscribeLiveOrg(
         emit();
       },
       (err) => onSnapError('teamLinkRequests')(err),
+    ),
+  );
+
+  unsubs.push(
+    onSnapshot(
+      collection(database, 'orgs', orgId, 'cardReportReopenRequests'),
+      (snap) => {
+        cardReportReopenRequests = snap.docs.map((d) =>
+          cardReportReopenRequestFromFirestore(
+            d.id,
+            d.data() as Record<string, unknown>,
+          ),
+        );
+        emit();
+      },
+      (err) => onSnapError('cardReportReopenRequests')(err),
     ),
   );
 
@@ -2233,6 +2288,51 @@ export async function callReviewTeamLinkRequest(input: {
   return result.data as { ok: true };
 }
 
+/** Filing MO requests reopen of a submitted card report. */
+export async function callRequestCardReportReopen(input: {
+  orgId?: string;
+  reportId: string;
+  requestReason: string;
+}): Promise<{ ok: true; requestId: string }> {
+  const fn = httpsCallable(requireFunctions(), 'requestCardReportReopen');
+  const result = await fn({
+    orgId: input.orgId ?? DEFAULT_ORG,
+    reportId: input.reportId,
+    requestReason: input.requestReason,
+  });
+  return result.data as { ok: true; requestId: string };
+}
+
+/** Scheduler or Judicial reviews a card-report reopen request. */
+export async function callReviewCardReportReopen(input: {
+  orgId?: string;
+  requestId: string;
+  decision: 'approve' | 'deny';
+  denyReason?: string;
+}): Promise<{ ok: true }> {
+  const fn = httpsCallable(requireFunctions(), 'reviewCardReportReopen');
+  const result = await fn({
+    orgId: input.orgId ?? DEFAULT_ORG,
+    requestId: input.requestId,
+    decision: input.decision,
+    denyReason: input.denyReason,
+  });
+  return result.data as { ok: true };
+}
+
+/** Scheduler or Judicial unlocks a submitted card report for editing. */
+export async function callUnlockCardReportForEdit(input: {
+  orgId?: string;
+  reportId: string;
+}): Promise<{ ok: true }> {
+  const fn = httpsCallable(requireFunctions(), 'unlockCardReportForEdit');
+  const result = await fn({
+    orgId: input.orgId ?? DEFAULT_ORG,
+    reportId: input.reportId,
+  });
+  return result.data as { ok: true };
+}
+
 export type MatchSelfServiceAction = 'confirm' | 'decline';
 
 /** Official confirm/decline — Cloud Function (Admin SDK crew write). */
@@ -2548,6 +2648,16 @@ export function cardReportFromFirestore(
     submittedAt:
       typeof data.submittedAt === 'string' ? data.submittedAt : undefined,
     createdAt,
+    editUnlockedAt:
+      typeof data.editUnlockedAt === 'string' ? data.editUnlockedAt : undefined,
+    editUnlockedByUid:
+      typeof data.editUnlockedByUid === 'string'
+        ? data.editUnlockedByUid
+        : undefined,
+    editUnlockedByName:
+      typeof data.editUnlockedByName === 'string'
+        ? data.editUnlockedByName
+        : undefined,
   };
 }
 
@@ -2793,6 +2903,7 @@ function cardReportToFirestore(
   orgId: string,
   report: CardReport,
 ): Record<string, unknown> {
+  const unlocked = Boolean(report.editUnlockedAt);
   return stripUndefined({
     orgId,
     id: report.id,
@@ -2812,6 +2923,14 @@ function cardReportToFirestore(
     additionalInfoPrivate: report.additionalInfoPrivate ?? null,
     submittedAt: report.submittedAt ?? null,
     createdAt: report.createdAt,
+    // Full setDoc omits unlock fields when locked (clears them on overwrite).
+    ...(unlocked
+      ? {
+          editUnlockedAt: report.editUnlockedAt,
+          editUnlockedByUid: report.editUnlockedByUid,
+          editUnlockedByName: report.editUnlockedByName,
+        }
+      : {}),
     updatedAt: new Date().toISOString(),
   });
 }
@@ -2977,6 +3096,23 @@ export async function saveCardReportWithCasesInFirestore(
     );
   }
   await batch.commit();
+}
+
+/** Load judicial cases for a card report (for merge on re-submit). */
+export async function loadJudicialCasesForReport(
+  orgId: string,
+  reportId: string,
+): Promise<JudicialCase[]> {
+  const database = requireDb();
+  const snap = await getDocs(
+    query(
+      collection(database, 'orgs', orgId, 'judicialCases'),
+      where('reportId', '==', reportId),
+    ),
+  );
+  return snap.docs
+    .map((d) => parseJudicialCase(d.id, d.data() as Record<string, unknown>))
+    .filter((c): c is JudicialCase => c != null);
 }
 
 /** Lazy-create a pending match report doc when the official opens the flow. */

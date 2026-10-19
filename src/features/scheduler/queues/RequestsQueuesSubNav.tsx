@@ -4,12 +4,15 @@ import { useApp, useAppHref } from '@/app/AppContext';
 import { formatDueBadge } from '@/features/referee/reports/dueCounts';
 import { countSchedulerQueues } from '@/features/scheduler/queues/selectors';
 
-/** Raise-hand | Fixtures | Team links under Requests. */
+/** Raise-hand | Fixtures | Team links | Card reopen under Requests. */
 export function RequestsQueuesSubNav() {
   const { state } = useApp();
   const raiseHandHref = useAppHref('/scheduler/schedule/requests/raise-hand');
   const fixturesHref = useAppHref('/scheduler/schedule/requests/fixtures');
   const teamLinksHref = useAppHref('/scheduler/schedule/requests/team-links');
+  const cardReopenHref = useAppHref(
+    '/scheduler/schedule/requests/card-reopen',
+  );
 
   const counts = useMemo(() => countSchedulerQueues(state), [state]);
 
@@ -69,6 +72,24 @@ export function RequestsQueuesSubNav() {
         {counts.teamLinkRequests > 0 && (
           <span className="rs-nav-badge rs-nav-badge--inline" aria-hidden>
             {formatDueBadge(counts.teamLinkRequests)}
+          </span>
+        )}
+      </NavLink>
+      <NavLink
+        to={cardReopenHref}
+        className={({ isActive }) =>
+          `rs-nav-with-badge${isActive ? ' active' : ''}`
+        }
+        aria-label={
+          counts.cardReportReopen > 0
+            ? `Card reopen, ${counts.cardReportReopen} pending`
+            : 'Card reopen'
+        }
+      >
+        Card reopen
+        {counts.cardReportReopen > 0 && (
+          <span className="rs-nav-badge rs-nav-badge--inline" aria-hidden>
+            {formatDueBadge(counts.cardReportReopen)}
           </span>
         )}
       </NavLink>

@@ -20,6 +20,11 @@ import {
   runReviewTeamLinkRequest,
   runSubmitTeamLinkRequests,
 } from './teamLinkRequests';
+import {
+  runRequestCardReportReopen,
+  runReviewCardReportReopen,
+  runUnlockCardReportForEdit,
+} from './cardReportReopen';
 import { setJudicialRole } from './setJudicialRole';
 import {
   MATCH_SELF_SERVICE_ACTIONS,
@@ -722,6 +727,88 @@ export const submitTeamLinkRequests = onCall(
     });
   },
 );
+
+/**
+ * Filing MO requests reopen of a submitted card report.
+ * Body: { orgId?, reportId, requestReason }
+ */
+export const requestCardReportReopen = onCall(async (request) => {
+  if (!request.auth?.uid) {
+    throw new HttpsError('unauthenticated', 'Sign in required');
+  }
+  const orgId =
+    String(request.data?.orgId ?? '').trim() ||
+    process.env.DEFAULT_ORG_ID ||
+    'lonestar';
+  return runRequestCardReportReopen({
+    db,
+    orgId,
+    uid: request.auth.uid,
+    reportId: String(request.data?.reportId ?? '').trim(),
+    requestReason: String(request.data?.requestReason ?? '').trim(),
+  });
+});
+
+/**
+ * Scheduler or Judicial: approve / deny a card-report reopen request.
+ * Body: { orgId?, requestId, decision, denyReason? }
+ */
+export const reviewCardReportReopen = onCall(async (request) => {
+  if (!request.auth?.uid) {
+    throw new HttpsError('unauthenticated', 'Sign in required');
+  }
+  const orgId =
+    String(request.data?.orgId ?? '').trim() ||
+    process.env.DEFAULT_ORG_ID ||
+    'lonestar';
+  const requestId = String(request.data?.requestId ?? '').trim();
+  const decision = String(request.data?.decision ?? '').trim();
+  if (!requestId || (decision !== 'approve' && decision !== 'deny')) {
+    throw new HttpsError(
+      'invalid-argument',
+      'requestId and decision (approve|deny) required',
+    );
+  }
+  try {
+    return await runReviewCardReportReopen({
+      db,
+      orgId,
+      requestId,
+      reviewerUid: request.auth.uid,
+      decision,
+      denyReason: String(request.data?.denyReason ?? '').trim() || undefined,
+    });
+  } catch (err) {
+    if (err instanceof HttpsError) throw err;
+    logger.error('reviewCardReportReopen failed', { orgId, requestId, err });
+    throw new HttpsError(
+      'internal',
+      err instanceof Error
+        ? err.message
+        : 'Failed to review card report reopen request.',
+    );
+  }
+});
+
+/**
+ * Scheduler or Judicial: unlock a submitted card report for editing.
+ * Body: { orgId?, reportId }
+ */
+export const unlockCardReportForEdit = onCall(async (request) => {
+  if (!request.auth?.uid) {
+    throw new HttpsError('unauthenticated', 'Sign in required');
+  }
+  const orgId =
+    String(request.data?.orgId ?? '').trim() ||
+    process.env.DEFAULT_ORG_ID ||
+    'lonestar';
+  return runUnlockCardReportForEdit({
+    db,
+    orgId,
+    reportId: String(request.data?.reportId ?? '').trim(),
+    reviewerUid: request.auth.uid,
+  });
+});
 
 /**
  * Assigner or current Team Admin for the club: approve / deny a link request.

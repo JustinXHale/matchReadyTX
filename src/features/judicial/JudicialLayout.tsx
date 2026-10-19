@@ -15,12 +15,16 @@ function seasonSearch(search: string): string {
 }
 
 export function JudicialLayout() {
-  const { hasJudicialRole, isJudicialView, roleView } = useApp();
+  const { hasJudicialRole, isJudicialView, roleView, state } = useApp();
   const location = useLocation();
   const dashboardHref = useAppHref('/judicial');
   const casesHref = useAppHref('/judicial/cases');
+  const cardReopenHref = useAppHref('/judicial/card-reopen');
   const roleHome = useAppHref(ROLE_HOME[roleView]);
   const seasonQs = seasonSearch(location.search);
+  const pendingReopen = state.cardReportReopenRequests.filter(
+    (r) => r.status === 'pending',
+  ).length;
 
   if (!hasJudicialRole) {
     return (
@@ -50,6 +54,24 @@ export function JudicialLayout() {
           className={({ isActive }) => (isActive ? 'active' : '')}
         >
           Cases
+        </NavLink>
+        <NavLink
+          to={cardReopenHref}
+          className={({ isActive }) =>
+            `rs-nav-with-badge${isActive ? ' active' : ''}`
+          }
+          aria-label={
+            pendingReopen > 0
+              ? `Card reopen, ${pendingReopen} pending`
+              : 'Card reopen'
+          }
+        >
+          Card reopen
+          {pendingReopen > 0 && (
+            <span className="rs-nav-badge rs-nav-badge--inline" aria-hidden>
+              {pendingReopen}
+            </span>
+          )}
         </NavLink>
       </nav>
       <Outlet />

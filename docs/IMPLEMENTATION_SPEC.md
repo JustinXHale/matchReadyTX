@@ -122,8 +122,18 @@ orgs/{orgId}/cardReports/{reportId}   // id = cardReportDocId(matchId, officialI
   matchId, officialId, cards[], competitionUnion, conference?,
   matchFilmed?, homeScore?, awayScore?,
   official contact fields, additionalInfoPrivate?,
-  status: draft|submitted, submittedAt?, orgId, createdAt, updatedAt
-  // MO card incidents — created on submit (no pending doc).
+  status: draft|submitted, submittedAt?,
+  editUnlockedAt?, editUnlockedByUid?, editUnlockedByName?,
+  orgId, createdAt, updatedAt
+  // Draft save is client write (no judicial cases). Submit creates/merges cases.
+  // Submitted is locked until unlock fields are set (callables).
+
+orgs/{orgId}/cardReportReopenRequests/{requestId}
+  reportId, matchId, matchLabel, requesterUserId, requesterName, requesterEmail,
+  requestReason, status: pending|approved|denied, denyReason?,
+  reviewedAt?, reviewedByUserId?, reviewedByName?,
+  orgId, createdAt
+  // Create/review via callables only (Admin SDK).
 
 orgs/{orgId}/judicialCases/{incidentId}
   reportId, matchId, conference, color, player snapshot, lawIds,
@@ -177,7 +187,7 @@ mail/{mailId}   // outbound queue — Admin SDK only; see docs/EMAIL.md
 - **Coach feedback** (`coachFeedback`): assigner, CMO, and `reportAnalytics` read all; Team Admins read/update when `reportingTeamId` is in their `teamIds` (club-owned, one doc per match×side). Org members may read a **submitted** report only when the Scheduler has set `publicOnProfile == true` (shown on the official’s profile; submitter phone/email stay off that view). Create/update binds match facts via `get(matches/…)` (home/away, kickoff, crew-visible status) and requires doc id `matchId_reportingTeamId`. Team Admin writes must not change `publicOnProfile`. Assigners may update only `publicOnProfile` + `updatedAt` on a submitted report.
 - **Outside coaching sessions** (`outsideCoachingSessions`): participants (`refereeId` / `coachId`) create/read/update; Insights readers (assigner / CMO / `reportAnalytics`) may read. Creates require the caller to be referee or coach on the doc; team names length-capped. Links a Performance report (`slot mo`, `source outside`) to a CMO coaching report (`slot cmo`, same `outsideSessionId`). Client UX: referee cannot view the submitted coaching report until their Performance side is submitted.
 - **Match reports** (`matchReports`): filer (`officialId`) read/write own; assigner, CMO, `reportAnalytics`, and finance staff read all; MO may read CMO reports where `subjectOfficialId == auth.uid`. Any org member may read **submitted CMO** reports (`slot == 'cmo'`, `status == 'submitted'`) for public profile write-ups (includes outside/club filings — they appear in Insights). Pending MO/AR/CMO and all card reports stay private to non-Insights/finance readers. Pending create + submit with shape validation; assigner may **create/submit** MO/AR reports on an official's behalf, **reset** submitted reports to pending (answers cleared), or **delete** any report row.
-- **Card reports** (`cardReports`): filer MO read/write own after kickoff; assigner, `reportAnalytics`, `judicial`, and finance staff read all; assigner delete. CMO does not get global card-report read.
+- **Card reports** (`cardReports`): filer MO create/update own draft after kickoff; submitted reports are locked until Scheduler or Judicial unlocks (`editUnlockedAt` via callables). While unlocked (or still draft), the filer and assigner/judicial may update; re-submit clears unlock and merges judicial case source fields without wiping rulings. Assigner, `reportAnalytics`, `judicial`, and finance staff read all; assigner delete. CMO does not get global card-report read. Reopen requests: `cardReportReopenRequests` (members read; create/review via callables only).
 - **`reportAnalytics` role:** Scheduler grants on member profile only (not self-assignable, not in onboarding). Enables Insights for people who are not CMOs. CMO is self-selectable on profile/onboarding and also enables Insights + global read of coach feedback + match reports.
 - **`cmo` role:** Self-selectable on profile and onboarding. Unlocks the CMO lens, Coaching Reports, shared Appointments, and Insights.
 - **`judicial` role:** Scheduler or existing Judicial grants (Members checkbox for assigner; `setJudicialRole` callable for Judicial-only). Not self-assignable. Unlocks Judicial lens: dashboard, cases, comments, rulings. Phone required. Cases and comments are assigner/judicial only — not visible to the filing referee, teams, or Insights. Filing MOs may **create** `judicialCases` for their own submitted card report (recorded/pending only); rulings are assigner/judicial updates.
@@ -224,6 +234,7 @@ mail/{mailId}   // outbound queue — Admin SDK only; see docs/EMAIL.md
 | `/judicial` | Executive discipline dashboard + print one-pager |
 | `/judicial/cases` | Card caseload |
 | `/judicial/cases/:incidentId` | Case detail, comments, ruling |
+| `/judicial/card-reopen` | Approve/deny MO card-report reopen requests |
 | `/finance/payouts` | Official payout tracker (assigner / treasurer) |
 | `/finance/invoices` | Conference invoice list |
 | `/finance/invoices/new` | New invoice builder |
@@ -288,6 +299,9 @@ See also [`SHEET_SYNC.md`](./SHEET_SYNC.md).
 | `matchSelfService` | Callable — official confirm/decline + T-72 (Admin SDK crew write) |
 | `deleteOrgMemberAccount` | Assigner |
 | `setJudicialRole` | Assigner or Judicial — grant/revoke `judicial` |
+| `requestCardReportReopen` | Filing MO — request unlock of submitted card report |
+| `reviewCardReportReopen` | Assigner or Judicial — approve (unlock) / deny with reason |
+| `unlockCardReportForEdit` | Assigner or Judicial — direct unlock for edit |
 
 ---
 

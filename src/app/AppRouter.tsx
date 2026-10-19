@@ -276,6 +276,18 @@ const SchedulerQueuesRaiseHandRequestsPage = lazy(() =>
     default: m.SchedulerQueuesRaiseHandRequestsPage,
   })),
 );
+const SchedulerQueuesCardReportReopenPage = lazy(() =>
+  import(
+    '@/features/scheduler/queues/SchedulerQueuesCardReportReopenPage'
+  ).then((m) => ({
+    default: m.SchedulerQueuesCardReportReopenPage,
+  })),
+);
+const JudicialCardReopenPage = lazy(() =>
+  import('@/features/judicial/JudicialCardReopenPage').then((m) => ({
+    default: m.JudicialCardReopenPage,
+  })),
+);
 const SchedulerSchedulePage = lazy(() =>
   import('@/features/scheduler/schedule/SchedulerSchedulePage').then((m) => ({
     default: m.SchedulerSchedulePage,
@@ -763,6 +775,7 @@ function FeatureRoutes() {
           <Route index element={<JudicialDashboardPage />} />
           <Route path="cases" element={<JudicialCasesPage />} />
           <Route path="cases/:incidentId" element={<JudicialCaseDetailPage />} />
+          <Route path="card-reopen" element={<JudicialCardReopenPage />} />
         </Route>
       </Route>
       <Route path="profile" element={<ProfilePage />} />
@@ -804,6 +817,10 @@ function FeatureRoutes() {
             <Route
               path="raise-hand"
               element={<SchedulerQueuesRaiseHandRequestsPage />}
+            />
+            <Route
+              path="card-reopen"
+              element={<SchedulerQueuesCardReportReopenPage />}
             />
           </Route>
           <Route path="crew" element={<SchedulerCrewDefaultsPage />} />

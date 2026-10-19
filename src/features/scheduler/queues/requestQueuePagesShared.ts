@@ -25,6 +25,7 @@ import { useAppFeedback } from '@/app/feedback/feedbackContext';
 import { isFirebaseConfigured } from '@/services/firebase';
 import {
   callApproveFixtureRequest,
+  callReviewCardReportReopen,
   callReviewTeamLinkRequest,
   callableErrorMessage,
   declineFixtureRequestInFirestore,
@@ -175,6 +176,7 @@ export function useSchedulerRequestActions() {
   const { notify } = useAppFeedback();
   const [fixtureBusyId, setFixtureBusyId] = useState<string | null>(null);
   const [teamLinkBusyId, setTeamLinkBusyId] = useState<string | null>(null);
+  const [cardReopenBusyId, setCardReopenBusyId] = useState<string | null>(null);
 
   const onApproveRaiseHand = (id: string, slot?: RequestableSlot) => {
     void approveRaiseHandRequest({
@@ -284,12 +286,52 @@ export function useSchedulerRequestActions() {
     }
   };
 
+  const onReviewCardReopen = async (
+    id: string,
+    decision: 'approve' | 'deny',
+    reason?: string,
+  ) => {
+    const reviewerId = currentUser?.uid;
+    if (!reviewerId) return;
+    const reviewerName = currentUser.displayName || 'Reviewer';
+    setCardReopenBusyId(id);
+    try {
+      if (dataMode === 'live' && isFirebaseConfigured) {
+        await callReviewCardReportReopen({
+          requestId: id,
+          decision,
+          denyReason: reason,
+        });
+      } else {
+        store.reviewCardReportReopen(
+          id,
+          reviewerId,
+          reviewerName,
+          decision,
+          reason,
+        );
+      }
+      refresh();
+    } catch (err) {
+      console.error('Card report reopen review failed', err);
+      refresh();
+      notify(
+        callableErrorMessage(err, 'Failed to review reopen request.'),
+        'error',
+      );
+    } finally {
+      setCardReopenBusyId(null);
+    }
+  };
+
   return {
     fixtureBusyId,
     teamLinkBusyId,
+    cardReopenBusyId,
     onApproveFixture,
     onDeclineFixture,
     onReviewTeamLink,
+    onReviewCardReopen,
     onApproveRaiseHand,
     onDeclineRaiseHand,
   };

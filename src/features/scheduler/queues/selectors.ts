@@ -127,9 +127,16 @@ export function pendingTeamLinkRequests(
   return requests.filter((r) => r.status === 'pending');
 }
 
+export function pendingCardReportReopenQueue(
+  requests: AppState['cardReportReopenRequests'],
+): AppState['cardReportReopenRequests'] {
+  return requests.filter((r) => r.status === 'pending');
+}
+
 export type SchedulerQueueCounts = {
   fixtureRequests: number;
   teamLinkRequests: number;
+  cardReportReopen: number;
   raiseHand: number;
   needsOfficials: number;
   needsReassignment: number;
@@ -146,6 +153,9 @@ export function countSchedulerQueues(state: AppState): SchedulerQueueCounts {
   const teamLinkRequests = pendingTeamLinkRequests(
     state.teamLinkRequests,
   ).length;
+  const cardReportReopen = pendingCardReportReopenQueue(
+    state.cardReportReopenRequests,
+  ).length;
   const raiseHand = actionableRaiseHandRequests(
     state.requests,
     state.matches,
@@ -161,6 +171,7 @@ export function countSchedulerQueues(state: AppState): SchedulerQueueCounts {
   return {
     fixtureRequests,
     teamLinkRequests,
+    cardReportReopen,
     raiseHand,
     needsOfficials,
     needsReassignment,
@@ -168,6 +179,10 @@ export function countSchedulerQueues(state: AppState): SchedulerQueueCounts {
     notifications,
     workActionable,
     totalActionable:
-      fixtureRequests + teamLinkRequests + raiseHand + workActionable,
+      fixtureRequests +
+      teamLinkRequests +
+      cardReportReopen +
+      raiseHand +
+      workActionable,
   };
 }

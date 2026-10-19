@@ -21,10 +21,15 @@ import {
   ensureOutsidePerformanceInFirestore,
   ensurePendingMatchReportInFirestore,
   deleteCardReportInFirestore,
+  loadJudicialCasesForReport,
+  saveCardReportInFirestore,
   saveCardReportWithCasesInFirestore,
   saveMatchReportInFirestore,
 } from '@/services/orgData';
-import { casesFromCardReport } from '@/domain/judicial';
+import {
+  casesFromCardReport,
+  mergeJudicialCasesFromCardReport,
+} from '@/domain/judicial';
 
 export async function ensureMatchReportReady(
   matchId: string,
@@ -273,21 +278,81 @@ export async function persistSchedulerResetMatchReport(
   await saveMatchReportInFirestore(defaultOrgId(), reset);
 }
 
-export async function persistSubmittedCardReport(
-  input: Omit<CardReport, 'id' | 'status' | 'submittedAt' | 'createdAt'> & {
-    id?: string;
-  },
-): Promise<void> {
+type CardReportPersistInput = Omit<
+  CardReport,
+  'id' | 'status' | 'submittedAt' | 'createdAt' | 'editUnlockedAt' | 'editUnlockedByUid' | 'editUnlockedByName'
+> & {
+  id?: string;
+  createdAt?: string;
+  submittedAt?: string;
+};
+
+/** Persist a draft card report (no judicial cases). */
+export async function persistDraftCardReport(
+  input: CardReportPersistInput,
+): Promise<CardReport> {
   const now = new Date().toISOString();
+  const existing = demoStore
+    .getState()
+    .cardReports.find(
+      (c) =>
+        c.id ===
+          (input.id ?? cardReportDocId(input.matchId, input.officialId)) ||
+        (c.matchId === input.matchId && c.officialId === input.officialId),
+    );
   const report: CardReport = {
     ...input,
     id: input.id ?? cardReportDocId(input.matchId, input.officialId),
-    status: 'submitted',
-    submittedAt: now,
-    createdAt: now,
+    status: existing?.status === 'submitted' ? 'submitted' : 'draft',
+    submittedAt: existing?.submittedAt,
+    createdAt: existing?.createdAt ?? input.createdAt ?? now,
+    // Keep unlock while editing a submitted report as draft-save.
+    editUnlockedAt: existing?.editUnlockedAt,
+    editUnlockedByUid: existing?.editUnlockedByUid,
+    editUnlockedByName: existing?.editUnlockedByName,
   };
-  await saveCardReportWithCasesInFirestore(
-    defaultOrgId(), report, casesFromCardReport(report, now),
-  );
+  await saveCardReportInFirestore(defaultOrgId(), report);
   demoStore.upsertCardReportLocal(report);
+  return report;
+}
+
+export async function persistSubmittedCardReport(
+  input: CardReportPersistInput,
+): Promise<void> {
+  const now = new Date().toISOString();
+  const id = input.id ?? cardReportDocId(input.matchId, input.officialId);
+  const existingLocal = demoStore
+    .getState()
+    .cardReports.find((c) => c.id === id);
+  const report: CardReport = {
+    ...input,
+    id,
+    status: 'submitted',
+    submittedAt: existingLocal?.submittedAt ?? input.submittedAt ?? now,
+    createdAt: existingLocal?.createdAt ?? input.createdAt ?? now,
+    // Clear unlock on submit.
+    editUnlockedAt: undefined,
+    editUnlockedByUid: undefined,
+    editUnlockedByName: undefined,
+  };
+  const orgId = defaultOrgId();
+  let existingCases = demoStore
+    .getState()
+    .judicialCases.filter((c) => c.reportId === report.id);
+  try {
+    const fromFs = await loadJudicialCasesForReport(orgId, report.id);
+    if (fromFs.length) existingCases = fromFs;
+  } catch {
+    // Demo / offline: fall back to local cases.
+  }
+  const merged =
+    existingCases.length > 0
+      ? mergeJudicialCasesFromCardReport(report, existingCases, now)
+      : casesFromCardReport(report, now);
+  await saveCardReportWithCasesInFirestore(orgId, report, merged);
+  demoStore.upsertCardReportLocal(report);
+  demoStore.applyLiveJudicialCases([
+    ...demoStore.getState().judicialCases.filter((c) => c.reportId !== report.id),
+    ...merged,
+  ]);
 }

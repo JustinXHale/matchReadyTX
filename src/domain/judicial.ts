@@ -210,6 +210,70 @@ export function casesFromCardReport(
   return out;
 }
 
+/**
+ * Merge regenerated cases from a (re)submitted card report with existing
+ * judicial cases. Preserves rulings/sanctions; creates new cases; never deletes.
+ */
+export function mergeJudicialCasesFromCardReport(
+  report: CardReport,
+  existing: JudicialCase[],
+  nowIso = new Date().toISOString(),
+): JudicialCase[] {
+  const generated = casesFromCardReport(report, nowIso);
+  const byId = new Map(
+    existing.filter((c) => c.reportId === report.id).map((c) => [c.id, c]),
+  );
+  const out: JudicialCase[] = [];
+
+  for (const next of generated) {
+    const prev = byId.get(next.id);
+    if (!prev) {
+      out.push(next);
+      continue;
+    }
+    out.push({
+      ...prev,
+      reportId: next.reportId,
+      incidentId: next.incidentId,
+      matchId: next.matchId,
+      conference: next.conference,
+      color: next.color,
+      playerFirstName: next.playerFirstName,
+      playerLastName: next.playerLastName,
+      playerName: next.playerName,
+      playerJersey: next.playerJersey,
+      teamId: next.teamId,
+      teamName: next.teamName,
+      lawIds: next.lawIds,
+      offenseSummary: next.offenseSummary,
+      matchDate: next.matchDate,
+      officialId: next.officialId,
+      officialName: next.officialName,
+      linkedCaseIds: next.linkedCaseIds,
+      sourceCardIds: next.sourceCardIds,
+      updatedAt: nowIso,
+    });
+    byId.delete(next.id);
+  }
+
+  // Keep cases whose cards were removed (do not delete judicial history).
+  for (const leftover of byId.values()) {
+    out.push(leftover);
+  }
+  return out;
+}
+
+/** Whether a judicial case already exists for this card incident (any color). */
+export function hasJudicialCaseForIncident(
+  cases: JudicialCase[],
+  reportId: string,
+  incidentId: string,
+): boolean {
+  return cases.some(
+    (c) => c.reportId === reportId && c.incidentId === incidentId,
+  );
+}
+
 function samePlayerIncidents(a: CardIncident, b: CardIncident): boolean {
   if (a.teamId && b.teamId && a.teamId !== b.teamId) return false;
   const jerseyA = (a.playerJersey ?? '').trim();

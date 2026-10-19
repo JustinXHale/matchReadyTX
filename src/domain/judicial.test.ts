@@ -8,6 +8,7 @@ import {
   displayCasePlayer,
   filterCasesForDashboard,
   filterJudicialCases,
+  mergeJudicialCasesFromCardReport,
   normalizePlayerTraceName,
   playerTraceKey,
   rugbySeasonDateRange,
@@ -161,6 +162,59 @@ describe('judicial cases from card reports', () => {
     expect(cases[0]?.playerJersey).toBe('10');
     expect(cases[0]?.playerName).toBe('#10');
     expect(displayCasePlayer(cases[0]!)).toBe('#10');
+  });
+
+  it('merge preserves rulings and patches source fields', () => {
+    const report = baseReport();
+    const existing = casesFromCardReport(report).map((c) =>
+      c.id === 'c2'
+        ? {
+            ...c,
+            status: 'upheld' as const,
+            sanctionMatches: 3,
+            sanctionNote: 'High tackle',
+            ruledAt: '2026-09-01T00:00:00.000Z',
+            ruledByUid: 'j1',
+            ruledByName: 'Judicial',
+          }
+        : c,
+    );
+    report.cards[1]!.playerFirstName = 'Bob';
+    report.cards[1]!.playerLastName = 'Updated';
+    report.cards[1]!.playerName = 'Bob Updated';
+    report.cards.push({
+      id: 'c3',
+      color: 'yellow',
+      playerName: 'New Card',
+      playerFirstName: 'New',
+      playerLastName: 'Card',
+      teamId: 't1',
+      teamName: 'SHSU',
+      reason: 'Late hit',
+      lawIds: ['law_9_7_unfair_play'],
+      offenseSummary: 'Late hit',
+    });
+    const merged = mergeJudicialCasesFromCardReport(
+      report,
+      existing,
+      '2026-09-02T00:00:00.000Z',
+    );
+    const red = merged.find((c) => c.id === 'c2');
+    expect(red?.status).toBe('upheld');
+    expect(red?.sanctionMatches).toBe(3);
+    expect(red?.playerFirstName).toBe('Bob');
+    expect(red?.playerLastName).toBe('Updated');
+    expect(merged.some((c) => c.id === 'c3')).toBe(true);
+    expect(merged).toHaveLength(3);
+  });
+
+  it('merge keeps cases for removed cards', () => {
+    const report = baseReport();
+    const existing = casesFromCardReport(report);
+    report.cards = [report.cards[0]!];
+    const merged = mergeJudicialCasesFromCardReport(report, existing);
+    expect(merged.some((c) => c.id === 'c2')).toBe(true);
+    expect(merged).toHaveLength(2);
   });
 });
 

@@ -44,7 +44,12 @@ export function QueuesSubNav() {
   );
   const requestTotal = useMemo(() => {
     const counts = countSchedulerQueues(state);
-    return counts.fixtureRequests + counts.teamLinkRequests + counts.raiseHand;
+    return (
+      counts.fixtureRequests +
+      counts.teamLinkRequests +
+      counts.cardReportReopen +
+      counts.raiseHand
+    );
   }, [state]);
 
   return (

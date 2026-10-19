@@ -15,7 +15,10 @@ export function ScheduleSubNav() {
   const counts = useMemo(() => countSchedulerQueues(state), [state]);
   const assignmentCount = counts.needsOfficials + counts.needsReassignment;
   const requestTotal =
-    counts.fixtureRequests + counts.teamLinkRequests + counts.raiseHand;
+    counts.fixtureRequests +
+    counts.teamLinkRequests +
+    counts.cardReportReopen +
+    counts.raiseHand;
 
   return (
     <nav className="rs-sub-tabs" aria-label="Schedule">

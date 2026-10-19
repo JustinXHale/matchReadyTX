@@ -522,7 +522,7 @@ export function CardReportViewBody({
 }: {
   matchId: string;
 }) {
-  const { state, isAssignerView } = useApp();
+  const { state, isAssignerView, isJudicialView } = useApp();
   const navigate = useNavigate();
   const matchHref = useAppHref(`/matches/${matchId}`);
   const match = state.matches.find((m) => m.id === matchId);
@@ -530,10 +530,11 @@ export function CardReportViewBody({
     (c) => c.matchId === matchId && c.status === 'submitted',
   );
   if (!match || !report) return null;
+  const showAdmin = isAssignerView || isJudicialView;
 
   return (
     <div className="rs-stack rs-report-view">
-      {isAssignerView && (
+      {showAdmin && (
         <div className="rs-report-view__admin-row">
           <span className="rs-match-card__meta">Submitted card report</span>
           <ReportAdminMenu

@@ -773,6 +773,23 @@ export interface CardReport {
   additionalInfoPrivate?: string;
   submittedAt?: string;
   createdAt: string;
+  /** Set by Scheduler/Judicial unlock (or approved reopen). Cleared on Submit. */
+  editUnlockedAt?: string;
+  editUnlockedByUid?: string;
+  editUnlockedByName?: string;
+}
+
+/** Submitted report is editable when unlocked (or still a draft). */
+export function isCardReportEditable(report: CardReport | undefined): boolean {
+  if (!report) return true;
+  if (report.status === 'draft') return true;
+  return Boolean(report.editUnlockedAt);
+}
+
+/** Locked submitted report — read-only until unlock / reopen approval. */
+export function isCardReportLocked(report: CardReport | undefined): boolean {
+  if (!report) return false;
+  return report.status === 'submitted' && !report.editUnlockedAt;
 }
 
 export function reportDueAt(kickoffAt: string, _now = Date.now()): string {

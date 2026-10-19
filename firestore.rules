@@ -765,7 +765,9 @@ service cloud.firestore {
             || isTreasurer(orgId)
             || resource.data.officialId == request.auth.uid
           );
-        allow create, update: if signedIn()
+        // Create: filing MO only. Update: draft freely; submitted only while unlocked
+        // (unlock fields set via Admin SDK callables).
+        allow create: if signedIn()
           && isMember(orgId)
           && request.resource.data.orgId == orgId
           && request.resource.data.officialId == request.auth.uid
@@ -773,6 +775,27 @@ service cloud.firestore {
           && request.resource.data.status in ['draft', 'submitted']
           && request.resource.data.cards is list
           && reportId == request.resource.data.id;
+        allow update: if signedIn()
+          && isMember(orgId)
+          && request.resource.data.orgId == orgId
+          && request.resource.data.matchId is string
+          && request.resource.data.status in ['draft', 'submitted']
+          && request.resource.data.cards is list
+          && reportId == request.resource.data.id
+          && request.resource.data.officialId == resource.data.officialId
+          && (
+            resource.data.status == 'draft'
+            || (
+              resource.data.keys().hasAny(['editUnlockedAt'])
+              && resource.data.editUnlockedAt is string
+              && resource.data.editUnlockedAt.size() > 0
+            )
+          )
+          && (
+            resource.data.officialId == request.auth.uid
+            || isAssigner(orgId)
+            || isJudicial(orgId)
+          );
         allow delete: if isAssigner(orgId);
       }
       match /judicialCases/{caseId} {
@@ -791,12 +814,26 @@ service cloud.firestore {
             || isJudicial(orgId)
             || getAfter(/databases/$(database)/documents/orgs/$(orgId)/cardReports/$(request.resource.data.reportId)).data.officialId == request.auth.uid
           );
-        allow update: if (isAssigner(orgId) || isJudicial(orgId))
+        // Assigner/judicial full update; MO may patch source fields only (ruling fields unchanged).
+        allow update: if signedIn()
+          && isMember(orgId)
           && request.resource.data.orgId == orgId
           && request.resource.data.id == caseId
           && request.resource.data.reportId == resource.data.reportId
           && request.resource.data.incidentId == resource.data.incidentId
-          && request.resource.data.matchId == resource.data.matchId;
+          && request.resource.data.matchId == resource.data.matchId
+          && (
+            isAssigner(orgId)
+            || isJudicial(orgId)
+            || (
+              get(/databases/$(database)/documents/orgs/$(orgId)/cardReports/$(resource.data.reportId)).data.officialId == request.auth.uid
+              && request.resource.data.status == resource.data.status
+              && request.resource.data.get('sanctionMatches', null) == resource.data.get('sanctionMatches', null)
+              && request.resource.data.get('sanctionNote', null) == resource.data.get('sanctionNote', null)
+              && request.resource.data.get('ruledAt', null) == resource.data.get('ruledAt', null)
+              && request.resource.data.get('ruledByUid', null) == resource.data.get('ruledByUid', null)
+            )
+          );
         allow delete: if isAssigner(orgId);
         match /comments/{commentId} {
           allow read: if isAssigner(orgId) || isJudicial(orgId);
@@ -829,6 +866,11 @@ service cloud.firestore {
       }
       /** Team Admin club-link requests — create/review via Admin SDK callables. */
       match /teamLinkRequests/{requestId} {
+        allow read: if isMember(orgId);
+        allow create, update, delete: if false;
+      }
+      /** Card report reopen — create/review/unlock via Admin SDK callables. */
+      match /cardReportReopenRequests/{requestId} {
         allow read: if isMember(orgId);
         allow create, update, delete: if false;
       }

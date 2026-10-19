@@ -1,13 +1,24 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { persistSubmittedCardReport } from '@/services/reportsLive';
 
-const mocks = vi.hoisted(() => ({ save: vi.fn(), upsert: vi.fn() }));
+const mocks = vi.hoisted(() => ({
+  save: vi.fn(),
+  upsert: vi.fn(),
+  loadCases: vi.fn(),
+  applyCases: vi.fn(),
+  getState: vi.fn(() => ({ cardReports: [], judicialCases: [] })),
+}));
 vi.mock('@/services/orgData', () => ({
   defaultOrgId: () => 'lonestar',
   saveCardReportWithCasesInFirestore: mocks.save,
+  loadJudicialCasesForReport: mocks.loadCases,
 }));
 vi.mock('@/services/demoStore', () => ({
-  demoStore: { upsertCardReportLocal: mocks.upsert },
+  demoStore: {
+    upsertCardReportLocal: mocks.upsert,
+    applyLiveJudicialCases: mocks.applyCases,
+    getState: mocks.getState,
+  },
 }));
 
 const input = {
@@ -24,13 +35,19 @@ const input = {
 };
 
 describe('live card submission', () => {
-  beforeEach(() => vi.resetAllMocks());
+  beforeEach(() => {
+    vi.resetAllMocks();
+    mocks.getState.mockReturnValue({ cardReports: [], judicialCases: [] });
+    mocks.loadCases.mockResolvedValue([]);
+  });
 
   it('publishes locally only after the report and both judicial incidents save', async () => {
     let finish!: () => void;
     mocks.save.mockReturnValue(new Promise<void>((resolve) => { finish = resolve; }));
     const submission = persistSubmittedCardReport(input);
+    await Promise.resolve();
     expect(mocks.upsert).not.toHaveBeenCalled();
+    expect(mocks.save).toHaveBeenCalled();
     const [org, report, cases] = mocks.save.mock.calls[0];
     expect(org).toBe('lonestar');
     expect(cases).toHaveLength(2);

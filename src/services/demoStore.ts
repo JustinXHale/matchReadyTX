@@ -82,6 +82,7 @@ import {
 } from '@/domain/outsideCoaching';
 import {
   casesFromCardReport,
+  mergeJudicialCasesFromCardReport,
   type JudicialCase,
   type JudicialComment,
   type JudicialDashboardSettings,
@@ -122,6 +123,7 @@ import type {
   RequestableSlot,
   Team,
   TeamLinkRequest,
+  CardReportReopenRequest,
   UserProfile,
 } from '@/domain/types';
 import {
@@ -1694,6 +1696,8 @@ export interface AppState {
   fixtureRequests: FixtureRequest[];
   /** Pending / resolved Team Admin club-link requests. */
   teamLinkRequests: TeamLinkRequest[];
+  /** MO requests to reopen submitted card reports. */
+  cardReportReopenRequests: CardReportReopenRequest[];
   /** Society meeting recordings and slide decks (Info → Resources). */
   meetingResources: MeetingResource[];
   /** Team Admin referee feedback (scheduler-confidential). */
@@ -2813,6 +2817,7 @@ function emptyLiveQueueState(): Pick<
   | 'requests'
   | 'fixtureRequests'
   | 'teamLinkRequests'
+  | 'cardReportReopenRequests'
   | 'meetingResources'
   | 'coachFeedback'
   | 'availability'
@@ -2835,6 +2840,7 @@ function emptyLiveQueueState(): Pick<
     requests: [],
     fixtureRequests: [],
     teamLinkRequests: [],
+    cardReportReopenRequests: [],
     meetingResources: [],
     coachFeedback: [],
     availability: [],
@@ -2940,6 +2946,7 @@ function createInitialState(opts?: { seedDemoQueue?: boolean }): AppState {
         requests: seedGameRequests(seeded.matches),
         fixtureRequests: seedFixtureRequests(),
         teamLinkRequests: seedTeamLinkRequests(),
+        cardReportReopenRequests: [],
         meetingResources: [],
         coachFeedback: seedCoachFeedback(seeded.matches),
         availability: seedDemoAvailability(),
@@ -3397,14 +3404,52 @@ class DemoStore {
     }));
   }
 
-  submitCardReport(
-    input: Omit<CardReport, 'id' | 'status' | 'submittedAt' | 'createdAt'> & {
-      id?: string;
-    },
+  saveDraftCardReport(
+    input: Omit<
+      CardReport,
+      | 'id'
+      | 'status'
+      | 'submittedAt'
+      | 'createdAt'
+      | 'editUnlockedAt'
+      | 'editUnlockedByUid'
+      | 'editUnlockedByName'
+    > & { id?: string },
   ): CardReport {
     const nowIso = new Date().toISOString();
+    const id = input.id ?? cardReportDocId(input.matchId, input.officialId);
+    const existing = this.state.cardReports.find((c) => c.id === id);
     const report: CardReport = {
-      id: input.id ?? cardReportDocId(input.matchId, input.officialId),
+      ...input,
+      id,
+      status: existing?.status === 'submitted' ? 'submitted' : 'draft',
+      submittedAt: existing?.submittedAt,
+      createdAt: existing?.createdAt ?? nowIso,
+      editUnlockedAt: existing?.editUnlockedAt,
+      editUnlockedByUid: existing?.editUnlockedByUid,
+      editUnlockedByName: existing?.editUnlockedByName,
+    };
+    this.upsertCardReportLocal(report);
+    return report;
+  }
+
+  submitCardReport(
+    input: Omit<
+      CardReport,
+      | 'id'
+      | 'status'
+      | 'submittedAt'
+      | 'createdAt'
+      | 'editUnlockedAt'
+      | 'editUnlockedByUid'
+      | 'editUnlockedByName'
+    > & { id?: string },
+  ): CardReport {
+    const nowIso = new Date().toISOString();
+    const id = input.id ?? cardReportDocId(input.matchId, input.officialId);
+    const existing = this.state.cardReports.find((c) => c.id === id);
+    const report: CardReport = {
+      id,
       matchId: input.matchId,
       officialId: input.officialId,
       status: 'submitted',
@@ -3419,12 +3464,21 @@ class DemoStore {
       awayScore: input.awayScore,
       cards: input.cards,
       additionalInfoPrivate: input.additionalInfoPrivate,
-      submittedAt: nowIso,
-      createdAt: nowIso,
+      submittedAt: existing?.submittedAt ?? nowIso,
+      createdAt: existing?.createdAt ?? nowIso,
     };
     this.set((s) => {
-      const nextCases = casesFromCardReport(report, nowIso);
-      const ids = new Set(nextCases.map((c) => c.id));
+      const existingCases = s.judicialCases.filter(
+        (c) => c.reportId === report.id,
+      );
+      const nextCases =
+        existingCases.length > 0
+          ? mergeJudicialCasesFromCardReport(report, existingCases, nowIso)
+          : casesFromCardReport(report, nowIso);
+      const nextIds = new Set(nextCases.map((c) => c.id));
+      const keptOrphans = s.judicialCases.filter(
+        (c) => c.reportId === report.id && !nextIds.has(c.id),
+      );
       return {
         ...s,
         cardReports: [
@@ -3432,19 +3486,156 @@ class DemoStore {
             (c) =>
               !(
                 c.matchId === report.matchId &&
-                c.officialId === report.officialId &&
-                c.status === 'draft'
+                c.officialId === report.officialId
               ),
           ),
           report,
         ],
         judicialCases: [
-          ...s.judicialCases.filter((c) => !ids.has(c.id)),
+          ...s.judicialCases.filter((c) => c.reportId !== report.id),
           ...nextCases,
+          ...keptOrphans,
         ],
+        cardReportReopenRequests: s.cardReportReopenRequests.map((r) =>
+          r.reportId === report.id && r.status === 'pending'
+            ? {
+                ...r,
+                status: 'approved' as const,
+                reviewedAt: nowIso,
+              }
+            : r,
+        ),
       };
     });
     return report;
+  }
+
+  requestCardReportReopen(input: {
+    reportId: string;
+    matchId: string;
+    matchLabel: string;
+    requesterUserId: string;
+    requesterName: string;
+    requesterEmail: string;
+    requestReason: string;
+  }): CardReportReopenRequest {
+    const pending = this.state.cardReportReopenRequests.find(
+      (r) => r.reportId === input.reportId && r.status === 'pending',
+    );
+    if (pending) {
+      throw new Error('A reopen request is already pending for this report.');
+    }
+    const report = this.state.cardReports.find((c) => c.id === input.reportId);
+    if (!report || report.status !== 'submitted') {
+      throw new Error('Only a submitted card report can be reopened.');
+    }
+    if (report.editUnlockedAt) {
+      throw new Error('This report is already unlocked for editing.');
+    }
+    const req: CardReportReopenRequest = {
+      id: `crr_${Math.random().toString(36).slice(2, 10)}`,
+      orgId: this.state.org.id,
+      matchId: input.matchId,
+      reportId: input.reportId,
+      requesterUserId: input.requesterUserId,
+      requesterName: input.requesterName,
+      requesterEmail: input.requesterEmail,
+      matchLabel: input.matchLabel,
+      requestReason: input.requestReason.trim(),
+      status: 'pending',
+      createdAt: new Date().toISOString(),
+    };
+    this.set((s) => ({
+      ...s,
+      cardReportReopenRequests: [req, ...s.cardReportReopenRequests],
+    }));
+    return req;
+  }
+
+  reviewCardReportReopen(
+    requestId: string,
+    reviewerId: string,
+    reviewerName: string,
+    decision: 'approve' | 'deny',
+    denyReason?: string,
+  ): void {
+    const req = this.state.cardReportReopenRequests.find((r) => r.id === requestId);
+    if (!req || req.status !== 'pending') {
+      throw new Error('Reopen request not found or already reviewed.');
+    }
+    if (decision === 'deny' && !denyReason?.trim()) {
+      throw new Error('A deny reason is required.');
+    }
+    const now = new Date().toISOString();
+    this.set((s) => {
+      let cardReports = s.cardReports;
+      if (decision === 'approve') {
+        cardReports = s.cardReports.map((c) =>
+          c.id === req.reportId
+            ? {
+                ...c,
+                editUnlockedAt: now,
+                editUnlockedByUid: reviewerId,
+                editUnlockedByName: reviewerName,
+              }
+            : c,
+        );
+      }
+      return {
+        ...s,
+        cardReports,
+        cardReportReopenRequests: s.cardReportReopenRequests.map((r) =>
+          r.id === requestId
+            ? {
+                ...r,
+                status: decision === 'approve' ? 'approved' : 'denied',
+                reviewedAt: now,
+                reviewedByUserId: reviewerId,
+                reviewedByName: reviewerName,
+                denyReason:
+                  decision === 'deny' ? denyReason?.trim() : undefined,
+              }
+            : r,
+        ),
+      };
+    });
+  }
+
+  unlockCardReportForEdit(
+    reportId: string,
+    reviewerId: string,
+    reviewerName: string,
+  ): void {
+    const report = this.state.cardReports.find((c) => c.id === reportId);
+    if (!report || report.status !== 'submitted') {
+      throw new Error('Only a submitted card report can be unlocked.');
+    }
+    if (report.editUnlockedAt) return;
+    const now = new Date().toISOString();
+    this.set((s) => ({
+      ...s,
+      cardReports: s.cardReports.map((c) =>
+        c.id === reportId
+          ? {
+              ...c,
+              editUnlockedAt: now,
+              editUnlockedByUid: reviewerId,
+              editUnlockedByName: reviewerName,
+            }
+          : c,
+      ),
+      cardReportReopenRequests: s.cardReportReopenRequests.map((r) =>
+        r.reportId === reportId && r.status === 'pending'
+          ? {
+              ...r,
+              status: 'approved' as const,
+              reviewedAt: now,
+              reviewedByUserId: reviewerId,
+              reviewedByName: reviewerName,
+            }
+          : r,
+      ),
+    }));
   }
 
   applyLiveJudicialCases(judicialCases: JudicialCase[]): void {
@@ -3760,6 +3951,7 @@ class DemoStore {
     teams: Team[];
     fixtureRequests?: FixtureRequest[];
     teamLinkRequests?: TeamLinkRequest[];
+    cardReportReopenRequests?: CardReportReopenRequest[];
     meetingResources?: MeetingResource[];
     proposals?: ChangeProposal[];
     gameRequests?: GameRequest[];
@@ -3803,6 +3995,8 @@ class DemoStore {
         requests,
         fixtureRequests: snap.fixtureRequests ?? [],
         teamLinkRequests: snap.teamLinkRequests ?? [],
+        cardReportReopenRequests:
+          snap.cardReportReopenRequests ?? s.cardReportReopenRequests,
         meetingResources: snap.meetingResources ?? [],
         // coachFeedback / cardReports filled by live subscriptions.
         coachFeedback: s.coachFeedback,
