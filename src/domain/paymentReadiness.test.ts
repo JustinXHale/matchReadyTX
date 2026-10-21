@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import { defaultFees } from '@/domain/economics';
-import { assigneeReportStatusesForMatch, buildAssignmentPayableRows } from '@/domain/paymentReadiness';
+import {
+  assigneeReportStatusesForMatch,
+  buildAssignmentPayableRows,
+  matchCrewReportSummary,
+} from '@/domain/paymentReadiness';
 import type { CardReport, MatchReport } from '@/domain/reports';
 import {
   emptyAssignment,
@@ -175,5 +179,19 @@ describe('paymentReadiness', () => {
     const mo = rows.find((r) => r.slot === 'mo');
     expect(mo?.matchReportSubmitted).toBe(true);
     expect(mo?.payReady).toBe(true);
+  });
+
+  it('matchCrewReportSummary lists officials still needing match reports', () => {
+    const match = pastMatch();
+    const summary = matchCrewReportSummary(
+      match,
+      users,
+      [moReport('submitted')],
+      [],
+    );
+    expect(summary?.pendingMatchReports).toBe(1);
+    expect(summary?.pendingPeople).toEqual([
+      { officialId: 'u_ar', officialName: 'AR Ref', slot: 'ar1' },
+    ]);
   });
 });

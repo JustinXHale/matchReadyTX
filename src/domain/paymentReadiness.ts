@@ -223,12 +223,20 @@ export function assigneeReportStatusesForMatch(
   });
 }
 
+export interface MatchCrewReportPendingPerson {
+  officialId: string;
+  officialName: string;
+  slot: RequestableSlot;
+}
+
 export interface MatchCrewReportSummary {
   assignedCount: number;
   pendingMatchReports: number;
   pendingCardReports: number;
   completeMatchReports: number;
   allMatchReportsIn: boolean;
+  /** Officials who still owe a match/coaching report (screenshot chase list). */
+  pendingPeople: MatchCrewReportPendingPerson[];
 }
 
 export function matchCrewReportSummary(
@@ -250,10 +258,18 @@ export function matchCrewReportSummary(
   let pendingMatchReports = 0;
   let pendingCardReports = 0;
   let completeMatchReports = 0;
+  const pendingPeople: MatchCrewReportPendingPerson[] = [];
   for (const row of rows) {
     if (row.matchReportRequired) {
       if (row.matchReportSubmitted) completeMatchReports++;
-      else pendingMatchReports++;
+      else {
+        pendingMatchReports++;
+        pendingPeople.push({
+          officialId: row.officialId,
+          officialName: row.officialName,
+          slot: row.slot,
+        });
+      }
     }
     if (row.cardReportRequired && !row.cardReportSubmitted) {
       pendingCardReports++;
@@ -266,6 +282,7 @@ export function matchCrewReportSummary(
     pendingCardReports,
     completeMatchReports,
     allMatchReportsIn: pendingMatchReports === 0,
+    pendingPeople,
   };
 }
 

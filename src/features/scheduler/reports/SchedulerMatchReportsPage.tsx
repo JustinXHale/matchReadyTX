@@ -7,6 +7,7 @@ import {
   type MatchCrewReportSummary,
 } from '@/domain/paymentReadiness';
 import type { Match } from '@/domain/types';
+import { REQUESTABLE_SLOT_SHORT } from '@/domain/types';
 import { MatchListRow } from '@/ui/MatchListRow';
 
 type StatusFilter = 'all' | 'pending' | 'complete';
@@ -43,6 +44,26 @@ function summaryBanner(summary: MatchCrewReportSummary) {
   return (
     <div className={`rs-report-status-banner rs-report-status-banner--${tone}`}>
       {summaryMeta(summary)}
+    </div>
+  );
+}
+
+/** Names of officials still owing a report — for screenshot chase lists. */
+function pendingPeopleFooter(summary: MatchCrewReportSummary) {
+  if (summary.pendingPeople.length === 0) return undefined;
+  return (
+    <div className="rs-appt-crew" aria-label="Officials still needing reports">
+      {summary.pendingPeople.map((person) => (
+        <p
+          key={`${person.slot}-${person.officialId}`}
+          className="rs-appt-crew__line"
+        >
+          <span className="rs-appt-crew__slot">
+            {REQUESTABLE_SLOT_SHORT[person.slot]}
+          </span>{' '}
+          {person.officialName}
+        </p>
+      ))}
     </div>
   );
 }
@@ -163,6 +184,7 @@ export function SchedulerMatchReportsPage() {
                 to={`${matchDetailBase}/${match.id}`}
                 back={matchReportsBack}
                 topBanner={summaryBanner(summary)}
+                footer={pendingPeopleFooter(summary)}
               />
             </li>
           ))}
