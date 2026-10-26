@@ -1,20 +1,17 @@
 /**
- * Email templates for match notifications.
+ * Match change notification — time, venue, details, or status.
+ * Triggered after assigner applies a proposal (or notifyMatchChangeCallable).
  */
+import {
+  formatKickoffDateTime,
+  matchFactsHtml,
+  matchFactsText,
+  matchLinkHtml,
+  type EmailBody,
+  type MatchEmailFacts,
+} from './shared';
 
 export type MatchChangeType = 'time' | 'venue' | 'status' | 'details';
-
-export type MatchEmailFacts = {
-  id: string;
-  homeTeamName: string;
-  awayTeamName: string;
-  kickoffAt: string;
-  venueName: string;
-  venueAddress?: string;
-  venueLat?: number;
-  venueLng?: number;
-  status: string;
-};
 
 export type MatchChangeDetails = {
   oldKickoffAt?: string;
@@ -25,40 +22,6 @@ export type MatchChangeDetails = {
   newVenueAddress?: string;
   newStatus?: string;
 };
-
-function formatKickoffDateTime(iso: string): string {
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return iso;
-  return new Intl.DateTimeFormat('en-US', {
-    timeZone: 'America/Chicago',
-    weekday: 'short',
-    month: 'short',
-    day: 'numeric',
-    year: 'numeric',
-    hour: 'numeric',
-    minute: '2-digit',
-    hour12: true,
-  }).format(d);
-}
-
-function mapsDirectionsUrl(opts: {
-  name: string;
-  address?: string;
-  lat?: number;
-  lng?: number;
-}): string | null {
-  if (
-    typeof opts.lat === 'number' &&
-    typeof opts.lng === 'number' &&
-    Number.isFinite(opts.lat) &&
-    Number.isFinite(opts.lng)
-  ) {
-    return `https://www.google.com/maps/dir/?api=1&destination=${opts.lat},${opts.lng}`;
-  }
-  const query = opts.address?.trim() || opts.name;
-  if (!query) return null;
-  return `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(query)}`;
-}
 
 function subjectSuffix(changeType: MatchChangeType): string {
   if (changeType === 'time') return 'Time Changed';
@@ -73,17 +36,10 @@ export function matchChangeEmailBody(opts: {
   changes: MatchChangeDetails;
   recipientType: 'crew' | 'team';
   matchUrl: string;
-}): { subject: string; text: string; html: string } {
+}): EmailBody {
   const { changeType, match, changes, recipientType, matchUrl } = opts;
 
   const fixture = `${match.homeTeamName} vs ${match.awayTeamName}`;
-  const mapsUrl = mapsDirectionsUrl({
-    name: match.venueName,
-    address: match.venueAddress,
-    lat: match.venueLat,
-    lng: match.venueLng,
-  });
-
   const subject = `Match Change: ${fixture} - ${subjectSuffix(changeType)}`;
 
   const changeSummary: string[] = [];
@@ -134,32 +90,6 @@ export function matchChangeEmailBody(opts: {
     );
   }
 
-  const currentDetails = [
-    `Home: ${match.homeTeamName}`,
-    `Away: ${match.awayTeamName}`,
-    `When: ${formatKickoffDateTime(match.kickoffAt)}`,
-    `Venue: ${match.venueName}`,
-  ];
-  if (match.venueAddress) {
-    currentDetails.push(`Address: ${match.venueAddress}`);
-  }
-  if (mapsUrl) {
-    currentDetails.push(`Maps: ${mapsUrl}`);
-  }
-
-  const currentDetailsHtml = `<p>
-    <strong>Home:</strong> ${match.homeTeamName}<br/>
-    <strong>Away:</strong> ${match.awayTeamName}<br/>
-    <strong>When:</strong> ${formatKickoffDateTime(match.kickoffAt)}<br/>
-    <strong>Venue:</strong> ${match.venueName}${
-      match.venueAddress ? `<br/><strong>Address:</strong> ${match.venueAddress}` : ''
-    }${
-      mapsUrl
-        ? `<br/><strong>Maps:</strong> <a href="${mapsUrl}">Open in Google Maps</a>`
-        : ''
-    }
-  </p>`;
-
   const ctaText =
     recipientType === 'crew'
       ? 'Please confirm you can still work this match by opening MatchReadyTX and reviewing the updated details.'
@@ -171,7 +101,7 @@ export function matchChangeEmailBody(opts: {
     ...changeSummary,
     '',
     'Current match details:',
-    ...currentDetails,
+    matchFactsText(match),
     '',
     ctaText,
     '',
@@ -187,19 +117,11 @@ export function matchChangeEmailBody(opts: {
 ${changeSummaryHtml.join('\n')}
 
 <h3>Current Match Details</h3>
-${currentDetailsHtml}
+${matchFactsHtml(match)}
 
 <p>${ctaText}</p>
 
-<p>
-  <a href="${matchUrl}" style="display:inline-block;background-color:#000;color:#fff;padding:12px 24px;text-decoration:none;border-radius:4px;margin:16px 0;">
-    Open Match in MatchReadyTX
-  </a>
-</p>
-
-<p style="color:#757575;font-size:13px;">
-  If you are not signed in, you will be asked to log in first, then taken to the match.
-</p>
+${matchLinkHtml(matchUrl)}
 
 <p style="color:#757575;font-size:13px;">
   If you have any questions, please contact the scheduler.

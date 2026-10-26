@@ -1,4 +1,5 @@
 import { COMPLIANCE_HOLD_SOCIETY_NAME } from '@/domain/complianceHold';
+import { complianceHoldEmailBody } from '@/domain/emailTemplates';
 import { isOutsideAppointmentUserId } from '@/domain/placeholderAssignment';
 import { CREW_SLOTS, crewPeople, type Match, type UserProfile } from '@/domain/types';
 import { formatMatchKickoff } from '@/domain/matchTime';
@@ -45,23 +46,23 @@ export async function notifyComplianceHoldChange(opts: {
   if (!isFirebaseConfigured) return;
 
   const { match, users, timeZone, locked, message } = opts;
-  const when = formatMatchKickoff(match.kickoffAt, timeZone);
-  const fixture = fixtureLine(match);
-  const subject = locked
-    ? `Match on hold: ${fixture}`
-    : `Match hold removed: ${fixture}`;
-  const body = locked
-    ? `This match (${when} at ${match.venueName}) has been placed on hold by ${COMPLIANCE_HOLD_SOCIETY_NAME} until teams are compliant.\n\n${message}`
-    : `The compliance hold has been removed for ${fixture} (${when} at ${match.venueName}) by ${COMPLIANCE_HOLD_SOCIETY_NAME}.`;
+  const email = complianceHoldEmailBody({
+    locked,
+    fixture: fixtureLine(match),
+    when: formatMatchKickoff(match.kickoffAt, timeZone),
+    venueName: match.venueName,
+    societyName: COMPLIANCE_HOLD_SOCIETY_NAME,
+    message,
+  });
 
   const uids = notifyUidsForMatch(match, users);
   for (const uid of uids) {
     await callNotifyUser({
       uid,
-      subject,
-      body,
+      subject: email.subject,
+      body: email.text,
       event: locked ? 'compliance_hold' : 'compliance_hold_cleared',
-      html: `<p>${body.replace(/\n/g, '<br/>')}</p>`,
+      html: email.html,
     });
   }
 }

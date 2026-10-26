@@ -6,30 +6,18 @@ import {
   type RequestableSlot,
 } from '@/domain/types';
 import {
-  formatMatchKickoffDate,
-  formatMatchKickoffTime,
-  DEFAULT_ORG_TIMEZONE,
-} from '@/domain/matchTime';
-import {
   markAssignmentEmailSent,
   type AssignmentEmailEvent,
 } from '@/domain/assignmentEmail';
 import { allActiveAssignments } from '@/domain/crew';
+import {
+  assignmentEmailBody,
+  unassignmentEmailBody,
+  type AssignmentCrewMate,
+} from '@/domain/emailTemplates';
 import { defaultOrgId, saveMatchCrewAssignment } from '@/services/orgData';
 import { callNotifyUser } from '@/services/notify';
 import { isFirebaseConfigured } from '@/services/firebase';
-import { mapsDirectionsUrl } from '@/services/maps';
-import { matchAppUrl } from '@/services/appLinks';
-
-function formatKickoffDate(iso: string, timeZone = DEFAULT_ORG_TIMEZONE): string {
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return iso;
-  return formatMatchKickoffDate(iso, timeZone);
-}
-
-function formatKickoffTime(iso: string, timeZone = DEFAULT_ORG_TIMEZONE): string {
-  return formatMatchKickoffTime(iso, timeZone);
-}
 
 function roleLabel(slot: RequestableSlot): string {
   return slot === 'cmo'
@@ -37,38 +25,12 @@ function roleLabel(slot: RequestableSlot): string {
     : CREW_SLOT_LABELS[slot];
 }
 
-function fixtureLine(match: Match): string {
-  return `${match.homeTeamName} vs ${match.awayTeamName}`;
-}
-
-/** e.g. Assigned: Home vs Away on Sat, Sep 5 at 11:00 AM */
-function subjectWithWhen(prefix: 'Assigned' | 'Unassigned', match: Match): string {
-  const fixture = fixtureLine(match);
-  const date = formatKickoffDate(match.kickoffAt);
-  const time = formatKickoffTime(match.kickoffAt);
-  if (time) return `${prefix}: ${fixture} on ${date} at ${time}`;
-  return `${prefix}: ${fixture} on ${date}`;
-}
-
-function fullAddressLine(match: Match): string {
-  return match.venueAddress?.trim() || '';
-}
-
-function mapsUrlForMatch(match: Match): string | null {
-  return mapsDirectionsUrl({
-    name: match.venueName,
-    address: match.venueAddress?.trim() || undefined,
-    lat: match.venueLat,
-    lng: match.venueLng,
-  });
-}
-
 /** Other named crew (excluding the email recipient). */
 function otherAssignees(
   match: Match,
   excludeUserId: string,
-): { role: string; name: string }[] {
-  const out: { role: string; name: string }[] = [];
+): AssignmentCrewMate[] {
+  const out: AssignmentCrewMate[] = [];
   for (const { slot, assignment } of allActiveAssignments(match)) {
     if (
       !assignment.userId ||
@@ -88,69 +50,6 @@ function otherAssignees(
   return out;
 }
 
-function matchFactsText(match: Match): string {
-  const date = formatKickoffDate(match.kickoffAt);
-  const time = formatKickoffTime(match.kickoffAt);
-  const address = fullAddressLine(match);
-  const maps = mapsUrlForMatch(match);
-  return [
-    `Home: ${match.homeTeamName}`,
-    `Away: ${match.awayTeamName}`,
-    `When: ${date}${time ? ` at ${time}` : ''}`,
-    `Venue: ${match.venueName}`,
-    address ? `Address: ${address}` : '',
-    maps ? `Maps: ${maps}` : '',
-  ]
-    .filter(Boolean)
-    .join('\n');
-}
-
-function matchFactsHtml(match: Match): string {
-  const date = formatKickoffDate(match.kickoffAt);
-  const time = formatKickoffTime(match.kickoffAt);
-  const address = fullAddressLine(match);
-  const maps = mapsUrlForMatch(match);
-  const mapsLine = maps
-    ? `<br/><strong>Maps:</strong> <a href="${maps}">Open in Google Maps</a>`
-    : '';
-  return `<p><strong>Home:</strong> ${match.homeTeamName}<br/>
-<strong>Away:</strong> ${match.awayTeamName}<br/>
-<strong>When:</strong> ${date}${time ? ` at ${time}` : ''}<br/>
-<strong>Venue:</strong> ${match.venueName}${
-    address ? `<br/><strong>Address:</strong> ${address}` : ''
-  }${mapsLine}</p>`;
-}
-
-function crewOthersText(
-  others: { role: string; name: string }[],
-): string {
-  if (others.length === 0) return '';
-  return [
-    `Also assigned:`,
-    ...others.map((o) => `· ${o.role}: ${o.name}`),
-  ].join('\n');
-}
-
-function crewOthersHtml(
-  others: { role: string; name: string }[],
-): string {
-  if (others.length === 0) return '';
-  const items = others
-    .map((o) => `<li><strong>${o.role}:</strong> ${o.name}</li>`)
-    .join('');
-  return `<p><strong>Also assigned:</strong></p><ul>${items}</ul>`;
-}
-
-function matchLinkText(match: Match): string {
-  const url = matchAppUrl(match.id);
-  return `Open in MatchReadyTX: ${url}`;
-}
-
-function matchLinkHtml(match: Match): string {
-  const url = matchAppUrl(match.id);
-  return `<p><a href="${url}">Open this match in MatchReadyTX</a></p>
-<p style="color:#757575;font-size:13px;">If you are not signed in, you will be asked to log in first, then taken to the match.</p>`;
-}
 function canNotify(userId: string): boolean {
   return (
     isFirebaseConfigured &&
@@ -170,35 +69,18 @@ export async function sendCrewAssignmentEmail(opts: {
   const { match, slot, userId } = opts;
   if (!canNotify(userId)) return;
 
-  const role = roleLabel(slot);
-  const fixture = fixtureLine(match);
-  const subject = subjectWithWhen('Assigned', match);
-  const others = otherAssignees(match, userId);
-  const othersText = crewOthersText(others);
-  const body = [
-    `You've been assigned as ${role} for ${fixture}.`,
-    ``,
-    matchFactsText(match),
-    othersText ? `` : null,
-    othersText || null,
-    ``,
-    matchLinkText(match),
-    ``,
-    `Open MatchReadyTX to review and confirm your assignment.`,
-  ]
-    .filter((line) => line != null)
-    .join('\n');
+  const email = assignmentEmailBody({
+    match,
+    roleLabel: roleLabel(slot),
+    otherCrew: otherAssignees(match, userId),
+  });
 
   await callNotifyUser({
     uid: userId,
-    subject,
-    body,
+    subject: email.subject,
+    body: email.text,
     event: opts.event ?? 'assignment',
-    html: `<p>You've been assigned as <strong>${role}</strong> for <strong>${fixture}</strong>.</p>
-${matchFactsHtml(match)}
-${crewOthersHtml(others)}
-${matchLinkHtml(match)}
-<p>Open MatchReadyTX to review and confirm your assignment.</p>`,
+    html: email.html,
   });
 }
 
@@ -259,29 +141,16 @@ export async function persistCrewUnassignmentAndEmail(opts: {
   await saveMatchCrewAssignment(defaultOrgId(), match);
   if (!canNotify(userId)) return;
 
-  const role = roleLabel(slot);
-  const fixture = fixtureLine(match);
-  const subject = subjectWithWhen('Unassigned', match);
-  const body = [
-    `You've been removed as ${role} for ${fixture}.`,
-    ``,
-    matchFactsText(match),
-    ``,
-    matchLinkText(match),
-    ``,
-    `You no longer need to work this match. Open MatchReadyTX if you have questions.`,
-  ]
-    .filter(Boolean)
-    .join('\n');
+  const email = unassignmentEmailBody({
+    match,
+    roleLabel: roleLabel(slot),
+  });
 
   await callNotifyUser({
     uid: userId,
-    subject,
-    body,
+    subject: email.subject,
+    body: email.text,
     event: 'unassignment',
-    html: `<p>You've been removed as <strong>${role}</strong> for <strong>${fixture}</strong>.</p>
-${matchFactsHtml(match)}
-${matchLinkHtml(match)}
-<p>You no longer need to work this match. Open MatchReadyTX if you have questions.</p>`,
+    html: email.html,
   });
 }

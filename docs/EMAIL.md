@@ -68,9 +68,27 @@ Clients **cannot** create `mail` docs (rules deny). Use:
 | `notifyUser` | Self or assigner | Queue email to `users/{uid}.email` |
 | `sendTestEmail` | Assigner | Queue a smoke-test to yourself |
 
+## Where templates live
+
+Transactional copy is **in code** (not Resend dashboard Templates):
+
+[`functions/src/emailTemplates/`](../functions/src/emailTemplates/) — server-side sends (barrel: `index.ts`).
+
+| Module | Event(s) |
+|--------|----------|
+| `matchChange.ts` | `match_change_*` |
+| `assignment.ts` | `assignment`, `assignment_resend` |
+| `unassignment.ts` | `unassignment` |
+| `gameRequestDeclined.ts` | `game_request_declined` |
+| `teamLinkRequest.ts` | `team_link_request` |
+| `complianceHold.ts` | `compliance_hold`, `compliance_hold_cleared` |
+| `shared.ts` | Helpers |
+
+Client-composed sends (Vite cannot import Functions) mirror assignment / compliance under [`src/domain/emailTemplates/`](../src/domain/emailTemplates/) and are used by [`liveAssignment.ts`](../src/services/liveAssignment.ts) / [`complianceHoldNotify.ts`](../src/services/complianceHoldNotify.ts).
+
 ## Assignment / unassignment copy
 
-There is **no separate Resend template file**. Subject/body/HTML are built in the client:
+Subject/body/HTML for crew assign/unassign are still built in the client:
 
 [`src/services/liveAssignment.ts`](../src/services/liveAssignment.ts)
 

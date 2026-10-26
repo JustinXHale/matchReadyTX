@@ -6,6 +6,7 @@ import { google } from 'googleapis';
 import { FieldValue, type Firestore } from 'firebase-admin/firestore';
 import { HttpsError } from 'firebase-functions/v2/https';
 import { logger } from 'firebase-functions';
+import { teamLinkRequestEmailBody } from './emailTemplates';
 import { enqueueMail } from './sendMail';
 import { schedulerTeamLinksUrl } from './appLinks';
 
@@ -246,18 +247,13 @@ async function notifyReviewers(opts: {
     }
   }
 
-  const subject = `Team Admin request: ${teamName}`;
   const reviewUrl = schedulerTeamLinksUrl();
-  const body = [
-    `${requesterName} (${requesterEmail}) asked to manage ${teamName}.`,
-    '',
-    `Review and approve or deny: ${reviewUrl}`,
-    '',
-    `If you are not signed in, log in first — you'll be taken to Team links afterward.`,
-  ].join('\n');
-  const html = `<p><strong>${requesterName}</strong> (<a href="mailto:${requesterEmail}">${requesterEmail}</a>) asked to manage <strong>${teamName}</strong>.</p>
-<p><a href="${reviewUrl}">Review Team Admin requests</a> — approve or deny in Scheduler → Requests → Team links.</p>
-<p style="color:#666;font-size:13px;">If you are not signed in, you'll be asked to log in first, then taken to Team links.</p>`;
+  const mail = teamLinkRequestEmailBody({
+    teamName,
+    requesterName,
+    requesterEmail,
+    reviewUrl,
+  });
 
   for (const uid of uids) {
     const user = await db.doc(`users/${uid}`).get();
@@ -268,9 +264,9 @@ async function notifyReviewers(opts: {
     try {
       await enqueueMail(db, {
         to: email,
-        subject,
-        text: body,
-        html,
+        subject: mail.subject,
+        text: mail.text,
+        html: mail.html,
         uid,
         event: 'team_link_request',
       });

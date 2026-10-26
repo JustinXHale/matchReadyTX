@@ -1,14 +1,17 @@
 import type { Firestore } from 'firebase-admin/firestore';
 import { logger } from 'firebase-functions';
 import { effectiveContactEmailFromUserData } from './contactEmail';
+import {
+  gameRequestDeclinedEmailBody,
+  MATCH_ASSIGNMENT_FULFILLED_DECLINE_REASON,
+} from './emailTemplates';
 import { enqueueMail } from './sendMail';
 
 const CREW_SLOTS = ['mo', 'ar1', 'ar2', 'no4'] as const;
 type CrewSlot = (typeof CREW_SLOTS)[number];
 type RequestableSlot = CrewSlot | 'cmo';
 
-const MATCH_ASSIGNMENT_FULFILLED_DECLINE_REASON =
-  'Match assignment has been fulfilled';
+export { MATCH_ASSIGNMENT_FULFILLED_DECLINE_REASON };
 
 type CrewRow = Record<string, unknown>;
 
@@ -206,8 +209,7 @@ export async function fulfillRaiseHandsOnAssignmentConfirm(opts: {
 
   await batch.commit();
 
-  const subject = 'Game request declined';
-  const body = MATCH_ASSIGNMENT_FULFILLED_DECLINE_REASON;
+  const mail = gameRequestDeclinedEmailBody();
   for (const uid of [...new Set(notifyUserIds)]) {
     try {
       const userSnap = await db.doc(`users/${uid}`).get();
@@ -217,8 +219,9 @@ export async function fulfillRaiseHandsOnAssignmentConfirm(opts: {
       if (!email) continue;
       await enqueueMail(opts.db, {
         to: email,
-        subject,
-        text: body,
+        subject: mail.subject,
+        text: mail.text,
+        html: mail.html,
         uid,
         event: 'game_request_declined',
       });
