@@ -1,5 +1,10 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
+import {
+  Navigate,
+  useNavigate,
+  useParams,
+  useSearchParams,
+} from 'react-router-dom';
 import {
   Button,
   Checkbox,
@@ -28,10 +33,12 @@ import {
 } from '@/domain/reports';
 import { backState, useAppBack, type BackNav } from '@/nav/backNav';
 import { isTournamentMatch } from '@/domain/matchScheduleUrl';
+import { sessionIdFromOutsideMatchId } from '@/domain/outsideCoaching';
 import {
   cardReportPath,
   MATCH_REPORTS_BACK,
   matchReportEditPath,
+  outsidePerformancePath,
   pendingCrewReportForUserOnMatch,
   reportHrefForSubmitted,
 } from '@/features/referee/reports/reportLinks';
@@ -330,6 +337,13 @@ export function MatchReportFlowPage({
   const [error, setError] = useState<string | null>(null);
 
   if (!currentUser) return null;
+
+  const outsideSessionId = sessionIdFromOutsideMatchId(matchId);
+  if (outsideSessionId && !isAssignerFiling) {
+    return (
+      <Navigate to={outsidePerformancePath(outsideSessionId)} replace />
+    );
+  }
 
   const filingUser: UserProfile =
     state.users.find((u) => u.uid === filingUserId) ??

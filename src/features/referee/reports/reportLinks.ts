@@ -1,6 +1,7 @@
 import type { MatchReport } from '@/domain/reports';
 import {
   kickoffHasPassed,
+  MATCH_REPORT_SOURCE_OUTSIDE,
   needsCardReportNudge,
   pendingCrewReportForOfficial,
   pendingReportForOfficial,
@@ -200,6 +201,15 @@ export function resolveSubmittedMatchReport(
 }
 
 export function reportHrefForPending(report: MatchReport): string {
+  if (
+    report.source === MATCH_REPORT_SOURCE_OUTSIDE &&
+    report.outsideSessionId
+  ) {
+    if (report.slot === 'cmo') {
+      return outsideCmoPath(report.outsideSessionId);
+    }
+    return outsidePerformancePath(report.outsideSessionId);
+  }
   if (report.slot === 'cmo') {
     return cmoReportPath(report.matchId, report.subjectOfficialId);
   }
@@ -207,6 +217,15 @@ export function reportHrefForPending(report: MatchReport): string {
 }
 
 export function reportHrefForSubmitted(report: MatchReport): string {
+  if (
+    report.source === MATCH_REPORT_SOURCE_OUTSIDE &&
+    report.outsideSessionId
+  ) {
+    if (report.slot === 'cmo') {
+      return outsideCmoViewPath(report.outsideSessionId);
+    }
+    return outsidePerformancePath(report.outsideSessionId);
+  }
   if (report.slot === 'cmo') {
     return cmoReportViewPath(report.matchId, report.subjectOfficialId, {
       officialId: report.officialId,
