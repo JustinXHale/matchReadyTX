@@ -278,7 +278,7 @@ export function MembersPage() {
           <p className="rs-member-row__meta">
             {refereeEmails.length}{' '}
             {refereeEmails.length === 1 ? 'recipient' : 'recipients'} · Opens
-            your email app with addresses in BCC.
+            Gmail with addresses in BCC.
           </p>
         </div>
       )}

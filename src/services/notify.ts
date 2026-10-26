@@ -41,3 +41,38 @@ export async function callConfirmMatchChange(input: {
   });
   return result.data as { ok: true; confirmedAt: string };
 }
+
+/** Assigner: email crew + teams about a match change (time/venue/status). */
+export async function callNotifyMatchChange(input: {
+  matchId: string;
+  changeType: 'time' | 'venue' | 'status' | 'details';
+  changes?: {
+    oldKickoffAt?: string;
+    newKickoffAt?: string;
+    oldVenueName?: string;
+    newVenueName?: string;
+    oldVenueAddress?: string;
+    newVenueAddress?: string;
+    newStatus?: string;
+  };
+  orgId?: string;
+}): Promise<{
+  emailsSent: number;
+  crewEmails: number;
+  teamEmails: number;
+  warnings: string[];
+}> {
+  const fn = httpsCallable(requireFunctions(), 'notifyMatchChangeCallable');
+  const result = await fn({
+    orgId: input.orgId,
+    matchId: input.matchId,
+    changeType: input.changeType,
+    changes: input.changes ?? {},
+  });
+  return result.data as {
+    emailsSent: number;
+    crewEmails: number;
+    teamEmails: number;
+    warnings: string[];
+  };
+}

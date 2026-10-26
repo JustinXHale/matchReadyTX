@@ -98,7 +98,11 @@ import {
   openRequestSlots,
   pendingRequestForUser,
 } from '@/domain/requests';
-import { openGroupMailto, uniqueEmails } from '@/services/mailto';
+import {
+  copyEmailsToClipboard,
+  openGroupMailto,
+  uniqueEmails,
+} from '@/services/mailto';
 import { persistCrewAssignmentAndEmail, persistCrewUnassignmentAndEmail, resendCrewAssignmentEmail } from '@/services/liveAssignment';
 import {
   applyComplianceHold,
@@ -110,6 +114,7 @@ import {
 import { ComplianceHoldOverlay } from '@/ui/ComplianceHoldOverlay';
 import { notifyComplianceHoldChange } from '@/services/complianceHoldNotify';
 import { defaultOrgId, clearMatchForfeitInFirestore, createGameRequestInFirestore, patchGameRequestContentInFirestore, saveComplianceHoldInFirestore, saveMatchCrewAssignment, saveMatchDetailsInFirestore, saveMatchForfeitInFirestore, saveMatchPlayedForfeitInFirestore, saveMatchRaiseHandInterest, saveMatchWorkflowInFirestore, callMatchSelfService } from '@/services/orgData';
+import { callNotifyMatchChange } from '@/services/notify';
 import {
   formatRaiseHandInterestSlots,
   mergedRaiseHandInterest,
@@ -351,6 +356,9 @@ export function MatchDetailPage() {
   const [showEmailMatch, setShowEmailMatch] = useState(false);
   const [emailScope, setEmailScope] = useState<EmailScope>('both');
   const [emailError, setEmailError] = useState('');
+  const [emailCopiedScope, setEmailCopiedScope] = useState<EmailScope | null>(
+    null,
+  );
   const [proposeKickoff, setProposeKickoff] = useState('');
   const [proposeVenueName, setProposeVenueName] = useState('');
   const [proposeVenueAddress, setProposeVenueAddress] = useState('');
@@ -1140,26 +1148,56 @@ export function MatchDetailPage() {
   const openEmailModal = (preset: EmailScope = 'both') => {
     setEmailScope(preset);
     setEmailError('');
+    setEmailCopiedScope(null);
     setShowEmailMatch(true);
   };
 
-  const confirmEmailMatch = () => {
-    const all = emailsForScope(emailScope);
+  /** Same recipient list Open email uses (prefer others; allow self-only). */
+  const recipientsForScope = (scope: EmailScope): string[] => {
+    const all = emailsForScope(scope);
     const me = currentUser.email.trim().toLowerCase();
     const withoutSelf = all.filter((e) => e.toLowerCase() !== me);
-    // Prefer others when present; allow self-only (dual-role assigner on crew).
-    const emails = withoutSelf.length > 0 ? withoutSelf : all;
+    return withoutSelf.length > 0 ? withoutSelf : all;
+  };
+
+  const copyScopeAddresses = async (scope: EmailScope) => {
+    const emails = recipientsForScope(scope);
     if (emails.length === 0) {
       setEmailError(
         'No profile emails found for that selection. Officials must have an email on their MatchReadyTX profile (Google/Apple sign-in).',
       );
       return;
     }
-    if (!openGroupMailto(emails, emailSubject)) {
-      setEmailError('Could not open your email app.');
+    setEmailScope(scope);
+    const ok = await copyEmailsToClipboard(emails);
+    if (!ok) {
+      setEmailError('Could not copy addresses. Check clipboard permission and try again.');
+      setEmailCopiedScope(null);
       return;
     }
+    setEmailError('');
+    setEmailCopiedScope(scope);
+  };
+
+  const confirmEmailMatch = () => {
+    const emails = recipientsForScope(emailScope);
+    if (emails.length === 0) {
+      setEmailError(
+        'No profile emails found for that selection. Officials must have an email on their MatchReadyTX profile (Google/Apple sign-in).',
+      );
+      return;
+    }
+    // Close first so MUI drops aria-hidden on #root before focus moves.
     setShowEmailMatch(false);
+    setEmailError('');
+    setEmailCopiedScope(null);
+    // Defer so the dialog unmounts before window.open (user-gesture still applies).
+    window.setTimeout(() => {
+      if (!openGroupMailto(emails, emailSubject)) {
+        setEmailError('Could not open Gmail. Allow pop-ups for this site and try again.');
+        setShowEmailMatch(true);
+      }
+    }, 0);
   };
 
   const openDecline = () => {
@@ -1310,38 +1348,75 @@ export function MatchDetailPage() {
         setCoverageAlertSent(true);
         break;
       case 'cancel': {
+        // Notify while crew is still on the match — cancel clears assignments on save.
+        const cancelled = cancelMatch(match);
         store.cancelOrPostpone(match.id, 'cancel');
         if (dataMode === 'live' && isFirebaseConfigured) {
-          void saveMatchWorkflowInFirestore(
-            defaultOrgId(),
-            cancelMatch(match),
-          ).catch((err) => {
-            console.error('saveMatchWorkflowInFirestore failed', err);
-            notify(
-              err instanceof Error
-                ? `Updated locally, but save failed: ${err.message}`
-                : 'Updated locally, but save failed.',
-              'error',
-            );
-          });
+          void (async () => {
+            try {
+              await callNotifyMatchChange({
+                orgId: defaultOrgId(),
+                matchId: match.id,
+                changeType: 'status',
+                changes: { newStatus: 'cancelled' },
+              });
+            } catch (err) {
+              console.error('cancel notifyMatchChange failed', err);
+              notify(
+                err instanceof Error
+                  ? `Match cancelled, but email failed: ${err.message}`
+                  : 'Match cancelled, but notification email failed.',
+                'error',
+              );
+            }
+            try {
+              await saveMatchWorkflowInFirestore(defaultOrgId(), cancelled);
+            } catch (err) {
+              console.error('saveMatchWorkflowInFirestore failed', err);
+              notify(
+                err instanceof Error
+                  ? `Updated locally, but save failed: ${err.message}`
+                  : 'Updated locally, but save failed.',
+                'error',
+              );
+            }
+          })();
         }
         break;
       }
       case 'postpone': {
+        const postponed = postponeMatch(match);
         store.cancelOrPostpone(match.id, 'postpone');
         if (dataMode === 'live' && isFirebaseConfigured) {
-          void saveMatchWorkflowInFirestore(
-            defaultOrgId(),
-            postponeMatch(match),
-          ).catch((err) => {
-            console.error('saveMatchWorkflowInFirestore failed', err);
-            notify(
-              err instanceof Error
-                ? `Updated locally, but save failed: ${err.message}`
-                : 'Updated locally, but save failed.',
-              'error',
-            );
-          });
+          void (async () => {
+            try {
+              await callNotifyMatchChange({
+                orgId: defaultOrgId(),
+                matchId: match.id,
+                changeType: 'status',
+                changes: { newStatus: 'postponed' },
+              });
+            } catch (err) {
+              console.error('postpone notifyMatchChange failed', err);
+              notify(
+                err instanceof Error
+                  ? `Match postponed, but email failed: ${err.message}`
+                  : 'Match postponed, but notification email failed.',
+                'error',
+              );
+            }
+            try {
+              await saveMatchWorkflowInFirestore(defaultOrgId(), postponed);
+            } catch (err) {
+              console.error('saveMatchWorkflowInFirestore failed', err);
+              notify(
+                err instanceof Error
+                  ? `Updated locally, but save failed: ${err.message}`
+                  : 'Updated locally, but save failed.',
+                'error',
+              );
+            }
+          })();
         }
         break;
       }
@@ -3897,7 +3972,11 @@ export function MatchDetailPage() {
       <Modal
         variant={ModalVariant.small}
         isOpen={showEmailMatch}
-        onClose={() => setShowEmailMatch(false)}
+        onClose={() => {
+          setShowEmailMatch(false);
+          setEmailCopiedScope(null);
+          setEmailError('');
+        }}
         aria-labelledby="email-match-title"
         aria-describedby="email-match-desc"
       >
@@ -3908,45 +3987,59 @@ export function MatchDetailPage() {
         </ModalHeader>
         <ModalBody>
           <p id="email-match-desc" className="rs-modal-lede">
-            Opens your default email app with recipients filled in (To). Choose
-            who to include. This is not the MatchReadyTX assignment email — use{' '}
-            <strong>Resend</strong> next to a crew name for that.
+            Opens Gmail in a new tab with recipients filled in (To). Choose who
+            to include. Or use <strong>Copy addresses</strong> and paste into
+            your own mail app. This is not the MatchReadyTX assignment email —
+            use <strong>Resend</strong> next to a crew name for that.
           </p>
           <div
             className="rs-detail-email-scope"
             role="radiogroup"
             aria-label="Recipients"
           >
-            <Radio
-              id="email-scope-teams"
-              name="email-scope"
-              label={`Teams only (${teamEmails.length})`}
-              isChecked={emailScope === 'teams'}
-              onChange={() => {
-                setEmailScope('teams');
-                setEmailError('');
-              }}
-            />
-            <Radio
-              id="email-scope-crew"
-              name="email-scope"
-              label={`Crew only (${crewEmails.length})`}
-              isChecked={emailScope === 'crew'}
-              onChange={() => {
-                setEmailScope('crew');
-                setEmailError('');
-              }}
-            />
-            <Radio
-              id="email-scope-both"
-              name="email-scope"
-              label={`Both (${uniqueEmails([...teamEmails, ...crewEmails]).length})`}
-              isChecked={emailScope === 'both'}
-              onChange={() => {
-                setEmailScope('both');
-                setEmailError('');
-              }}
-            />
+            {(
+              [
+                {
+                  id: 'teams' as const,
+                  label: `Teams only (${teamEmails.length})`,
+                  count: teamEmails.length,
+                },
+                {
+                  id: 'crew' as const,
+                  label: `Crew only (${crewEmails.length})`,
+                  count: crewEmails.length,
+                },
+                {
+                  id: 'both' as const,
+                  label: `Both (${uniqueEmails([...teamEmails, ...crewEmails]).length})`,
+                  count: uniqueEmails([...teamEmails, ...crewEmails]).length,
+                },
+              ] as const
+            ).map((opt) => (
+              <div key={opt.id} className="rs-detail-email-scope__option">
+                <Radio
+                  id={`email-scope-${opt.id}`}
+                  name="email-scope"
+                  label={opt.label}
+                  isChecked={emailScope === opt.id}
+                  onChange={() => {
+                    setEmailScope(opt.id);
+                    setEmailError('');
+                    setEmailCopiedScope(null);
+                  }}
+                />
+                <button
+                  type="button"
+                  className="rs-detail-email-scope__copy"
+                  disabled={opt.count === 0}
+                  onClick={() => void copyScopeAddresses(opt.id)}
+                >
+                  {emailCopiedScope === opt.id
+                    ? 'Copied'
+                    : 'Copy addresses'}
+                </button>
+              </div>
+            ))}
           </div>
           {emailError && (
             <p className="rs-detail-note rs-detail-note--error" role="alert">
@@ -3955,7 +4048,14 @@ export function MatchDetailPage() {
           )}
         </ModalBody>
         <ModalFooter>
-          <Button variant="link" onClick={() => setShowEmailMatch(false)}>
+          <Button
+            variant="link"
+            onClick={() => {
+              setShowEmailMatch(false);
+              setEmailCopiedScope(null);
+              setEmailError('');
+            }}
+          >
             Cancel
           </Button>
           <Button variant="primary" onClick={confirmEmailMatch}>

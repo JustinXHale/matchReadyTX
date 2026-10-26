@@ -23,10 +23,17 @@ export type MatchChangeDetails = {
   newStatus?: string;
 };
 
-function subjectSuffix(changeType: MatchChangeType): string {
+function subjectSuffix(
+  changeType: MatchChangeType,
+  newStatus?: string,
+): string {
   if (changeType === 'time') return 'Time Changed';
   if (changeType === 'venue') return 'Venue Changed';
-  if (changeType === 'status') return 'Status Update';
+  if (changeType === 'status') {
+    if (newStatus === 'cancelled') return 'Cancelled';
+    if (newStatus === 'postponed') return 'Postponed';
+    return 'Status Update';
+  }
   return 'Details Changed';
 }
 
@@ -40,7 +47,7 @@ export function matchChangeEmailBody(opts: {
   const { changeType, match, changes, recipientType, matchUrl } = opts;
 
   const fixture = `${match.homeTeamName} vs ${match.awayTeamName}`;
-  const subject = `Match Change: ${fixture} - ${subjectSuffix(changeType)}`;
+  const subject = `Match Change: ${fixture} - ${subjectSuffix(changeType, changes.newStatus)}`;
 
   const changeSummary: string[] = [];
   const changeSummaryHtml: string[] = [];
@@ -90,13 +97,33 @@ export function matchChangeEmailBody(opts: {
     );
   }
 
-  const ctaText =
-    recipientType === 'crew'
-      ? 'Please confirm you can still work this match by opening MatchReadyTX and reviewing the updated details.'
-      : 'Please confirm your team received this change by opening MatchReadyTX and reviewing the updated details.';
+  const isCancelled = changes.newStatus === 'cancelled';
+  const isPostponed = changes.newStatus === 'postponed';
+  const ctaText = isCancelled
+    ? recipientType === 'crew'
+      ? 'This appointment is cancelled. You are no longer required for this match. Open MatchReadyTX if you need details.'
+      : 'This match has been cancelled. Open MatchReadyTX if you need details or have questions for the scheduler.'
+    : isPostponed
+      ? recipientType === 'crew'
+        ? 'This match is postponed. Please open MatchReadyTX to review details and reconfirm when a new time is set.'
+        : 'This match has been postponed. Please open MatchReadyTX to review details and reconfirm when updated.'
+      : recipientType === 'crew'
+        ? 'Please confirm you can still work this match by opening MatchReadyTX and reviewing the updated details.'
+        : 'Please confirm your team received this change by opening MatchReadyTX and reviewing the updated details.';
+
+  const heading = isCancelled
+    ? 'Match Cancelled'
+    : isPostponed
+      ? 'Match Postponed'
+      : 'Match Details Changed';
+  const intro = isCancelled
+    ? `The following match has been cancelled: ${fixture}.`
+    : isPostponed
+      ? `The following match has been postponed: ${fixture}.`
+      : `Match details have changed for ${fixture}.`;
 
   const text = [
-    `Match details have changed for ${fixture}.`,
+    intro,
     '',
     ...changeSummary,
     '',
@@ -111,7 +138,7 @@ export function matchChangeEmailBody(opts: {
   ].join('\n');
 
   const html = `
-<h2>Match Details Changed</h2>
+<h2>${heading}</h2>
 <p><strong>${fixture}</strong></p>
 
 ${changeSummaryHtml.join('\n')}

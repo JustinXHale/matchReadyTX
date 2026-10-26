@@ -185,6 +185,8 @@ export async function notifyMatchChange(
   const matchFacts: MatchEmailFacts = {
     ...matchData,
     id: matchId,
+    // Prefer announced status (cancel notifies before crew is cleared on save).
+    ...(changes.newStatus ? { status: changes.newStatus } : {}),
   };
 
   const crewUserIds = extractCrewUserIds(matchData.crew);
