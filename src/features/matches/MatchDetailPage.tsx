@@ -454,6 +454,12 @@ export function MatchDetailPage() {
     () => (match ? mergedRaiseHandInterest(match, state.requests) : []),
     [match, state.requests],
   );
+  const changeHistory = useMemo(() => {
+    if (!match) return [];
+    return [...state.proposals]
+      .filter((p) => p.matchId === match.id)
+      .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  }, [match, state.proposals]);
 
   const teamEmails = useMemo(() => {
     if (!match) return [];
@@ -3193,6 +3199,85 @@ export function MatchDetailPage() {
                     </div>
                   </li>
                 ))}
+              </ul>
+            )}
+          </details>
+          <details className="rs-detail-tools rs-match-history-details">
+            <summary id="change-history-heading">Change history</summary>
+            {changeHistory.length === 0 ? (
+              <p className="rs-match-card__meta">
+                No schedule change proposals on this match yet.
+              </p>
+            ) : (
+              <ul className="rs-history-list">
+                {changeHistory.map((p) => {
+                  const statusLabel =
+                    p.status === 'approved'
+                      ? 'Approved'
+                      : p.status === 'pending'
+                        ? 'Pending'
+                        : p.status === 'withdrawn'
+                          ? 'Withdrawn'
+                          : 'Denied';
+                  const whenChanged =
+                    p.kickoffAt &&
+                    p.previousKickoffAt &&
+                    p.kickoffAt !== p.previousKickoffAt;
+                  const venueChanged =
+                    (p.venueName != null &&
+                      p.venueName !== (p.previousVenueName ?? '')) ||
+                    (p.venueAddress != null &&
+                      p.venueAddress !== (p.previousVenueAddress ?? ''));
+                  const changeParts: string[] = [];
+                  if (whenChanged) {
+                    changeParts.push(
+                      `${formatMatchKickoff(p.previousKickoffAt!, orgTz)} → ${formatMatchKickoff(p.kickoffAt!, orgTz)}`,
+                    );
+                  }
+                  if (venueChanged) {
+                    const from =
+                      [p.previousVenueName, p.previousVenueAddress]
+                        .filter(Boolean)
+                        .join(' · ') || '—';
+                    const to =
+                      [p.venueName, p.venueAddress]
+                        .filter(Boolean)
+                        .join(' · ') || '—';
+                    changeParts.push(`${from} → ${to}`);
+                  }
+                  if (changeParts.length === 0) {
+                    changeParts.push('No field deltas recorded');
+                  }
+                  return (
+                    <li key={p.id}>
+                      <strong>
+                        {statusLabel} · {p.proposedByName ?? 'Team'} (
+                        {proposalTeamName(p.proposedByTeamId)})
+                      </strong>
+                      <div className="rs-match-card__meta">
+                        {changeParts.join(' · ')}
+                      </div>
+                      <div className="rs-match-card__meta">
+                        Proposed {new Date(p.createdAt).toLocaleString()}
+                        {p.assignerAckAt
+                          ? ` · Applied ${new Date(p.assignerAckAt).toLocaleString()}${
+                              p.assignerAckByName
+                                ? ` by ${p.assignerAckByName}`
+                                : ''
+                            }`
+                          : ''}
+                        {p.otherTeamAcceptedAt
+                          ? ` · Other team accepted ${new Date(p.otherTeamAcceptedAt).toLocaleString()}${
+                              p.otherTeamAcceptedByName
+                                ? ` (${p.otherTeamAcceptedByName})`
+                                : ''
+                            }`
+                          : ''}
+                        {p.denyReason ? ` · ${p.denyReason}` : ''}
+                      </div>
+                    </li>
+                  );
+                })}
               </ul>
             )}
           </details>

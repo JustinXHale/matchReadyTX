@@ -121,10 +121,36 @@ export function pendingFixtureRequests(
   return requests.filter((r) => r.status === 'pending');
 }
 
+/** Approved / declined fixture proposals — newest review first. */
+export function resolvedFixtureRequests(
+  requests: FixtureRequest[],
+): FixtureRequest[] {
+  return requests
+    .filter((r) => r.status === 'approved' || r.status === 'declined')
+    .sort((a, b) =>
+      (b.reviewedAt ?? b.createdAt).localeCompare(
+        a.reviewedAt ?? a.createdAt,
+      ),
+    );
+}
+
 export function pendingTeamLinkRequests(
   requests: AppState['teamLinkRequests'],
 ): AppState['teamLinkRequests'] {
   return requests.filter((r) => r.status === 'pending');
+}
+
+/** Approved / denied team-link requests — newest review first. */
+export function resolvedTeamLinkRequests(
+  requests: AppState['teamLinkRequests'],
+): AppState['teamLinkRequests'] {
+  return [...requests]
+    .filter((r) => r.status === 'approved' || r.status === 'denied')
+    .sort((a, b) =>
+      (b.reviewedAt ?? b.createdAt).localeCompare(
+        a.reviewedAt ?? a.createdAt,
+      ),
+    );
 }
 
 export function pendingCardReportReopenQueue(

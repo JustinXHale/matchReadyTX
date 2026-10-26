@@ -1,7 +1,10 @@
 import { useMemo } from 'react';
 import { useApp } from '@/app/AppContext';
 import { TeamLinkRequestQueue } from '@/features/scheduler/queues/TeamLinkRequestQueue';
-import { pendingTeamLinkRequests } from '@/features/scheduler/queues/selectors';
+import {
+  pendingTeamLinkRequests,
+  resolvedTeamLinkRequests,
+} from '@/features/scheduler/queues/selectors';
 import { useSchedulerRequestActions } from '@/features/scheduler/queues/requestQueuePagesShared';
 
 export function SchedulerQueuesTeamLinkRequestsPage() {
@@ -12,6 +15,16 @@ export function SchedulerQueuesTeamLinkRequestsPage() {
     () => pendingTeamLinkRequests(state.teamLinkRequests),
     [state.teamLinkRequests],
   );
+
+  const teamLinkHistory = useMemo(
+    () => resolvedTeamLinkRequests(state.teamLinkRequests),
+    [state.teamLinkRequests],
+  );
+
+  const reviewerName = (userId: string | undefined) => {
+    if (!userId) return undefined;
+    return state.users.find((u) => u.uid === userId)?.displayName;
+  };
 
   return (
     <>
@@ -30,6 +43,46 @@ export function SchedulerQueuesTeamLinkRequestsPage() {
           onDeny={(id, reason) => void onReviewTeamLink(id, 'deny', reason)}
         />
       )}
+
+      <details className="rs-detail-tools">
+        <summary id="team-link-request-history-heading">
+          Team link history
+          {teamLinkHistory.length > 0 ? ` (${teamLinkHistory.length})` : ''}
+        </summary>
+        {teamLinkHistory.length === 0 ? (
+          <p className="rs-match-card__meta">
+            No approved or denied team-link requests yet.
+          </p>
+        ) : (
+          <ul className="rs-history-list">
+            {teamLinkHistory.map((r) => {
+              const statusLabel =
+                r.status === 'approved' ? 'Approved' : 'Denied';
+              const reviewedBy = reviewerName(r.reviewedByUserId);
+              return (
+                <li key={r.id}>
+                  <strong>
+                    {statusLabel} · {r.requesterName} → {r.teamName}
+                  </strong>
+                  <div className="rs-match-card__meta">
+                    {r.requesterEmail}
+                    {r.autoApproved ? ' · Auto-approved' : ''}
+                  </div>
+                  <div className="rs-match-card__meta">
+                    Submitted {new Date(r.createdAt).toLocaleString()}
+                    {r.reviewedAt
+                      ? ` · ${statusLabel} ${new Date(r.reviewedAt).toLocaleString()}${
+                          reviewedBy ? ` by ${reviewedBy}` : ''
+                        }`
+                      : ''}
+                    {r.denyReason ? ` · ${r.denyReason}` : ''}
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
+        )}
+      </details>
     </>
   );
 }
