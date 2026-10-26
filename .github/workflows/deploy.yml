@@ -1,6 +1,6 @@
 # Deploy Hosting + Firestore rules + Cloud Functions on push to main.
 # One-time setup (GitHub → Settings → Secrets and variables → Actions):
-#   FIREBASE_TOKEN          — from `firebase login:ci`
+#   FIREBASE_SERVICE_ACCOUNT — full JSON key for github-firebase-deploy@… SA
 #   VITE_FIREBASE_API_KEY
 #   VITE_FIREBASE_AUTH_DOMAIN   — matchreadytx.web.app (Hosting host)
 #   VITE_FIREBASE_PROJECT_ID
@@ -89,7 +89,10 @@ jobs:
           } > functions/.env.matchreadytx
           echo "Wrote functions/.env.matchreadytx (string params only) for non-interactive deploy"
 
+      - name: Authenticate to Google Cloud
+        run: |
+          echo '${{ secrets.FIREBASE_SERVICE_ACCOUNT }}' > "${RUNNER_TEMP}/gcp-sa.json"
+          echo "GOOGLE_APPLICATION_CREDENTIALS=${RUNNER_TEMP}/gcp-sa.json" >> "$GITHUB_ENV"
+
       - name: Deploy to Firebase
         run: npx firebase-tools@13 deploy --only hosting,firestore,functions --project matchreadytx --non-interactive --force
-        env:
-          FIREBASE_TOKEN: ${{ secrets.FIREBASE_TOKEN }}
