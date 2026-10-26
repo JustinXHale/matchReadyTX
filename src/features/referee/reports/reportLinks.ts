@@ -303,6 +303,14 @@ export function matchDetailReportActions(
   return { primary, cardLink };
 }
 
+export type MatchDetailReportLink = {
+  kind: 'match' | 'coaching' | 'card';
+  label: string;
+  to: string;
+  /** Submitted report on file — green “View …” treatment. */
+  complete?: boolean;
+};
+
 /** Compact header links for match detail title row. */
 export function matchDetailHeaderReportLinks(
   match: Match,
@@ -310,12 +318,8 @@ export function matchDetailHeaderReportLinks(
   matchReports: MatchReport[],
   cardReports: CardReport[],
   now = Date.now(),
-): { kind: 'match' | 'coaching' | 'card'; label: string; to: string }[] {
-  const links: {
-    kind: 'match' | 'coaching' | 'card';
-    label: string;
-    to: string;
-  }[] = [];
+): MatchDetailReportLink[] {
+  const links: MatchDetailReportLink[] = [];
   const pendings = pendingReportsForOfficialOnMatch(
     matchReports,
     match.id,
@@ -346,11 +350,12 @@ export function matchDetailHeaderReportLinks(
   } else if (moSubmitted) {
     links.push({
       kind: 'match',
-      label: 'Match report',
+      label: 'View match report',
       to: matchReportViewPath(match.id, {
         officialId: moSubmitted.officialId,
         slot: 'mo',
       }),
+      complete: true,
     });
   }
 
@@ -369,30 +374,33 @@ export function matchDetailHeaderReportLinks(
   } else if (cmoSubmittedList.length === 1) {
     links.push({
       kind: 'coaching',
-      label: 'Coaching report',
+      label: 'View coaching report',
       to: cmoReportViewPath(
         match.id,
         cmoSubmittedList[0]!.subjectOfficialId,
       ),
+      complete: true,
     });
   } else if (cmoSubmittedList.length > 1) {
     links.push({
       kind: 'coaching',
-      label: 'Coaching reports',
+      label: 'View coaching reports',
       to: cmoReportPath(match.id),
+      complete: true,
     });
   }
 
   if (cardSubmitted) {
     links.push({
       kind: 'card',
-      label: 'Card report',
+      label: 'View card report',
       to: cardReportPath(match.id),
+      complete: true,
     });
   } else if (isMo && kickoffHasPassed(match.kickoffAt, now)) {
     links.push({
       kind: 'card',
-      label: 'Card report',
+      label: 'File card report',
       to: cardReportPath(match.id),
     });
   }

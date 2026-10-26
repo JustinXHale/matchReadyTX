@@ -341,6 +341,28 @@
   min-height: var(--rs-tap-min);
 }
 
+/* No report on file — clearly inert vs actionable / complete. */
+.rs-detail-crew-report-actions__empty,
+.rs-detail-crew-report-actions__empty:disabled {
+  color: var(--rs-color-muted) !important;
+  background: color-mix(
+    in srgb,
+    var(--rs-color-muted) 12%,
+    var(--rs-color-surface)
+  ) !important;
+  border-color: color-mix(
+    in srgb,
+    var(--rs-color-muted) 28%,
+    var(--rs-color-surface-border)
+  ) !important;
+  opacity: 1 !important;
+  cursor: not-allowed;
+}
+
+.rs-detail-crew-report-actions__complete {
+  font-weight: 700;
+}
+
 .rs-detail-people__row--reports {
   display: flex;
   flex-wrap: wrap;

@@ -30,6 +30,7 @@ import {
   matchTeamDisplayNames,
   type TeamConfirmationState,
 } from '@/domain/matchCardFooter';
+import { matchHasOutsideAppointmentMo } from '@/domain/placeholderAssignment';
 import { genderLabel, type GameRequest, type Match } from '@/domain/types';
 import { backState, type BackNav } from '@/nav/backNav';
 import { assignmentStatusPaletteKey } from '@/theme/m3Theme';
@@ -196,6 +197,10 @@ export function MatchSummaryCard({
     match.status === 'cancelled' ||
     Boolean(match.forfeitTeamId) ||
     match.playedForfeit === true;
+  /** Outside MO — green status border, muted body like cancelled/forfeit. */
+  const outsideAppointmentMuted =
+    !inactiveMatch && matchHasOutsideAppointmentMo(match);
+  const mutedCard = inactiveMatch || outsideAppointmentMuted;
   const officialNeededEmphasis = emphasizeOfficialNeeded && !inactiveMatch;
 
   const venue =
@@ -210,10 +215,8 @@ export function MatchSummaryCard({
         p: 2,
         '&:last-child': { pb: 2 },
         minHeight: 88,
-        color: inactiveMatch ? 'text.secondary' : 'text.primary',
-        '& .MuiTypography-root': inactiveMatch
-          ? { opacity: 0.72 }
-          : undefined,
+        color: mutedCard ? 'text.secondary' : 'text.primary',
+        '& .MuiTypography-root': mutedCard ? { opacity: 0.72 } : undefined,
       }}
     >
       <Box
@@ -463,7 +466,7 @@ export function MatchSummaryCard({
       className="rs-match-summary-card"
       elevation={0}
       sx={{
-        bgcolor: inactiveMatch ? 'surfaceContainerHigh' : 'background.paper',
+        bgcolor: mutedCard ? 'surfaceContainerHigh' : 'background.paper',
         border: (t) =>
           officialNeededEmphasis
             ? `2px solid ${t.palette.assignmentPending.main}`
@@ -476,6 +479,7 @@ export function MatchSummaryCard({
       data-assignment-status={status}
       data-card-emphasis={officialNeededEmphasis ? 'official-needed' : undefined}
       data-match-inactive={inactiveMatch ? 'true' : undefined}
+      data-outside-appointment={outsideAppointmentMuted ? 'true' : undefined}
     >
       {topBanner ? (
         <Box
@@ -484,7 +488,7 @@ export function MatchSummaryCard({
             width: '100%',
             borderBottom: (t) => `1px solid ${t.palette.outlineVariant}`,
             bgcolor: (t) => t.palette.surfaceContainerHigh,
-            '& > *': inactiveMatch ? { opacity: 0.72 } : undefined,
+            '& > *': mutedCard ? { opacity: 0.72 } : undefined,
           }}
           onClick={(e) => e.stopPropagation()}
         >

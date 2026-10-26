@@ -1,3 +1,4 @@
+import { isOutsideAppointmentUserId } from '@/domain/placeholderAssignment';
 import {
   assignmentForUser,
   cmoAsAssignment,
@@ -43,6 +44,9 @@ export function crewSlotLineLabel(assignment: CrewAssignment | undefined): strin
     assignment.status === 'released'
   ) {
     return 'None';
+  }
+  if (isOutsideAppointmentUserId(assignment.userId)) {
+    return 'Outside';
   }
   if (assignment.status === 'confirmed') {
     return assignment.userName ?? 'Appointed';
@@ -224,23 +228,29 @@ export function crewColumnLines(
 
     for (const a of people) {
       const isMine = Boolean(highlightUserId && a.userId === highlightUserId);
-      const raw =
-        a.status === 'confirmed' && a.userName?.trim()
+      const outside = isOutsideAppointmentUserId(a.userId);
+      const raw = outside
+        ? 'Outside'
+        : a.status === 'confirmed' && a.userName?.trim()
           ? compactCrewPersonName(a.userName)
           : crewSlotLineLabel(a);
       const value = redactNames
-        ? a.status === 'confirmed'
-          ? 'Confirmed'
+        ? a.status === 'confirmed' || outside
+          ? outside
+            ? 'Outside'
+            : 'Confirmed'
           : 'Pending'
         : raw;
       lines.push({
         id: a.id,
         slotLabel: label,
         value,
-        isMine,
+        isMine: isMine && !outside,
         userId: a.userId,
-        confirmed: a.status === 'confirmed',
-        doubleBooked: Boolean(a.userId && doubleBooked.has(a.userId)),
+        confirmed: a.status === 'confirmed' || outside,
+        doubleBooked: Boolean(
+          a.userId && !outside && doubleBooked.has(a.userId),
+        ),
       });
     }
     if (openN > 0) pushOpen(`${key}-open`, label, openN, feeTarget);

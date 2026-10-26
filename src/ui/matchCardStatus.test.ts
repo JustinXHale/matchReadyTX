@@ -1,9 +1,16 @@
 import { describe, expect, it } from 'vitest';
+import {
+  OUTSIDE_APPOINTMENT_LABEL,
+  OUTSIDE_APPOINTMENT_USER_ID,
+} from '@/domain/placeholderAssignment';
 import type { Match } from '@/domain/types';
 import { emptyCrew } from '@/domain/types';
 import { workflowMatchCardStatus } from '@/ui/matchCardStatus';
 
-function match(status: Match['status']): Match {
+function match(
+  status: Match['status'],
+  crew: Match['crew'] = emptyCrew(),
+): Match {
   return {
     id: `m-${status}`,
     sheetRowKey: `m-${status}`,
@@ -19,7 +26,7 @@ function match(status: Match['status']): Match {
     gender: 'men',
     flightProvided: false,
     housingProvided: false,
-    crew: emptyCrew(),
+    crew,
   };
 }
 
@@ -53,5 +60,23 @@ describe('workflowMatchCardStatus', () => {
         needsReassignment: true,
       }),
     ).toEqual({ tone: 'declined', label: 'Needs reassignment' });
+  });
+
+  it('treats outside MO appointments as approved Outside', () => {
+    const crew = emptyCrew();
+    crew.mo = [
+      {
+        id: 'mo1',
+        slot: 'mo',
+        userId: OUTSIDE_APPOINTMENT_USER_ID,
+        userName: OUTSIDE_APPOINTMENT_LABEL,
+        status: 'confirmed',
+        history: [],
+      },
+    ];
+    expect(workflowMatchCardStatus(match('draft', crew))).toEqual({
+      tone: 'approved',
+      label: 'Outside',
+    });
   });
 });

@@ -4,6 +4,7 @@ import {
   displayMatchStatus,
   matchStatusLabel,
 } from '@/domain/matchTransitions';
+import { matchHasOutsideAppointmentMo } from '@/domain/placeholderAssignment';
 import type { Match } from '@/domain/types';
 
 export type MatchCardStatusPresentation = {
@@ -37,6 +38,10 @@ export function workflowMatchCardStatus(
     status === 'needs_reconfirmation'
   ) {
     return { tone: 'declined', label: matchStatusLabel(match) };
+  }
+  // Outside MO — no society accept / confirm work; green but informational.
+  if (matchHasOutsideAppointmentMo(match)) {
+    return { tone: 'approved', label: 'Outside' };
   }
   if (
     status === 'team_confirmed' ||

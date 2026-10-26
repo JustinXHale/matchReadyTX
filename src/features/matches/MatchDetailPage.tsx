@@ -1582,6 +1582,7 @@ export function MatchDetailPage() {
     kind: 'match' | 'coaching' | 'card';
     label: string;
     to?: string;
+    complete?: boolean;
     unavailableLabel?: string;
   }[] = [];
   const addCrewReportAction = (
@@ -2807,27 +2808,38 @@ export function MatchDetailPage() {
             className="rs-detail-crew-report-actions"
             aria-label="Report actions"
           >
-            {crewReportActions.map((action) => (
-              <Button
-                key={action.kind}
-                variant="secondary"
-                isDisabled={!action.to}
-                aria-label={action.unavailableLabel ?? action.label}
-                onClick={
-                  action.to
-                    ? () =>
-                        navigate(action.to!, {
-                          state: backState({
-                            to: `/matches/${match.id}`,
-                            label: 'Match',
-                          }),
-                        })
-                    : undefined
-                }
-              >
-                {action.label}
-              </Button>
-            ))}
+            {crewReportActions.map((action) => {
+              const available = Boolean(action.to);
+              const complete = Boolean(action.complete && available);
+              return (
+                <Button
+                  key={action.kind}
+                  variant={complete ? 'success' : 'secondary'}
+                  isDisabled={!available}
+                  className={
+                    !available
+                      ? 'rs-detail-crew-report-actions__empty'
+                      : complete
+                        ? 'rs-detail-crew-report-actions__complete'
+                        : undefined
+                  }
+                  aria-label={action.unavailableLabel ?? action.label}
+                  onClick={
+                    available
+                      ? () =>
+                          navigate(action.to!, {
+                            state: backState({
+                              to: `/matches/${match.id}`,
+                              label: 'Match',
+                            }),
+                          })
+                      : undefined
+                  }
+                >
+                  {action.label}
+                </Button>
+              );
+            })}
           </div>
         )}
         {crewVisible ? (

@@ -19,6 +19,7 @@ import {
   shouldShowComplianceHoldUi,
 } from '@/domain/complianceHold';
 import { statusLabel } from '@/domain/matchTransitions';
+import { matchHasOutsideAppointmentMo } from '@/domain/placeholderAssignment';
 import { isMatchDidNotPlay } from '@/domain/requests';
 import { genderLabel, type Match } from '@/domain/types';
 import { useMemo } from 'react';
@@ -351,6 +352,7 @@ export function MatchListRow({
   );
 
   const isMutedOutcome = isMatchDidNotPlay(match);
+  const outsideAppointmentMuted = matchHasOutsideAppointmentMo(match);
   const rowClass = [
     'rs-list-row',
     split === 'action' ? 'rs-list-row--action' : '',
@@ -364,6 +366,13 @@ export function MatchListRow({
     !complianceLocked && !urgent && warn ? 'rs-list-row--warn' : '',
     !complianceLocked && !urgent && !warn && submitted
       ? 'rs-list-row--submitted'
+      : '',
+    !complianceLocked &&
+    !urgent &&
+    !warn &&
+    !submitted &&
+    outsideAppointmentMuted
+      ? 'rs-list-row--outside'
       : '',
     !complianceLocked &&
     !urgent &&

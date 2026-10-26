@@ -8,6 +8,10 @@ import {
   teamDisplayAbbreviation,
   teamDisplayLabel,
 } from '@/domain/matchCardFooter';
+import {
+  OUTSIDE_APPOINTMENT_LABEL,
+  OUTSIDE_APPOINTMENT_USER_ID,
+} from '@/domain/placeholderAssignment';
 import type { Match } from '@/domain/types';
 import { emptyCrew } from '@/domain/types';
 
@@ -116,6 +120,29 @@ describe('matchCardFooter', () => {
     const m = match({ id: 'm1', status: 'cancelled' });
     expect(matchTeamConfirmationState(m, 'home')).toBeNull();
     expect(matchTeamConfirmationState(m, 'away')).toBeNull();
+  });
+
+  it('hides Unconfirmed on outside MO games but keeps Confirmed', () => {
+    const crew = emptyCrew();
+    crew.mo = [
+      {
+        id: 'mo1',
+        slot: 'mo',
+        userId: OUTSIDE_APPOINTMENT_USER_ID,
+        userName: OUTSIDE_APPOINTMENT_LABEL,
+        status: 'confirmed',
+        history: [],
+      },
+    ];
+    const m = match({
+      id: 'm1',
+      crew,
+      homeConfirmedAt: '2026-09-01T00:00:00.000Z',
+      awayConfirmedAt: undefined,
+    });
+    expect(matchTeamConfirmationState(m, 'home')).toBe('confirmed');
+    expect(matchTeamConfirmationState(m, 'away')).toBeNull();
+    expect(matchUnconfirmedTeamBadges(m, new Map())).toEqual([]);
   });
 
   it('falls back to initials when abbreviation missing', () => {

@@ -417,6 +417,35 @@
   border-color: var(--rs-card-outline);
 }
 
+/* Outside MO appointment — green edge, muted body (informational). */
+.rs-list-row--outside {
+  --rs-card-outline: color-mix(
+    in srgb,
+    var(--rs-color-ok) 42%,
+    var(--rs-color-surface-border)
+  );
+  background: color-mix(in srgb, var(--rs-color-ok) 8%, var(--rs-color-surface));
+  border-color: var(--rs-card-outline);
+  border-left-color: var(--rs-color-ok);
+  opacity: 0.88;
+}
+
+.rs-list-row--outside .rs-list-row__teams,
+.rs-list-row--outside .rs-list-row__date,
+.rs-list-row--outside .rs-list-row__day,
+.rs-list-row--outside .rs-list-row__month,
+.rs-list-row--outside .rs-list-row__venue,
+.rs-list-row--outside .rs-list-row__time,
+.rs-list-row--outside .rs-list-row__ha,
+.rs-list-row--outside .rs-list-row__name {
+  color: color-mix(in srgb, var(--rs-card-text) 70%, var(--rs-card-secondary-text));
+}
+
+.pf-v6-theme-dark .rs-list-row--outside {
+  background: color-mix(in srgb, var(--rs-color-ok) 12%, var(--rs-color-surface));
+  opacity: 0.92;
+}
+
 .rs-list-row--submitted .rs-list-row__main:hover,
 .rs-list-row--submitted .rs-list-row__main:focus-visible {
   background: var(--rs-m3-surface-container-high);

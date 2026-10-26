@@ -4,6 +4,7 @@ import {
   matchSideChoiceLabel,
   parseMatchDivision,
 } from '@/domain/matchDivision';
+import { matchHasOutsideAppointmentMo } from '@/domain/placeholderAssignment';
 import type { Match, Team } from '@/domain/types';
 
 /** Card footer label — explicit title, or derived format + event type (e.g. 7s Tournament). */
@@ -111,12 +112,15 @@ export function matchTeamConfirmationState(
     | 'playedForfeit'
     | 'homeConfirmedAt'
     | 'awayConfirmedAt'
+    | 'crew'
   >,
   side: 'home' | 'away',
 ): TeamConfirmationState {
   if (!matchShowsTeamConfirmation(match)) return null;
   const confirmedAt =
     side === 'home' ? match.homeConfirmedAt : match.awayConfirmedAt;
+  // Outside MO games do not need team confirm — hide Unconfirmed; keep Confirmed if set.
+  if (!confirmedAt && matchHasOutsideAppointmentMo(match)) return null;
   return confirmedAt ? 'confirmed' : 'unconfirmed';
 }
 
@@ -137,10 +141,12 @@ export function matchUnconfirmedTeamBadges(
     | 'awayTeamName'
     | 'homeConfirmedAt'
     | 'awayConfirmedAt'
+    | 'crew'
   >,
   teamsById: ReadonlyMap<string, Pick<Team, 'abbreviation' | 'name'>>,
 ): MatchUnconfirmedTeamBadge[] {
   if (!matchShowsTeamConfirmation(match)) return [];
+  if (matchHasOutsideAppointmentMo(match)) return [];
 
   const out: MatchUnconfirmedTeamBadge[] = [];
   if (!match.homeConfirmedAt) {
