@@ -2814,7 +2814,7 @@ export function MatchDetailPage() {
               return (
                 <Button
                   key={action.kind}
-                  variant={complete ? 'success' : 'secondary'}
+                  variant="secondary"
                   isDisabled={!available}
                   className={
                     !available

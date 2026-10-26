@@ -361,6 +361,9 @@
 
 .rs-detail-crew-report-actions__complete {
   font-weight: 700;
+  color: var(--rs-color-on-ok, #fff) !important;
+  background: var(--rs-color-ok) !important;
+  border-color: var(--rs-color-ok) !important;
 }
 
 .rs-detail-people__row--reports {
