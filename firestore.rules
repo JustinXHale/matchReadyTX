@@ -286,6 +286,8 @@ service cloud.firestore {
         allow write: if isAssigner(orgId)
           || (isMember(orgId) && memberMatchSelfServicePatch());
 
+        // Team confirm timestamps (including reconfirm after a schedule change).
+        // Crew reconfirm is Admin SDK via matchSelfService / confirmMatchChange.
         function memberMatchSelfServicePatch() {
           let diff = request.resource.data.diff(resource.data).affectedKeys();
           let held = resource.data.get('complianceHold', null) is map

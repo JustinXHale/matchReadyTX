@@ -48,6 +48,38 @@ function allPeopleConfirmed(crew: Record<CrewSlot, CrewRow[]>): boolean {
   );
 }
 
+function anyHeldNamed(matchData: Record<string, unknown>): boolean {
+  const crew = cloneCrew(matchData.crew);
+  if (
+    CREW_SLOTS.some((slot) =>
+      crewPeople(crew[slot]).some((a) => String(a.status ?? '') === 'held'),
+    )
+  ) {
+    return true;
+  }
+  const cmoRaw = Array.isArray(matchData.cmo) ? matchData.cmo : [];
+  return cmoRaw.some(
+    (row) =>
+      row &&
+      typeof row === 'object' &&
+      Boolean((row as CrewRow).userId) &&
+      String((row as CrewRow).status ?? '') === 'held',
+  );
+}
+
+function retainNeedsReconfirmation(
+  prev: Record<string, unknown>,
+  next: Record<string, unknown>,
+): string {
+  const status = String(next.status ?? prev.status ?? '');
+  if (String(prev.status ?? '') !== 'needs_reconfirmation') return status;
+  const bothTeams =
+    Boolean(next.homeConfirmedAt ?? prev.homeConfirmedAt) &&
+    Boolean(next.awayConfirmedAt ?? prev.awayConfirmedAt);
+  if (!bothTeams || anyHeldNamed(next)) return 'needs_reconfirmation';
+  return status;
+}
+
 function appendHistory(
   row: CrewRow,
   entry: Record<string, unknown>,
@@ -196,7 +228,11 @@ export async function runMatchSelfService(opts: {
       throw new HttpsError('invalid-argument', 'Unknown action.');
     }
     patch.cmo = cmoList;
-    patch.status = status;
+    patch.status = retainNeedsReconfirmation(data, {
+      ...data,
+      cmo: cmoList,
+      status,
+    });
     await matchRef.set(patch, { merge: true });
     if (action === 'confirm') {
       await fulfillRaiseHandsOnAssignmentConfirm({
@@ -254,7 +290,11 @@ export async function runMatchSelfService(opts: {
   }
 
   patch.crew = crew;
-  patch.status = status;
+  patch.status = retainNeedsReconfirmation(data, {
+    ...data,
+    crew,
+    status,
+  });
   await matchRef.set(patch, { merge: true });
 
   if (action === 'confirm') {

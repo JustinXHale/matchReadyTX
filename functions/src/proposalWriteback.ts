@@ -32,6 +32,44 @@ function headerIndex(headers: string[], aliases: string[]): number {
   return -1;
 }
 
+const HOLDABLE_STATUSES = new Set(['confirmed', 'official', 'held']);
+
+function asRow(value: unknown): Record<string, unknown> | null {
+  if (value && typeof value === 'object' && !Array.isArray(value)) {
+    return { ...(value as Record<string, unknown>) };
+  }
+  return null;
+}
+
+/** Put named crew/CMO on hold so they must reconfirm after a schedule change. */
+function holdNamedAssignments(raw: unknown): unknown {
+  if (Array.isArray(raw)) {
+    return raw.map((item) => holdOne(item));
+  }
+  if (raw && typeof raw === 'object') {
+    const src = raw as Record<string, unknown>;
+    const out: Record<string, unknown> = {};
+    for (const [key, value] of Object.entries(src)) {
+      if (Array.isArray(value)) {
+        out[key] = value.map((item) => holdOne(item));
+      } else {
+        out[key] = holdOne(value);
+      }
+    }
+    return out;
+  }
+  return raw;
+}
+
+function holdOne(value: unknown): unknown {
+  const row = asRow(value);
+  if (!row) return value;
+  const userId = String(row.userId ?? '').trim();
+  const status = String(row.status ?? '');
+  if (!userId || !HOLDABLE_STATUSES.has(status || 'confirmed')) return row;
+  return { ...row, status: 'held', confirmedAt: null };
+}
+
 function chicagoDateParts(iso: string): { date: string; time: string } {
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) {
@@ -229,6 +267,8 @@ export async function runProposalWriteback(
   });
 
   const updatedAt = new Date().toISOString();
+  const heldCrew = holdNamedAssignments(match.crew);
+  const heldCmo = holdNamedAssignments(match.cmo);
   await matchRef.set(
     {
       kickoffAt,
@@ -237,6 +277,8 @@ export async function runProposalWriteback(
       status: 'needs_reconfirmation',
       homeConfirmedAt: FieldValue.delete(),
       awayConfirmedAt: FieldValue.delete(),
+      ...(heldCrew ? { crew: heldCrew } : {}),
+      ...(heldCmo ? { cmo: heldCmo } : {}),
       updatedAt,
       sheetSyncedAt: updatedAt,
     },

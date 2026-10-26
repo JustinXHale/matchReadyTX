@@ -1,10 +1,12 @@
 import { archiveCrewAssignmentsHistory } from './crew';
-import type { Match, MatchStatus } from './types';
+import { isOutsideAppointmentUserId } from './placeholderAssignment';
+import type { CmoContact, Match, MatchStatus } from './types';
 import {
   allPartiesConfirmed,
   CREW_SLOTS,
   bothTeamsConfirmed,
   crewPeople,
+  effectiveCmoStatus,
   emptyCrew,
   isCrewVisibleToTeams,
 } from './types';
@@ -34,6 +36,20 @@ export function confirmTeam(
     homeConfirmedAt: side === 'home' ? at : match.homeConfirmedAt,
     awayConfirmedAt: side === 'away' ? at : match.awayConfirmedAt,
   };
+  if (match.status === 'needs_reconfirmation') {
+    const pending = needsReconfirmation({
+      ...next,
+      status: 'needs_reconfirmation',
+    });
+    if (
+      pending.homeNeedsConfirm ||
+      pending.awayNeedsConfirm ||
+      pending.crewNeedsConfirm.length > 0
+    ) {
+      return { ...next, status: 'needs_reconfirmation' };
+    }
+    return { ...next, status: inferWorkflowStatus(next) };
+  }
   if (bothTeamsConfirmed(next)) {
     const hasOfficialCrew = CREW_SLOTS.some((s) =>
       crewPeople(next.crew[s]).some(
@@ -110,6 +126,18 @@ function holdCrewAssignments(match: Match): Match['crew'] {
   return crew;
 }
 
+function holdCmoContacts(cmo: CmoContact[] | undefined): CmoContact[] | undefined {
+  if (!cmo) return cmo;
+  return cmo.map((c) => {
+    if (!c.userId) return c;
+    const status = effectiveCmoStatus(c);
+    if (status === 'confirmed' || status === 'official' || status === 'held') {
+      return { ...c, status: 'held' as const, confirmedAt: undefined };
+    }
+    return c;
+  });
+}
+
 export function markNeedsReconfirmation(match: Match): Match {
   return {
     ...match,
@@ -117,6 +145,7 @@ export function markNeedsReconfirmation(match: Match): Match {
     homeConfirmedAt: undefined,
     awayConfirmedAt: undefined,
     crew: holdCrewAssignments(match),
+    cmo: holdCmoContacts(match.cmo),
   };
 }
 
@@ -280,4 +309,60 @@ export function displayMatchStatus(match: Match): MatchStatus {
 
 export function matchStatusLabel(match: Match): string {
   return statusLabel(displayMatchStatus(match));
+}
+
+function namedPersonNeedsReconfirm(status: string | undefined): boolean {
+  return status === 'held' || status === 'official';
+}
+
+/**
+ * Who still needs to acknowledge a schedule change.
+ * Uses held/unconfirmed crew and cleared team timestamps — not match.updatedAt,
+ * which is bumped on every save (including the confirm itself).
+ */
+export function needsReconfirmation(match: Match): {
+  crewNeedsConfirm: string[];
+  homeNeedsConfirm: boolean;
+  awayNeedsConfirm: boolean;
+} {
+  const changeOpen =
+    match.status === 'needs_reconfirmation' ||
+    CREW_SLOTS.some((slot) =>
+      crewPeople(match.crew[slot]).some((a) => a.status === 'held'),
+    ) ||
+    (match.cmo ?? []).some(
+      (c) => c.userId && effectiveCmoStatus(c) === 'held',
+    );
+
+  if (!changeOpen) {
+    return {
+      crewNeedsConfirm: [],
+      homeNeedsConfirm: false,
+      awayNeedsConfirm: false,
+    };
+  }
+
+  const crewNeedsConfirm: string[] = [];
+  for (const slot of CREW_SLOTS) {
+    for (const assignment of crewPeople(match.crew[slot])) {
+      if (!assignment.userId) continue;
+      if (isOutsideAppointmentUserId(assignment.userId)) continue;
+      if (namedPersonNeedsReconfirm(assignment.status)) {
+        crewNeedsConfirm.push(assignment.userId);
+      }
+    }
+  }
+  for (const contact of match.cmo ?? []) {
+    if (!contact.userId) continue;
+    if (isOutsideAppointmentUserId(contact.userId)) continue;
+    if (namedPersonNeedsReconfirm(effectiveCmoStatus(contact))) {
+      crewNeedsConfirm.push(contact.userId);
+    }
+  }
+
+  return {
+    crewNeedsConfirm: [...new Set(crewNeedsConfirm)],
+    homeNeedsConfirm: !match.homeConfirmedAt,
+    awayNeedsConfirm: !match.awayConfirmedAt,
+  };
 }

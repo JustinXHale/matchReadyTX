@@ -51,6 +51,7 @@ import {
   processMailDocument,
   type MailDoc,
 } from './sendMail';
+import { changesFromProposal, notifyMatchChange } from './notifyMatchChange';
 
 initializeApp();
 const db = getFirestore();
@@ -342,6 +343,41 @@ export const proposalWriteback = onCall(
         { merge: true },
       );
       logger.info('proposalWriteback ok', { orgId, matchId, proposalId });
+
+      try {
+        const proposalSnap = await db
+          .doc(`orgs/${orgId}/matches/${matchId}/proposals/${proposalId}`)
+          .get();
+        const matchSnap = await db.doc(`orgs/${orgId}/matches/${matchId}`).get();
+        const detected = changesFromProposal(
+          (proposalSnap.data() ?? {}) as Record<string, unknown>,
+        );
+        const matchData = matchSnap.data();
+        if (detected && matchData) {
+          await notifyMatchChange({
+            db,
+            orgId,
+            matchId,
+            changeType: detected.changeType,
+            matchData: matchData as {
+              homeTeamName: string;
+              awayTeamName: string;
+              kickoffAt: string;
+              venueName: string;
+              status: string;
+            },
+            changes: detected.changes,
+          });
+        }
+      } catch (notifyErr) {
+        logger.warn('Failed to send change notifications', {
+          orgId,
+          matchId,
+          error:
+            notifyErr instanceof Error ? notifyErr.message : 'Unknown error',
+        });
+      }
+
       return { ...result, proposalId };
     } catch (err) {
       if (err instanceof HttpsError) throw err;
@@ -913,6 +949,314 @@ export const notifyUser = onCall(async (request) => {
   });
   logger.info('notifyUser queued', { mailId, to: email, event });
   return { ok: true, mailId, bodyPreview: String(body).slice(0, 80) };
+});
+
+/**
+ * Send match change notifications to crew and teams.
+ * Body: { orgId?, matchId, changeType: 'time' | 'venue' | 'status' | 'details', changes: { ... } }
+ */
+export const notifyMatchChangeCallable = onCall(async (request) => {
+  if (!request.auth?.uid) {
+    throw new HttpsError('unauthenticated', 'Sign in required');
+  }
+  const orgId =
+    String(request.data?.orgId ?? '').trim() ||
+    process.env.DEFAULT_ORG_ID ||
+    'lonestar';
+  await assertAssigner(request.auth.uid, orgId);
+
+  const matchId = String(request.data?.matchId ?? '').trim();
+  const changeType = String(request.data?.changeType ?? '').trim();
+
+  if (!matchId) {
+    throw new HttpsError('invalid-argument', 'matchId is required');
+  }
+  if (
+    changeType !== 'time' &&
+    changeType !== 'venue' &&
+    changeType !== 'status' &&
+    changeType !== 'details'
+  ) {
+    throw new HttpsError(
+      'invalid-argument',
+      'changeType must be time, venue, status, or details',
+    );
+  }
+
+  const matchSnap = await db.doc(`orgs/${orgId}/matches/${matchId}`).get();
+  if (!matchSnap.exists) {
+    throw new HttpsError('not-found', 'Match not found');
+  }
+
+  const matchData = matchSnap.data() ?? {};
+  const rawChanges =
+    request.data?.changes && typeof request.data.changes === 'object'
+      ? (request.data.changes as Record<string, unknown>)
+      : {};
+
+  try {
+    const result = await notifyMatchChange({
+      db,
+      orgId,
+      matchId,
+      changeType,
+      matchData: matchData as {
+        homeTeamName: string;
+        awayTeamName: string;
+        kickoffAt: string;
+        venueName: string;
+        status: string;
+      },
+      changes: {
+        oldKickoffAt:
+          typeof rawChanges.oldKickoffAt === 'string'
+            ? rawChanges.oldKickoffAt
+            : undefined,
+        newKickoffAt:
+          typeof rawChanges.newKickoffAt === 'string'
+            ? rawChanges.newKickoffAt
+            : undefined,
+        oldVenueName:
+          typeof rawChanges.oldVenueName === 'string'
+            ? rawChanges.oldVenueName
+            : undefined,
+        newVenueName:
+          typeof rawChanges.newVenueName === 'string'
+            ? rawChanges.newVenueName
+            : undefined,
+        oldVenueAddress:
+          typeof rawChanges.oldVenueAddress === 'string'
+            ? rawChanges.oldVenueAddress
+            : undefined,
+        newVenueAddress:
+          typeof rawChanges.newVenueAddress === 'string'
+            ? rawChanges.newVenueAddress
+            : undefined,
+        newStatus:
+          typeof rawChanges.newStatus === 'string'
+            ? rawChanges.newStatus
+            : undefined,
+      },
+    });
+
+    logger.info('notifyMatchChangeCallable success', {
+      orgId,
+      matchId,
+      changeType,
+      emailsSent: result.emailsSent,
+    });
+
+    return result;
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Notification failed';
+    logger.error('notifyMatchChangeCallable failed', { orgId, matchId, message });
+    throw new HttpsError('internal', message);
+  }
+});
+
+function findAssignedSlot(
+  matchData: Record<string, unknown>,
+  uid: string,
+): string | null {
+  const crew = matchData.crew;
+  if (crew && typeof crew === 'object') {
+    const src = crew as Record<string, unknown>;
+    for (const slot of ['mo', 'ar1', 'ar2', 'no4']) {
+      const slotData = src[slot];
+      const assignments = Array.isArray(slotData)
+        ? slotData
+        : slotData
+          ? [slotData]
+          : [];
+      for (const assignment of assignments) {
+        if (
+          assignment &&
+          typeof assignment === 'object' &&
+          (assignment as Record<string, unknown>).userId === uid
+        ) {
+          return slot;
+        }
+      }
+    }
+  }
+  if (Array.isArray(matchData.cmo)) {
+    for (const contact of matchData.cmo) {
+      if (
+        contact &&
+        typeof contact === 'object' &&
+        (contact as Record<string, unknown>).userId === uid
+      ) {
+        return 'cmo';
+      }
+    }
+  }
+  return null;
+}
+
+function anyHeldNamed(matchData: Record<string, unknown>): boolean {
+  const crew = matchData.crew;
+  if (crew && typeof crew === 'object') {
+    for (const slot of ['mo', 'ar1', 'ar2', 'no4']) {
+      const slotData = (crew as Record<string, unknown>)[slot];
+      const assignments = Array.isArray(slotData)
+        ? slotData
+        : slotData
+          ? [slotData]
+          : [];
+      for (const assignment of assignments) {
+        if (
+          assignment &&
+          typeof assignment === 'object' &&
+          (assignment as Record<string, unknown>).userId &&
+          (assignment as Record<string, unknown>).status === 'held'
+        ) {
+          return true;
+        }
+      }
+    }
+  }
+  if (Array.isArray(matchData.cmo)) {
+    for (const contact of matchData.cmo) {
+      if (
+        contact &&
+        typeof contact === 'object' &&
+        (contact as Record<string, unknown>).userId &&
+        (contact as Record<string, unknown>).status === 'held'
+      ) {
+        return true;
+      }
+    }
+  }
+  return false;
+}
+
+/**
+ * Confirm match change acknowledgment (crew or team contact).
+ * Body: { orgId?, matchId, confirmationType: 'crew' | 'home' | 'away' }
+ */
+export const confirmMatchChange = onCall(async (request) => {
+  if (!request.auth?.uid) {
+    throw new HttpsError('unauthenticated', 'Sign in required');
+  }
+
+  const orgId =
+    String(request.data?.orgId ?? '').trim() ||
+    process.env.DEFAULT_ORG_ID ||
+    'lonestar';
+  const matchId = String(request.data?.matchId ?? '').trim();
+  const confirmationType = String(request.data?.confirmationType ?? '').trim();
+
+  if (!matchId) {
+    throw new HttpsError('invalid-argument', 'matchId is required');
+  }
+  if (
+    confirmationType !== 'crew' &&
+    confirmationType !== 'home' &&
+    confirmationType !== 'away'
+  ) {
+    throw new HttpsError(
+      'invalid-argument',
+      'confirmationType must be crew, home, or away',
+    );
+  }
+
+  const matchRef = db.doc(`orgs/${orgId}/matches/${matchId}`);
+  const matchSnap = await matchRef.get();
+  if (!matchSnap.exists) {
+    throw new HttpsError('not-found', 'Match not found');
+  }
+
+  const matchData = (matchSnap.data() ?? {}) as Record<string, unknown>;
+  const uid = request.auth.uid;
+  const now = new Date().toISOString();
+
+  if (confirmationType === 'crew') {
+    const slot = findAssignedSlot(matchData, uid);
+    if (!slot) {
+      throw new HttpsError(
+        'permission-denied',
+        'You are not assigned to this match',
+      );
+    }
+    await runMatchSelfService({
+      db,
+      orgId,
+      uid,
+      matchId,
+      action: 'confirm',
+      slot,
+    });
+    logger.info('Match change confirmed by crew', { orgId, matchId, uid, slot });
+    return { ok: true, confirmedAt: now };
+  }
+
+  const teamId =
+    confirmationType === 'home'
+      ? String(matchData.homeTeamId ?? '')
+      : String(matchData.awayTeamId ?? '');
+
+  if (!teamId) {
+    throw new HttpsError('failed-precondition', 'Team ID not found on match');
+  }
+
+  const memberSnap = await db.doc(`orgs/${orgId}/members/${uid}`).get();
+  if (!memberSnap.exists) {
+    throw new HttpsError('permission-denied', 'You are not a member');
+  }
+
+  const memberData = memberSnap.data();
+  const roles = Array.isArray(memberData?.roles) ? memberData.roles : [];
+  const teamIds = Array.isArray(memberData?.teamIds) ? memberData.teamIds : [];
+
+  if (!roles.includes('teamAdmin') && !roles.includes('assigner')) {
+    throw new HttpsError(
+      'permission-denied',
+      'Only team contacts can confirm',
+    );
+  }
+
+  if (!teamIds.includes(teamId) && !roles.includes('assigner')) {
+    throw new HttpsError(
+      'permission-denied',
+      'You are not a contact for this team',
+    );
+  }
+
+  const homeConfirmedAt =
+    confirmationType === 'home'
+      ? now
+      : typeof matchData.homeConfirmedAt === 'string'
+        ? matchData.homeConfirmedAt
+        : '';
+  const awayConfirmedAt =
+    confirmationType === 'away'
+      ? now
+      : typeof matchData.awayConfirmedAt === 'string'
+        ? matchData.awayConfirmedAt
+        : '';
+  const bothTeams = Boolean(homeConfirmedAt && awayConfirmedAt);
+  const keepReconfirm =
+    String(matchData.status ?? '') === 'needs_reconfirmation' &&
+    (!bothTeams || anyHeldNamed(matchData));
+
+  const updateField =
+    confirmationType === 'home' ? 'homeConfirmedAt' : 'awayConfirmedAt';
+  await matchRef.set(
+    {
+      [updateField]: now,
+      ...(keepReconfirm ? { status: 'needs_reconfirmation' } : {}),
+      updatedAt: now,
+    },
+    { merge: true },
+  );
+
+  logger.info('Match change confirmed by team', {
+    orgId,
+    matchId,
+    uid,
+    team: confirmationType,
+  });
+  return { ok: true, confirmedAt: now };
 });
 
 /**

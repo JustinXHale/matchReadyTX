@@ -103,3 +103,77 @@ To email other people, verify your own domain in Resend and set `RESEND_FROM_EMA
 ## Cost
 
 Resend free tier is enough for society-scale reminders (thousands of emails/month). Cloud Functions + Firestore ops for the queue are usually within Blaze free allowances at this volume.
+
+## Match change notifications
+
+When match details change (time, venue, or status), all assigned crew and team contacts receive notification emails via the `notifyMatchChange` function.
+
+### Triggers
+
+Notifications are sent **after the assigner applies / acknowledges a change** (proposal write-back). Team requests alone do not email anyone — the assigner might still deny the request.
+
+- `proposalWriteback` succeeds → `notifyMatchChange`
+- Assigner can also call `notifyMatchChangeCallable` manually
+
+### Email events
+
+| Event | Recipients | Trigger |
+|-------|-----------|---------|
+| `match_change_time` | Assigned crew | Kickoff time changed |
+| `match_change_venue` | Assigned crew | Venue name or address changed |
+| `match_change_details` | Assigned crew | Time and venue both changed |
+| `match_change_status` | Assigned crew | Match cancelled or postponed |
+| `*_team` | Home + away `Team.contactEmails` / `contactPeople` | Same events, team copy |
+
+Proposal snapshots use `previousKickoffAt` / `previousVenueName` / `previousVenueAddress` (not `oldKickoffAt`).
+
+### Email content
+
+Subject: `Match Change: {home} vs {away} - {Time Changed|Venue Changed|Status Update}`
+
+Body includes:
+- What changed (old value → new value)
+- Current match details (home, away, date, time, venue, address)
+- Google Maps link to venue
+- Deep link to match detail page: `/matches/{id}`
+- Call to action: "Please confirm you can still work/attend this match"
+
+### Reconfirmation workflow
+
+1. Write-back sets `needs_reconfirmation`, clears team timestamps, and puts named crew/CMO on `held`
+2. Recipients open `/matches/{id}` from the email
+3. Match Detail shows a banner until that person / team has acked
+4. Crew confirm uses the existing assignment confirm path (`matchSelfService` / `confirmCrewSlot`) so status becomes `confirmed`, not only a timestamp
+5. Teams confirm via `setTeamDetailsConfirmed` (live: `saveMatchTeamConfirmation`)
+6. `needs_reconfirmation` stays until **both teams and remaining held crew** have confirmed
+
+### Manual notification trigger
+
+Assigners can manually trigger notifications via:
+
+```ts
+await callNotifyMatchChangeCallable({
+  matchId: 'match_123',
+  changeType: 'time' | 'venue' | 'status',
+  changes: {
+    oldKickoffAt?: '2026-10-25T18:00:00Z',
+    newKickoffAt?: '2026-10-25T20:00:00Z',
+    oldVenueName?: 'Old Field',
+    newVenueName?: 'New Field',
+    // ... other change details
+  },
+});
+```
+
+### Recipient filtering
+
+- **Crew:** All assigned officials with `userId` (excludes outside appointments)
+- **Teams:** All email addresses in `Team.contactEmails` for home and away teams
+- **Warnings:** Logged when crew member has no email or team has no contacts
+
+### Related functions
+
+- `notifyMatchChange` — Core notification logic (bulk email queue)
+- `notifyMatchChangeCallable` — Manual trigger (assigner-only)
+- `confirmMatchChange` — Record confirmation from crew/team
+- `needsReconfirmation` — Domain helper to check who needs to confirm

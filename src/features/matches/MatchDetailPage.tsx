@@ -30,6 +30,7 @@ import {
   postponeMatch,
   reactivateMatch,
   statusLabel,
+  needsReconfirmation,
 } from '@/domain/matchTransitions';
 import {
   crewChipClass,
@@ -393,6 +394,7 @@ export function MatchDetailPage() {
   const [scheduleUrlError, setScheduleUrlError] = useState('');
   const requestSectionRef = useRef<HTMLElement | null>(null);
   const titleRowRef = useRef<HTMLDivElement | null>(null);
+  const [reconfirmBusy, setReconfirmBusy] = useState(false);
 
   useEffect(() => {
     setDetailsDraft(null);
@@ -1467,6 +1469,47 @@ export function MatchDetailPage() {
     setShowComplianceHoldModal(false);
   };
 
+  const handleConfirmMatchChange = async (
+    confirmationType: 'crew' | 'home' | 'away',
+  ) => {
+    if (!currentUser || !match || reconfirmBusy) return;
+    setReconfirmBusy(true);
+    try {
+      if (confirmationType === 'crew') {
+        if (!mySlot) {
+          throw new Error('You are not assigned to this match.');
+        }
+        store.confirmCrewSlot(match.id, mySlot, myAssignment?.id);
+        const ok = await persistSelfServiceIfLive({
+          matchId: match.id,
+          action: 'confirm',
+          slot: mySlot,
+          assignmentId: myAssignment?.id,
+        });
+        if (ok) {
+          await fulfillRaiseHandsOnAssignmentConfirm({
+            store,
+            dataMode,
+            matchId: match.id,
+            confirmedUserId: currentUser.uid,
+          });
+        }
+      } else {
+        store.setTeamDetailsConfirmed(match.id, confirmationType, true);
+      }
+      notify('Match changes confirmed', 'success');
+    } catch (err) {
+      notify(
+        err instanceof Error
+          ? `Confirmation failed: ${err.message}`
+          : 'Confirmation failed',
+        'error',
+      );
+    } finally {
+      setReconfirmBusy(false);
+    }
+  };
+
   const onAssignerMenuAction = (action: AssignerMenuAction) => {
     if (action === 'edit_details') {
       beginDetailsEdit();
@@ -1752,6 +1795,66 @@ export function MatchDetailPage() {
           remove the hold from the match menu.
         </Alert>
       ) : null}
+
+      {!detailsDraft && match && currentUser && (() => {
+        const reconfirmState = needsReconfirmation(match);
+        const crewNeedsConfirm = reconfirmState.crewNeedsConfirm.includes(
+          currentUser.uid,
+        );
+        const homeNeedsConfirm = isHomeAdmin && reconfirmState.homeNeedsConfirm;
+        const awayNeedsConfirm = isAwayAdmin && reconfirmState.awayNeedsConfirm;
+
+        if (crewNeedsConfirm || homeNeedsConfirm || awayNeedsConfirm) {
+          return (
+            <Alert
+              variant="warning"
+              title="Match details changed"
+              isInline
+            >
+              <p>
+                Please review the updated match details below and confirm you can
+                still{' '}
+                {crewNeedsConfirm
+                  ? 'work this match'
+                  : 'make this match'}.
+              </p>
+              <div className="rs-actions rs-actions--inline">
+                {crewNeedsConfirm ? (
+                  <Button
+                    variant="primary"
+                    isDisabled={reconfirmBusy}
+                    isLoading={reconfirmBusy}
+                    onClick={() => void handleConfirmMatchChange('crew')}
+                  >
+                    Confirm changes
+                  </Button>
+                ) : null}
+                {homeNeedsConfirm ? (
+                  <Button
+                    variant="primary"
+                    isDisabled={reconfirmBusy}
+                    isLoading={reconfirmBusy}
+                    onClick={() => void handleConfirmMatchChange('home')}
+                  >
+                    Confirm for {match.homeTeamName}
+                  </Button>
+                ) : null}
+                {awayNeedsConfirm ? (
+                  <Button
+                    variant="primary"
+                    isDisabled={reconfirmBusy}
+                    isLoading={reconfirmBusy}
+                    onClick={() => void handleConfirmMatchChange('away')}
+                  >
+                    Confirm for {match.awayTeamName}
+                  </Button>
+                ) : null}
+              </div>
+            </Alert>
+          );
+        }
+        return null;
+      })()}
 
       {!detailsDraft && <div className="rs-label-row rs-detail__status-row">
         {match.status !== 'crew_pending' && (

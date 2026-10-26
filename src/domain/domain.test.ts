@@ -36,6 +36,8 @@ import {
   postponeMatch,
   reactivateMatch,
   releaseMatch,
+  markNeedsReconfirmation,
+  needsReconfirmation,
 } from '@/domain/matchTransitions';
 import {
   assignOfficial,
@@ -239,6 +241,31 @@ describe('match transitions', () => {
     const back = reactivateMatch(m);
     expect(back.status).toBe('needs_reconfirmation');
     expect(back.postponedAt).toBeUndefined();
+  });
+
+  it('needsReconfirmation uses held crew and cleared team timestamps', () => {
+    let m = releaseMatch(baseMatch());
+    m = confirmTeam(confirmTeam(m, 'home'), 'away');
+    m = assignOfficial(m, 'mo', { uid: 'r1', displayName: 'Ref' });
+    m = confirmOfficialSlot(m, 'mo');
+    m = markNeedsReconfirmation(m);
+    expect(m.status).toBe('needs_reconfirmation');
+    expect(crewPeople(m.crew.mo)[0]?.status).toBe('held');
+    const pending = needsReconfirmation(m);
+    expect(pending.homeNeedsConfirm).toBe(true);
+    expect(pending.awayNeedsConfirm).toBe(true);
+    expect(pending.crewNeedsConfirm).toEqual(['r1']);
+
+    m = confirmTeam(m, 'home');
+    expect(m.status).toBe('needs_reconfirmation');
+    expect(needsReconfirmation(m).homeNeedsConfirm).toBe(false);
+    expect(needsReconfirmation(m).crewNeedsConfirm).toEqual(['r1']);
+
+    m = confirmTeam(m, 'away');
+    expect(m.status).toBe('needs_reconfirmation');
+    m = confirmOfficialSlot(m, 'mo');
+    expect(needsReconfirmation(m).crewNeedsConfirm).toEqual([]);
+    expect(m.status).not.toBe('needs_reconfirmation');
   });
 
   it('applySheetFacts updates facts without clearing confirmations', () => {

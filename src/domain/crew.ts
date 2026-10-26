@@ -13,7 +13,9 @@ import type {
 } from './types';
 import {
   CREW_SLOTS,
+  bothTeamsConfirmed,
   crewPeople,
+  effectiveCmoStatus,
   emptyCrewBlocks,
   isCrewVisibleToTeams,
   newAssignmentId,
@@ -22,6 +24,21 @@ import {
 
 function historyId(): string {
   return `h_${Math.random().toString(36).slice(2, 10)}`;
+}
+
+/** Keep needs_reconfirmation until teams and remaining held crew have acked. */
+function retainNeedsReconfirmation(prev: Match, next: Match): Match {
+  if (prev.status !== 'needs_reconfirmation') return next;
+  const heldCrew = CREW_SLOTS.some((slot) =>
+    crewPeople(next.crew[slot]).some((a) => a.status === 'held'),
+  );
+  const heldCmo = (next.cmo ?? []).some(
+    (c) => c.userId && effectiveCmoStatus(c) === 'held',
+  );
+  if (!bothTeamsConfirmed(next) || heldCrew || heldCmo) {
+    return { ...next, status: 'needs_reconfirmation' };
+  }
+  return next;
 }
 
 function appendCmoHistory(
@@ -192,7 +209,7 @@ export function confirmOfficialSlot(
   if (allFilledConfirmed && isCrewVisibleToTeams({ ...match, crew })) {
     status = 'crew_confirmed';
   }
-  return { ...match, crew, status };
+  return retainNeedsReconfirmation(match, { ...match, crew, status });
 }
 
 /**
@@ -320,7 +337,7 @@ export function confirmCmoContact(
       },
     );
   });
-  return { ...match, cmo: nextList };
+  return retainNeedsReconfirmation(match, { ...match, cmo: nextList });
 }
 
 /**

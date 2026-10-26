@@ -26,3 +26,18 @@ export async function callNotifyUser(input: {
   });
   return result.data as { ok: true; mailId: string };
 }
+
+/** Confirm match change acknowledgment (crew or team). */
+export async function callConfirmMatchChange(input: {
+  matchId: string;
+  confirmationType: 'crew' | 'home' | 'away';
+  orgId?: string;
+}): Promise<{ ok: true; confirmedAt: string }> {
+  const fn = httpsCallable(requireFunctions(), 'confirmMatchChange');
+  const result = await fn({
+    orgId: input.orgId,
+    matchId: input.matchId,
+    confirmationType: input.confirmationType,
+  });
+  return result.data as { ok: true; confirmedAt: string };
+}
