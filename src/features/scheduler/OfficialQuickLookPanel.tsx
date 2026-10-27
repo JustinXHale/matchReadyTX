@@ -143,14 +143,17 @@ export function OfficialQuickLookPanel({
             </Link>
           </div>
 
-          <section aria-labelledby="official-quicklook-availability">
+          <section
+            className="rs-official-quicklook__availability"
+            aria-labelledby="official-quicklook-availability"
+          >
             <h3
               id="official-quicklook-availability"
               className="rs-detail-section__label"
             >
               Availability
             </h3>
-            <p className="rs-match-card__meta pf-v6-u-mb-sm">
+            <p className="rs-match-card__meta rs-official-quicklook__avail-meta">
               Month view — green available, red blocked, gray not set (
               {timeZone.replace(/_/g, ' ')}).
             </p>

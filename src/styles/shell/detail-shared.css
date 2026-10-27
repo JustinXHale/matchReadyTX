@@ -14,6 +14,12 @@
   box-sizing: border-box;
 }
 
+/** Denser padding/gap for long field lists (member contact). */
+.rs-detail-card--compact {
+  gap: var(--rs-space-sm);
+  padding: var(--rs-space-sm) var(--rs-space-md);
+}
+
 .rs-detail-card__head {
   display: flex;
   align-items: baseline;

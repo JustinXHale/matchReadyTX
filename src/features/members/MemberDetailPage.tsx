@@ -26,6 +26,7 @@ import {
 import {
   fanFavoriteLabel,
   formatMemberAddress,
+  formatMemberCityState,
   formatMemberJoinedAt,
   memberListName,
   memberSlotLabel,
@@ -305,6 +306,9 @@ export function MemberDetailPage() {
   const { state, hasAssignerRole, isAssignerView, hasInsightsAccess, hasJudicialRole, isJudicialView, dataMode, store, currentUser } =
     useApp();
   const memberHref = useAppHref(`/about/members/${userId ?? ''}`);
+  const insightsFeedbackBase = useAppHref(
+    '/insights/reports/coach-feedback',
+  );
   const timeZone = state.org.timezone || 'America/Chicago';
   const availNow = new Date();
   useContextualAppBack(FALLBACK_BACK);
@@ -362,22 +366,38 @@ export function MemberDetailPage() {
     fetchedCmo,
   ]);
 
-  const publishedTeamFeedback = useMemo(() => {
+  /**
+   * Profile Team feedback list.
+   * Insights / assigner lens: same submitted set as the Insights dashboard
+   * (not only `publicOnProfile`). Everyone else: published-on-profile only.
+   */
+  const teamFeedbackList = useMemo(() => {
     if (!userId) return [];
+    const sortFb = (a: CoachFeedback, b: CoachFeedback) =>
+      new Date(b.submittedAt ?? b.createdAt).getTime() -
+      new Date(a.submittedAt ?? a.createdAt).getTime();
+
+    if (hasInsightsAccess) {
+      return state.coachFeedback
+        .filter(
+          (f) =>
+            f.officialUserId === userId &&
+            f.status === 'submitted' &&
+            f.feedbackScope !== 'crew',
+        )
+        .sort(sortFb);
+    }
+
     const fromStore = state.coachFeedback.filter(
       (f) =>
         f.officialUserId === userId &&
         f.status === 'submitted' &&
         f.publicOnProfile === true,
     );
-    if (hasInsightsAccess || dataMode !== 'live') return fromStore;
+    if (dataMode !== 'live') return fromStore.sort(sortFb);
     const byId = new Map<string, CoachFeedback>();
     for (const f of [...fromStore, ...fetchedFeedback]) byId.set(f.id, f);
-    return [...byId.values()].sort(
-      (a, b) =>
-        new Date(b.submittedAt ?? b.createdAt).getTime() -
-        new Date(a.submittedAt ?? a.createdAt).getTime(),
-    );
+    return [...byId.values()].sort(sortFb);
   }, [
     userId,
     hasInsightsAccess,
@@ -408,7 +428,8 @@ export function MemberDetailPage() {
   const [judicialBusy, setJudicialBusy] = useState(false);
   const [availYear, setAvailYear] = useState(availNow.getFullYear());
   const [availMonth, setAvailMonth] = useState(availNow.getMonth() + 1);
-  const [officialTab, setOfficialTab] = useState<'profile' | 'insights'>('profile');
+  type OfficialViewTab = 'ready' | 'performance' | 'admin';
+  const [officialTab, setOfficialTab] = useState<OfficialViewTab>('ready');
   const assessedUserId = user?.uid;
   const assessedUserLevel = user?.assessedLevel;
 
@@ -428,7 +449,7 @@ export function MemberDetailPage() {
     setEditError(null);
     setEditFieldErrors([]);
     setEditErrorToast(false);
-    setOfficialTab('profile');
+    setOfficialTab('ready');
   }, [user?.uid]);
 
   useEffect(() => {
@@ -464,11 +485,11 @@ export function MemberDetailPage() {
   useEffect(() => {
     const hash = location.hash.replace('#', '');
     if (hash !== 'cmo-reports' && hash !== 'team-feedback') return;
-    setOfficialTab('profile');
+    setOfficialTab('performance');
   }, [location.hash, userId]);
 
   useEffect(() => {
-    if (officialTab !== 'profile') return;
+    if (officialTab !== 'performance') return;
     const hash = location.hash.replace('#', '');
     if (hash !== 'cmo-reports' && hash !== 'team-feedback') return;
     const el = document.getElementById(hash);
@@ -481,7 +502,7 @@ export function MemberDetailPage() {
     location.hash,
     userId,
     publicCmoReports.length,
-    publishedTeamFeedback.length,
+    teamFeedbackList.length,
   ]);
 
   const listName = user ? memberListName(user) : '';
@@ -537,6 +558,12 @@ export function MemberDetailPage() {
     !user.roles.includes('reportAnalytics') &&
     !user.roles.includes('judicial');
   const birthdayLabel = formatBirthdayLabel(user.birthday);
+  const cityState = formatMemberCityState(user);
+  const contactEmail = effectiveContactEmail(user);
+  const phone = user.phone?.trim() ?? '';
+  const phoneHref = phone ? `tel:${phone.replace(/[^\d+]/g, '')}` : '';
+  /** Assigner casting brief: Ready / Performance / Admin. */
+  const castingBrief = canSeeAssignerPii && isOfficialLens;
 
   const editFanOnly =
     Boolean(editDraft) &&
@@ -621,6 +648,7 @@ export function MemberDetailPage() {
   };
 
   const startEdit = () => {
+    setOfficialTab('admin');
     setEditDraft(draftFromUser(user));
     setEditing(true);
     setEditSaved(false);
@@ -799,7 +827,7 @@ export function MemberDetailPage() {
       <section className="rs-detail-card rs-member-hero" aria-labelledby="member-name">
         <div className="rs-member-hero__head">
           <UserAvatar user={user} size="md" />
-          <div>
+          <div className="rs-member-hero__main">
             <Title headingLevel="h1" size="lg" id="member-name">
               {listName}
             </Title>
@@ -821,17 +849,83 @@ export function MemberDetailPage() {
                 </span>
               )}
             </div>
-            {joinedLabel ? (
-              <p className="rs-match-card__meta">Joined {joinedLabel}</p>
-            ) : null}
+            {(cityState || joinedLabel) && (
+              <p className="rs-match-card__meta rs-member-hero__meta">
+                {[cityState, joinedLabel ? `Joined ${joinedLabel}` : null]
+                  .filter(Boolean)
+                  .join(' · ')}
+              </p>
+            )}
             {fanFavorite ? (
               <p className="rs-match-card__meta">Favorite: {fanFavorite}</p>
+            ) : null}
+            {castingBrief && (contactEmail || phone) ? (
+              <div className="rs-member-hero__actions">
+                {phone ? (
+                  <a className="rs-member-hero__action" href={phoneHref}>
+                    Call
+                  </a>
+                ) : null}
+                {contactEmail ? (
+                  <a
+                    className="rs-member-hero__action"
+                    href={`mailto:${contactEmail}`}
+                  >
+                    Email
+                  </a>
+                ) : null}
+              </div>
             ) : null}
           </div>
         </div>
       </section>
 
-      <section className="rs-detail-card" aria-labelledby="member-contact">
+      {castingBrief ? (
+        <nav className="rs-inline-tabs" aria-label="Official profile">
+          <button
+            type="button"
+            className={
+              officialTab === 'ready'
+                ? 'rs-inline-tabs__tab active'
+                : 'rs-inline-tabs__tab'
+            }
+            aria-current={officialTab === 'ready' ? 'page' : undefined}
+            onClick={() => setOfficialTab('ready')}
+          >
+            Ready
+          </button>
+          <button
+            type="button"
+            className={
+              officialTab === 'performance'
+                ? 'rs-inline-tabs__tab active'
+                : 'rs-inline-tabs__tab'
+            }
+            aria-current={officialTab === 'performance' ? 'page' : undefined}
+            onClick={() => setOfficialTab('performance')}
+          >
+            Performance
+          </button>
+          <button
+            type="button"
+            className={
+              officialTab === 'admin'
+                ? 'rs-inline-tabs__tab active'
+                : 'rs-inline-tabs__tab'
+            }
+            aria-current={officialTab === 'admin' ? 'page' : undefined}
+            onClick={() => setOfficialTab('admin')}
+          >
+            Admin
+          </button>
+        </nav>
+      ) : null}
+
+      {(!castingBrief || officialTab === 'admin') && (
+      <section
+        className="rs-detail-card rs-detail-card--compact"
+        aria-labelledby="member-contact"
+      >
         <div className="rs-detail-card__head">
           <h2 id="member-contact" className="rs-detail-section__label">
             Contact
@@ -855,7 +949,7 @@ export function MemberDetailPage() {
                 <dd>{listName}</dd>
               </div>
               <div>
-                <dt>Contact email</dt>
+                <dt>Email</dt>
                 <dd>
                   <a href={`mailto:${effectiveContactEmail(user)}`}>
                     {effectiveContactEmail(user)}
@@ -871,7 +965,7 @@ export function MemberDetailPage() {
               {(user.contactEmailSameAsSignIn === false ||
                 isApplePrivateRelayEmail(user.email)) && (
                 <div>
-                  <dt>Sign-in email</dt>
+                  <dt>Sign-in</dt>
                   <dd className="rs-match-card__meta">{user.email}</dd>
                 </div>
               )}
@@ -901,29 +995,30 @@ export function MemberDetailPage() {
                   <dd>{user.refereeingSince}</dd>
                 </div>
               )}
-              {isOfficialLens && user.jerseySize && (
+              {isOfficialLens && (user.jerseySize || user.shortsSize) && (
                 <div>
-                  <dt>Jersey</dt>
-                  <dd>{user.jerseySize}</dd>
-                </div>
-              )}
-              {isOfficialLens && user.shortsSize && (
-                <div>
-                  <dt>Shorts</dt>
-                  <dd>{user.shortsSize}</dd>
+                  <dt>Kit</dt>
+                  <dd>
+                    {[
+                      user.jerseySize ? `Jersey ${user.jerseySize}` : null,
+                      user.shortsSize ? `Shorts ${user.shortsSize}` : null,
+                    ]
+                      .filter(Boolean)
+                      .join(' · ')}
+                  </dd>
                 </div>
               )}
               {isOfficialLens && (
                 <div>
-                  <dt>Assessed Level</dt>
+                  <dt>Level</dt>
                   <dd>
                     {user.assessedLevel != null
-                      ? user.assessedLevel
+                      ? `Assessed ${user.assessedLevel}`
                       : 'Not assessed'}
                     {user.assessedLevel == null && user.refereeLevel != null && (
                       <span className="rs-member-dl__hint">
                         {' '}
-                        · self-assessed lvl {user.refereeLevel}
+                        · self-assessed {user.refereeLevel}
                       </span>
                     )}
                   </dd>
@@ -1386,62 +1481,73 @@ export function MemberDetailPage() {
           </div>
         ) : null}
       </section>
+      )}
 
-      {canManage && showsRefereeProfileFields && (
-        <section className="rs-detail-card" aria-labelledby="member-assessed">
-          <h2 id="member-assessed" className="rs-detail-section__label">
-            Set Assessed Level
-          </h2>
-          <p className="rs-detail-note">
-            Society / CMO grade — only schedulers set this. Officials may
-            request a level from their profile.
-          </p>
-          <RefereeLevelChart
-            className="pf-v6-u-mb-md"
-            caption="Tap chart to compare competencies by level."
-          />
-          {user.requestedAssessedLevel != null && (
-            <div className="rs-actions pf-v6-u-mb-md">
-              <p className="rs-match-card__meta" role="status">
-                Requested assessed level:{' '}
-                <strong>{user.requestedAssessedLevel}</strong>
-              </p>
-              <Button variant="primary" onClick={onApproveRequestedLevel}>
-                Approve level {user.requestedAssessedLevel}
-              </Button>
-              <Button variant="link" onClick={onDismissLevelRequest}>
-                Dismiss request
-              </Button>
-            </div>
-          )}
-          <FormGroup label="Assessed Level" fieldId="member-assessed-input">
-            <TextInput
-              id="member-assessed-input"
-              type="number"
-              min={ASSESSED_LEVEL_MIN}
-              max={ASSESSED_LEVEL_MAX}
-              value={assessedDraft}
-              onChange={(_, v) => {
-                setAssessedDraft(v);
-                setAssessedSaved(false);
-                setAssessedError(null);
-              }}
-              placeholder={`${ASSESSED_LEVEL_MIN}–${ASSESSED_LEVEL_MAX}, blank to clear`}
+      {(!castingBrief || officialTab === 'admin') &&
+        canManage &&
+        showsRefereeProfileFields && (
+        <section
+          className="rs-detail-card rs-detail-card--compact rs-member-collapse-wrap"
+          aria-labelledby="member-assessed"
+        >
+          <details className="rs-detail-tools rs-member-collapse rs-member-assessed-collapse">
+            <summary id="member-assessed">
+              Set assessed level
+              {user.assessedLevel != null ? ` (${user.assessedLevel})` : ''}
+              {user.requestedAssessedLevel != null ? ' · request pending' : ''}
+            </summary>
+            <p className="rs-member-assessed-help">
+              Society / CMO grade — only schedulers set this. Example: a level 6
+              referee is typically capable of men&apos;s Division 1 matches. Tap
+              the chart for competencies by level.
+            </p>
+            <RefereeLevelChart
+              className="pf-v6-u-mb-md"
+              caption="Tap chart to compare competencies by level."
             />
-          </FormGroup>
-          <Button variant="secondary" onClick={onSaveAssessedLevel}>
-            Save assessed level
-          </Button>
-          {assessedSaved && (
-            <p className="rs-match-card__meta" role="status">
-              Saved.
-            </p>
-          )}
-          {assessedError && (
-            <p className="rs-match-card__meta" role="alert">
-              {assessedError}
-            </p>
-          )}
+            {user.requestedAssessedLevel != null && (
+              <div className="rs-actions pf-v6-u-mb-md">
+                <p className="rs-match-card__meta" role="status">
+                  Requested assessed level:{' '}
+                  <strong>{user.requestedAssessedLevel}</strong>
+                </p>
+                <Button variant="primary" onClick={onApproveRequestedLevel}>
+                  Approve level {user.requestedAssessedLevel}
+                </Button>
+                <Button variant="link" onClick={onDismissLevelRequest}>
+                  Dismiss request
+                </Button>
+              </div>
+            )}
+            <FormGroup label="Assessed level" fieldId="member-assessed-input">
+              <TextInput
+                id="member-assessed-input"
+                type="number"
+                min={ASSESSED_LEVEL_MIN}
+                max={ASSESSED_LEVEL_MAX}
+                value={assessedDraft}
+                onChange={(_, v) => {
+                  setAssessedDraft(v);
+                  setAssessedSaved(false);
+                  setAssessedError(null);
+                }}
+                placeholder={`${ASSESSED_LEVEL_MIN}–${ASSESSED_LEVEL_MAX}, blank to clear`}
+              />
+            </FormGroup>
+            <Button variant="secondary" onClick={onSaveAssessedLevel}>
+              Save assessed level
+            </Button>
+            {assessedSaved && (
+              <p className="rs-match-card__meta" role="status">
+                Saved.
+              </p>
+            )}
+            {assessedError && (
+              <p className="rs-match-card__meta" role="alert">
+                {assessedError}
+              </p>
+            )}
+          </details>
         </section>
       )}
 
@@ -1486,7 +1592,7 @@ export function MemberDetailPage() {
         </ModalFooter>
       </Modal>
 
-      {isTeamAdmin && (
+      {(!castingBrief || officialTab === 'admin') && isTeamAdmin && (
         <section className="rs-detail-card" aria-labelledby="member-teams">
           <h2 id="member-teams" className="rs-detail-section__label">
             Teams
@@ -1503,85 +1609,49 @@ export function MemberDetailPage() {
         </section>
       )}
 
-      {isOfficialLens && (
-        <>
-          {canSeeAssignerPii && user.roles.includes('official') && (
-            <nav className="rs-inline-tabs" aria-label="Official profile">
-              <button
-                type="button"
-                className={
-                  officialTab === 'profile'
-                    ? 'rs-inline-tabs__tab active'
-                    : 'rs-inline-tabs__tab'
-                }
-                aria-current={officialTab === 'profile' ? 'page' : undefined}
-                onClick={() => setOfficialTab('profile')}
-              >
-                Profile
-              </button>
-              <button
-                type="button"
-                className={
-                  officialTab === 'insights'
-                    ? 'rs-inline-tabs__tab active'
-                    : 'rs-inline-tabs__tab'
-                }
-                aria-current={officialTab === 'insights' ? 'page' : undefined}
-                onClick={() => setOfficialTab('insights')}
-              >
-                Insights
-              </button>
-            </nav>
-          )}
-
-          {officialTab === 'insights' &&
-          canSeeAssignerPii &&
-          user.roles.includes('official') ? (
-            <section
-              className="rs-detail-card"
-              aria-labelledby="member-official-insights"
+      {(!castingBrief || officialTab === 'admin') && canManage && (
+        <div className="rs-member-delete">
+          {canDelete ? (
+            <button
+              type="button"
+              className="rs-member-delete__link"
+              onClick={() => {
+                setRemoveError(null);
+                setRemoveOpen(true);
+              }}
             >
-              <h2
-                id="member-official-insights"
-                className="rs-detail-section__label"
-              >
-                Referee insights
-              </h2>
-              <OfficialInsightsPanel userId={user.uid} />
-            </section>
+              Delete from MatchReadyTX
+            </button>
           ) : (
-            <>
-          <section className="rs-detail-card rs-member-collapse-wrap">
-            <details className="rs-detail-tools rs-member-collapse" open>
-              <summary>Upcoming schedule</summary>
-              {upcoming.length === 0 ? (
-                <p className="rs-detail-note">No upcoming appointments.</p>
-              ) : (
-                <ul className="rs-list">
-                  {upcoming.map((m) => (
-                    <li key={m.id}>
-                      <MatchListRow
-                        match={m}
-                        to={`/matches/${m.id}`}
-                        showTime
-                        back={matchBack}
-                        meta={
-                          <span className="rs-list-row__hint">
-                            {memberSlotLabel(m, user.uid) ?? 'Crew'}
-                          </span>
-                        }
-                      />
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </details>
-          </section>
+            <p className="rs-match-card__meta">You can’t delete yourself.</p>
+          )}
+          {canDelete && (
+            <p className="rs-member-delete__hint">
+              Removes society membership, profile data, and Firebase login.
+            </p>
+          )}
+        </div>
+      )}
 
+      {castingBrief && officialTab === 'performance' && (
+        <>
+          <section
+            className="rs-detail-card"
+            aria-labelledby="member-official-insights"
+          >
+            <h2
+              id="member-official-insights"
+              className="rs-detail-section__label"
+            >
+              Season insights
+            </h2>
+            <OfficialInsightsPanel userId={user.uid} />
+          </section>
           <section className="rs-detail-card rs-member-collapse-wrap">
             <details
               id="cmo-reports"
               className="rs-detail-tools rs-member-collapse"
+              open
             >
               <summary>
                 CMO coaching reports
@@ -1614,35 +1684,76 @@ export function MemberDetailPage() {
               )}
             </details>
           </section>
-
           <section className="rs-detail-card rs-member-collapse-wrap">
             <details
               id="team-feedback"
               className="rs-detail-tools rs-member-collapse"
+              open
             >
               <summary>
                 Team feedback
-                {publishedTeamFeedback.length > 0
-                  ? ` (${publishedTeamFeedback.length})`
+                {teamFeedbackList.length > 0
+                  ? ` (${teamFeedbackList.length})`
                   : ''}
               </summary>
-              {publishedTeamFeedback.length === 0 ? (
+              <p className="rs-detail-note">
+                Same reports as Insights. “Not on profile” means the official
+                cannot see it until you publish it from the report.
+              </p>
+              {teamFeedbackList.length === 0 ? (
                 <p className="rs-detail-note">
-                  No published team feedback on this profile yet.
+                  No submitted team feedback on file yet.
                 </p>
               ) : (
                 <ul className="rs-list">
-                  {publishedTeamFeedback.map((feedback) => (
+                  {teamFeedbackList.map((feedback) => (
                     <li key={feedback.id}>
                       <PublishedTeamFeedbackRow
                         feedback={feedback}
                         matches={state.matches}
-                        to={`${memberHref}/feedback/${feedback.id}`}
+                        to={`${insightsFeedbackBase}/${feedback.id}`}
                         back={{
                           to: `${memberHref}#team-feedback`,
                           label: listName,
                           state: location.state,
                         }}
+                        note={
+                          feedback.publicOnProfile !== true
+                            ? 'Not on profile'
+                            : undefined
+                        }
+                      />
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </details>
+          </section>
+        </>
+      )}
+
+      {((castingBrief && officialTab === 'ready') ||
+        (!castingBrief && isOfficialLens)) && (
+        <>
+          <section className="rs-detail-card rs-member-collapse-wrap">
+            <details className="rs-detail-tools rs-member-collapse" open>
+              <summary>Upcoming schedule</summary>
+              {upcoming.length === 0 ? (
+                <p className="rs-detail-note">No upcoming appointments.</p>
+              ) : (
+                <ul className="rs-list">
+                  {upcoming.map((m) => (
+                    <li key={m.id}>
+                      <MatchListRow
+                        match={m}
+                        to={`/matches/${m.id}`}
+                        showTime
+                        back={matchBack}
+                        meta={
+                          <span className="rs-list-row__hint">
+                            {memberSlotLabel(m, user.uid) ?? 'Crew'}
+                          </span>
+                        }
                       />
                     </li>
                   ))}
@@ -1651,14 +1762,95 @@ export function MemberDetailPage() {
             </details>
           </section>
 
+          {!castingBrief && (
+            <>
+              <section className="rs-detail-card rs-member-collapse-wrap">
+                <details
+                  id="cmo-reports"
+                  className="rs-detail-tools rs-member-collapse"
+                >
+                  <summary>
+                    CMO coaching reports
+                    {publicCmoReports.length > 0
+                      ? ` (${publicCmoReports.length})`
+                      : ''}
+                  </summary>
+                  {publicCmoReports.length === 0 ? (
+                    <p className="rs-detail-note">
+                      No submitted CMO coaching reports on file.
+                    </p>
+                  ) : (
+                    <ul className="rs-list">
+                      {publicCmoReports.map((report) => (
+                        <li key={report.id}>
+                          <CmoPublicReportRow
+                            report={report}
+                            matches={state.matches}
+                            users={state.users}
+                            to={`${memberHref}/cmo/${report.id}`}
+                            back={{
+                              to: `${memberHref}#cmo-reports`,
+                              label: listName,
+                              state: location.state,
+                            }}
+                          />
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </details>
+              </section>
+
+              <section className="rs-detail-card rs-member-collapse-wrap">
+                <details
+                  id="team-feedback"
+                  className="rs-detail-tools rs-member-collapse"
+                >
+                  <summary>
+                    Team feedback
+                    {teamFeedbackList.length > 0
+                      ? ` (${teamFeedbackList.length})`
+                      : ''}
+                  </summary>
+                  {teamFeedbackList.length === 0 ? (
+                    <p className="rs-detail-note">
+                      No published team feedback on this profile yet.
+                    </p>
+                  ) : (
+                    <ul className="rs-list">
+                      {teamFeedbackList.map((feedback) => (
+                        <li key={feedback.id}>
+                          <PublishedTeamFeedbackRow
+                            feedback={feedback}
+                            matches={state.matches}
+                            to={`${memberHref}/feedback/${feedback.id}`}
+                            back={{
+                              to: `${memberHref}#team-feedback`,
+                              label: listName,
+                              state: location.state,
+                            }}
+                          />
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </details>
+              </section>
+            </>
+          )}
+
           {canSeeAssignerPii && (
             <section
-              className="rs-detail-card"
+              className="rs-detail-card rs-member-availability-card"
               aria-labelledby="member-availability"
             >
               <h2 id="member-availability" className="rs-detail-section__label">
                 Availability
               </h2>
+              <p className="rs-match-card__meta rs-member-availability-meta">
+                Month view — green available, red blocked, gray not set (
+                {timeZone.replace(/_/g, ' ')}).
+              </p>
               <AvailabilityMonthCalendar
                 ranges={userAvailRanges}
                 userId={user.uid}
@@ -1701,33 +1893,7 @@ export function MemberDetailPage() {
               )}
             </details>
           </section>
-            </>
-          )}
         </>
-      )}
-
-      {canManage && (
-        <div className="rs-member-delete">
-          {canDelete ? (
-            <button
-              type="button"
-              className="rs-member-delete__link"
-              onClick={() => {
-                setRemoveError(null);
-                setRemoveOpen(true);
-              }}
-            >
-              Delete from MatchReadyTX
-            </button>
-          ) : (
-            <p className="rs-match-card__meta">You can’t delete yourself.</p>
-          )}
-          {canDelete && (
-            <p className="rs-member-delete__hint">
-              Removes society membership, profile data, and Firebase login.
-            </p>
-          )}
-        </div>
       )}
 
       {editing && (

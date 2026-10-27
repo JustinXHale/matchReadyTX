@@ -69,6 +69,15 @@ const AVAIL_FILTER_LABELS: Record<AssignAvailabilityFilter, string> = {
   requested: 'Requested this game',
 };
 
+/** Sentinel for officials whose home city is not mapped to a metro. */
+const TERRITORY_FILTER_NONE = '__none__';
+
+function territoryFilterLabel(filter: string): string | null {
+  if (!filter) return null;
+  if (filter === TERRITORY_FILTER_NONE) return 'No territory';
+  return filter;
+}
+
 function buildFilterSummary(opts: {
   query: string;
   territoryFilter: string;
@@ -82,7 +91,8 @@ function buildFilterSummary(opts: {
   const parts: string[] = [];
   const q = opts.query.trim();
   if (q) parts.push(`“${q}”`);
-  if (opts.territoryFilter) parts.push(opts.territoryFilter);
+  const territoryLabel = territoryFilterLabel(opts.territoryFilter);
+  if (territoryLabel) parts.push(territoryLabel);
   if (opts.levelCap) parts.push(`Level ${opts.levelCap}+`);
   if (opts.availFilter !== 'all') {
     parts.push(AVAIL_FILTER_LABELS[opts.availFilter]);
@@ -184,7 +194,9 @@ export function OfficialAssignPicker({
     .filter((o) => {
       const level = officialEffectiveLevel(o);
       if (!officialMatchesLevelCap(level, cap)) return false;
-      if (territoryFilter) {
+      if (territoryFilter === TERRITORY_FILTER_NONE) {
+        if (resolveOfficialTerritory(o, territoryLookup) != null) return false;
+      } else if (territoryFilter) {
         const metro = resolveOfficialTerritory(o, territoryLookup);
         if (metro !== territoryFilter) return false;
       }
@@ -330,6 +342,10 @@ export function OfficialAssignPicker({
               onChange={(_e, value) => setTerritoryFilter(value)}
             >
               <FormSelectOption value="" label="All territories" />
+              <FormSelectOption
+                value={TERRITORY_FILTER_NONE}
+                label="No territory"
+              />
               {metroOptions.map((metro) => (
                 <FormSelectOption key={metro} value={metro} label={metro} />
               ))}

@@ -670,6 +670,21 @@
   margin-bottom: 8px;
 }
 
+.rs-official-quicklook__availability {
+  display: flex;
+  flex-direction: column;
+  gap: var(--rs-space-sm);
+}
+
+.rs-official-quicklook__avail-meta {
+  margin: 0;
+}
+
+.rs-official-quicklook__availability .rs-avail-legend {
+  margin-top: var(--rs-space-xs);
+  margin-bottom: var(--rs-space-md);
+}
+
 .rs-official-quicklook__profile {
   display: flex;
   flex-direction: column;

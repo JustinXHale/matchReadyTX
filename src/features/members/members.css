@@ -106,33 +106,72 @@
   gap: 14px;
 }
 
+.rs-member-hero__main {
+  flex: 1;
+  min-width: 0;
+}
+
+.rs-member-hero__meta {
+  margin: 4px 0 0;
+}
+
+.rs-member-hero__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 14px;
+  margin-top: 10px;
+}
+
+.rs-member-hero__action {
+  font-size: 14px;
+  font-weight: 650;
+  color: var(--rs-color-primary);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.rs-member-availability-card {
+  gap: var(--rs-space-sm);
+}
+
+.rs-member-availability-meta {
+  margin: 0;
+}
+
+.rs-member-availability-card .rs-avail-legend {
+  margin-top: var(--rs-space-xs);
+  margin-bottom: var(--rs-space-md);
+}
+
 .rs-member-dl {
   margin: 0;
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 5px;
 }
 
 .rs-member-dl > div {
   display: grid;
-  grid-template-columns: 5rem 1fr;
-  gap: 8px;
-  align-items: start;
+  grid-template-columns: 4.75rem 1fr;
+  gap: 6px 8px;
+  align-items: baseline;
 }
 
 .rs-member-dl dt {
   margin: 0;
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.03em;
   color: var(--rs-color-muted);
-  padding-top: 2px;
+  padding-top: 0;
+  line-height: 1.3;
 }
 
 .rs-member-dl dd {
   margin: 0;
-  font-size: 14px;
+  font-size: 13px;
+  line-height: 1.35;
 }
 
 .rs-member-dl a {
@@ -177,6 +216,36 @@
   text-transform: uppercase;
   color: var(--rs-color-ended);
   margin-bottom: var(--rs-space-sm);
+}
+
+.rs-member-assessed-collapse > summary {
+  cursor: pointer;
+  list-style: none;
+}
+
+.rs-member-assessed-collapse > summary::-webkit-details-marker {
+  display: none;
+}
+
+.rs-member-assessed-collapse > summary::after {
+  content: 'Show';
+  float: right;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--rs-color-primary);
+}
+
+.rs-member-assessed-collapse[open] > summary::after {
+  content: 'Hide';
+}
+
+.rs-member-assessed-help {
+  margin: 0 0 var(--rs-space-sm);
+  font-size: 13px;
+  line-height: 1.4;
+  color: var(--rs-color-muted);
 }
 
 .rs-member-public-report {

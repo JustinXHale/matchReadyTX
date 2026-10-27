@@ -133,16 +133,22 @@ export function PublishedTeamFeedbackRow({
   matches,
   to,
   back,
+  note,
 }: {
   feedback: CoachFeedback;
   matches: Match[];
   to: string;
   back?: BackNav;
+  /** Extra meta (e.g. “Not on profile” for scheduler Insights viewers). */
+  note?: string;
 }) {
   const match = matches.find((m) => m.id === feedback.matchId);
   const avg = coachFeedbackAverage(feedback.scales);
   const meta = (
-    <span className="rs-match-card__meta">{feedback.reportingTeamName}</span>
+    <span className="rs-match-card__meta">
+      {feedback.reportingTeamName}
+      {note ? ` · ${note}` : ''}
+    </span>
   );
   const trailing = (
     <ScorePill value={avg != null ? formatInsightsAvg(avg) : '—'} />
