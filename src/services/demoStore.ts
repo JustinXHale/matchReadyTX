@@ -93,8 +93,10 @@ import { notifyApp } from '@/app/feedback/feedbackBus';
 import { buildAssignmentPayableRows } from '@/domain/paymentReadiness';
 import {
   isOtherOpponentTeamId,
+  matchFromCreateFacts,
   matchFromFixtureRequest,
   newAppMatchId,
+  type MatchCreateFacts,
 } from '@/domain/fixtureRequests';
 import {
   coachFeedbackDocId,
@@ -6045,6 +6047,54 @@ class DemoStore {
           : r,
       ),
     }));
+  }
+
+  /**
+   * Assigner adds a match (demo / optimistic local). Live mode also calls createMatch CF.
+   */
+  createMatch(
+    facts: MatchCreateFacts,
+    ids?: { matchId: string; sheetRowKey: string },
+  ): string | null {
+    const homeOther = isOtherOpponentTeamId(facts.homeTeamId);
+    const awayOther = isOtherOpponentTeamId(facts.awayTeamId);
+    if (facts.homeTeamId === facts.awayTeamId) return null;
+    if (!homeOther && !this.state.teams.some((t) => t.id === facts.homeTeamId)) {
+      return null;
+    }
+    if (!awayOther && !this.state.teams.some((t) => t.id === facts.awayTeamId)) {
+      return null;
+    }
+    if (!facts.venueName.trim() || !facts.venueAddress.trim()) return null;
+    if (!facts.kickoffAt || Number.isNaN(new Date(facts.kickoffAt).getTime())) {
+      return null;
+    }
+    if (!facts.level.trim()) return null;
+    if (!facts.homeTeamName.trim() || !facts.awayTeamName.trim()) return null;
+
+    const resolved = ids ?? newAppMatchId();
+    if (this.state.matches.some((m) => m.id === resolved.matchId)) {
+      return resolved.matchId;
+    }
+    const at = new Date().toISOString();
+    const match = matchFromCreateFacts(
+      {
+        ...facts,
+        venueName: facts.venueName.trim(),
+        venueAddress: facts.venueAddress.trim(),
+        competition: facts.competition?.trim() || undefined,
+        level: facts.level.trim(),
+        notes: facts.notes?.trim() || undefined,
+        homeTeamName: facts.homeTeamName.trim(),
+        awayTeamName: facts.awayTeamName.trim(),
+      },
+      { matchId: resolved.matchId, sheetRowKey: resolved.sheetRowKey, at },
+    );
+    this.set((s) => ({
+      ...s,
+      matches: [match, ...s.matches],
+    }));
+    return resolved.matchId;
   }
 
   /**

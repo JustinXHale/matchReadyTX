@@ -353,6 +353,7 @@ Assigner notified (email)
 Team Admins may **request a new fixture** (not an official raise-hand). Flow:
 
 1. Team Admin → FAB **+** → form (own club + Home/Away, opponent from org teams, date/time, venue name + address, competition, level, gender, notes, flight/housing).
+1a. Assigner → Schedule → FAB **Add match** → same schedule facts (home/away teams) → creates Sheet row + match immediately (no request queue; neither side pre-confirmed).
 2. Creates a pending `FixtureRequest` (Firestore `orgs/{orgId}/fixtureRequests`).
 3. Assigner reviews in **Scheduler → Queues → Fixture requests**.
 4. **Approve** → Cloud Function appends a Schedule row (`APP-…` match_id) + Locations row, creates the match as `pending_team_review` (requester’s side pre-confirmed), marks request approved.

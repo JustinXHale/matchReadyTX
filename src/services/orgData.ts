@@ -2259,6 +2259,43 @@ export async function callApproveFixtureRequest(input: {
   return result.data as ApproveFixtureResult;
 }
 
+/** Assigner creates a match from the app (Sheet append + match create). */
+export async function callCreateMatch(input: {
+  orgId?: string;
+  homeTeamId: string;
+  awayTeamId: string;
+  homeTeamName: string;
+  awayTeamName: string;
+  kickoffAt: string;
+  venueName: string;
+  venueAddress: string;
+  level: string;
+  gender: string;
+  competition?: string;
+  notes?: string;
+  flightProvided?: boolean;
+  housingProvided?: boolean;
+}): Promise<ApproveFixtureResult> {
+  const fn = httpsCallable(requireFunctions(), 'createMatch');
+  const result = await fn({
+    orgId: input.orgId ?? DEFAULT_ORG,
+    homeTeamId: input.homeTeamId,
+    awayTeamId: input.awayTeamId,
+    homeTeamName: input.homeTeamName,
+    awayTeamName: input.awayTeamName,
+    kickoffAt: input.kickoffAt,
+    venueName: input.venueName,
+    venueAddress: input.venueAddress,
+    level: input.level,
+    gender: input.gender,
+    competition: input.competition,
+    notes: input.notes,
+    flightProvided: input.flightProvided === true,
+    housingProvided: input.housingProvided === true,
+  });
+  return result.data as ApproveFixtureResult;
+}
+
 export type SubmitTeamLinkResult = {
   ok: true;
   autoApproved: string[];

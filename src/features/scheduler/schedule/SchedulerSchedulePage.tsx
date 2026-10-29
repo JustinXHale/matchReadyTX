@@ -6,7 +6,7 @@ import {
   EmptyStateBody,
   Title,
 } from '@patternfly/react-core';
-import { useApp } from '@/app/AppContext';
+import { useApp, useAppHref } from '@/app/AppContext';
 import { isComplianceHeld } from '@/domain/complianceHold';
 import { namedOfficialsNeedingAvailability } from '@/domain/crew';
 import {
@@ -57,6 +57,7 @@ import { useScheduleListSections } from '@/ui/useScheduleListSections';
 import { FilterDialog } from '@/ui/FilterDialog';
 import { RsFilterSelect } from '@/ui/RsFilterSelect';
 import { MatchFilterSummary } from '@/ui/MatchFilterSummary';
+import '@/features/teamAdmin/team-admin.css';
 
 const SCHEDULER_SCHEDULE_PATH = '/scheduler/schedule';
 
@@ -122,6 +123,7 @@ function matchesScheduleStatus(
 /** Assigner schedule — browse, filter, and assign crew from one list. */
 export function SchedulerSchedulePage() {
   const { currentUser, state } = useApp();
+  const addMatchHref = useAppHref('/scheduler/schedule/add-match');
   const { onApproveRaiseHand, onDeclineRaiseHand } =
     useSchedulerRequestActions();
   const {
@@ -444,7 +446,7 @@ export function SchedulerSchedulePage() {
       {state.matches.length === 0 ? (
         <EmptyState titleText="No matches" headingLevel="h3">
           <EmptyStateBody>
-            Sync a schedule from Upload to get started.
+            Add a match here, or sync a schedule from Upload.
           </EmptyStateBody>
         </EmptyState>
       ) : list.length === 0 ? (
@@ -468,6 +470,12 @@ export function SchedulerSchedulePage() {
         pickTarget={pick?.target ?? null}
         onClose={() => setPick(null)}
       />
+
+      {currentUser ? (
+        <Link to={addMatchHref} className="rs-fab rs-fab--labeled">
+          Add match
+        </Link>
+      ) : null}
     </div>
   );
 }

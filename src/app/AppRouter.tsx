@@ -298,6 +298,11 @@ const SchedulerSchedulePage = lazy(() =>
     default: m.SchedulerSchedulePage,
   })),
 );
+const AddMatchPage = lazy(() =>
+  import('@/features/scheduler/schedule/AddMatchPage').then((m) => ({
+    default: m.AddMatchPage,
+  })),
+);
 const SchedulerUploadPage = lazy(() =>
   import('@/features/scheduler/upload/SchedulerUploadPage').then((m) => ({
     default: m.SchedulerUploadPage,
@@ -795,6 +800,7 @@ function FeatureRoutes() {
         <Route index element={<SchedulerIndexRedirect />} />
         <Route path="schedule" element={<SchedulerScheduleLayout />}>
           <Route index element={<SchedulerSchedulePage />} />
+          <Route path="add-match" element={<AddMatchPage />} />
           <Route path="coverage" element={<SchedulerQueuesCoveragePage />} />
           <Route path="changes" element={<SchedulerQueuesChangesPage />} />
           <Route

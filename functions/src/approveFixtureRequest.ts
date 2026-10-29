@@ -383,6 +383,171 @@ async function upsertLocationsRow(
   }
 }
 
+export type CreateMatchFacts = {
+  homeTeamId: string;
+  awayTeamId: string;
+  homeTeamName: string;
+  awayTeamName: string;
+  kickoffAt: string;
+  venueName: string;
+  venueAddress: string;
+  competition?: string | null;
+  level: string;
+  gender: string;
+  notes?: string | null;
+  flightProvided?: boolean;
+  housingProvided?: boolean;
+  /** Pre-confirm one side (fixture-request approve). Omit for assigner add. */
+  preConfirmSide?: FixtureSide;
+};
+
+/**
+ * Create a released match + Schedule (/Locations) Sheet row.
+ * Used by fixture approve and assigner Add match.
+ */
+export async function runCreateMatchFromFacts(opts: {
+  db: Firestore;
+  orgId: string;
+  serviceAccountJson: string;
+  facts: CreateMatchFacts;
+}): Promise<{ ok: true; matchId: string; sheetRowKey: string }> {
+  const { db, orgId, serviceAccountJson, facts } = opts;
+
+  const kickoffAt = String(facts.kickoffAt ?? '').trim();
+  const venueName = String(facts.venueName ?? '').trim();
+  const venueAddress = String(facts.venueAddress ?? '').trim();
+  const level = String(facts.level ?? '').trim();
+  const homeTeamId = String(facts.homeTeamId ?? '').trim();
+  const awayTeamId = String(facts.awayTeamId ?? '').trim();
+  const homeTeamName = String(facts.homeTeamName ?? '').trim();
+  const awayTeamName = String(facts.awayTeamName ?? '').trim();
+
+  if (!kickoffAt || Number.isNaN(new Date(kickoffAt).getTime())) {
+    throw new HttpsError('invalid-argument', 'Valid kickoffAt is required.');
+  }
+  if (!venueName || !venueAddress) {
+    throw new HttpsError(
+      'invalid-argument',
+      'venueName and venueAddress are required.',
+    );
+  }
+  if (!level) {
+    throw new HttpsError('invalid-argument', 'level is required.');
+  }
+  if (!homeTeamId || !awayTeamId || homeTeamId === awayTeamId) {
+    throw new HttpsError(
+      'invalid-argument',
+      'Distinct home and away teams are required.',
+    );
+  }
+  if (!homeTeamName || !awayTeamName) {
+    throw new HttpsError(
+      'invalid-argument',
+      'homeTeamName and awayTeamName are required.',
+    );
+  }
+
+  const orgSnap = await db.doc(`orgs/${orgId}`).get();
+  const sheetId = String(orgSnap.data()?.sheetId ?? '').trim();
+  if (!sheetId) {
+    throw new HttpsError(
+      'failed-precondition',
+      'No Sheet linked. Paste a Google Sheet link on Upload, then Sync.',
+    );
+  }
+
+  const { matchId, sheetRowKey } = newAppMatchIds();
+  const { date, time } = chicagoDateParts(kickoffAt);
+  const sheets = sheetsClient(serviceAccountJson);
+  const gender = facts.gender === 'women' ? 'women' : 'men';
+  const competition =
+    typeof facts.competition === 'string' ? facts.competition.trim() : '';
+  const notes = typeof facts.notes === 'string' ? facts.notes.trim() : '';
+
+  const [homeTeam, awayTeam] = await Promise.all([
+    loadTeamForWrite(db, orgId, homeTeamId),
+    loadTeamForWrite(db, orgId, awayTeamId),
+  ]);
+  const homeSheet = sheetTeamLabelForWrite(homeTeam, homeTeamName);
+  const awaySheet = sheetTeamLabelForWrite(awayTeam, awayTeamName);
+  const locationsRows = await readTab(sheets, sheetId, 'Locations');
+  const locationSheet = resolveScheduleLocationForWrite({
+    venueName,
+    homeTeamAbbr: homeTeam?.abbreviation,
+    locationsRows,
+  });
+
+  const matchRef = db.doc(`orgs/${orgId}/matches/${matchId}`);
+  const existingMatch = await matchRef.get();
+  if (!existingMatch.exists) {
+    const at = new Date().toISOString();
+    const matchDoc: Record<string, unknown> = {
+      id: matchId,
+      sheetRowKey,
+      status: 'pending_team_review',
+      kickoffAt,
+      venueName,
+      venueAddress,
+      homeTeamId,
+      awayTeamId,
+      homeTeamName: homeSheet,
+      awayTeamName: awaySheet,
+      competition: competition || null,
+      level,
+      gender,
+      notes: notes || null,
+      flightProvided: Boolean(facts.flightProvided),
+      housingProvided: Boolean(facts.housingProvided),
+      crew: emptyCrew(),
+      rolesNeeded: ['mo'],
+      releasedAt: at,
+      homeConfirmedAt: facts.preConfirmSide === 'home' ? at : null,
+      awayConfirmedAt: facts.preConfirmSide === 'away' ? at : null,
+      createdAt: FieldValue.serverTimestamp(),
+      updatedAt: FieldValue.serverTimestamp(),
+    };
+    await matchRef.set(matchDoc);
+  }
+
+  try {
+    if (!(await scheduleRowExists(sheets, sheetId, sheetRowKey))) {
+      await upsertLocationsRow(
+        sheets,
+        sheetId,
+        locationSheet,
+        venueName,
+        venueAddress,
+        gender,
+        competition || undefined,
+      );
+      await appendScheduleRow(sheets, sheetId, {
+        matchId: sheetRowKey,
+        date,
+        time,
+        location: locationSheet,
+        homeTeam: homeSheet,
+        awayTeam: awaySheet,
+        competition: competition || undefined,
+        level,
+        gender,
+        notes: notes || undefined,
+      });
+    }
+  } catch (err) {
+    if (err instanceof HttpsError) throw err;
+    logger.error('Sheet write failed for match create', err);
+    throw new HttpsError(
+      'internal',
+      err instanceof Error
+        ? `Sheet write failed: ${err.message}`
+        : 'Sheet write failed. Ensure the service account is Editor on the workbook.',
+    );
+  }
+
+  logger.info('createMatchFromFacts', { orgId, matchId, sheetRowKey });
+  return { ok: true, matchId, sheetRowKey };
+}
+
 /**
  * Approve a pending fixture request: append Sheet row, create match,
  * mark request approved.
@@ -415,110 +580,42 @@ export async function runApproveFixtureRequest(opts: {
     );
   }
 
-  const orgSnap = await db.doc(`orgs/${orgId}`).get();
-  const sheetId = String(orgSnap.data()?.sheetId ?? '').trim();
-  if (!sheetId) {
-    throw new HttpsError(
-      'failed-precondition',
-      'No Sheet linked. Paste a Google Sheet link on Upload, then Sync.',
-    );
-  }
-
-  const { matchId, sheetRowKey } = newAppMatchIds();
-  const { date, time } = chicagoDateParts(req.kickoffAt);
-  const sheets = sheetsClient(serviceAccountJson);
-  const gender = req.gender === 'women' ? 'women' : 'men';
-
-  const [homeTeam, awayTeam] = await Promise.all([
-    loadTeamForWrite(db, orgId, req.homeTeamId),
-    loadTeamForWrite(db, orgId, req.awayTeamId),
-  ]);
-  const homeSheet = sheetTeamLabelForWrite(homeTeam, req.homeTeamName);
-  const awaySheet = sheetTeamLabelForWrite(awayTeam, req.awayTeamName);
-  const locationsRows = await readTab(sheets, sheetId, 'Locations');
-  const locationSheet = resolveScheduleLocationForWrite({
-    venueName: req.venueName,
-    homeTeamAbbr: homeTeam?.abbreviation,
-    locationsRows,
-  });
-
-  const matchRef = db.doc(`orgs/${orgId}/matches/${matchId}`);
-  const existingMatch = await matchRef.get();
-  if (!existingMatch.exists) {
-    const at = new Date().toISOString();
-    const matchDoc: Record<string, unknown> = {
-      id: matchId,
-      sheetRowKey,
-      status: 'pending_team_review',
+  const result = await runCreateMatchFromFacts({
+    db,
+    orgId,
+    serviceAccountJson,
+    facts: {
+      homeTeamId: req.homeTeamId,
+      awayTeamId: req.awayTeamId,
+      homeTeamName: req.homeTeamName,
+      awayTeamName: req.awayTeamName,
       kickoffAt: req.kickoffAt,
       venueName: req.venueName,
       venueAddress: req.venueAddress,
-      homeTeamId: req.homeTeamId,
-      awayTeamId: req.awayTeamId,
-      homeTeamName: homeSheet,
-      awayTeamName: awaySheet,
-      competition: req.competition || null,
+      competition: req.competition,
       level: req.level,
-      gender,
-      notes: req.notes || null,
-      flightProvided: Boolean(req.flightProvided),
-      housingProvided: Boolean(req.housingProvided),
-      crew: emptyCrew(),
-      rolesNeeded: ['mo'],
-      releasedAt: at,
-      homeConfirmedAt: req.side === 'home' ? at : null,
-      awayConfirmedAt: req.side === 'away' ? at : null,
-      createdAt: FieldValue.serverTimestamp(),
-      updatedAt: FieldValue.serverTimestamp(),
-    };
-    await matchRef.set(matchDoc);
-  }
-
-  try {
-    if (!(await scheduleRowExists(sheets, sheetId, sheetRowKey))) {
-      await upsertLocationsRow(
-        sheets,
-        sheetId,
-        locationSheet,
-        req.venueName,
-        req.venueAddress,
-        gender,
-        req.competition ?? undefined,
-      );
-      await appendScheduleRow(sheets, sheetId, {
-        matchId: sheetRowKey,
-        date,
-        time,
-        location: locationSheet,
-        homeTeam: homeSheet,
-        awayTeam: awaySheet,
-        competition: req.competition ?? undefined,
-        level: req.level,
-        gender,
-        notes: req.notes ?? undefined,
-      });
-    }
-  } catch (err) {
-    if (err instanceof HttpsError) throw err;
-    logger.error('Sheet write failed for fixture approve', err);
-    throw new HttpsError(
-      'internal',
-      err instanceof Error
-        ? `Sheet write failed: ${err.message}`
-        : 'Sheet write failed. Ensure the service account is Editor on the workbook.',
-    );
-  }
+      gender: req.gender,
+      notes: req.notes,
+      flightProvided: req.flightProvided,
+      housingProvided: req.housingProvided,
+      preConfirmSide: req.side,
+    },
+  });
 
   const at = new Date().toISOString();
   await reqRef.update({
     status: 'approved',
-    matchId,
-    sheetRowKey,
+    matchId: result.matchId,
+    sheetRowKey: result.sheetRowKey,
     reviewedAt: at,
     reviewedByUserId,
     updatedAt: at,
   });
 
-  logger.info('approveFixtureRequest', { orgId, requestId, matchId });
-  return { ok: true, matchId, sheetRowKey };
+  logger.info('approveFixtureRequest', {
+    orgId,
+    requestId,
+    matchId: result.matchId,
+  });
+  return result;
 }

@@ -78,6 +78,7 @@ Firebase Console → Authentication → Settings → **Authorized domains** → 
 | `sheetWebhook` | Apps Script `onEdit` / timed | Same ingest (no longer timestamp-only) |
 | `proposalWriteback` | Assigner ack after other-team accept | Updates Schedule row + match facts |
 | `updateMatchSchedule` | Assigner Edit details → kickoff/venue | Same Schedule + match write-back (no proposal) |
+| `createMatch` | Assigner Schedule → Add match | Appends Schedule (+ Locations) row + creates `pending_team_review` match |
 | `submitTeamLinkRequests` | Onboarding / Profile | Auto-approve when email on Contacts; else pending |
 | `reviewTeamLinkRequest` | Assigner or Team Admin for club | Approve → Contacts append + `teamIds`; deny may strip TA / Fan |
 

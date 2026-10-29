@@ -14,7 +14,10 @@ import { logger } from 'firebase-functions';
 import { FieldValue } from 'firebase-admin/firestore';
 import { runSheetSync } from './syncSheet';
 import { effectiveContactEmailFromUserData } from './contactEmail';
-import { runApproveFixtureRequest } from './approveFixtureRequest';
+import {
+  runApproveFixtureRequest,
+  runCreateMatchFromFacts,
+} from './approveFixtureRequest';
 import {
   runMatchScheduleWriteback,
   runProposalWriteback,
@@ -531,6 +534,60 @@ export const proposalWriteback = onCall(
       }
       throw new HttpsError('internal', message);
     }
+  },
+);
+
+/**
+ * Assigner adds a match from the app (no fixture-request queue).
+ * Body: { orgId?, homeTeamId, awayTeamId, homeTeamName, awayTeamName,
+ *   kickoffAt, venueName, venueAddress, level, gender, competition?, notes?,
+ *   flightProvided?, housingProvided? }
+ */
+export const createMatch = onCall(
+  {
+    secrets: [googleServiceAccountJson],
+    timeoutSeconds: 120,
+    memory: '512MiB',
+  },
+  async (request) => {
+    if (!request.auth?.uid) {
+      throw new HttpsError('unauthenticated', 'Sign in required');
+    }
+    const orgId =
+      String(request.data?.orgId ?? '').trim() ||
+      process.env.DEFAULT_ORG_ID ||
+      'lonestar';
+    await assertAssigner(request.auth.uid, orgId);
+
+    const sa = googleServiceAccountJson.value();
+    if (!sa) {
+      throw new HttpsError(
+        'failed-precondition',
+        'GOOGLE_SERVICE_ACCOUNT_JSON secret is not set',
+      );
+    }
+
+    const data = request.data ?? {};
+    return runCreateMatchFromFacts({
+      db,
+      orgId,
+      serviceAccountJson: sa,
+      facts: {
+        homeTeamId: String(data.homeTeamId ?? '').trim(),
+        awayTeamId: String(data.awayTeamId ?? '').trim(),
+        homeTeamName: String(data.homeTeamName ?? '').trim(),
+        awayTeamName: String(data.awayTeamName ?? '').trim(),
+        kickoffAt: String(data.kickoffAt ?? '').trim(),
+        venueName: String(data.venueName ?? '').trim(),
+        venueAddress: String(data.venueAddress ?? '').trim(),
+        competition: String(data.competition ?? '').trim() || null,
+        level: String(data.level ?? '').trim(),
+        gender: String(data.gender ?? '').trim(),
+        notes: String(data.notes ?? '').trim() || null,
+        flightProvided: data.flightProvided === true,
+        housingProvided: data.housingProvided === true,
+      },
+    });
   },
 );
 

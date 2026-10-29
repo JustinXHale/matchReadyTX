@@ -11,9 +11,27 @@ export function isOtherOpponentTeamId(teamId: string): boolean {
   return teamId === OTHER_OPPONENT_TEAM_ID;
 }
 
-/** Build a released match from an approved fixture request (requester side pre-confirmed). */
-export function matchFromFixtureRequest(
-  req: FixtureRequest,
+export type MatchCreateFacts = {
+  homeTeamId: string;
+  awayTeamId: string;
+  homeTeamName: string;
+  awayTeamName: string;
+  kickoffAt: string;
+  venueName: string;
+  venueAddress: string;
+  competition?: string;
+  level: string;
+  gender: Match['gender'];
+  notes?: string;
+  flightProvided: boolean;
+  housingProvided: boolean;
+  /** Pre-confirm one side (fixture approve). Omit for assigner add. */
+  preConfirmSide?: 'home' | 'away';
+};
+
+/** Build a released pending_team_review match from schedule facts. */
+export function matchFromCreateFacts(
+  facts: MatchCreateFacts,
   opts: {
     matchId: string;
     sheetRowKey: string;
@@ -25,25 +43,55 @@ export function matchFromFixtureRequest(
     id: opts.matchId,
     sheetRowKey: opts.sheetRowKey,
     status: 'pending_team_review',
-    kickoffAt: req.kickoffAt,
-    venueName: req.venueName,
-    venueAddress: req.venueAddress,
-    homeTeamId: req.homeTeamId,
-    awayTeamId: req.awayTeamId,
-    homeTeamName: req.homeTeamName,
-    awayTeamName: req.awayTeamName,
-    competition: req.competition,
-    level: req.level,
-    gender: req.gender,
-    notes: req.notes,
-    flightProvided: req.flightProvided,
-    housingProvided: req.housingProvided,
+    kickoffAt: facts.kickoffAt,
+    venueName: facts.venueName,
+    venueAddress: facts.venueAddress,
+    homeTeamId: facts.homeTeamId,
+    awayTeamId: facts.awayTeamId,
+    homeTeamName: facts.homeTeamName,
+    awayTeamName: facts.awayTeamName,
+    competition: facts.competition,
+    level: facts.level,
+    gender: facts.gender,
+    notes: facts.notes,
+    flightProvided: facts.flightProvided,
+    housingProvided: facts.housingProvided,
     crew: emptyCrew(),
     rolesNeeded: ['mo'],
     releasedAt: at,
-    homeConfirmedAt: req.side === 'home' ? at : undefined,
-    awayConfirmedAt: req.side === 'away' ? at : undefined,
+    homeConfirmedAt: facts.preConfirmSide === 'home' ? at : undefined,
+    awayConfirmedAt: facts.preConfirmSide === 'away' ? at : undefined,
   };
+}
+
+/** Build a released match from an approved fixture request (requester side pre-confirmed). */
+export function matchFromFixtureRequest(
+  req: FixtureRequest,
+  opts: {
+    matchId: string;
+    sheetRowKey: string;
+    at?: string;
+  },
+): Match {
+  return matchFromCreateFacts(
+    {
+      homeTeamId: req.homeTeamId,
+      awayTeamId: req.awayTeamId,
+      homeTeamName: req.homeTeamName,
+      awayTeamName: req.awayTeamName,
+      kickoffAt: req.kickoffAt,
+      venueName: req.venueName,
+      venueAddress: req.venueAddress,
+      competition: req.competition,
+      level: req.level,
+      gender: req.gender,
+      notes: req.notes,
+      flightProvided: req.flightProvided,
+      housingProvided: req.housingProvided,
+      preConfirmSide: req.side,
+    },
+    opts,
+  );
 }
 
 /** Generate APP-{yyyyMMdd}-{short} match / sheet ids. */
