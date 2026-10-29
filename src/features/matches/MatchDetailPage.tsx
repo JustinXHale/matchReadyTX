@@ -163,6 +163,9 @@ type CrewPickTarget = {
 
 type MatchDetailsDraft = {
   title: string;
+  kickoffLocal: string;
+  venueName: string;
+  venueAddress: string;
   division: MatchDivisionSelection;
   fees: Partial<Record<RequestableSlot, string>>;
   flightProvided: boolean;
@@ -188,6 +191,9 @@ function buildMatchDetailsDraft(
   }
   return {
     title: match.title ?? '',
+    kickoffLocal: match.kickoffAt ? toDatetimeLocalValue(match.kickoffAt) : '',
+    venueName: match.venueName ?? '',
+    venueAddress: match.venueAddress ?? '',
     division: parseMatchDivision(match, tierOptions),
     fees,
     flightProvided: match.flightProvided,
@@ -807,6 +813,39 @@ export function MatchDetailPage() {
       return;
     }
 
+    const venueName = detailsDraft.venueName.trim();
+    const venueAddress = detailsDraft.venueAddress.trim();
+    const kickoffLocal = detailsDraft.kickoffLocal.trim();
+    if (!kickoffLocal) {
+      setDetailsSaveError('Enter a kickoff date and time.');
+      setDetailsSaveState('error');
+      return;
+    }
+    const kickoffAt = new Date(kickoffLocal).toISOString();
+    if (Number.isNaN(new Date(kickoffLocal).getTime())) {
+      setDetailsSaveError('Enter a valid kickoff date and time.');
+      setDetailsSaveState('error');
+      return;
+    }
+    if (!venueName) {
+      setDetailsSaveError('Enter a venue name.');
+      setDetailsSaveState('error');
+      return;
+    }
+
+    const scheduleDirty =
+      kickoffAt !== match.kickoffAt ||
+      venueName !== (match.venueName ?? '') ||
+      venueAddress !== (match.venueAddress ?? '');
+
+    if (scheduleDirty && match.status === 'change_proposed') {
+      setDetailsSaveError(
+        'Resolve the pending schedule proposal (Apply or Deny) before editing kickoff or venue.',
+      );
+      setDetailsSaveState('error');
+      return;
+    }
+
     const feeOverride = { ...(match.feeOverride ?? {}) };
     for (const slot of matchRoles) {
       const raw = detailsDraft.fees[slot]?.trim() ?? '';
@@ -841,6 +880,13 @@ export function MatchDetailPage() {
     setDetailsSaveError('');
     setScheduleUrlError('');
     try {
+      if (scheduleDirty) {
+        await store.updateMatchSchedule(match.id, {
+          kickoffAt,
+          venueName,
+          venueAddress,
+        });
+      }
       if (dataMode === 'live' && isFirebaseConfigured) {
         await saveMatchDetailsInFirestore(defaultOrgId(), match.id, details);
       }
@@ -849,8 +895,14 @@ export function MatchDetailPage() {
       setDetailsDraft(null);
       setDetailsSaveState('idle');
       setDetailsSaved(true);
+      if (scheduleDirty) {
+        notify(
+          'Schedule updated — teams and crew were asked to reconfirm.',
+          'success',
+        );
+      }
     } catch (err) {
-      console.error('saveMatchDetailsInFirestore failed', err);
+      console.error('saveMatchDetails failed', err);
       setDetailsSaveState('error');
       setDetailsSaveError(
         err instanceof Error
@@ -2386,9 +2438,56 @@ export function MatchDetailPage() {
             <span className="rs-detail-editor__mode">Unsaved draft</span>
           </div>
           <p className="rs-detail-note">
-            These settings describe the match. Schedule changes to kickoff or
-            venue use the separate proposal workflow.
+            Changing kickoff or venue updates the Google Sheet, emails teams and
+            crew, and asks them to reconfirm.
+            {match.status === 'change_proposed'
+              ? ' Resolve the pending proposal before editing schedule fields.'
+              : ''}
           </p>
+
+          <div className="rs-detail-editor__group">
+            <h3 className="rs-detail-section__sublabel">Schedule</h3>
+            <FormGroup fieldId="match-kickoff" label="Kickoff" isRequired>
+              <IconDateInput
+                id="match-kickoff"
+                type="datetime-local"
+                value={detailsDraft.kickoffLocal}
+                isDisabled={match.status === 'change_proposed'}
+                onChange={(_e, value) =>
+                  setDetailsDraft((draft) =>
+                    draft ? { ...draft, kickoffLocal: value } : draft,
+                  )
+                }
+                aria-label="Kickoff date and time"
+              />
+            </FormGroup>
+            <FormGroup fieldId="match-venue-name" label="Venue" isRequired>
+              <TextInput
+                id="match-venue-name"
+                value={detailsDraft.venueName}
+                isDisabled={match.status === 'change_proposed'}
+                onChange={(_e, value) =>
+                  setDetailsDraft((draft) =>
+                    draft ? { ...draft, venueName: value } : draft,
+                  )
+                }
+                placeholder="Field or complex name"
+              />
+            </FormGroup>
+            <FormGroup fieldId="match-venue-address" label="Address">
+              <TextInput
+                id="match-venue-address"
+                value={detailsDraft.venueAddress}
+                isDisabled={match.status === 'change_proposed'}
+                onChange={(_e, value) =>
+                  setDetailsDraft((draft) =>
+                    draft ? { ...draft, venueAddress: value } : draft,
+                  )
+                }
+                placeholder="Street, city, state, ZIP"
+              />
+            </FormGroup>
+          </div>
 
           <FormGroup fieldId="match-event-title" label="Event or tournament name">
             <TextInput

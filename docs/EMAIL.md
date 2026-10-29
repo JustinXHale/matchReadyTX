@@ -131,6 +131,7 @@ When match details change (time, venue, or status), all assigned crew and team c
 Notifications are sent when the assigner applies a schedule change or cancels/postpones a match. Team requests alone do not email anyone — the assigner might still deny the request.
 
 - `proposalWriteback` succeeds → `notifyMatchChange` (time / venue)
+- Assigner **Edit details** saves a kickoff/venue change → `updateMatchSchedule` → `notifyMatchChange`
 - Assigner **Cancel** or **Postpone** on match detail → `notifyMatchChangeCallable` with `changeType: 'status'` (**before** cancel clears crew)
 - Assigner can also call `notifyMatchChangeCallable` manually
 

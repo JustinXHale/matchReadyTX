@@ -1412,6 +1412,35 @@ export async function callProposalWriteback(input: {
   return result.data as ProposalWritebackResult;
 }
 
+export type UpdateMatchScheduleResult = {
+  ok: true;
+  matchId: string;
+  sheetRowKey: string;
+  updatedAt: string;
+  kickoffAt: string;
+  venueName: string;
+  venueAddress: string;
+};
+
+/** Assigner edits kickoff / venue — Schedule Sheet write-back + reconfirm. */
+export async function callUpdateMatchSchedule(input: {
+  orgId?: string;
+  matchId: string;
+  kickoffAt: string;
+  venueName: string;
+  venueAddress?: string;
+}): Promise<UpdateMatchScheduleResult> {
+  const fn = httpsCallable(requireFunctions(), 'updateMatchSchedule');
+  const result = await fn({
+    orgId: input.orgId ?? DEFAULT_ORG,
+    matchId: input.matchId,
+    kickoffAt: input.kickoffAt,
+    venueName: input.venueName,
+    venueAddress: input.venueAddress ?? '',
+  });
+  return result.data as UpdateMatchScheduleResult;
+}
+
 /** Persist sheetId on the org doc (assigner write). */
 export async function saveOrgSheetId(
   orgId: string,

@@ -1,5 +1,6 @@
 /**
- * Update an existing Schedule row after a change proposal is accepted.
+ * Update an existing Schedule row after a change proposal is accepted
+ * or an assigner edits kickoff / venue in the app.
  */
 import { google } from 'googleapis';
 import { FieldValue, type Firestore } from 'firebase-admin/firestore';
@@ -90,55 +91,37 @@ function chicagoDateParts(iso: string): { date: string; time: string } {
   return { date: dateFmt.format(d), time: timeFmt.format(d) };
 }
 
-export type ProposalWritebackInput = {
+export type MatchScheduleWritebackInput = {
   db: Firestore;
   orgId: string;
   matchId: string;
-  proposalId: string;
   serviceAccountJson: string;
-  /** Optional overrides (from accepted proposal). */
-  kickoffAt?: string;
-  venueName?: string;
+  kickoffAt: string;
+  venueName: string;
   venueAddress?: string;
 };
 
-export type ProposalWritebackResult = {
+export type MatchScheduleWritebackResult = {
   ok: true;
   matchId: string;
   sheetRowKey: string;
   updatedAt: string;
+  previousKickoffAt: string;
+  previousVenueName: string;
+  previousVenueAddress: string;
+  kickoffAt: string;
+  venueName: string;
+  venueAddress: string;
 };
 
 /**
- * Merge accepted proposal facts onto Firestore match + Schedule Sheet row.
+ * Write kickoff / venue to the Schedule Sheet row and match doc.
+ * Puts the match into needs_reconfirmation and holds named crew.
  */
-export async function runProposalWriteback(
-  opts: ProposalWritebackInput,
-): Promise<ProposalWritebackResult> {
-  const { db, orgId, matchId, proposalId, serviceAccountJson } = opts;
-  const proposalRef = db.doc(
-    `orgs/${orgId}/matches/${matchId}/proposals/${proposalId}`,
-  );
-  const proposalSnap = await proposalRef.get();
-  if (!proposalSnap.exists) {
-    throw new HttpsError('not-found', 'Change proposal not found.');
-  }
-  const proposal = proposalSnap.data() as Record<string, unknown>;
-  if (!proposal.otherTeamAcceptedAt && !proposal.assignerAckAt) {
-    throw new HttpsError(
-      'failed-precondition',
-      'Assigner must apply or acknowledge the proposal before write-back.',
-    );
-  }
-  if (
-    proposal.status === 'rejected_by_other_team' ||
-    proposal.status === 'withdrawn'
-  ) {
-    throw new HttpsError(
-      'failed-precondition',
-      'Proposal was denied or withdrawn — cannot write back.',
-    );
-  }
+export async function runMatchScheduleWriteback(
+  opts: MatchScheduleWritebackInput,
+): Promise<MatchScheduleWritebackResult> {
+  const { db, orgId, matchId, serviceAccountJson } = opts;
 
   const orgSnap = await db.doc(`orgs/${orgId}`).get();
   if (!orgSnap.exists) {
@@ -168,15 +151,13 @@ export async function runProposalWriteback(
     );
   }
 
-  const kickoffAt = String(
-    opts.kickoffAt ?? proposal.kickoffAt ?? match.kickoffAt ?? '',
-  ).trim();
-  const venueName = String(
-    opts.venueName ?? proposal.venueName ?? match.venueName ?? '',
-  ).trim();
-  const venueAddress = String(
-    opts.venueAddress ?? proposal.venueAddress ?? match.venueAddress ?? '',
-  ).trim();
+  const previousKickoffAt = String(match.kickoffAt ?? '').trim();
+  const previousVenueName = String(match.venueName ?? '').trim();
+  const previousVenueAddress = String(match.venueAddress ?? '').trim();
+
+  const kickoffAt = String(opts.kickoffAt ?? '').trim();
+  const venueName = String(opts.venueName ?? '').trim();
+  const venueAddress = String(opts.venueAddress ?? '').trim();
   const homeTeam = String(match.homeTeamName ?? '').trim();
   const awayTeam = String(match.awayTeamName ?? '').trim();
   const level = String(match.level ?? '').trim();
@@ -284,13 +265,6 @@ export async function runProposalWriteback(
     },
     { merge: true },
   );
-  await proposalRef.set(
-    {
-      status: 'approved',
-      updatedAt,
-    },
-    { merge: true },
-  );
   await db.doc(`orgs/${orgId}`).set(
     {
       sheetSyncedAt: updatedAt,
@@ -300,11 +274,120 @@ export async function runProposalWriteback(
     { merge: true },
   );
 
-  logger.info('proposalWriteback updated Sheet + match', {
+  logger.info('match schedule write-back updated Sheet + match', {
     orgId,
     matchId,
     sheetRowKey,
   });
 
-  return { ok: true, matchId, sheetRowKey, updatedAt };
+  return {
+    ok: true,
+    matchId,
+    sheetRowKey,
+    updatedAt,
+    previousKickoffAt,
+    previousVenueName,
+    previousVenueAddress,
+    kickoffAt,
+    venueName,
+    venueAddress,
+  };
+}
+
+export type ProposalWritebackInput = {
+  db: Firestore;
+  orgId: string;
+  matchId: string;
+  proposalId: string;
+  serviceAccountJson: string;
+  /** Optional overrides (from accepted proposal). */
+  kickoffAt?: string;
+  venueName?: string;
+  venueAddress?: string;
+};
+
+export type ProposalWritebackResult = {
+  ok: true;
+  matchId: string;
+  sheetRowKey: string;
+  updatedAt: string;
+};
+
+/**
+ * Merge accepted proposal facts onto Firestore match + Schedule Sheet row.
+ */
+export async function runProposalWriteback(
+  opts: ProposalWritebackInput,
+): Promise<ProposalWritebackResult> {
+  const { db, orgId, matchId, proposalId, serviceAccountJson } = opts;
+  const proposalRef = db.doc(
+    `orgs/${orgId}/matches/${matchId}/proposals/${proposalId}`,
+  );
+  const proposalSnap = await proposalRef.get();
+  if (!proposalSnap.exists) {
+    throw new HttpsError('not-found', 'Change proposal not found.');
+  }
+  const proposal = proposalSnap.data() as Record<string, unknown>;
+  if (!proposal.otherTeamAcceptedAt && !proposal.assignerAckAt) {
+    throw new HttpsError(
+      'failed-precondition',
+      'Assigner must apply or acknowledge the proposal before write-back.',
+    );
+  }
+  if (
+    proposal.status === 'rejected_by_other_team' ||
+    proposal.status === 'withdrawn'
+  ) {
+    throw new HttpsError(
+      'failed-precondition',
+      'Proposal was denied or withdrawn — cannot write back.',
+    );
+  }
+
+  const matchSnap = await db.doc(`orgs/${orgId}/matches/${matchId}`).get();
+  if (!matchSnap.exists) {
+    throw new HttpsError('not-found', 'Match not found.');
+  }
+  const match = matchSnap.data() as Record<string, unknown>;
+
+  const kickoffAt = String(
+    opts.kickoffAt ?? proposal.kickoffAt ?? match.kickoffAt ?? '',
+  ).trim();
+  const venueName = String(
+    opts.venueName ?? proposal.venueName ?? match.venueName ?? '',
+  ).trim();
+  const venueAddress = String(
+    opts.venueAddress ?? proposal.venueAddress ?? match.venueAddress ?? '',
+  ).trim();
+
+  const result = await runMatchScheduleWriteback({
+    db,
+    orgId,
+    matchId,
+    serviceAccountJson,
+    kickoffAt,
+    venueName,
+    venueAddress,
+  });
+
+  await proposalRef.set(
+    {
+      status: 'approved',
+      updatedAt: result.updatedAt,
+    },
+    { merge: true },
+  );
+
+  logger.info('proposalWriteback updated Sheet + match', {
+    orgId,
+    matchId,
+    sheetRowKey: result.sheetRowKey,
+  });
+
+  return {
+    ok: true,
+    matchId: result.matchId,
+    sheetRowKey: result.sheetRowKey,
+    updatedAt: result.updatedAt,
+  };
 }

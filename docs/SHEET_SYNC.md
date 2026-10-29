@@ -77,6 +77,7 @@ Firebase Console → Authentication → Settings → **Authorized domains** → 
 | `sheetPoll` | Daily (~06:00 UTC) | Fallback ingest when `sheetId` + SA present; use Upload → Sync anytime |
 | `sheetWebhook` | Apps Script `onEdit` / timed | Same ingest (no longer timestamp-only) |
 | `proposalWriteback` | Assigner ack after other-team accept | Updates Schedule row + match facts |
+| `updateMatchSchedule` | Assigner Edit details → kickoff/venue | Same Schedule + match write-back (no proposal) |
 | `submitTeamLinkRequests` | Onboarding / Profile | Auto-approve when email on Contacts; else pending |
 | `reviewTeamLinkRequest` | Assigner or Team Admin for club | Approve → Contacts append + `teamIds`; deny may strip TA / Fan |
 

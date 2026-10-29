@@ -142,6 +142,54 @@ export function changesFromProposal(proposal: Record<string, unknown>): {
   return { changeType, changes };
 }
 
+/** Detect schedule edits from assigner write-back (previous vs next facts). */
+export function changesFromScheduleUpdate(input: {
+  previousKickoffAt: string;
+  previousVenueName: string;
+  previousVenueAddress: string;
+  kickoffAt: string;
+  venueName: string;
+  venueAddress: string;
+}): {
+  changeType: MatchChangeType;
+  changes: MatchChangeDetails;
+} | null {
+  const previousKickoffAt = input.previousKickoffAt.trim();
+  const kickoffAt = input.kickoffAt.trim();
+  const previousVenueName = input.previousVenueName.trim();
+  const venueName = input.venueName.trim();
+  const previousVenueAddress = input.previousVenueAddress.trim();
+  const venueAddress = input.venueAddress.trim();
+
+  const timeChanged = Boolean(
+    kickoffAt && previousKickoffAt && kickoffAt !== previousKickoffAt,
+  );
+  const venueChanged =
+    venueName !== previousVenueName || venueAddress !== previousVenueAddress;
+
+  if (!timeChanged && !venueChanged) return null;
+
+  const changes: MatchChangeDetails = {};
+  if (timeChanged) {
+    changes.oldKickoffAt = previousKickoffAt;
+    changes.newKickoffAt = kickoffAt;
+  }
+  if (venueChanged) {
+    if (previousVenueName || venueName) {
+      changes.oldVenueName = previousVenueName || undefined;
+      changes.newVenueName = venueName || undefined;
+    }
+    if (previousVenueAddress || venueAddress) {
+      changes.oldVenueAddress = previousVenueAddress || undefined;
+      changes.newVenueAddress = venueAddress || undefined;
+    }
+  }
+
+  const changeType: MatchChangeType =
+    timeChanged && venueChanged ? 'details' : timeChanged ? 'time' : 'venue';
+  return { changeType, changes };
+}
+
 /** Fetch team contact emails. */
 async function getTeamContactEmails(
   db: Firestore,

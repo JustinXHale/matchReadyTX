@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   changesFromProposal,
+  changesFromScheduleUpdate,
   extractCrewUserIds,
   extractCmoUserIds,
 } from './notifyMatchChange';
@@ -34,6 +35,34 @@ describe('changesFromProposal', () => {
       changesFromProposal({
         kickoffAt: '2026-10-26T18:00:00.000Z',
         oldKickoffAt: '2026-10-26T16:00:00.000Z',
+      }),
+    ).toBeNull();
+  });
+});
+
+describe('changesFromScheduleUpdate', () => {
+  it('detects address-only venue changes', () => {
+    const detected = changesFromScheduleUpdate({
+      previousKickoffAt: '2026-10-26T16:00:00.000Z',
+      kickoffAt: '2026-10-26T16:00:00.000Z',
+      previousVenueName: 'Field A',
+      venueName: 'Field A',
+      previousVenueAddress: '',
+      venueAddress: '123 Main St',
+    });
+    expect(detected?.changeType).toBe('venue');
+    expect(detected?.changes.newVenueAddress).toBe('123 Main St');
+  });
+
+  it('returns null when facts are unchanged', () => {
+    expect(
+      changesFromScheduleUpdate({
+        previousKickoffAt: '2026-10-26T16:00:00.000Z',
+        kickoffAt: '2026-10-26T16:00:00.000Z',
+        previousVenueName: 'Field A',
+        venueName: 'Field A',
+        previousVenueAddress: '123 Main',
+        venueAddress: '123 Main',
       }),
     ).toBeNull();
   });

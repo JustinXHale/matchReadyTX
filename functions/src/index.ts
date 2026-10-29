@@ -15,7 +15,10 @@ import { FieldValue } from 'firebase-admin/firestore';
 import { runSheetSync } from './syncSheet';
 import { effectiveContactEmailFromUserData } from './contactEmail';
 import { runApproveFixtureRequest } from './approveFixtureRequest';
-import { runProposalWriteback } from './proposalWriteback';
+import {
+  runMatchScheduleWriteback,
+  runProposalWriteback,
+} from './proposalWriteback';
 import {
   runReviewTeamLinkRequest,
   runSubmitTeamLinkRequests,
@@ -51,7 +54,11 @@ import {
   processMailDocument,
   type MailDoc,
 } from './sendMail';
-import { changesFromProposal, notifyMatchChange } from './notifyMatchChange';
+import {
+  changesFromProposal,
+  changesFromScheduleUpdate,
+  notifyMatchChange,
+} from './notifyMatchChange';
 
 initializeApp();
 const db = getFirestore();
@@ -282,6 +289,123 @@ export const sheetPoll = onSchedule(
         },
         { merge: true },
       );
+    }
+  },
+);
+
+/**
+ * Assigner edits kickoff / venue in the app: write Schedule + match, then notify.
+ * Body: { orgId?, matchId, kickoffAt, venueName, venueAddress? }
+ */
+export const updateMatchSchedule = onCall(
+  {
+    secrets: [googleServiceAccountJson],
+    timeoutSeconds: 120,
+    memory: '512MiB',
+  },
+  async (request) => {
+    if (!request.auth?.uid) {
+      throw new HttpsError('unauthenticated', 'Sign in required');
+    }
+    const orgId =
+      String(request.data?.orgId ?? '').trim() ||
+      process.env.DEFAULT_ORG_ID ||
+      'lonestar';
+    const matchId = String(request.data?.matchId ?? '').trim();
+    const kickoffAt = String(request.data?.kickoffAt ?? '').trim();
+    const venueName = String(request.data?.venueName ?? '').trim();
+    const venueAddress = String(request.data?.venueAddress ?? '').trim();
+    if (!matchId) {
+      throw new HttpsError('invalid-argument', 'matchId is required.');
+    }
+    if (!kickoffAt || !venueName) {
+      throw new HttpsError(
+        'invalid-argument',
+        'kickoffAt and venueName are required.',
+      );
+    }
+    await assertAssigner(request.auth.uid, orgId);
+
+    const sa = googleServiceAccountJson.value();
+    if (!sa) {
+      throw new HttpsError(
+        'failed-precondition',
+        'GOOGLE_SERVICE_ACCOUNT_JSON secret is not set. See docs/SHEET_SYNC.md.',
+      );
+    }
+
+    try {
+      const result = await runMatchScheduleWriteback({
+        db,
+        orgId,
+        matchId,
+        serviceAccountJson: sa,
+        kickoffAt,
+        venueName,
+        venueAddress,
+      });
+      await db.doc(`orgs/${orgId}`).set(
+        { sheetSyncError: FieldValue.delete() },
+        { merge: true },
+      );
+      logger.info('updateMatchSchedule ok', { orgId, matchId });
+
+      try {
+        const detected = changesFromScheduleUpdate(result);
+        const matchSnap = await db.doc(`orgs/${orgId}/matches/${matchId}`).get();
+        const matchData = matchSnap.data();
+        if (detected && matchData) {
+          await notifyMatchChange({
+            db,
+            orgId,
+            matchId,
+            changeType: detected.changeType,
+            matchData: matchData as {
+              homeTeamName: string;
+              awayTeamName: string;
+              kickoffAt: string;
+              venueName: string;
+              status: string;
+            },
+            changes: detected.changes,
+          });
+        }
+      } catch (notifyErr) {
+        logger.warn('Failed to send change notifications', {
+          orgId,
+          matchId,
+          error:
+            notifyErr instanceof Error ? notifyErr.message : 'Unknown error',
+        });
+      }
+
+      return result;
+    } catch (err) {
+      if (err instanceof HttpsError) throw err;
+      const message =
+        err instanceof Error ? err.message : 'Schedule update failed';
+      logger.error('updateMatchSchedule failed', {
+        orgId,
+        matchId,
+        message,
+      });
+      await db.doc(`orgs/${orgId}`).set(
+        {
+          sheetSyncError: `Schedule update failed: ${message}`,
+          updatedAt: new Date().toISOString(),
+        },
+        { merge: true },
+      );
+      if (
+        message.includes('permission') ||
+        message.includes('The caller does not have permission')
+      ) {
+        throw new HttpsError(
+          'permission-denied',
+          'Service account cannot edit this Sheet. Share the workbook as Editor with the service account email.',
+        );
+      }
+      throw new HttpsError('internal', message);
     }
   },
 );

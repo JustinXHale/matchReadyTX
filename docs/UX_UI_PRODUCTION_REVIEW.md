@@ -84,7 +84,7 @@ This avoids one giant global “editable/not editable” switch. The page instea
 
 | Interaction type | Examples | Recommended behavior |
 | --- | --- | --- |
-| Record configuration | Event title, gender, tier, event type, format, side, fees, flight, lodging, notes, schedule URL | Enter **Edit details**, change a draft, then Save or Cancel |
+| Record configuration | Kickoff, venue, event title, gender, tier, event type, format, side, fees, flight, lodging, notes, schedule URL | Enter **Edit details**, change a draft, then Save or Cancel. Kickoff/venue save writes the Sheet and notifies teams/crew. |
 | Match operations | Assign an official, confirm details, respond to a schedule proposal, resend an assignment, alert for coverage | Available from the relevant section or action menu, with confirmation where consequential |
 | Utility action | Open maps, add to calendar, email contacts, view schedule/report | Available in view mode; never requires edit mode |
 

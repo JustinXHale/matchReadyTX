@@ -147,6 +147,7 @@ import {
 import { isFirebaseConfigured } from '@/services/firebase';
 import {
   callProposalWriteback,
+  callUpdateMatchSchedule,
   createChangeProposalInFirestore,
   defaultOrgId,
   saveMatchTeamConfirmation,
@@ -4863,6 +4864,47 @@ class DemoStore {
         console.error('updateChangeProposalInFirestore failed', err),
       );
     }
+  }
+
+  /**
+   * Assigner edits kickoff / venue from match detail.
+   * Live: Schedule Sheet write-back + notify. Demo: local reconfirm only.
+   */
+  async updateMatchSchedule(
+    matchId: string,
+    facts: { kickoffAt: string; venueName: string; venueAddress?: string },
+  ): Promise<void> {
+    const kickoffAt = facts.kickoffAt.trim();
+    const venueName = facts.venueName.trim();
+    const venueAddress = facts.venueAddress?.trim() ?? '';
+    if (!kickoffAt || !venueName) {
+      throw new Error('Kickoff and venue are required.');
+    }
+
+    if (isLiveDataMode()) {
+      await callUpdateMatchSchedule({
+        orgId: defaultOrgId(),
+        matchId,
+        kickoffAt,
+        venueName,
+        venueAddress,
+      });
+    }
+
+    this.set((s) => ({
+      ...s,
+      matches: s.matches.map((m) => {
+        if (m.id !== matchId) return m;
+        return markNeedsReconfirmation(
+          applySheetFacts(m, { kickoffAt, venueName, venueAddress }),
+        );
+      }),
+      org: {
+        ...s.org,
+        sheetSyncedAt: new Date().toISOString(),
+        sheetSyncError: undefined,
+      },
+    }));
   }
 
   /** Apply proposal facts to the match + Sheet (assigner authority — in-app team accept optional). */
