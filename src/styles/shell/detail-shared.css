@@ -272,7 +272,7 @@ button.rs-detail-meta__maps {
   position: fixed;
   left: 0;
   right: 0;
-  bottom: calc(var(--rs-bottom-nav-height) + env(safe-area-inset-bottom, 0px));
+  bottom: calc(var(--rs-bottom-chrome-height) + env(safe-area-inset-bottom, 0px));
   z-index: 250;
   padding: 10px 16px calc(10px + env(safe-area-inset-bottom, 0px));
   background: color-mix(in srgb, var(--rs-color-bg) 92%, transparent);

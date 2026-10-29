@@ -232,7 +232,7 @@
 .rs-fab {
   position: fixed;
   right: max(16px, env(safe-area-inset-right, 0px));
-  bottom: calc(var(--rs-bottom-nav-height) + env(safe-area-inset-bottom, 0px) + 16px);
+  bottom: calc(var(--rs-bottom-chrome-height) + env(safe-area-inset-bottom, 0px) + 16px);
   z-index: 250;
   width: 56px;
   height: 56px;

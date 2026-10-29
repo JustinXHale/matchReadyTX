@@ -748,7 +748,7 @@
     left: 0;
     width: 100%;
     border-left: none;
-    bottom: calc(var(--rs-bottom-nav-height) + env(safe-area-inset-bottom, 0px));
+    bottom: calc(var(--rs-bottom-chrome-height) + env(safe-area-inset-bottom, 0px));
   }
 
   .rs-masthead-official-pick {

@@ -269,7 +269,7 @@
     position: fixed;
     left: 0;
     right: 0;
-    bottom: calc(var(--rs-bottom-nav-height) + env(safe-area-inset-bottom, 0px));
+    bottom: calc(var(--rs-bottom-chrome-height) + env(safe-area-inset-bottom, 0px));
     z-index: 250;
     display: flex;
     max-width: var(--rs-content-max);

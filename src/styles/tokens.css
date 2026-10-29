@@ -116,11 +116,13 @@
   --rs-page-pad: 0.75rem;
   --rs-gap-grid: var(--rs-space-sm);
   --rs-bottom-nav-height: 5rem;
+  --rs-promo-banner-height: 3rem;
+  --rs-bottom-chrome-height: var(--rs-bottom-nav-height);
   /** Material 3 navigation rail width (medium+). */
   --rs-nav-rail-width: 5rem;
   /** Space below fixed masthead for overlays (mobile brand block is taller). */
   --rs-masthead-offset: 5.75rem;
-  --rs-bottom-clearance: 7.25rem;
+  --rs-bottom-clearance: calc(var(--rs-bottom-chrome-height) + 2.25rem);
   --rs-tap-min: 3rem;
   --rs-action-bar-height: 3.5rem;
   --rs-status-height: 2rem;
@@ -153,6 +155,12 @@
   --rs-m3-outline-variant: var(--rs-color-border);
   --rs-m3-error: var(--rs-color-urgent);
   --rs-m3-on-error: var(--rs-color-on-urgent);
+
+  /* Safe defaults; a validated public feed overrides these on the banner. */
+  --rs-promo-background: var(--rs-m3-inverse-surface);
+  --rs-promo-primary: var(--rs-m3-inverse-on-surface);
+  --rs-promo-secondary: var(--rs-m3-inverse-on-surface);
+  --rs-promo-accent: var(--rs-m3-inverse-on-surface);
   --rs-m3-error-container: var(--rs-color-error-container);
   --rs-m3-on-error-container: var(--rs-color-on-error-container);
   --rs-m3-success-container: var(--rs-color-success-container);

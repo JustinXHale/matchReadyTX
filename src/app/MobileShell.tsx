@@ -11,6 +11,8 @@ import { navForRole } from '@/app/shell/navItems';
 import { PrimaryNav } from '@/app/shell/PrimaryNav';
 import { TopAppBar } from '@/app/shell/TopAppBar';
 import { useCompactWidth } from '@/app/shell/useCompactWidth';
+import { PromoBanner } from '@/features/promotions/PromoBanner';
+import { usePromotionsFeed } from '@/features/promotions/usePromotionsFeed';
 import {
   ContextualBarContext,
   type ContextualBarSpec,
@@ -67,6 +69,7 @@ export function MobileShell() {
   );
   const showChrome =
     Boolean(currentUser) && !isPublicPath(location.pathname);
+  const promotionsFeed = usePromotionsFeed(showChrome);
   const inDemoTree = isDemoPath(location.pathname);
   const isPublicDoc = location.pathname === '/privacy';
 
@@ -92,6 +95,7 @@ export function MobileShell() {
   const shellClass = [
     'rs-app-shell',
     showChrome && (compact ? 'rs-app-shell--compact' : 'rs-app-shell--medium'),
+    showChrome && compact && promotionsFeed && 'rs-app-shell--has-promo',
     !showChrome && (isPublicDoc ? 'rs-app-shell--public-doc' : 'rs-app-shell--auth'),
   ]
     .filter(Boolean)
@@ -101,29 +105,29 @@ export function MobileShell() {
     <ContextualBarContext.Provider value={setContextualBar}>
       <OfficialQuickLookProvider>
         <div className={shellClass}>
-        <a className="rs-skip-link" href="#main">
-          Skip to main content
-        </a>
+          <a className="rs-skip-link" href="#main">
+            Skip to main content
+          </a>
 
-        {showChrome && (
-          <TopAppBar
-            clockLabel={clockLabel}
-            todayIso={todayIso}
-            inDemoTree={inDemoTree}
-            hasFirebaseSession={hasFirebaseSession}
-            canSwitchRoleView={canSwitchRoleView}
-            availableLenses={availableLenses}
-            roleView={roleView}
-            isAssignerView={isAssignerView}
-            hasAssignerRole={hasAssignerRole}
-            onEnterLive={() => {
-              if (enterLive()) {
-                navigate(ROLE_HOME[roleView]);
-              }
-            }}
-            onSwitchView={switchView}
-          />
-        )}
+          {showChrome && (
+            <TopAppBar
+              clockLabel={clockLabel}
+              todayIso={todayIso}
+              inDemoTree={inDemoTree}
+              hasFirebaseSession={hasFirebaseSession}
+              canSwitchRoleView={canSwitchRoleView}
+              availableLenses={availableLenses}
+              roleView={roleView}
+              isAssignerView={isAssignerView}
+              hasAssignerRole={hasAssignerRole}
+              onEnterLive={() => {
+                if (enterLive()) {
+                  navigate(ROLE_HOME[roleView]);
+                }
+              }}
+              onSwitchView={switchView}
+            />
+          )}
 
           <div className="rs-app-shell__frame">
             {showChrome && !compact && (
@@ -153,14 +157,23 @@ export function MobileShell() {
                 {/* pathname only — search-param updates must not remount (e.g. members search). */}
                 <Outlet key={location.pathname} />
               </main>
+
+              {showChrome && !compact && promotionsFeed ? (
+                <PromoBanner feed={promotionsFeed} placement="medium" />
+              ) : null}
             </div>
           </div>
 
-        {showChrome && compact && (
-          <PrimaryNav items={primaryNav} variant="bar" />
-        )}
+          {showChrome && compact && (
+            <div className="rs-bottom-chrome">
+              {promotionsFeed ? (
+                <PromoBanner feed={promotionsFeed} placement="compact" />
+              ) : null}
+              <PrimaryNav items={primaryNav} variant="bar" />
+            </div>
+          )}
 
-        <UpdatePrompt />
+          <UpdatePrompt />
         </div>
       </OfficialQuickLookProvider>
     </ContextualBarContext.Provider>

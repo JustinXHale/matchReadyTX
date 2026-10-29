@@ -30,6 +30,11 @@ const PrivacyPage = lazy(() =>
     default: m.PrivacyPage,
   })),
 );
+const PromotionsManagerPage = lazy(() =>
+  import('@/features/promotions/PromotionsManagerPage').then((m) => ({
+    default: m.PromotionsManagerPage,
+  })),
+);
 const OnboardingPage = lazy(() =>
   import('@/features/auth/OnboardingPage').then((m) => ({
     default: m.OnboardingPage,
@@ -863,6 +868,10 @@ export function AppRouter() {
       <BrowserRouter>
         <Suspense fallback={<div className="rs-stack">Loading...</div>}>
           <Routes>
+            <Route
+              path="/promotions-manager"
+              element={<PromotionsManagerPage />}
+            />
             <Route
               element={
                 <DemoPrefixSync>

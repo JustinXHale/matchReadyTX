@@ -49,6 +49,12 @@
   overflow: hidden;
 }
 
+.rs-app-shell--compact.rs-app-shell--has-promo {
+  --rs-bottom-chrome-height: calc(
+    var(--rs-bottom-nav-height) + var(--rs-promo-banner-height)
+  );
+}
+
 /* The authenticated shell owns vertical scrolling through .rs-page-body. */
 html:has(.rs-app-shell--compact),
 html:has(.rs-app-shell--medium),
@@ -126,7 +132,7 @@ body:has(.rs-app-shell--medium),
 
 .rs-app-snackbar {
   bottom: calc(
-    var(--rs-bottom-nav-height) + var(--rs-space-sm) +
+    var(--rs-bottom-chrome-height) + var(--rs-space-sm) +
       env(safe-area-inset-bottom, 0px)
   ) !important;
 }
@@ -321,6 +327,17 @@ body:has(.rs-app-shell--medium),
 }
 
 /* —— Navigation bar (compact / mobile referees) —— */
+.rs-bottom-chrome {
+  position: fixed;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  z-index: 300;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
 .rs-nav-bar,
 .rs-bottom-nav {
   position: fixed;
@@ -336,6 +353,12 @@ body:has(.rs-app-shell--medium),
   padding-inline: env(safe-area-inset-left, 0) env(safe-area-inset-right, 0);
   background: var(--rs-m3-surface-container);
   border-top: 1px solid var(--rs-m3-outline-variant);
+}
+
+.rs-bottom-chrome .rs-nav-bar,
+.rs-bottom-chrome .rs-bottom-nav {
+  position: static;
+  flex: 0 0 auto;
 }
 
 .rs-nav-dest--bar {

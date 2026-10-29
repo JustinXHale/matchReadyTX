@@ -58,6 +58,20 @@ When signed in with Google/Apple, use the masthead **Demo | Live** control to co
 5. Point Apps Script `onEdit` / time trigger at `sheetWebhook`.
 6. `npm run build` && `firebase deploy --only hosting,functions`
 
+### Shared promotions
+
+The optional partner strip reads `publicFeeds/matchreadytx` from a separate,
+read-only Firebase app. Add the `VITE_PROMOTIONS_FIREBASE_*` values from the
+promotions project to `.env.local`; leave them unset to keep the strip hidden.
+The client performs a single document read, caches the validated feed for 45
+minutes, and refreshes an expired cache when the app returns to the foreground.
+`VITE_PROMOTIONS_ENABLED=false` is the client-side kill switch.
+
+The authenticated editor is available at `/promotions-manager`. Before using
+it, enable Google sign-in in the promotions project, create the administrator
+allowlist, and publish the dedicated rules described in
+[`promotions-firebase/README.md`](promotions-firebase/README.md).
+
 ### CI (auto-deploy)
 
 Pushing to `main` runs [.github/workflows/deploy.yml](.github/workflows/deploy.yml) (Hosting + Firestore rules + Functions).
@@ -66,7 +80,9 @@ Pushing to `main` runs [.github/workflows/deploy.yml](.github/workflows/deploy.y
 2. GitHub repo → **Settings → Secrets and variables → Actions** → add:
    - `FIREBASE_TOKEN`
    - `VITE_FIREBASE_API_KEY`, `VITE_FIREBASE_AUTH_DOMAIN` (`matchreadytx.web.app`), `VITE_FIREBASE_PROJECT_ID`, `VITE_FIREBASE_STORAGE_BUCKET`, `VITE_FIREBASE_MESSAGING_SENDER_ID`, `VITE_FIREBASE_APP_ID`
+   - Promotions project secrets: `VITE_PROMOTIONS_FIREBASE_API_KEY`, `VITE_PROMOTIONS_FIREBASE_PROJECT_ID`, `VITE_PROMOTIONS_FIREBASE_APP_ID`
 3. Optional **Variables**: `VITE_DEMO_MODE` (CI defaults to `true`), `VITE_DEFAULT_ORG_ID`, `VITE_APP_ORIGIN`, `RESEND_FROM_EMAIL`.
+   Promotions variables: `VITE_PROMOTIONS_ENABLED`, `VITE_PROMOTIONS_FEED_APP_ID`, `VITE_PROMOTIONS_FIREBASE_AUTH_DOMAIN`, `VITE_PROMOTIONS_FIREBASE_STORAGE_BUCKET`, and `VITE_PROMOTIONS_FIREBASE_MESSAGING_SENDER_ID`.
 
 Function secrets (Resend, sheet service account, etc.) stay in Firebase Secret Manager — not in GitHub.
 

@@ -43,7 +43,7 @@ body {
 :focus-visible,
 :target {
   scroll-margin-top: calc(var(--rs-masthead-offset) + 0.5rem);
-  scroll-margin-bottom: calc(var(--rs-bottom-nav-height) + 0.75rem);
+  scroll-margin-bottom: calc(var(--rs-bottom-chrome-height) + 0.75rem);
 }
 
 /* WCAG 2.3.3 — calm motion for vestibular / preference users */
