@@ -79,6 +79,10 @@ export function AddMatchPage() {
   const [flightProvided, setFlightProvided] = useState(false);
   const [housingProvided, setHousingProvided] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [fieldErrors, setFieldErrors] = useState<{
+    home?: boolean;
+    away?: boolean;
+  }>({});
   const [busy, setBusy] = useState(false);
 
   const homeOther = homeTeamId === OTHER_OPPONENT_TEAM_ID;
@@ -116,6 +120,7 @@ export function AddMatchPage() {
 
   const onSubmit = async () => {
     setError(null);
+    setFieldErrors({});
     const kickoffAt = combineKickoff(date, time);
     if (!kickoffAt) {
       setError('Enter a valid date and kickoff time.');
@@ -123,20 +128,36 @@ export function AddMatchPage() {
     }
     if (!homeTeamId || !awayTeamId) {
       setError('Select home and away teams.');
+      setFieldErrors({
+        home: !homeTeamId,
+        away: !awayTeamId,
+      });
       return;
     }
     if (homeTeamId === awayTeamId && homeTeamId !== OTHER_OPPONENT_TEAM_ID) {
       setError('Home and away must be different teams.');
+      setFieldErrors({ home: true, away: true });
       return;
     }
     const homeTeamName = resolveTeamName(homeTeamId, homeOtherName);
     const awayTeamName = resolveTeamName(awayTeamId, awayOtherName);
     if (!homeTeamName) {
       setError(homeOther ? 'Enter the home team name.' : 'Select a home team.');
+      setFieldErrors({ home: true });
       return;
     }
     if (!awayTeamName) {
       setError(awayOther ? 'Enter the away team name.' : 'Select an away team.');
+      setFieldErrors({ away: true });
+      return;
+    }
+    if (
+      homeOther &&
+      awayOther &&
+      homeTeamName.toLowerCase() === awayTeamName.toLowerCase()
+    ) {
+      setError('Home and away team names must be different.');
+      setFieldErrors({ home: true, away: true });
       return;
     }
     if (!venueName.trim() || !venueAddress.trim()) {
@@ -187,9 +208,16 @@ export function AddMatchPage() {
       navigate(`${matchHref}/${matchId}`);
     } catch (err) {
       console.error('Create match failed', err);
-      setError(
-        err instanceof Error ? err.message : 'Failed to create match.',
-      );
+      const message =
+        err instanceof Error ? err.message : 'Failed to create match.';
+      setError(message);
+      if (
+        /distinct home and away|team names must be different|select home and away/i.test(
+          message,
+        )
+      ) {
+        setFieldErrors({ home: true, away: true });
+      }
     } finally {
       setBusy(false);
     }
@@ -214,8 +242,10 @@ export function AddMatchPage() {
           <FormSelect
             id="am-home"
             value={homeTeamId}
+            validated={fieldErrors.home ? 'error' : 'default'}
             onChange={(_e, v) => {
               setHomeTeamId(v);
+              setFieldErrors((current) => ({ ...current, home: false }));
               if (v !== OTHER_OPPONENT_TEAM_ID) setHomeOtherName('');
               if (v && v === awayTeamId && v !== OTHER_OPPONENT_TEAM_ID) {
                 setAwayTeamId('');
@@ -237,7 +267,11 @@ export function AddMatchPage() {
             <TextInput
               id="am-home-name"
               value={homeOtherName}
-              onChange={(_e, v) => setHomeOtherName(v)}
+              validated={fieldErrors.home ? 'error' : 'default'}
+              onChange={(_e, v) => {
+                setHomeOtherName(v);
+                setFieldErrors((current) => ({ ...current, home: false }));
+              }}
               placeholder="Club or school name"
               aria-label="Home team name"
             />
@@ -254,8 +288,10 @@ export function AddMatchPage() {
           <FormSelect
             id="am-away"
             value={awayTeamId}
+            validated={fieldErrors.away ? 'error' : 'default'}
             onChange={(_e, v) => {
               setAwayTeamId(v);
+              setFieldErrors((current) => ({ ...current, away: false }));
               if (v !== OTHER_OPPONENT_TEAM_ID) setAwayOtherName('');
               if (v && v === homeTeamId && v !== OTHER_OPPONENT_TEAM_ID) {
                 setHomeTeamId('');
@@ -277,7 +313,11 @@ export function AddMatchPage() {
             <TextInput
               id="am-away-name"
               value={awayOtherName}
-              onChange={(_e, v) => setAwayOtherName(v)}
+              validated={fieldErrors.away ? 'error' : 'default'}
+              onChange={(_e, v) => {
+                setAwayOtherName(v);
+                setFieldErrors((current) => ({ ...current, away: false }));
+              }}
               placeholder="Club or school name"
               aria-label="Away team name"
             />
@@ -392,7 +432,7 @@ export function AddMatchPage() {
       </div>
 
       {error && (
-        <p className="rs-match-card__meta" role="alert">
+        <p className="rs-fixture-form__error" role="alert">
           {error}
         </p>
       )}

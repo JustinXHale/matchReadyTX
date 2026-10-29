@@ -95,6 +95,12 @@
   margin-block-end: 0;
 }
 
+.rs-fixture-form__error {
+  margin: 0;
+  color: var(--rs-color-urgent-ink, var(--rs-color-urgent));
+  font-weight: 600;
+}
+
 .rs-fixture-form__travel {
   display: flex;
   flex-direction: column;

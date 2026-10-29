@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import {
+  areMatchSidesDistinct,
   isResolvableTeamDocId,
+  OTHER_OPPONENT_TEAM_ID,
   resolveScheduleLocationForWrite,
   sheetTeamLabelForWrite,
 } from './approveFixtureRequest';
@@ -10,6 +12,27 @@ describe('approveFixtureRequest sheet labels', () => {
     expect(isResolvableTeamDocId('__other__')).toBe(false);
     expect(isResolvableTeamDocId('tamucc')).toBe(true);
     expect(isResolvableTeamDocId('')).toBe(false);
+  });
+
+  it('allows both Other… sides when typed names differ', () => {
+    expect(
+      areMatchSidesDistinct(
+        OTHER_OPPONENT_TEAM_ID,
+        OTHER_OPPONENT_TEAM_ID,
+        'Lonestar 01',
+        'Great Planes 01',
+      ),
+    ).toBe(true);
+    expect(
+      areMatchSidesDistinct(
+        OTHER_OPPONENT_TEAM_ID,
+        OTHER_OPPONENT_TEAM_ID,
+        'Lonestar 01',
+        'lonestar 01',
+      ),
+    ).toBe(false);
+    expect(areMatchSidesDistinct('team_a', 'team_a', 'A', 'B')).toBe(false);
+    expect(areMatchSidesDistinct('team_a', 'team_b', 'A', 'B')).toBe(true);
   });
 
   it('prefers team abbreviation over full name for Schedule columns', () => {

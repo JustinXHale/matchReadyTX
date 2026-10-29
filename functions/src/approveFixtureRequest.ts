@@ -152,6 +152,30 @@ export function isResolvableTeamDocId(teamId: string): boolean {
   return !(id.startsWith('__') && id.endsWith('__'));
 }
 
+/**
+ * Home/away must be different org teams, or both "Other…" with distinct typed names.
+ * Used by createMatch / fixture approve so TBD clubs can be planned before rostering.
+ */
+export function areMatchSidesDistinct(
+  homeTeamId: string,
+  awayTeamId: string,
+  homeTeamName: string,
+  awayTeamName: string,
+): boolean {
+  const homeId = homeTeamId.trim();
+  const awayId = awayTeamId.trim();
+  if (!homeId || !awayId) return false;
+
+  if (homeId === awayId) {
+    if (homeId !== OTHER_OPPONENT_TEAM_ID) return false;
+    const home = homeTeamName.trim().toLowerCase();
+    const away = awayTeamName.trim().toLowerCase();
+    return Boolean(home && away && home !== away);
+  }
+
+  return true;
+}
+
 function teamFromSnap(snap: DocumentSnapshot): SheetTeamRow | null {
   if (!snap.exists) return null;
   const d = snap.data()!;
@@ -434,16 +458,26 @@ export async function runCreateMatchFromFacts(opts: {
   if (!level) {
     throw new HttpsError('invalid-argument', 'level is required.');
   }
-  if (!homeTeamId || !awayTeamId || homeTeamId === awayTeamId) {
-    throw new HttpsError(
-      'invalid-argument',
-      'Distinct home and away teams are required.',
-    );
-  }
   if (!homeTeamName || !awayTeamName) {
     throw new HttpsError(
       'invalid-argument',
       'homeTeamName and awayTeamName are required.',
+    );
+  }
+  if (
+    !areMatchSidesDistinct(
+      homeTeamId,
+      awayTeamId,
+      homeTeamName,
+      awayTeamName,
+    )
+  ) {
+    throw new HttpsError(
+      'invalid-argument',
+      homeTeamId === OTHER_OPPONENT_TEAM_ID &&
+        awayTeamId === OTHER_OPPONENT_TEAM_ID
+        ? 'Home and away team names must be different.'
+        : 'Distinct home and away teams are required.',
     );
   }
 
