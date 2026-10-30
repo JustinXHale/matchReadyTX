@@ -12,7 +12,13 @@ import {
 import { useNavigate } from 'react-router-dom';
 import { useApp, useAppHref } from '@/app/AppContext';
 import { useContextualAppBack } from '@/app/shell/contextualBar';
+import { competitionsEqual } from '@/domain/competitions';
 import { OTHER_OPPONENT_TEAM_ID } from '@/domain/fixtureRequests';
+import { dedupeTeamsForPicker } from '@/domain/teamList';
+import {
+  conferenceTeamOptionLabel,
+  conferenceTeamOptions,
+} from '@/domain/teams';
 import type { MatchGender } from '@/domain/types';
 import { isFirebaseConfigured } from '@/services/firebase';
 import {
@@ -60,6 +66,11 @@ export function RequestFixturePage() {
       .filter((t): t is NonNullable<typeof t> => t != null);
   }, [currentUser, state.teams]);
 
+  const myTeamOptions = useMemo(
+    () => conferenceTeamOptions(dedupeTeamsForPicker(myTeams)),
+    [myTeams],
+  );
+
   const defaultKick = useMemo(() => {
     const d = new Date();
     d.setDate(d.getDate() + 14);
@@ -88,10 +99,20 @@ export function RequestFixturePage() {
 
   const otherOpponent = opponentTeamId === OTHER_OPPONENT_TEAM_ID;
 
-  const opponents = useMemo(
-    () => state.teams.filter((t) => t.id !== requesterTeamId),
-    [state.teams, requesterTeamId],
+  const rosterOptions = useMemo(
+    () => conferenceTeamOptions(dedupeTeamsForPicker(state.teams)),
+    [state.teams],
   );
+
+  const opponents = useMemo(() => {
+    const selected = competition.trim();
+    const base = selected
+      ? rosterOptions.filter((option) =>
+          competitionsEqual(option.conference, selected),
+        )
+      : rosterOptions;
+    return base.filter((option) => option.id !== requesterTeamId);
+  }, [rosterOptions, competition, requesterTeamId]);
 
   if (!currentUser || !currentUser.roles.includes('teamAdmin')) {
     return (
@@ -209,8 +230,20 @@ export function RequestFixturePage() {
             }}
             aria-label="Your team"
           >
-            {myTeams.map((t) => (
-              <FormSelectOption key={t.id} value={t.id} label={t.name} />
+            {(myTeamOptions.length > 0 ? myTeamOptions : myTeams.map((t) => ({
+              id: t.id,
+              name: t.name,
+              conference: t.competition?.trim() || 'Conference unknown',
+            }))).map((option) => (
+              <FormSelectOption
+                key={option.id}
+                value={option.id}
+                label={
+                  option.conference && option.conference !== 'Conference unknown'
+                    ? conferenceTeamOptionLabel(option)
+                    : option.name
+                }
+              />
             ))}
           </FormSelect>
         </FormGroup>
@@ -244,8 +277,12 @@ export function RequestFixturePage() {
             aria-label="Opponent team"
           >
             <FormSelectOption value="" label="Select opponent…" />
-            {opponents.map((t) => (
-              <FormSelectOption key={t.id} value={t.id} label={t.name} />
+            {opponents.map((option) => (
+              <FormSelectOption
+                key={option.id}
+                value={option.id}
+                label={conferenceTeamOptionLabel(option)}
+              />
             ))}
             <FormSelectOption value={OTHER_OPPONENT_TEAM_ID} label="Other…" />
           </FormSelect>
@@ -309,10 +346,27 @@ export function RequestFixturePage() {
           <FormSelect
             id="fr-competition"
             value={competition}
-            onChange={(_e, v) => setCompetition(v)}
+            onChange={(_e, v) => {
+              setCompetition(v);
+              if (
+                v.trim() &&
+                opponentTeamId &&
+                opponentTeamId !== OTHER_OPPONENT_TEAM_ID
+              ) {
+                const stillValid = rosterOptions.some(
+                  (option) =>
+                    option.id === opponentTeamId &&
+                    competitionsEqual(option.conference, v),
+                );
+                if (!stillValid) {
+                  setOpponentTeamId('');
+                  setOpponentTeamName('');
+                }
+              }
+            }}
             aria-label="Competition"
           >
-            <FormSelectOption value="" label="None" />
+            <FormSelectOption value="" label="All conferences" />
             {competitions.map((c) => (
               <FormSelectOption key={c} value={c} label={c} />
             ))}

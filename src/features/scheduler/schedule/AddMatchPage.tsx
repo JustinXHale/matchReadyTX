@@ -12,8 +12,14 @@ import {
 import { useNavigate } from 'react-router-dom';
 import { useApp, useAppHref } from '@/app/AppContext';
 import { useContextualAppBack } from '@/app/shell/contextualBar';
+import { competitionsEqual } from '@/domain/competitions';
 import { OTHER_OPPONENT_TEAM_ID } from '@/domain/fixtureRequests';
 import { teamDisplayAbbreviation } from '@/domain/matchCardFooter';
+import { dedupeTeamsForPicker } from '@/domain/teamList';
+import {
+  conferenceTeamOptionLabel,
+  conferenceTeamOptions,
+} from '@/domain/teams';
 import type { MatchGender } from '@/domain/types';
 import { isFirebaseConfigured } from '@/services/firebase';
 import { callCreateMatch, defaultOrgId } from '@/services/orgData';
@@ -88,13 +94,32 @@ export function AddMatchPage() {
   const homeOther = homeTeamId === OTHER_OPPONENT_TEAM_ID;
   const awayOther = awayTeamId === OTHER_OPPONENT_TEAM_ID;
 
+  const rosterOptions = useMemo(
+    () => conferenceTeamOptions(dedupeTeamsForPicker(teams)),
+    [teams],
+  );
+
+  const filteredRoster = useMemo(() => {
+    const selected = competition.trim();
+    if (!selected) return rosterOptions;
+    return rosterOptions.filter((option) =>
+      competitionsEqual(option.conference, selected),
+    );
+  }, [rosterOptions, competition]);
+
   const homeOptions = useMemo(
-    () => teams.filter((t) => t.id !== awayTeamId || awayOther),
-    [teams, awayTeamId, awayOther],
+    () =>
+      filteredRoster.filter(
+        (option) => option.id !== awayTeamId || awayOther,
+      ),
+    [filteredRoster, awayTeamId, awayOther],
   );
   const awayOptions = useMemo(
-    () => teams.filter((t) => t.id !== homeTeamId || homeOther),
-    [teams, homeTeamId, homeOther],
+    () =>
+      filteredRoster.filter(
+        (option) => option.id !== homeTeamId || homeOther,
+      ),
+    [filteredRoster, homeTeamId, homeOther],
   );
 
   if (!currentUser || !hasAssignerRole) {
@@ -255,8 +280,12 @@ export function AddMatchPage() {
             aria-label="Home team"
           >
             <FormSelectOption value="" label="Select home…" />
-            {homeOptions.map((t) => (
-              <FormSelectOption key={t.id} value={t.id} label={t.name} />
+            {homeOptions.map((option) => (
+              <FormSelectOption
+                key={option.id}
+                value={option.id}
+                label={conferenceTeamOptionLabel(option)}
+              />
             ))}
             <FormSelectOption value={OTHER_OPPONENT_TEAM_ID} label="Other…" />
           </FormSelect>
@@ -301,8 +330,12 @@ export function AddMatchPage() {
             aria-label="Away team"
           >
             <FormSelectOption value="" label="Select away…" />
-            {awayOptions.map((t) => (
-              <FormSelectOption key={t.id} value={t.id} label={t.name} />
+            {awayOptions.map((option) => (
+              <FormSelectOption
+                key={option.id}
+                value={option.id}
+                label={conferenceTeamOptionLabel(option)}
+              />
             ))}
             <FormSelectOption value={OTHER_OPPONENT_TEAM_ID} label="Other…" />
           </FormSelect>
@@ -370,10 +403,38 @@ export function AddMatchPage() {
           <FormSelect
             id="am-competition"
             value={competition}
-            onChange={(_e, v) => setCompetition(v)}
+            onChange={(_e, v) => {
+              setCompetition(v);
+              // Drop club picks that are outside the newly selected conference.
+              if (v.trim()) {
+                const allowed = new Set(
+                  rosterOptions
+                    .filter((option) =>
+                      competitionsEqual(option.conference, v),
+                    )
+                    .map((option) => option.id),
+                );
+                if (
+                  homeTeamId &&
+                  homeTeamId !== OTHER_OPPONENT_TEAM_ID &&
+                  !allowed.has(homeTeamId)
+                ) {
+                  setHomeTeamId('');
+                  setHomeOtherName('');
+                }
+                if (
+                  awayTeamId &&
+                  awayTeamId !== OTHER_OPPONENT_TEAM_ID &&
+                  !allowed.has(awayTeamId)
+                ) {
+                  setAwayTeamId('');
+                  setAwayOtherName('');
+                }
+              }
+            }}
             aria-label="Competition"
           >
-            <FormSelectOption value="" label="None" />
+            <FormSelectOption value="" label="All conferences" />
             {competitions.map((c) => (
               <FormSelectOption key={c} value={c} label={c} />
             ))}

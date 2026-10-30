@@ -2487,6 +2487,27 @@ describe('conferenceTeamOptions', () => {
     expect(options).toHaveLength(1);
     expect(options[0]?.id).toBe('t_uh_lonestar_men');
   });
+
+  it('excludes schedule orphans without Locations abbreviation', () => {
+    const teams: Team[] = [
+      {
+        id: 'orphan',
+        name: 'Lonestar 01',
+        competition: 'Lonestar Men',
+        contactEmails: [],
+      },
+      {
+        id: 't_uh_lonestar_men',
+        name: 'University of Houston',
+        abbreviation: 'UH',
+        competition: 'Lonestar Men',
+        contactEmails: [],
+      },
+    ];
+    expect(conferenceTeamOptions(teams).map((o) => o.id)).toEqual([
+      't_uh_lonestar_men',
+    ]);
+  });
 });
 
 describe('crewColumnLines', () => {

@@ -287,6 +287,7 @@ export function conferenceTeamOptions(
   return teams
     .filter((team) => {
       if (!team.competition?.trim()) return false;
+      if (!team.abbreviation?.trim()) return false;
       if (isVenueOnlyCompetition(team.competition)) return false;
       if (allowedTeamIds && !allowedTeamIds.has(team.id)) return false;
       return true;
@@ -301,4 +302,9 @@ export function conferenceTeamOptions(
         ? a.name.localeCompare(b.name)
         : a.conference.localeCompare(b.conference),
     );
+}
+
+/** FormSelect / list label: club name with conference so men/women sides differ. */
+export function conferenceTeamOptionLabel(option: ConferenceTeamOption): string {
+  return `${option.name} · ${option.conference}`;
 }
