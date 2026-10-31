@@ -2,7 +2,7 @@
   "name": "MatchReadyTX-functions",
   "private": true,
   "main": "lib/index.js",
-  "engines": { "node": "20" },
+  "engines": { "node": "22" },
   "scripts": {
     "build": "tsc",
     "audit:cmo-personas": "npm run build && node lib/auditCmoPersonaCompatibility.js",
