@@ -1097,7 +1097,9 @@
 @media (max-width: 599px) {
   .rs-detail--has-fixed-action,
   .rs-detail--has-mobile-action {
-    padding-bottom: var(--rs-space-xl);
+    padding-bottom: calc(
+      var(--rs-action-bar-height, 3.5rem) + var(--rs-space-md)
+    );
   }
 
   .rs-detail-editor__actions {
@@ -1112,7 +1114,7 @@
     position: fixed;
     left: 0;
     right: 0;
-    bottom: calc(var(--rs-bottom-chrome-height) + env(safe-area-inset-bottom, 0px));
+    bottom: var(--rs-bottom-chrome-height);
     z-index: 250;
     display: flex;
     max-width: var(--rs-content-max);
@@ -1133,7 +1135,7 @@
     position: fixed;
     left: 0;
     right: 0;
-    bottom: calc(var(--rs-bottom-chrome-height) + env(safe-area-inset-bottom, 0px));
+    bottom: var(--rs-bottom-chrome-height);
     z-index: 250;
     display: grid;
     grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);

@@ -2,7 +2,9 @@
   flex: 0 0 var(--rs-promo-banner-height);
   width: 100%;
   min-width: 0;
+  height: var(--rs-promo-banner-height);
   min-height: var(--rs-promo-banner-height);
+  max-height: var(--rs-promo-banner-height);
   box-sizing: border-box;
   overflow: hidden;
   border-top: 1px solid
@@ -15,8 +17,7 @@
   display: flex;
   align-items: stretch;
   width: 100%;
-  height: var(--rs-promo-banner-height);
-  min-height: var(--rs-tap-min);
+  height: 100%;
   box-sizing: border-box;
   color: inherit;
   text-decoration: none;

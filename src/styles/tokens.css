@@ -117,7 +117,14 @@
   --rs-gap-grid: var(--rs-space-sm);
   --rs-bottom-nav-height: 5rem;
   --rs-promo-banner-height: 3rem;
-  --rs-bottom-chrome-height: var(--rs-bottom-nav-height);
+  /**
+   * Full fixed bottom chrome (nav + home-indicator). Promo adds on
+   * `.rs-app-shell--compact.rs-app-shell--has-promo`. Sticky/FAB bottoms
+   * and page clearance should use this alone — do not add safe-area again.
+   */
+  --rs-bottom-chrome-height: calc(
+    var(--rs-bottom-nav-height) + env(safe-area-inset-bottom, 0px)
+  );
   /** Material 3 navigation rail width (medium+). */
   --rs-nav-rail-width: 5rem;
   /** Space below fixed masthead for overlays (mobile brand block is taller). */

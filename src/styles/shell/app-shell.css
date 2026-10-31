@@ -51,8 +51,14 @@
 
 .rs-app-shell--compact.rs-app-shell--has-promo {
   --rs-bottom-chrome-height: calc(
-    var(--rs-bottom-nav-height) + var(--rs-promo-banner-height)
+    var(--rs-bottom-nav-height) + var(--rs-promo-banner-height) +
+      env(safe-area-inset-bottom, 0px)
   );
+}
+
+/* Medium uses a side rail — no fixed bottom nav/promo chrome. */
+.rs-app-shell--medium {
+  --rs-bottom-chrome-height: env(safe-area-inset-bottom, 0px);
 }
 
 /* The authenticated shell owns vertical scrolling through .rs-page-body. */
@@ -131,10 +137,7 @@ body:has(.rs-app-shell--medium),
 }
 
 .rs-app-snackbar {
-  bottom: calc(
-    var(--rs-bottom-chrome-height) + var(--rs-space-sm) +
-      env(safe-area-inset-bottom, 0px)
-  ) !important;
+  bottom: calc(var(--rs-bottom-chrome-height) + var(--rs-space-sm)) !important;
 }
 
 @media (min-width: 600px) {
@@ -348,6 +351,8 @@ body:has(.rs-app-shell--medium),
   display: flex;
   justify-content: space-around;
   align-items: stretch;
+  /* content-box so safe-area padding stacks on min-height (matches chrome token). */
+  box-sizing: content-box;
   min-height: var(--rs-bottom-nav-height);
   padding-bottom: env(safe-area-inset-bottom, 0);
   padding-inline: env(safe-area-inset-left, 0) env(safe-area-inset-right, 0);
