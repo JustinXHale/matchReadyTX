@@ -9,6 +9,7 @@ export function InsightsStatCard({
   avg,
   avgLabel,
   meta,
+  onNavigate,
 }: {
   to: string;
   title: string;
@@ -16,9 +17,10 @@ export function InsightsStatCard({
   avg?: number | null;
   avgLabel?: string;
   meta?: string;
+  onNavigate?: () => void;
 }) {
   return (
-    <Link to={to} className="rs-insights-stat-card">
+    <Link to={to} className="rs-insights-stat-card" onClick={onNavigate}>
       <span className="rs-insights-stat-card__title">{title}</span>
       <span className="rs-insights-stat-card__count">{count}</span>
       {avgLabel != null && (

@@ -4,12 +4,14 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type ReactNode,
 } from 'react';
 import { Button, FormSelect, FormSelectOption, Title } from '@patternfly/react-core';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faTimes } from '@fortawesome/free-solid-svg-icons';
+import { useLocation } from 'react-router-dom';
 import { useApp } from '@/app/AppContext';
 import { memberListName } from '@/domain/members';
 import { hasRefereeLensRole } from '@/domain/types';
@@ -47,9 +49,11 @@ export function useOfficialQuickLookOptional():
 
 export function OfficialQuickLookProvider({ children }: { children: ReactNode }) {
   const { state } = useApp();
+  const location = useLocation();
   const [selectedUid, setSelectedUid] = useState('');
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [matchBack, setMatchBack] = useState<BackNav | undefined>();
+  const routeKeyRef = useRef(`${location.pathname}${location.search}`);
 
   const officials = useMemo(
     () =>
@@ -108,6 +112,18 @@ export function OfficialQuickLookProvider({ children }: { children: ReactNode })
       document.body.style.overflow = prevOverflow;
     };
   }, [drawerOpen, closeDrawer]);
+
+  useEffect(() => {
+    const routeKey = `${location.pathname}${location.search}`;
+    if (!drawerOpen) {
+      routeKeyRef.current = routeKey;
+      return;
+    }
+    if (routeKey !== routeKeyRef.current) {
+      closeDrawer();
+    }
+    routeKeyRef.current = routeKey;
+  }, [location.pathname, location.search, drawerOpen, closeDrawer]);
 
   return (
     <OfficialQuickLookContext.Provider

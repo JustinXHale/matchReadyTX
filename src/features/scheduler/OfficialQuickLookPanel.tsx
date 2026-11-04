@@ -187,7 +187,11 @@ export function OfficialQuickLookPanel({
           />
         </section>
       ) : (
-        <OfficialInsightsPanel userId={user.uid} compact />
+        <OfficialInsightsPanel
+          userId={user.uid}
+          compact
+          onNavigate={onNavigate}
+        />
       )}
     </div>
   );

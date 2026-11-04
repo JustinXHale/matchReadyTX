@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
 import {
+  Button,
   EmptyState,
   EmptyStateBody,
   FormGroup,
@@ -8,6 +9,7 @@ import {
   TextInput,
   Title,
 } from '@patternfly/react-core';
+import { useSearchParams } from 'react-router-dom';
 import { useApp, useAppHref } from '@/app/AppContext';
 import { submittedCmoReports, cmoReportStats } from '@/domain/insights';
 import { displayMatchForCmoReport, type MatchReport } from '@/domain/reports';
@@ -21,7 +23,9 @@ import {
   cmoFilerName,
   cmoFilterOptionsFromOfficialIds,
   cmoSubjectName,
+  cmoSubjectOfficialId,
   reportMatchesCmoFilter,
+  userDisplayName,
 } from '@/features/insights/insightsDisplay';
 import { formatInsightsAvg } from '@/features/insights/insightsFormat';
 import { moDisplayNames } from '@/features/referee/appointments/crewLines';
@@ -34,8 +38,22 @@ const ALL_CMOS = '';
 export function InsightsCmoReportsPage() {
   const { state } = useApp();
   const memberBase = useAppHref('/about/members');
+  const [searchParams, setSearchParams] = useSearchParams();
   const [query, setQuery] = useState('');
   const [cmoFilter, setCmoFilter] = useState(ALL_CMOS);
+  const officialFilter = searchParams.get('official')?.trim() ?? '';
+
+  const officialFilterName = useMemo(() => {
+    if (!officialFilter) return '';
+    const user = state.users.find((u) => u.uid === officialFilter);
+    return user ? userDisplayName(user) : 'Selected official';
+  }, [officialFilter, state.users]);
+
+  const clearOfficialFilter = () => {
+    const next = new URLSearchParams(searchParams);
+    next.delete('official');
+    setSearchParams(next, { replace: true });
+  };
 
   const cmoOptions = useMemo(
     () =>
@@ -61,6 +79,12 @@ export function InsightsCmoReportsPage() {
         (row): row is { report: MatchReport; match: Match } => row.match != null,
       )
       .filter(({ report, match }) => {
+        if (
+          officialFilter &&
+          cmoSubjectOfficialId(report, match) !== officialFilter
+        ) {
+          return false;
+        }
         if (!q) return true;
         const subject = cmoSubjectName(
           report,
@@ -87,7 +111,14 @@ export function InsightsCmoReportsPage() {
           new Date(b.report.kickoffAt).getTime() -
           new Date(a.report.kickoffAt).getTime(),
       );
-  }, [state.matchReports, state.matches, state.users, query, cmoFilter]);
+  }, [
+    state.matchReports,
+    state.matches,
+    state.users,
+    query,
+    cmoFilter,
+    officialFilter,
+  ]);
 
   const filteredAvg = useMemo(() => {
     const ratings = rows
@@ -112,6 +143,20 @@ export function InsightsCmoReportsPage() {
             ? ` · society avg ${formatInsightsAvg(stats.globalAverage)}`
             : ''}
       </p>
+
+      {officialFilter ? (
+        <p className="rs-match-card__meta rs-insights-official-filter">
+          Showing reports for <strong>{officialFilterName}</strong>
+          {' · '}
+          <Button
+            variant="link"
+            isInline
+            onClick={clearOfficialFilter}
+          >
+            Clear official filter
+          </Button>
+        </p>
+      ) : null}
 
       <div className="rs-insights-report-filters">
         <FormGroup label="Search" fieldId="insights-cmo-search">
@@ -147,7 +192,7 @@ export function InsightsCmoReportsPage() {
       {rows.length === 0 ? (
         <EmptyState titleText="No matching CMO reports" headingLevel="h3">
           <EmptyStateBody>
-            {query.trim() || cmoFilter
+            {query.trim() || cmoFilter || officialFilter
               ? 'Try a different search or filter.'
               : 'When CMOs submit coaching reports after matches, they will appear here.'}
           </EmptyStateBody>

@@ -23,17 +23,31 @@ type OfficialInsightsPanelProps = {
   /** Scheduler-confidential team feedback — assigner lens only. */
   showCoachFeedback?: boolean;
   compact?: boolean;
+  /** Close overlays (e.g. official drawer) when leaving via a report link. */
+  onNavigate?: () => void;
 };
+
+function withOfficialQuery(href: string, userId: string): string {
+  const join = href.includes('?') ? '&' : '?';
+  return `${href}${join}official=${encodeURIComponent(userId)}`;
+}
 
 /** Cumulative referee stats for quick look and member profile. */
 export function OfficialInsightsPanel({
   userId,
   showCoachFeedback = true,
   compact = false,
+  onNavigate,
 }: OfficialInsightsPanelProps) {
   const { state } = useApp();
-  const coachReportsHref = useAppHref('/insights/reports/coach-feedback');
-  const cmoReportsHref = useAppHref('/insights/reports/cmo');
+  const coachReportsHref = withOfficialQuery(
+    useAppHref('/insights/reports/coach-feedback'),
+    userId,
+  );
+  const cmoReportsHref = withOfficialQuery(
+    useAppHref('/insights/reports/cmo'),
+    userId,
+  );
   const refereeCmoReceivedHref = useAppHref('/referee/reports/coaching/cmo');
   const refereeCmoFiledHref = useAppHref('/referee/reports/coaching/mine');
   const cmoCoachingLink = showCoachFeedback
@@ -145,6 +159,7 @@ export function OfficialInsightsPanel({
               count={stats.coachFeedbackCount}
               avg={stats.coachFeedbackAvg}
               avgLabel="avg"
+              onNavigate={onNavigate}
             />
           ) : (
             <InsightsStatTile
@@ -159,6 +174,7 @@ export function OfficialInsightsPanel({
             count={stats.cmoReportsReceived}
             avg={stats.cmoRatingAvg}
             avgLabel="avg grade"
+            onNavigate={onNavigate}
           />
           <InsightsStatTile
             title="CMO reports filed"
@@ -186,13 +202,18 @@ export function OfficialInsightsPanel({
       <p className="rs-match-card__meta">
         {showCoachFeedback ? (
           <>
-            <Link className="rs-official-quicklook__link" to={cmoReportsHref}>
+            <Link
+              className="rs-official-quicklook__link"
+              to={cmoReportsHref}
+              onClick={onNavigate}
+            >
               Society CMO reports
             </Link>
             {' · '}
             <Link
               className="rs-official-quicklook__link"
               to={coachReportsHref}
+              onClick={onNavigate}
             >
               Team feedback reports
             </Link>
@@ -202,6 +223,7 @@ export function OfficialInsightsPanel({
             <Link
               className="rs-official-quicklook__link"
               to={refereeCmoReceivedHref}
+              onClick={onNavigate}
             >
               CMO coaching received
             </Link>
@@ -209,6 +231,7 @@ export function OfficialInsightsPanel({
             <Link
               className="rs-official-quicklook__link"
               to={refereeCmoFiledHref}
+              onClick={onNavigate}
             >
               CMO reports you filed
             </Link>

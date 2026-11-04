@@ -1,5 +1,6 @@
 import { useMemo, useState, type FormEvent } from 'react';
 import {
+  Button,
   EmptyState,
   EmptyStateBody,
   FormGroup,
@@ -8,9 +9,10 @@ import {
   TextInput,
   Title,
 } from '@patternfly/react-core';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { useApp, useAppHref } from '@/app/AppContext';
 import { coachFeedbackAverage, isCrewScopeCoachFeedback } from '@/domain/coachFeedback';
+import { userDisplayName } from '@/features/insights/insightsDisplay';
 import { formatInsightsAvg } from '@/features/insights/insightsFormat';
 import { MatchListRow } from '@/ui/MatchListRow';
 import { ReportAttributionFooter } from '@/ui/ReportAttributionFooter';
@@ -25,8 +27,26 @@ export function InsightsCoachFeedbackPage() {
   const { state } = useApp();
   const detailBase = useAppHref('/insights/reports/coach-feedback');
   const memberBase = useAppHref('/about/members');
+  const [searchParams, setSearchParams] = useSearchParams();
   const [query, setQuery] = useState('');
   const [teamFilter, setTeamFilter] = useState(ALL_TEAMS);
+  const officialFilter = searchParams.get('official')?.trim() ?? '';
+
+  const officialFilterName = useMemo(() => {
+    if (!officialFilter) return '';
+    const user = state.users.find((u) => u.uid === officialFilter);
+    if (user) return userDisplayName(user);
+    const fromFeedback = state.coachFeedback.find(
+      (f) => f.officialUserId === officialFilter && f.officialName,
+    );
+    return fromFeedback?.officialName?.trim() || 'Selected official';
+  }, [officialFilter, state.users, state.coachFeedback]);
+
+  const clearOfficialFilter = () => {
+    const next = new URLSearchParams(searchParams);
+    next.delete('official');
+    setSearchParams(next, { replace: true });
+  };
 
   const teamOptions = useMemo(() => {
     const byId = new Map<string, string>();
@@ -44,6 +64,9 @@ export function InsightsCoachFeedbackPage() {
     return [...state.coachFeedback]
       .filter((f) => f.status === 'submitted')
       .filter((f) => (teamFilter ? f.reportingTeamId === teamFilter : true))
+      .filter((f) =>
+        officialFilter ? f.officialUserId === officialFilter : true,
+      )
       .filter((f) => {
         if (!q) return true;
         const haystack = [
@@ -66,7 +89,13 @@ export function InsightsCoachFeedbackPage() {
         feedback: f,
         match: state.matches.find((m) => m.id === f.matchId),
       }));
-  }, [state.coachFeedback, state.matches, query, teamFilter]);
+  }, [
+    state.coachFeedback,
+    state.matches,
+    query,
+    teamFilter,
+    officialFilter,
+  ]);
 
   const avgRating = useMemo(() => {
     const avgs = rows
@@ -86,6 +115,20 @@ export function InsightsCoachFeedbackPage() {
         {rows.length} report{rows.length === 1 ? '' : 's'}
         {avgRating != null ? ` · avg ${formatAvg(avgRating)} (1–5)` : ''}
       </p>
+
+      {officialFilter ? (
+        <p className="rs-match-card__meta rs-insights-official-filter">
+          Showing feedback for <strong>{officialFilterName}</strong>
+          {' · '}
+          <Button
+            variant="link"
+            isInline
+            onClick={clearOfficialFilter}
+          >
+            Clear official filter
+          </Button>
+        </p>
+      ) : null}
 
       <div className="rs-insights-report-filters">
         <FormGroup
@@ -130,7 +173,7 @@ export function InsightsCoachFeedbackPage() {
       {rows.length === 0 ? (
         <EmptyState titleText="No matching feedback" headingLevel="h3">
           <EmptyStateBody>
-            {query.trim() || teamFilter
+            {query.trim() || teamFilter || officialFilter
               ? 'Try a different search or team filter.'
               : 'When Team Admins submit referee feedback after a match, it will appear here.'}
           </EmptyStateBody>
