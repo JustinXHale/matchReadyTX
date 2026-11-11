@@ -2,7 +2,12 @@ import { useMemo } from 'react';
 import { Navigate, useParams, useSearchParams } from 'react-router-dom';
 import { Title } from '@patternfly/react-core';
 import { useApp, useAppHref } from '@/app/AppContext';
-import { officialHasCrewReportSlot, type CrewReportSlot } from '@/domain/reports';
+import {
+  displayMatchForArchivedReport,
+  officialHasCrewReportSlot,
+  submittedCrewReportForAssignee,
+  type CrewReportSlot,
+} from '@/domain/reports';
 import { crewPeople } from '@/domain/types';
 import {
   MatchReportFlowPage,
@@ -42,7 +47,21 @@ export function AssignerMatchReportFlowPage() {
 
   const officialId = params.get('officialId') ?? '';
   const slot = parseCrewReportSlot(params.get('slot'));
-  const match = state.matches.find((m) => m.id === matchId);
+  const isEditing = params.get('edit') === '1';
+  const submitted =
+    officialId && slot
+      ? submittedCrewReportForAssignee(
+          state.matchReports,
+          matchId,
+          officialId,
+          slot,
+        )
+      : undefined;
+  const match =
+    state.matches.find((m) => m.id === matchId) ??
+    (submitted
+      ? displayMatchForArchivedReport(submitted, state.matches)
+      : undefined);
 
   const officialName = useMemo(() => {
     if (!officialId) return 'Official';
@@ -65,7 +84,9 @@ export function AssignerMatchReportFlowPage() {
     !match ||
     !officialId ||
     !slot ||
-    !officialHasCrewReportSlot(match, officialId, slot)
+    (isEditing
+      ? !submitted
+      : !officialHasCrewReportSlot(match, officialId, slot))
   ) {
     return <InvalidAssignerReport matchHref={matchHref} />;
   }
@@ -75,6 +96,7 @@ export function AssignerMatchReportFlowPage() {
     slot,
     officialName,
     back: { to: matchHref, label: 'Match' },
+    match,
   };
 
   return <MatchReportFlowPage assignerFiling={assignerFiling} />;

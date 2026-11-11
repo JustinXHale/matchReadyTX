@@ -3119,6 +3119,29 @@ export async function saveMatchReportInFirestore(
   );
 }
 
+/** Update submitted answers without rewriting immutable/legacy report metadata. */
+export async function updateSubmittedMatchReportInFirestore(
+  orgId: string,
+  report: MatchReport,
+): Promise<void> {
+  const answers: Record<string, unknown> = {
+    formKind: report.formKind ?? null,
+    updatedAt: new Date().toISOString(),
+  };
+  if (report.slot === 'cmo') {
+    answers.cmoPayload = firestoreJson(report.cmoPayload);
+  } else if (report.formKind === 'ar_basic') {
+    answers.arPayload = firestoreJson(report.arPayload);
+  } else {
+    answers.moPayload = firestoreJson(report.moPayload);
+  }
+  await setDoc(
+    doc(requireDb(), 'orgs', orgId, 'matchReports', report.id),
+    answers,
+    { merge: true },
+  );
+}
+
 export async function deleteMatchReportInFirestore(
   orgId: string,
   reportId: string,

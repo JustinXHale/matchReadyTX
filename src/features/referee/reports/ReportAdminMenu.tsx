@@ -28,6 +28,10 @@ import {
   callableErrorMessage,
 } from '@/services/orgData';
 import { useAppFeedback } from '@/app/feedback/feedbackContext';
+import {
+  assignerCmoReportEditPath,
+  assignerMatchReportEditPath,
+} from '@/features/referee/reports/reportLinks';
 
 type Props = (
   | {
@@ -62,7 +66,17 @@ export function ReportAdminMenu(props: Props) {
   const editHref = useAppHref(
     props.kind === 'card'
       ? `/referee/reports/match/${props.report.matchId}/cards`
-      : '/',
+      : props.report.slot === 'cmo'
+        ? assignerCmoReportEditPath(
+            props.report.matchId,
+            props.report.officialId,
+            props.report.subjectOfficialId,
+          )
+        : assignerMatchReportEditPath(
+            props.report.matchId,
+            props.report.officialId,
+            props.report.slot,
+          ),
   );
   const [isOpen, setIsOpen] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -169,6 +183,14 @@ export function ReportAdminMenu(props: Props) {
   const items: MenuItem[] = [
     ...(props.kind === 'match'
       ? [
+          {
+            id: 'edit',
+            label: 'Edit report',
+            run: () => {
+              setIsOpen(false);
+              navigate(editHref);
+            },
+          },
           {
             id: 'reset',
             label: 'Reset report',

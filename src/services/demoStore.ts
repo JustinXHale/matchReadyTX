@@ -3386,7 +3386,7 @@ class DemoStore {
     subjectOfficialId?: string,
   ): void {
     const report = this.state.matchReports.find((r) => r.id === reportId);
-    if (!report || report.slot !== 'cmo' || report.status === 'submitted') {
+    if (!report || report.slot !== 'cmo') {
       return;
     }
     const nowIso = new Date().toISOString();
@@ -3398,7 +3398,7 @@ class DemoStore {
               ...r,
               formKind: 'cmo' as const,
               status: 'submitted' as const,
-              submittedAt: nowIso,
+              submittedAt: r.submittedAt ?? nowIso,
               cmoPayload: payload,
               ...(subjectOfficialId ? { subjectOfficialId } : {}),
             }

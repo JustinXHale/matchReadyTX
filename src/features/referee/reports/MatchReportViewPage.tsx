@@ -145,7 +145,7 @@ export function MatchReportViewPage() {
           ? ` · ${new Date(report.submittedAt).toLocaleString()}`
           : ''}
       </p>
-      {report.officialId === currentUser.uid && (
+      {report.officialId === currentUser.uid && !isAssignerView && (
         <Button
           variant="secondary"
           isBlock

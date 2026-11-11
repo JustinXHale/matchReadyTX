@@ -730,6 +730,24 @@ service cloud.firestore {
             && request.resource.data.submittedAt is string
             && request.resource.data.submittedAt.size() > 0;
         }
+        /** Assigner edits answers in place without changing report ownership or assignment. */
+        function assignerMatchReportEditOk() {
+          return resource.data.status == 'submitted'
+            && request.resource.data.status == 'submitted'
+            && request.resource.data.orgId == resource.data.orgId
+            && request.resource.data.matchId == resource.data.matchId
+            && request.resource.data.officialId == resource.data.officialId
+            && request.resource.data.slot == resource.data.slot
+            && request.resource.data.get('subjectOfficialId', null)
+              == resource.data.get('subjectOfficialId', null)
+            && request.resource.data.dueAt == resource.data.dueAt
+            && request.resource.data.kickoffAt == resource.data.kickoffAt
+            && request.resource.data.get('submittedAt', null)
+              == resource.data.get('submittedAt', null)
+            && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+              'formKind', 'moPayload', 'arPayload', 'cmoPayload', 'updatedAt'
+            ]);
+        }
         allow read: if canReadMatchReport();
         allow create: if isAssigner(orgId) && assignerMatchReportCreateOk()
           || (
@@ -740,7 +758,11 @@ service cloud.firestore {
             && reportId == request.resource.data.id
           );
         allow update: if isAssigner(orgId)
-          && (assignerMatchReportResetOk() || assignerMatchReportSubmitOk())
+          && (
+            assignerMatchReportResetOk()
+            || assignerMatchReportSubmitOk()
+            || assignerMatchReportEditOk()
+          )
           || (
             signedIn()
             && isMember(orgId)

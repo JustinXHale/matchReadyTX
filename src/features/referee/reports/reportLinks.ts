@@ -61,6 +61,16 @@ export function assignerMatchReportFilePath(
   return `/matches/${matchId}/file-report?${q.toString()}`;
 }
 
+/** Scheduler edits an already-submitted crew report without changing its owner. */
+export function assignerMatchReportEditPath(
+  matchId: string,
+  officialId: string,
+  slot: CrewReportSlot,
+): string {
+  const q = new URLSearchParams({ officialId, slot, edit: '1' });
+  return `/matches/${matchId}/file-report?${q.toString()}`;
+}
+
 export function matchReportViewPath(
   matchId: string,
   opts?: { officialId?: string; slot?: ReportAssigneeSlot },
@@ -95,6 +105,17 @@ export function cmoReportPath(
   const base = `/referee/reports/coaching/${matchId}`;
   if (!subjectOfficialId) return base;
   return `${base}?subjectOfficialId=${encodeURIComponent(subjectOfficialId)}`;
+}
+
+/** Scheduler edits an already-submitted CMO report as the original filer. */
+export function assignerCmoReportEditPath(
+  matchId: string,
+  officialId: string,
+  subjectOfficialId?: string,
+): string {
+  const q = new URLSearchParams({ officialId, edit: '1' });
+  if (subjectOfficialId) q.set('subjectOfficialId', subjectOfficialId);
+  return `/referee/reports/coaching/${matchId}?${q.toString()}`;
 }
 
 export function cmoReportViewPath(

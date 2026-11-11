@@ -58,7 +58,7 @@ import {
   ensureMatchReportReady,
   ensureMatchReportReadyForAssignee,
 } from '@/services/reportsLive';
-import type { UserProfile } from '@/domain/types';
+import type { Match, UserProfile } from '@/domain/types';
 import { MatchListRow } from '@/ui/MatchListRow';
 import { useContextualBackBar } from '@/app/shell/contextualBar';
 
@@ -69,6 +69,8 @@ export type AssignerFilingContext = {
   slot: CrewReportSlot;
   officialName: string;
   back: BackNav;
+  /** Archived/imported reports may no longer have a live schedule row. */
+  match?: Match;
 };
 
 function crewFormKind(
@@ -100,7 +102,8 @@ export function MatchReportFlowPage({
   const flowBack = assignerFiling?.back ?? MATCH_REPORTS_BACK;
   const { goBack: exitFlow, backLabel: flowBackLabel } = useAppBack(flowBack);
 
-  const match = state.matches.find((m) => m.id === matchId);
+  const match =
+    state.matches.find((m) => m.id === matchId) ?? assignerFiling?.match;
   const pending = useMemo(() => {
     if (!filingUserId || !matchId) return undefined;
     if (assignerFiling) {
@@ -138,7 +141,6 @@ export function MatchReportFlowPage({
   }, [assignerFiling, filingUserId, matchId, state.matchReports]);
 
   const isEditing =
-    !isAssignerFiling &&
     searchParams.get('edit') === '1' &&
     Boolean(submitted) &&
     !pending;

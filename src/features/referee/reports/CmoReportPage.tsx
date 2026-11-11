@@ -20,6 +20,7 @@ import {
   CMO_SCALE_LABELS,
   CMO_TEMPERATURE_CARD_LABELS,
   cmoComplexityComplete,
+  displayMatchForCmoReport,
   parseAssessedRating,
   validateCmoScales,
   moOfficialIdsOnMatch,
@@ -107,29 +108,70 @@ export function CmoReportPage() {
   const { matchId = '' } = useParams();
   const [searchParams] = useSearchParams();
   const subjectFromQuery = searchParams.get('subjectOfficialId') ?? '';
-  const { currentUser, state, store, dataMode } = useApp();
+  const editOfficialId = searchParams.get('officialId') ?? '';
+  const { currentUser, state, store, dataMode, hasAssignerRole } = useApp();
   const navigate = useNavigate();
+  const isAssignerEditing =
+    hasAssignerRole &&
+    searchParams.get('edit') === '1' &&
+    Boolean(editOfficialId);
   const coachingReportsHref = useAppHref('/referee/reports/coaching');
+  const editBackHref = useAppHref(
+    cmoReportViewPath(matchId, subjectFromQuery || undefined, {
+      officialId: editOfficialId || undefined,
+    }),
+  );
   const coachingReportsBack = useMemo(
-    () => ({ to: coachingReportsHref, label: 'Coaching Reports' }),
-    [coachingReportsHref],
+    () =>
+      isAssignerEditing
+        ? { to: editBackHref, label: 'CMO report' }
+        : { to: coachingReportsHref, label: 'Coaching Reports' },
+    [coachingReportsHref, editBackHref, isAssignerEditing],
   );
   useContextualAppBack(coachingReportsBack);
 
-  const match = resolveMatchForReports(
-    matchId,
-    state.matches,
-    state.outsideCoachingSessions,
+  const editingReport = useMemo(
+    () =>
+      isAssignerEditing
+        ? state.matchReports.find(
+            (r) =>
+              r.matchId === matchId &&
+              r.officialId === editOfficialId &&
+              r.slot === 'cmo' &&
+              r.status === 'submitted' &&
+              (!subjectFromQuery ||
+                r.subjectOfficialId === subjectFromQuery),
+          )
+        : undefined,
+    [
+      editOfficialId,
+      isAssignerEditing,
+      matchId,
+      state.matchReports,
+      subjectFromQuery,
+    ],
   );
+  const match =
+    resolveMatchForReports(
+      matchId,
+      state.matches,
+      state.outsideCoachingSessions,
+    ) ??
+    (editingReport
+      ? displayMatchForCmoReport(editingReport, state.matches)
+      : undefined);
   const outsideSessionId = sessionIdFromOutsideMatchId(matchId);
   const moIds = useMemo(
     () => (match ? moOfficialIdsOnMatch(match) : []),
     [match],
   );
   const effectiveSubjectId =
-    subjectFromQuery || (moIds.length === 1 ? moIds[0]! : '');
+    subjectFromQuery ||
+    editingReport?.subjectOfficialId ||
+    (moIds.length === 1 ? moIds[0]! : '');
 
   const report = useMemo(() => {
+    if (isAssignerEditing) return editingReport;
     if (!currentUser || !matchId || !match || !effectiveSubjectId) {
       return undefined;
     }
@@ -152,6 +194,8 @@ export function CmoReportPage() {
     return hit?.status === 'pending' ? hit : undefined;
   }, [
     currentUser,
+    editingReport,
+    isAssignerEditing,
     matchId,
     match,
     effectiveSubjectId,
@@ -196,6 +240,32 @@ export function CmoReportPage() {
   const [done, setDone] = useState(false);
 
   useEffect(() => {
+    if (!isAssignerEditing || !report?.cmoPayload) return;
+    const p = report.cmoPayload;
+    setScales(p.scales);
+    setComments(p.comments);
+    setPlayedLike(p.playedLike ?? '');
+    setMatchKind(p.matchKind ?? '');
+    setGameTemperature(p.gameTemperature ?? '');
+    setContestBalance(p.contestBalance ?? '');
+    setComplexityFactors(p.complexityFactors ?? []);
+    setComplexityOther(p.complexityOther ?? '');
+    setPenaltyCount(p.penaltyCount ?? '');
+    setAttendedInPerson(p.attendedInPerson ?? '');
+    setVideoLink(p.videoLink ?? '');
+    setKeep(p.keep ?? '');
+    setStart(p.start ?? '');
+    setStop(p.stop ?? '');
+    setOverallComment(p.overallComment ?? '');
+    setAssessedRating(
+      p.assessedRating == null ? '' : String(p.assessedRating),
+    );
+    setGradingConfidence(p.gradingConfidence ?? '');
+    setGradingRationale(p.gradingRationale ?? '');
+  }, [isAssignerEditing, report]);
+
+  useEffect(() => {
+    if (isAssignerEditing) return;
     if (!currentUser || !matchId || !effectiveSubjectId) {
       return;
     }
@@ -217,6 +287,7 @@ export function CmoReportPage() {
     ).catch((err) => console.error('ensureCmoReportReady failed', err));
   }, [
     dataMode,
+    isAssignerEditing,
     currentUser,
     matchId,
     effectiveSubjectId,
@@ -285,7 +356,7 @@ export function CmoReportPage() {
   const goPrev = () => {
     setError(null);
     if (section === 0) {
-      navigate(coachingReportsHref);
+      navigate(isAssignerEditing ? editBackHref : coachingReportsHref);
       return;
     }
     setSection((s) => s - 1);
@@ -330,7 +401,16 @@ export function CmoReportPage() {
       } else {
         store.submitCmoReport(report!.id, payload, effectiveSubjectId);
       }
-      setDone(true);
+      if (isAssignerEditing) {
+        navigate(
+          cmoReportViewPath(matchId, effectiveSubjectId, {
+            officialId: report!.officialId,
+          }),
+          { replace: true },
+        );
+      } else {
+        setDone(true);
+      }
     } catch (err) {
       setError(
         err instanceof Error ? err.message : 'Could not save CMO report.',
@@ -460,7 +540,7 @@ export function CmoReportPage() {
         </button>
       ) : null}
       <Title headingLevel="h2" size="lg" className="rs-cmo-report__title">
-        CMO report
+        {isAssignerEditing ? 'Edit CMO report' : 'CMO report'}
       </Title>
       <p className="rs-match-card__meta">
         {match.homeTeamName} vs {match.awayTeamName} · MO {subjectMoName}
@@ -813,7 +893,11 @@ export function CmoReportPage() {
             Back
           </Button>
           <Button type="submit" variant="primary" className="rs-btn--gold">
-            {section < SECTION_COUNT - 1 ? 'Continue' : 'Submit CMO report'}
+            {section < SECTION_COUNT - 1
+              ? 'Continue'
+              : isAssignerEditing
+                ? 'Update CMO report'
+                : 'Submit CMO report'}
           </Button>
         </div>
       </Form>
